@@ -2,8 +2,15 @@
     "name": "vscode-autocommit",
     "displayName": "AutoCommit",
     "description": "Automatically generate commit messages using Google AI",
-    "version": "0.0.1",
-    "publisher": "IvanK",
+    "version": "0.0.2",
+    "publisher": "VizzleTF",
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/VizzleTF/vscode-autommit.git"
+    },
+    "bugs": {
+        "url": "https://github.com/VizzleTF/vscode-autommit/issues"
+    },
     "engines": {
         "vscode": "^1.75.0"
     },
@@ -15,9 +22,19 @@
         "commands": [
             {
                 "command": "extension.generateCommitMessage",
-                "title": "Generate Commit Message"
+                "title": "Generate Commit Message",
+                "icon": "$(sparkle)"
             }
         ],
+        "menus": {
+            "scm/title": [
+                {
+                    "when": "scmProvider == git",
+                    "command": "extension.generateCommitMessage",
+                    "group": "navigation"
+                }
+            ]
+        },
         "views": {
             "scm": [
                 {
