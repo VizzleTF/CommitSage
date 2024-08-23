@@ -1,0 +1,4 @@
+node_modules*
+vscode-autocommit*
+package-lock.json
+out*
