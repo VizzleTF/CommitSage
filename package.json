@@ -1,0 +1,62 @@
+{
+    "name": "vscode-autocommit",
+    "displayName": "AutoCommit",
+    "description": "Automatically generate commit messages using Google AI",
+    "version": "0.0.1",
+    "publisher": "IvanK",
+    "engines": {
+        "vscode": "^1.75.0"
+    },
+    "categories": [
+        "Other"
+    ],
+    "main": "./out/extension.js",
+    "contributes": {
+        "commands": [
+            {
+                "command": "extension.generateCommitMessage",
+                "title": "Generate Commit Message"
+            }
+        ],
+        "views": {
+            "scm": [
+                {
+                    "id": "autoCommitView",
+                    "name": "AutoCommit"
+                }
+            ]
+        },
+        "configuration": {
+            "title": "AutoCommit",
+            "properties": {
+                "autoCommit.googleApiKey": {
+                    "type": "string",
+                    "default": "",
+                    "description": "API Key for Google AI service"
+                }
+            }
+        }
+    },
+    "scripts": {
+        "vscode:prepublish": "npm run compile",
+        "compile": "tsc -p ./",
+        "watch": "tsc -watch -p ./",
+        "pretest": "npm run compile && npm run lint",
+        "lint": "eslint src --ext ts",
+        "test": "node ./out/test/runTest.js"
+    },
+    "devDependencies": {
+        "@types/vscode": "^1.75.0",
+        "@types/mocha": "^10.0.6",
+        "@types/node": "^20.11.10",
+        "@typescript-eslint/eslint-plugin": "^6.19.1",
+        "@typescript-eslint/parser": "^6.19.1",
+        "eslint": "^8.56.0",
+        "mocha": "^10.2.0",
+        "typescript": "^5.3.3",
+        "@vscode/test-electron": "^2.3.9"
+    },
+    "dependencies": {
+        "axios": "^1.6.7"
+    }
+}
