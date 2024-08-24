@@ -14,7 +14,7 @@ function logError(message: string) {
 export function activate(context: vscode.ExtensionContext) {
     log('AutoCommit extension is now active!');
 
-    const generateCommitMessageCommand = vscode.commands.registerCommand('extension.generateCommitMessage', generateAndSetCommitMessage);
+    const generateCommitMessageCommand = vscode.commands.registerCommand('GemmaCommit.generateCommitMessage', generateAndSetCommitMessage);
 
     const treeDataProvider = new AutoCommitTreeDataProvider();
     const treeView = vscode.window.createTreeView('autoCommitView', { treeDataProvider });
@@ -33,8 +33,8 @@ class AutoCommitTreeDataProvider implements vscode.TreeDataProvider<vscode.TreeI
         } else {
             const generateButton = new vscode.TreeItem("Generate Commit Message");
             generateButton.command = {
-                command: 'extension.generateCommitMessage',
-                title: 'Generate Commit Message'
+                command: 'GemmaCommit.generateCommitMessage',
+                title: 'GemmaCommit: Generate Message'
             };
             return Promise.resolve([generateButton]);
         }
