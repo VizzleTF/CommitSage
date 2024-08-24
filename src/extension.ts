@@ -94,52 +94,62 @@ class AIService {
         return `As an expert developer specializing in creating informative and detailed Git commit messages, your task is to analyze the provided git diff output and generate a comprehensive commit message. ${languageInstruction} Follow these instructions carefully:
     
         1. Analyze the git diff thoroughly:
-        - Identify ALL files that have been modified, added, or deleted.
-        - Understand the nature of EACH change (e.g., feature addition, bug fix, refactoring, documentation update).
-        - Determine the overall purpose or goal of the changes.
-        - Note any significant implementation details or architectural changes across ALL modifications.
-    
-        2. Create a concise commit message with the following structure:
-        - Each line describes a distinct, important change or aspect of the changes.
-        - Start each line with a capitalized verb in the past tense.
-        - Focus on describing what was changed and why, briefly.
-        - Aim to cover the most significant changes.
-    
-        3. Additional guidelines:
-        - Use 1 to 3 lines total, depending on the scope of changes.
-        - No blank lines between the lines of the commit message.
-        - Keep each line between 20-50 characters.
-        - Use extremely concise language, avoiding unnecessary words.
-        - Prioritize breadth over depth - mention more changes rather than explaining few in detail.
-        - Avoid technical jargon unless absolutely necessary.
-        - Do not include specific file names or line numbers from the diff.
-    
-        4. Examples of good commit messages:
-    
+        * Identify ALL files that have been modified, added, or deleted.
+        * Understand the nature of EACH change (e.g., feature addition, bug fix, refactoring, documentation update).
+        * Determine the overall purpose or goal of the changes.
+        * Note any significant implementation details or architectural changes across ALL modifications.
+
+        2. Determine the commit type based on the following conditions:
+        * feature: Only when adding a new feature.
+        * fix: When fixing a bug.
+        * docs: When updating documentation.
+        * style: When changing elements styles or design and/or making changes to the code style (formatting, missing semicolons, etc.) without changing the code logic.
+        * test: When adding or updating tests.
+        * chore: When making changes to the build process or auxiliary tools and libraries.
+        * revert: When undoing a previous commit.
+
+        3. Create a concise commit message with the following structure:
+        * Start with the commit type, followed by a colon and a space.
+        * Each subsequent line describes a distinct, important change or aspect of the changes.
+        * Start each line of the message (after the type) with a capitalized verb in the past tense.
+        * Focus on describing what was changed and why, briefly.
+        * Aim to cover the most significant changes.
+
+        4. Additional guidelines:
+        * Use 1 to 3 lines total (including the type line), depending on the scope of changes.
+        * No blank lines between the lines of the commit message.
+        * Keep each line between 20-50 characters (excluding the type).
+        * Use extremely concise language, avoiding unnecessary words.
+        * Prioritize breadth over depth - mention more changes rather than explaining few in detail.
+        * Avoid technical jargon unless absolutely necessary.
+        * Do not include specific file names or line numbers from the diff.
+
+        5. Examples of good commit messages:
+
         English:
-        Fixed typo in login form validation
-    
-        Added user profile page functionality
-        Implemented avatar upload and cropping
-    
-        Refactored database schema for users
-        Optimized query performance for feeds
+        fix: Fixed typo in login form validation
+
+        feature: Added user profile functionality
+        Implemented avatar upload and crop
+
+        refactor: Reworked user database schema
+        Optimized feed query performance
         Added data migration scripts for v2
-    
+
         Russian:
-        Исправлена опечатка в валидации формы входа
-    
-        Добавлена функциональность страницы профиля
-        Реализована загрузка и обрезка аватара
-    
-        Переработана схема базы данных для пользователей
-        Оптимизирована производительность запросов для лент
-        Добавлены скрипты миграции данных для v2
-    
-        5. Output:
-        - Provide the complete commit message (1-3 lines).
-        - No additional formatting or explanations.
-    
+        fix: Исправлена опечатка в форме входа
+
+        feature: Добавлена страница профиля
+        Реализована загрузка аватара
+
+        refactor: Переработана схема БД пользователей
+        Оптимизированы запросы для лент
+        Добавлены скрипты миграции для v2
+
+        6. Output:
+        * Provide the complete commit message (1-3 lines, including the type).
+        * No additional formatting or explanations.
+
         Git diff to analyze:
         ${diff}
         `;
