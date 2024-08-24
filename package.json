@@ -1,28 +1,30 @@
 {
-    "name": "vscode-autocommit",
-    "displayName": "AutoCommit",
+    "name": "GemmaCommit",
+    "displayName": "GemmaCommit",
     "description": "Automatically generate commit messages using Google AI",
-    "version": "0.0.2",
+    "version": "0.0.3",
     "publisher": "VizzleTF",
     "repository": {
         "type": "git",
-        "url": "https://github.com/VizzleTF/vscode-autommit.git"
+        "url": "https://github.com/VizzleTF/GemmaCommit.git"
     },
     "bugs": {
-        "url": "https://github.com/VizzleTF/vscode-autommit/issues"
+        "url": "https://github.com/VizzleTF/GemmaCommit/issues"
     },
     "engines": {
         "vscode": "^1.75.0"
     },
     "categories": [
-        "Other"
+        "Machine Learning",
+        "Programming Languages"
     ],
-    "main": "./out/extension.js",
+    "icon": "icon.jpg",
+    "main": "./dist/extension.js",
     "contributes": {
         "commands": [
             {
-                "command": "extension.generateCommitMessage",
-                "title": "Generate Commit Message",
+                "command": "GemmaCommit.generateCommitMessage",
+                "title": "GemmaCommit: Generate Message",
                 "icon": "$(sparkle)"
             }
         ],
@@ -30,7 +32,7 @@
             "scm/title": [
                 {
                     "when": "scmProvider == git",
-                    "command": "extension.generateCommitMessage",
+                    "command": "GemmaCommit.generateCommitMessage",
                     "group": "navigation"
                 }
             ]
