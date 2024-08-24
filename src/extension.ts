@@ -3,8 +3,8 @@ import * as child_process from 'child_process';
 import axios from 'axios';
 
 // Constants
-const EXTENSION_NAME = 'GemmaCommit';
-const COMMAND_ID = 'gemmacommit.generateCommitMessage';
+const EXTENSION_NAME = 'GeminiCommit';
+const COMMAND_ID = 'geminicommit.generateCommitMessage';
 const VIEW_ID = 'autoCommitView';
 const API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent";
 
