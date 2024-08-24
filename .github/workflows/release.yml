@@ -15,6 +15,8 @@ jobs:
     steps:
     - name: Checkout code
       uses: actions/checkout@v3
+      with:
+        fetch-depth: 0
 
     - name: Setup Node.js
       uses: actions/setup-node@v3
@@ -34,6 +36,16 @@ jobs:
       id: get_version
       run: echo "VERSION=$(node -p "require('./package.json').version")" >> $GITHUB_OUTPUT
 
+    - name: Generate Release Notes
+      id: release_notes
+      run: |
+        LATEST_TAG=$(git describe --tags --abbrev=0)
+        SECOND_LATEST_TAG=$(git describe --tags --abbrev=0 $LATEST_TAG^)
+        NOTES=$(git log $SECOND_LATEST_TAG..$LATEST_TAG --pretty=format:"- %s")
+        echo "NOTES<<EOF" >> $GITHUB_OUTPUT
+        echo "$NOTES" >> $GITHUB_OUTPUT
+        echo "EOF" >> $GITHUB_OUTPUT
+
     - name: Create Release
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -51,7 +63,7 @@ jobs:
             repo,
             tag_name: tag,
             name: `Release ${tag}`,
-            body: 'Release notes for this version',
+            body: `${{ steps.release_notes.outputs.NOTES }}`,
             draft: false,
             prerelease: false
           });
