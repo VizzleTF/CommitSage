@@ -25,8 +25,8 @@ If you want to build the extension from source, follow these steps:
 
 1. Clone the repository:
    ```
-   git clone https://github.com/yourusername/vscode-autocommit.git
-   cd vscode-autocommit
+   git clone https://github.com/VizzleTF/GemmaCommit.git
+   cd GemmaCommit
    ```
 
 2. Install dependencies:
@@ -78,7 +78,7 @@ Before using the extension, you need to set up your Google AI API key:
 
 ## Known Issues
 
-Please report any issues or suggest improvements on our [GitHub Issues](https://github.com/VizzleTF/vscode-autommit/issues) page.
+Please report any issues or suggest improvements on our [GitHub Issues](https://github.com/VizzleTF/GemmaCommit/issues) page.
 
 ## Contributing
 
@@ -101,7 +101,7 @@ This project is licensed under the MIT License.
 
 ## Support
 
-If you encounter any problems or have any questions, please open an issue on the [GitHub repository](https://github.com/VizzleTF/vscode-autommit/issues).
+If you encounter any problems or have any questions, please open an issue on the [GitHub repository](https://github.com/VizzleTF/GemmaCommit/issues).
 
 ---
 

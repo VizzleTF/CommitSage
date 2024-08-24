@@ -103,7 +103,6 @@ async function generateCommitMessage(status: string, diff: string): Promise<stri
 
     const prompt = `Generate a concise and informative Git commit message based on the following git status and diff output. The commit message should follow this format:
 - First line: A brief summary of changes (max 72 characters)
-- Second line: Blank
 - Subsequent lines: More detailed explanation if necessary (each line max 72 characters)
 
 Avoid excessive newlines and keep the message compact.
