@@ -1,4 +1,4 @@
-name: Create Release
+name: Create Release and Publish to Marketplace
 
 on:
   push:
@@ -72,3 +72,11 @@ jobs:
             console.error(`File not found: ${vsixFile}`);
             core.setFailed(`VSIX file not found: ${vsixFile}`);
           }
+
+    - name: Publish to Visual Studio Marketplace
+      uses: HaaLeo/publish-vscode-extension@v1
+      with:
+        pat: ${{ secrets.VS_MARKETPLACE_TOKEN }}
+        registryUrl: https://marketplace.visualstudio.com
+        extensionFile: ./geminicommit-${{ steps.get_version.outputs.VERSION }}.vsix
+        packagePath: ''
