@@ -8,6 +8,7 @@ GeminiCommit is a Visual Studio Code extension that automatically generates mean
 - Uses Google's Gemini AI for intelligent and context-aware message generation
 - Easy-to-use button in the Source Control view
 - Customizable API key for Google AI integration
+- Supports both English and Russian languages for commit messages
 
 ## Installation
 
@@ -72,6 +73,7 @@ Before using the extension, you need to set up your Google AI API key:
 2. Open VS Code settings (File > Preferences > Settings).
 3. Search for "GeminiCommit" in the settings search bar.
 4. Enter your Google AI API key in the "Gemini Commit: Google Api Key" field.
+5. (Optional) Choose your preferred language for commit messages in the "Gemini Commit: Commit Language" dropdown.
 
 ## Usage
 
@@ -117,6 +119,17 @@ This project is licensed under the MIT License.
 ## Support
 
 If you encounter any problems or have any questions, please open an issue on the [GitHub repository](https://github.com/VizzleTF/GeminiCommit/issues).
+
+---
+
+## Краткая инструкция по установке (на русском)
+
+1. Установите расширение GeminiCommit из [Visual Studio Code Marketplace](https://marketplace.visualstudio.com/items?itemName=VizzleTF.geminicommit).
+2. Получите API ключ Google AI на странице: https://aistudio.google.com/app/apikey
+3. Откройте настройки VS Code (Файл > Параметры > Настройки).
+4. Найдите "GeminiCommit" в строке поиска настроек.
+5. Введите ваш API ключ Google AI в поле "Gemini Commit: Google Api Key".
+6. (Опционально) Выберите предпочитаемый язык для сообщений коммитов в выпадающем списке "Gemini Commit: Commit Language".
 
 ---
 
