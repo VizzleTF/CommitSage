@@ -2,7 +2,7 @@
     "name": "GemmaCommit",
     "displayName": "GemmaCommit",
     "description": "Automatically generate commit messages using Google AI",
-    "version": "0.0.3",
+    "version": "0.0.4",
     "publisher": "VizzleTF",
     "repository": {
         "type": "git",
