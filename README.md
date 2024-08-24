@@ -1,6 +1,6 @@
-# AutoCommit VSCode Extension
+# GeminiCommit VSCode Extension
 
-AutoCommit is a Visual Studio Code extension that automatically generates meaningful commit messages using Google's Gemini AI. This extension simplifies the process of writing clear and descriptive commit messages, saving time and improving the quality of your version control history.
+GeminiCommit is a Visual Studio Code extension that automatically generates meaningful commit messages using Google's Gemini AI. This extension simplifies the process of writing clear and descriptive commit messages, saving time and improving the quality of your version control history.
 
 ## Features
 
@@ -11,7 +11,21 @@ AutoCommit is a Visual Studio Code extension that automatically generates meanin
 
 ## Installation
 
+### Installing from VS Code Marketplace
+
+The easiest way to install GeminiCommit is directly from the Visual Studio Code Marketplace:
+
+1. Open Visual Studio Code
+2. Go to the Extensions view (Ctrl+Shift+X or Cmd+Shift+X on macOS)
+3. Search for "GeminiCommit"
+4. Click on the "Install" button for the GeminiCommit extension by VizzleTF
+
+Alternatively, you can visit the marketplace page directly:
+https://marketplace.visualstudio.com/items?itemName=VizzleTF.geminicommit
+
 ### Installing from VSIX
+
+If you prefer to install from a VSIX file:
 
 1. Download the `.vsix` file from the latest release.
 2. Open Visual Studio Code.
@@ -54,14 +68,15 @@ If you want to build the extension from source, follow these steps:
 
 Before using the extension, you need to set up your Google AI API key:
 
-1. Open VS Code settings (File > Preferences > Settings).
-2. Search for "AutoCommit" in the settings search bar.
-3. Enter your Google AI API key in the "Auto Commit: Google Api Key" field.
+1. Get your Google AI API key from: https://aistudio.google.com/app/apikey
+2. Open VS Code settings (File > Preferences > Settings).
+3. Search for "GeminiCommit" in the settings search bar.
+4. Enter your Google AI API key in the "Gemini Commit: Google Api Key" field.
 
 ## Usage
 
 1. Stage your changes in Git as you normally would.
-2. In the Source Control view, look for the "AutoCommit" section.
+2. In the Source Control view, look for the "GeminiCommit" section.
 3. Click on the "Generate Commit Message" button.
 4. The extension will analyze your staged changes and generate a commit message.
 5. The generated message will be automatically inserted into the commit message input box.
@@ -105,4 +120,4 @@ If you encounter any problems or have any questions, please open an issue on the
 
 ---
 
-Enjoy using AutoCommit! We hope it enhances your development workflow and improves your commit message quality.
+Enjoy using GeminiCommit! We hope it enhances your development workflow and improves your commit message quality.
