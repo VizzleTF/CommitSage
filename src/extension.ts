@@ -5,7 +5,7 @@ import axios from 'axios';
 // Constants
 const EXTENSION_NAME = 'GeminiCommit';
 const COMMAND_ID = 'geminicommit.generateCommitMessage';
-const VIEW_ID = 'autoCommitView';
+const VIEW_ID = 'geminiCommitView';
 const API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent";
 
 // Logger
@@ -57,7 +57,8 @@ class GitService {
 class AIService {
     static async generateCommitMessage(diff: string): Promise<string> {
         const apiKey = this.getApiKey();
-        const prompt = this.generatePrompt(diff);
+        const language = this.getCommitLanguage();
+        const prompt = this.generatePrompt(diff, language);
         const payload = this.createPayload(prompt);
         const headers = this.createHeaders(apiKey);
 
@@ -70,7 +71,7 @@ class AIService {
     }
 
     private static getApiKey(): string {
-        const config = vscode.workspace.getConfiguration('autoCommit');
+        const config = vscode.workspace.getConfiguration('geminiCommit');
         const apiKey = config.get<string>('googleApiKey');
 
         if (!apiKey) {
@@ -80,21 +81,30 @@ class AIService {
         return apiKey;
     }
 
-    private static generatePrompt(diff: string): string {
-        return `As an expert developer specializing in creating informative and detailed Git commit messages, your task is to analyze the provided git diff output and generate a comprehensive commit message. Follow these instructions carefully:
+    private static getCommitLanguage(): string {
+        const config = vscode.workspace.getConfiguration('geminiCommit');
+        return config.get<string>('commitLanguage', 'english');
+    }
 
+    private static generatePrompt(diff: string, language: string): string {
+        const languageInstruction = language === 'russian' ?
+            'Generate the commit message in Russian.' :
+            'Generate the commit message in English.';
+
+        return `As an expert developer specializing in creating informative and detailed Git commit messages, your task is to analyze the provided git diff output and generate a comprehensive commit message. ${languageInstruction} Follow these instructions carefully:
+    
         1. Analyze the git diff thoroughly:
         - Identify ALL files that have been modified, added, or deleted.
         - Understand the nature of EACH change (e.g., feature addition, bug fix, refactoring, documentation update).
         - Determine the overall purpose or goal of the changes.
         - Note any significant implementation details or architectural changes across ALL modifications.
-
+    
         2. Create a concise commit message with the following structure:
         - Each line describes a distinct, important change or aspect of the changes.
-        - Start each line with a capitalized, present-tense verb.
+        - Start each line with a capitalized verb in the past tense.
         - Focus on describing what was changed and why, briefly.
         - Aim to cover the most significant changes.
-
+    
         3. Additional guidelines:
         - Use 1 to 3 lines total, depending on the scope of changes.
         - No blank lines between the lines of the commit message.
@@ -103,25 +113,33 @@ class AIService {
         - Prioritize breadth over depth - mention more changes rather than explaining few in detail.
         - Avoid technical jargon unless absolutely necessary.
         - Do not include specific file names or line numbers from the diff.
-
+    
         4. Examples of good commit messages:
-
-        Single line (for simple changes):
-        Fix typo in login form validation
-
-        Two lines (for moderate changes):
-        Add user profile page functionality
-        Implement avatar upload and cropping
-
-        Three lines (for more complex changes):
-        Refactor database schema for users
-        Optimize query performance for feeds
-        Add data migration scripts for v2
-
+    
+        English:
+        Fixed typo in login form validation
+    
+        Added user profile page functionality
+        Implemented avatar upload and cropping
+    
+        Refactored database schema for users
+        Optimized query performance for feeds
+        Added data migration scripts for v2
+    
+        Russian:
+        Исправлена опечатка в валидации формы входа
+    
+        Добавлена функциональность страницы профиля
+        Реализована загрузка и обрезка аватара
+    
+        Переработана схема базы данных для пользователей
+        Оптимизирована производительность запросов для лент
+        Добавлены скрипты миграции данных для v2
+    
         5. Output:
         - Provide the complete commit message (1-3 lines).
         - No additional formatting or explanations.
-
+    
         Git diff to analyze:
         ${diff}
         `;
@@ -156,7 +174,7 @@ class AIService {
 }
 
 // Tree Data Provider
-class AutoCommitTreeDataProvider implements vscode.TreeDataProvider<vscode.TreeItem> {
+class GeminiCommitTreeDataProvider implements vscode.TreeDataProvider<vscode.TreeItem> {
     getTreeItem(element: vscode.TreeItem): vscode.TreeItem {
         return element;
     }
@@ -218,7 +236,7 @@ export function activate(context: vscode.ExtensionContext) {
 
     const generateCommitMessageCommand = vscode.commands.registerCommand(COMMAND_ID, generateAndSetCommitMessage);
 
-    const treeDataProvider = new AutoCommitTreeDataProvider();
+    const treeDataProvider = new GeminiCommitTreeDataProvider();
     const treeView = vscode.window.createTreeView(VIEW_ID, { treeDataProvider });
 
     context.subscriptions.push(generateCommitMessageCommand, treeView);

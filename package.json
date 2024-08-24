@@ -2,7 +2,7 @@
     "name": "geminicommit",
     "displayName": "GeminiCommit",
     "description": "Automatically generate commit messages using Google AI",
-    "version": "0.0.5",
+    "version": "0.0.7",
     "publisher": "VizzleTF",
     "repository": {
         "type": "git",
@@ -17,6 +17,10 @@
     "categories": [
         "Machine Learning",
         "Programming Languages"
+    ],
+    "activationEvents": [
+        "onCommand:geminicommit.generateCommitMessage",
+        "onView:geminiCommitView"
     ],
     "icon": "icon.jpg",
     "main": "./dist/extension.js",
@@ -40,18 +44,27 @@
         "views": {
             "scm": [
                 {
-                    "id": "autoCommitView",
-                    "name": "AutoCommit"
+                    "id": "geminiCommitView",
+                    "name": "GeminiCommit"
                 }
             ]
         },
         "configuration": {
-            "title": "AutoCommit",
+            "title": "GeminiCommit",
             "properties": {
-                "autoCommit.googleApiKey": {
+                "geminiCommit.googleApiKey": {
                     "type": "string",
                     "default": "",
                     "description": "API Key for Google AI service"
+                },
+                "geminiCommit.commitLanguage": {
+                    "type": "string",
+                    "enum": [
+                        "english",
+                        "russian"
+                    ],
+                    "default": "english",
+                    "description": "Language for generated commit messages"
                 }
             }
         }
@@ -62,7 +75,8 @@
         "watch": "tsc -watch -p ./",
         "pretest": "npm run compile && npm run lint",
         "lint": "eslint src --ext ts",
-        "test": "node ./out/test/runTest.js"
+        "test": "node ./out/test/runTest.js",
+        "package": "vsce package"
     },
     "devDependencies": {
         "@types/vscode": "^1.75.0",
@@ -73,7 +87,8 @@
         "eslint": "^8.56.0",
         "mocha": "^10.2.0",
         "typescript": "^5.3.3",
-        "@vscode/test-electron": "^2.3.9"
+        "@vscode/test-electron": "^2.3.9",
+        "vsce": "^2.15.0"
     },
     "dependencies": {
         "axios": "^1.6.7"

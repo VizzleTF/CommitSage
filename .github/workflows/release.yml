@@ -1,0 +1,74 @@
+name: Create Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+  packages: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: '18'
+
+    - name: Install dependencies
+      run: npm install
+
+    - name: Compile extension
+      run: npm run compile
+
+    - name: Package extension
+      run: npm run package
+
+    - name: Get version from package.json
+      id: get_version
+      run: echo "VERSION=$(node -p "require('./package.json').version")" >> $GITHUB_OUTPUT
+
+    - name: Create Release
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        VERSION: ${{ steps.get_version.outputs.VERSION }}
+      uses: actions/github-script@v6
+      with:
+        script: |
+          const fs = require('fs');
+          const { repo: { owner, repo }, sha } = context;
+          const tag = context.ref.substring(10); // remove 'refs/tags/'
+          console.log(`Creating release for version ${process.env.VERSION}`);
+          
+          const release = await github.rest.repos.createRelease({
+            owner,
+            repo,
+            tag_name: tag,
+            name: `Release ${tag}`,
+            body: 'Release notes for this version',
+            draft: false,
+            prerelease: false
+          });
+          
+          const vsixFile = `geminicommit-${process.env.VERSION}.vsix`;
+          console.log(`Looking for file: ${vsixFile}`);
+          
+          if (fs.existsSync(vsixFile)) {
+            const asset = await github.rest.repos.uploadReleaseAsset({
+              owner,
+              repo,
+              release_id: release.data.id,
+              name: vsixFile,
+              data: fs.readFileSync(vsixFile)
+            });
+            console.log(`Asset uploaded: ${asset.data.browser_download_url}`);
+          } else {
+            console.error(`File not found: ${vsixFile}`);
+            core.setFailed(`VSIX file not found: ${vsixFile}`);
+          }
