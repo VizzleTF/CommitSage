@@ -2,7 +2,7 @@
     "name": "geminicommit",
     "displayName": "GeminiCommit",
     "description": "Automatically generate commit messages using Google AI",
-    "version": "0.0.10",
+    "version": "0.0.11",
     "publisher": "VizzleTF",
     "repository": {
         "type": "git",
@@ -22,7 +22,7 @@
         "onCommand:geminicommit.generateCommitMessage",
         "onView:geminiCommitView"
     ],
-    "icon": "icon.jpg",
+    "icon": "icon.png",
     "main": "./dist/extension.js",
     "contributes": {
         "commands": [
