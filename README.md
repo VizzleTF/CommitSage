@@ -1,4 +1,4 @@
-# GeminiCommit VSCode Extension
+# [GeminiCommit VSCode Extension](https://github.com/VizzleTF/GeminiCommit)
 
 GeminiCommit is a Visual Studio Code extension that automatically generates meaningful commit messages using Google's Gemini AI. This extension simplifies the process of writing clear and descriptive commit messages, saving time and improving the quality of your version control history.
 
