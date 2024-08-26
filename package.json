@@ -16,7 +16,16 @@
     },
     "categories": [
         "Machine Learning",
-        "Programming Languages"
+        "Programming Languages",
+        "AI"
+    ],
+    "tags": [
+        "Machine Learning",
+        "Programming Languages",
+        "AI Assistant",
+        "AI",
+        "Autocommit",
+        "Git"
     ],
     "activationEvents": [
         "onCommand:geminicommit.generateCommitMessage",
