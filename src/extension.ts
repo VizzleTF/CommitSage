@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 import * as child_process from 'child_process';
 import axios from 'axios';
+import { longCommitInstructions, shortCommitInstructions } from './commitInstructions';
 
 // Constants
 const EXTENSION_NAME = 'GeminiCommit';
@@ -54,11 +55,13 @@ class GitService {
 }
 
 // AI Service
+
 class AIService {
     static async generateCommitMessage(diff: string): Promise<string> {
         const apiKey = this.getApiKey();
         const language = this.getCommitLanguage();
-        const prompt = this.generatePrompt(diff, language);
+        const messageLength = this.getCommitMessageLength();
+        const prompt = this.generatePrompt(diff, language, messageLength);
         const payload = this.createPayload(prompt);
         const headers = this.createHeaders(apiKey);
 
@@ -86,69 +89,19 @@ class AIService {
         return config.get<string>('commitLanguage', 'english');
     }
 
-    private static generatePrompt(diff: string, language: string): string {
+    private static getCommitMessageLength(): string {
+        const config = vscode.workspace.getConfiguration('geminiCommit');
+        return config.get<string>('commitMessageLength', 'long');
+    }
+
+    private static generatePrompt(diff: string, language: string, messageLength: string): string {
         const languageInstruction = language === 'russian' ?
             'Generate the commit message in Russian.' :
             'Generate the commit message in English.';
 
-        return `As an expert developer specializing in creating informative and detailed Git commit messages, your task is to analyze the provided git diff output and generate a comprehensive commit message. ${languageInstruction} Follow these instructions carefully:
-    
-        1. Analyze the git diff thoroughly:
-        * Identify ALL files that have been modified, added, or deleted.
-        * Understand the nature of EACH change (e.g., feature addition, bug fix, refactoring, documentation update).
-        * Determine the overall purpose or goal of the changes.
-        * Note any significant implementation details or architectural changes across ALL modifications.
+        const instructions = messageLength === 'short' ? shortCommitInstructions : longCommitInstructions;
 
-        2. Determine the commit type based on the following conditions:
-        * feature: Only when adding a new feature.
-        * fix: When fixing a bug.
-        * docs: When updating documentation.
-        * style: When changing elements styles or design and/or making changes to the code style (formatting, missing semicolons, etc.) without changing the code logic.
-        * test: When adding or updating tests.
-        * chore: When making changes to the build process or auxiliary tools and libraries.
-        * revert: When undoing a previous commit.
-
-        3. Create a concise commit message with the following structure:
-        * Start with the commit type, followed by a colon and a space.
-        * Each subsequent line describes a distinct, important change or aspect of the changes.
-        * Start each line of the message (after the type) with a capitalized verb in the past tense.
-        * Focus on describing what was changed and why, briefly.
-        * Aim to cover the most significant changes.
-
-        4. Additional guidelines:
-        * Use 1 to 3 lines total (including the type line), depending on the scope of changes.
-        * No blank lines between the lines of the commit message.
-        * Keep each line between 20-50 characters (excluding the type).
-        * Use extremely concise language, avoiding unnecessary words.
-        * Prioritize breadth over depth - mention more changes rather than explaining few in detail.
-        * Avoid technical jargon unless absolutely necessary.
-        * Do not include specific file names or line numbers from the diff.
-
-        5. Examples of good commit messages:
-
-        English:
-        fix: Fixed typo in login form validation
-
-        feature: Added user profile functionality
-        Implemented avatar upload and crop
-
-        refactor: Reworked user database schema
-        Optimized feed query performance
-        Added data migration scripts for v2
-
-        Russian:
-        fix: Исправлена опечатка в форме входа
-
-        feature: Добавлена страница профиля
-        Реализована загрузка аватара
-
-        refactor: Переработана схема БД пользователей
-        Оптимизированы запросы для лент
-        Добавлены скрипты миграции для v2
-
-        6. Output:
-        * Provide the complete commit message (1-3 lines, including the type).
-        * No additional formatting or explanations.
+        return `${instructions.replace('{languageInstruction}', languageInstruction)}
 
         Git diff to analyze:
         ${diff}
