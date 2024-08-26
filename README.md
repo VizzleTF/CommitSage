@@ -9,6 +9,7 @@ GeminiCommit is a Visual Studio Code extension that automatically generates mean
 - Easy-to-use button in the Source Control view
 - Customizable API key for Google AI integration
 - Supports both English and Russian languages for commit messages
+- Choose between short and long commit message styles
 
 ## Installation
 
@@ -67,13 +68,22 @@ If you want to build the extension from source, follow these steps:
 
 ## Configuration
 
-Before using the extension, you need to set up your Google AI API key:
+Before using the extension, you need to set up your Google AI API key and configure your preferences:
 
 1. Get your Google AI API key from: https://aistudio.google.com/app/apikey
 2. Open VS Code settings (File > Preferences > Settings).
 3. Search for "GeminiCommit" in the settings search bar.
 4. Enter your Google AI API key in the "Gemini Commit: Google Api Key" field.
 5. (Optional) Choose your preferred language for commit messages in the "Gemini Commit: Commit Language" dropdown.
+6. (Optional) Select your preferred commit message length in the "Gemini Commit: Commit Message Length" dropdown.
+
+### Available Settings
+
+- **Gemini Commit: Google Api Key**: Your Google AI API key for accessing the Gemini AI service.
+- **Gemini Commit: Commit Language**: Choose between "english" and "russian" for the language of generated commit messages.
+- **Gemini Commit: Commit Message Length**: Choose between "short" and "long" for the style of generated commit messages.
+  - Short: Concise, single-line commit messages (up to 50 characters).
+  - Long: More detailed commit messages with up to 3 lines, providing more context about the changes.
 
 ## Usage
 
@@ -130,6 +140,7 @@ If you encounter any problems or have any questions, please open an issue on the
 4. Найдите "GeminiCommit" в строке поиска настроек.
 5. Введите ваш API ключ Google AI в поле "Gemini Commit: Google Api Key".
 6. (Опционально) Выберите предпочитаемый язык для сообщений коммитов в выпадающем списке "Gemini Commit: Commit Language".
+7. (Опционально) Выберите предпочитаемую длину сообщений коммитов в выпадающем списке "Gemini Commit: Commit Message Length".
 
 ---
 
