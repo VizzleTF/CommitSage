@@ -2,7 +2,7 @@
     "name": "geminicommit",
     "displayName": "GeminiCommit",
     "description": "Automatically generate commit messages using Google AI",
-    "version": "0.0.12",
+    "version": "1.0.0",
     "publisher": "VizzleTF",
     "repository": {
         "type": "git",
@@ -65,6 +65,15 @@
                     ],
                     "default": "english",
                     "description": "Language for generated commit messages"
+                },
+                "geminiCommit.commitMessageLength": {
+                    "type": "string",
+                    "enum": [
+                        "short",
+                        "long"
+                    ],
+                    "default": "long",
+                    "description": "Length of generated commit messages"
                 }
             }
         }
