@@ -31,7 +31,21 @@ export const longCommitInstructions = `As an expert developer specializing in cr
 * Avoid technical jargon unless absolutely necessary.
 * Do not include specific file names or line numbers from the diff.
 
-5. Output:
+5. FewShots examples:
+Example 1:
+feature: Added user statistics calc
+Implemented data aggregation
+Optimized query performance
+
+Example 2:
+fix: Resolved login button issue
+Improved mobile responsiveness
+
+Example 3:
+docs: Updated API authentication docs
+Clarified OAuth2 flow steps
+
+6. Output:
 * Provide the complete commit message (1-3 lines, including the type).
 * No additional formatting or explanations.`;
 
@@ -50,4 +64,20 @@ refactor: When restructuring code without changing its external behavior, or is 
 - Do not add any issues numeration, explain your output nor introduce your answer.
 - Output directly only one commit message in plain text with the next format: type: commit_message.
 - Be as concise as possible, keep the message under 50 characters.
+
+FewShots examples:
+Example 1:
+Diff: Added user profile page and avatar upload feature
+Output: feat: Add user profile and avatar upload
+
+Example 2:
+Diff: Fixed a critical security vulnerability in the authentication system
+Output: fix: Patch auth system security flaw
+
+Example 3:
+Diff: Updated the README with new installation instructions
+Output: docs: Update README installation guide
+
 {languageInstruction}`;
+
+export const customInstructions = "{customInstructions}";
