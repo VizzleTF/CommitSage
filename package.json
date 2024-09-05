@@ -128,7 +128,8 @@
         "minimatch": "3.0.4",
         "mocha": "^10.2.0",
         "typescript": "^5.3.3",
-        "@vscode/test-electron": "^2.3.9"
+        "@vscode/test-electron": "^2.3.9",
+        "@vscode/vsce": "^3.1.0"
     },
     "dependencies": {
         "axios": "^1.6.7"
