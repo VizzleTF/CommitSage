@@ -1,13 +1,14 @@
 import * as vscode from 'vscode';
 import * as child_process from 'child_process';
 import axios from 'axios';
-import { longCommitInstructions, shortCommitInstructions } from './commitInstructions';
+import { longCommitInstructions, shortCommitInstructions, customInstructions } from './commitInstructions';
 
 // Constants
 const EXTENSION_NAME = 'GeminiCommit';
 const COMMAND_ID = 'geminicommit.generateCommitMessage';
 const VIEW_ID = 'geminiCommitView';
-const API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent";
+const GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent";
+const COHERE_API_URL = "https://api.cohere.ai/v1/generate";
 
 // Logger
 class Logger {
@@ -55,33 +56,34 @@ class GitService {
 }
 
 // AI Service
-
 class AIService {
     static async generateCommitMessage(diff: string): Promise<string> {
-        const apiKey = this.getApiKey();
+        const aiProvider = this.getAIProvider();
         const language = this.getCommitLanguage();
         const messageLength = this.getCommitMessageLength();
         const prompt = this.generatePrompt(diff, language, messageLength);
-        const payload = this.createPayload(prompt);
-        const headers = this.createHeaders(apiKey);
 
-        try {
-            const response = await axios.post(API_URL, payload, { headers });
-            return this.cleanCommitMessage(response.data.candidates[0].content.parts[0].text);
-        } catch (error) {
-            throw new Error(`Error calling Google AI API: ${error}`);
+        if (aiProvider === 'gemini') {
+            return this.generateWithGemini(prompt);
+        } else {
+            return this.generateWithCohere(prompt);
         }
     }
 
-    private static getApiKey(): string {
+    private static getAIProvider(): string {
         const config = vscode.workspace.getConfiguration('geminiCommit');
-        const apiKey = config.get<string>('googleApiKey');
+        return config.get<string>('aiProvider', 'gemini');
+    }
 
-        if (!apiKey) {
-            throw new Error('Google API key is not set. Please set it in the extension settings.');
+    private static getApiKey(provider: string): string {
+        const config = vscode.workspace.getConfiguration('geminiCommit');
+        const key = provider === 'gemini' ? config.get<string>('googleApiKey') : config.get<string>('cohereApiKey');
+
+        if (!key) {
+            throw new Error(`${provider.charAt(0).toUpperCase() + provider.slice(1)} API key is not set. Please set it in the extension settings.`);
         }
 
-        return apiKey;
+        return key;
     }
 
     private static getCommitLanguage(): string {
@@ -94,22 +96,40 @@ class AIService {
         return config.get<string>('commitMessageLength', 'long');
     }
 
+    private static getCustomInstructions(): string {
+        const config = vscode.workspace.getConfiguration('geminiCommit');
+        return config.get<string>('customInstructions', '');
+    }
+
     private static generatePrompt(diff: string, language: string, messageLength: string): string {
         const languageInstruction = language === 'russian' ?
             'Generate the commit message in Russian.' :
             'Generate the commit message in English.';
 
-        const instructions = messageLength === 'short' ? shortCommitInstructions : longCommitInstructions;
+        let instructions;
+        switch (messageLength) {
+            case 'short':
+                instructions = shortCommitInstructions;
+                break;
+            case 'custom':
+                instructions = customInstructions.replace('{customInstructions}', this.getCustomInstructions());
+                break;
+            case 'long':
+            default:
+                instructions = longCommitInstructions;
+        }
 
         return `${instructions.replace('{languageInstruction}', languageInstruction)}
 
         Git diff to analyze:
         ${diff}
-        `;
+        
+        Please provide ONLY the commit message, without any additional text or explanations.`;
     }
 
-    private static createPayload(prompt: string) {
-        return {
+    private static async generateWithGemini(prompt: string): Promise<string> {
+        const apiKey = this.getApiKey('gemini');
+        const payload = {
             contents: [{ parts: [{ text: prompt }] }],
             generationConfig: {
                 temperature: 0.7,
@@ -118,13 +138,44 @@ class AIService {
                 maxOutputTokens: 1024,
             },
         };
-    }
-
-    private static createHeaders(apiKey: string) {
-        return {
+        const headers = {
             'Content-Type': 'application/json',
             'x-goog-api-key': apiKey
         };
+
+        try {
+            const response = await axios.post(GEMINI_API_URL, payload, { headers });
+            return this.cleanCommitMessage(response.data.candidates[0].content.parts[0].text);
+        } catch (error) {
+            throw new Error(`Error calling Gemini AI API: ${error}`);
+        }
+    }
+
+    private static async generateWithCohere(prompt: string): Promise<string> {
+        const apiKey = this.getApiKey('cohere');
+        const payload = {
+            model: 'command',
+            prompt: prompt,
+            max_tokens: 100,
+            temperature: 0.7,
+            k: 0,
+            p: 0.75,
+            frequency_penalty: 0,
+            presence_penalty: 0,
+            stop_sequences: [],
+            return_likelihoods: 'NONE'
+        };
+        const headers = {
+            'Authorization': `Bearer ${apiKey}`,
+            'Content-Type': 'application/json',
+        };
+
+        try {
+            const response = await axios.post(COHERE_API_URL, payload, { headers });
+            return this.cleanCommitMessage(response.data.generations[0].text);
+        } catch (error) {
+            throw new Error(`Error calling Cohere AI API: ${error}`);
+        }
     }
 
     private static cleanCommitMessage(message: string): string {
