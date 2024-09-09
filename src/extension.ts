@@ -116,7 +116,7 @@ class AIService {
                 break;
             case 'long':
             default:
-                instructions = longCommitInstructions;
+                instructions = shortCommitInstructions;
         }
 
         return `${instructions.replace('{languageInstruction}', languageInstruction)}
