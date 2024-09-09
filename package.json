@@ -2,7 +2,7 @@
     "name": "geminicommit",
     "displayName": "GeminiCommit",
     "description": "Automatically generate commit messages using AI",
-    "version": "1.1.3",
+    "version": "1.1.4",
     "publisher": "VizzleTF",
     "repository": {
         "type": "git",
@@ -38,7 +38,7 @@
             {
                 "command": "geminicommit.generateCommitMessage",
                 "title": "GeminiCommit: Generate Message",
-                "icon": "$(sparkle)"
+                "icon": "$(rocket)"
             }
         ],
         "menus": {
@@ -61,24 +61,20 @@
         "configuration": {
             "title": "GeminiCommit",
             "properties": {
-                "geminiCommit.aiProvider": {
-                    "type": "string",
-                    "enum": [
-                        "gemini",
-                        "cohere"
-                    ],
-                    "default": "gemini",
-                    "description": "Select AI provider for commit message generation"
-                },
                 "geminiCommit.googleApiKey": {
                     "type": "string",
                     "default": "",
                     "description": "API Key for Google AI service"
                 },
-                "geminiCommit.cohereApiKey": {
+                "geminiCommit.geminiModel": {
                     "type": "string",
-                    "default": "",
-                    "description": "API Key for Cohere AI service"
+                    "enum": [
+                        "gemini-1.0-pro",
+                        "gemini-1.5-pro",
+                        "gemini-1.5-flash"
+                    ],
+                    "default": "gemini-1.5-flash",
+                    "description": "Select Gemini model for commit message generation. Options: gemini-1.0-pro, gemini-1.5-pro, gemini-1.5-flash"
                 },
                 "geminiCommit.commitLanguage": {
                     "type": "string",

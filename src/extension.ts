@@ -7,8 +7,6 @@ import { longCommitInstructions, shortCommitInstructions, customInstructions } f
 const EXTENSION_NAME = 'GeminiCommit';
 const COMMAND_ID = 'geminicommit.generateCommitMessage';
 const VIEW_ID = 'geminiCommitView';
-const GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent";
-const COHERE_API_URL = "https://api.cohere.ai/v1/generate";
 
 // Logger
 class Logger {
@@ -58,32 +56,27 @@ class GitService {
 // AI Service
 class AIService {
     static async generateCommitMessage(diff: string): Promise<string> {
-        const aiProvider = this.getAIProvider();
         const language = this.getCommitLanguage();
         const messageLength = this.getCommitMessageLength();
         const prompt = this.generatePrompt(diff, language, messageLength);
 
-        if (aiProvider === 'gemini') {
-            return this.generateWithGemini(prompt);
-        } else {
-            return this.generateWithCohere(prompt);
-        }
+        return this.generateWithGemini(prompt);
     }
 
-    private static getAIProvider(): string {
+    private static getApiKey(): string {
         const config = vscode.workspace.getConfiguration('geminiCommit');
-        return config.get<string>('aiProvider', 'gemini');
-    }
-
-    private static getApiKey(provider: string): string {
-        const config = vscode.workspace.getConfiguration('geminiCommit');
-        const key = provider === 'gemini' ? config.get<string>('googleApiKey') : config.get<string>('cohereApiKey');
+        const key = config.get<string>('googleApiKey');
 
         if (!key) {
-            throw new Error(`${provider.charAt(0).toUpperCase() + provider.slice(1)} API key is not set. Please set it in the extension settings.`);
+            throw new Error('Google API key is not set. Please set it in the extension settings.');
         }
 
         return key;
+    }
+
+    private static getGeminiModel(): string {
+        const config = vscode.workspace.getConfiguration('geminiCommit');
+        return config.get<string>('geminiModel', 'gemini-1.5-flash');
     }
 
     private static getCommitLanguage(): string {
@@ -116,7 +109,7 @@ class AIService {
                 break;
             case 'long':
             default:
-                instructions = shortCommitInstructions;
+                instructions = longCommitInstructions;
         }
 
         return `${instructions.replace('{languageInstruction}', languageInstruction)}
@@ -128,7 +121,10 @@ class AIService {
     }
 
     private static async generateWithGemini(prompt: string): Promise<string> {
-        const apiKey = this.getApiKey('gemini');
+        const apiKey = this.getApiKey();
+        const model = this.getGeminiModel();
+        const GEMINI_API_URL = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
+
         const payload = {
             contents: [{ parts: [{ text: prompt }] }],
             generationConfig: {
@@ -148,33 +144,6 @@ class AIService {
             return this.cleanCommitMessage(response.data.candidates[0].content.parts[0].text);
         } catch (error) {
             throw new Error(`Error calling Gemini AI API: ${error}`);
-        }
-    }
-
-    private static async generateWithCohere(prompt: string): Promise<string> {
-        const apiKey = this.getApiKey('cohere');
-        const payload = {
-            model: 'command',
-            prompt: prompt,
-            max_tokens: 100,
-            temperature: 0.7,
-            k: 0,
-            p: 0.75,
-            frequency_penalty: 0,
-            presence_penalty: 0,
-            stop_sequences: [],
-            return_likelihoods: 'NONE'
-        };
-        const headers = {
-            'Authorization': `Bearer ${apiKey}`,
-            'Content-Type': 'application/json',
-        };
-
-        try {
-            const response = await axios.post(COHERE_API_URL, payload, { headers });
-            return this.cleanCommitMessage(response.data.generations[0].text);
-        } catch (error) {
-            throw new Error(`Error calling Cohere AI API: ${error}`);
         }
     }
 
