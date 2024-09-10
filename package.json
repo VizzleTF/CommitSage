@@ -12,7 +12,7 @@
         "url": "https://github.com/VizzleTF/GeminiCommit/issues"
     },
     "engines": {
-        "vscode": "^1.80.0"
+        "vscode": "^1.93.0"
     },
     "categories": [
         "Machine Learning",
@@ -113,14 +113,14 @@
         "package": "vsce package"
     },
     "devDependencies": {
-        "@types/vscode": "^1.80.0",
-        "@types/glob": "7.1.3",
-        "@types/mocha": "^10.0.6",
+        "@types/vscode": "^1.93.0",
+        "@types/glob": "7.2.0",
+        "@types/mocha": "^10.0.7",
         "@types/node": "^20.11.10",
         "eslint": "^8.56.0",
-        "@typescript-eslint/eslint-plugin": "^6.19.1",
+        "@typescript-eslint/eslint-plugin": "^7.0.0",
         "@typescript-eslint/parser": "^6.19.1",
-        "glob": "^7.1.6",
+        "glob": "^8.1.0",
         "minimatch": "3.1.2",
         "mocha": "^10.2.0",
         "typescript": "^5.3.3",
