@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 import * as child_process from 'child_process';
-import axios from 'axios';
+import axios, { AxiosError } from 'axios';
 import { longCommitInstructions, shortCommitInstructions, customInstructions } from './commitInstructions';
 
 // Constants
@@ -55,6 +55,9 @@ class GitService {
 
 // AI Service
 class AIService {
+    private static MAX_RETRIES = 3;
+    private static RETRY_DELAY = 1000; // 1 second
+
     static async generateCommitMessage(diff: string): Promise<string> {
         const language = this.getCommitLanguage();
         const messageLength = this.getCommitMessageLength();
@@ -139,12 +142,44 @@ class AIService {
             'x-goog-api-key': apiKey
         };
 
-        try {
-            const response = await axios.post(GEMINI_API_URL, payload, { headers });
-            return this.cleanCommitMessage(response.data.candidates[0].content.parts[0].text);
-        } catch (error) {
-            throw new Error(`Error calling Gemini AI API: ${error}`);
+        for (let attempt = 1; attempt <= this.MAX_RETRIES; attempt++) {
+            try {
+                const response = await axios.post(GEMINI_API_URL, payload, { headers });
+                return this.cleanCommitMessage(response.data.candidates[0].content.parts[0].text);
+            } catch (error) {
+                if (attempt === this.MAX_RETRIES) {
+                    this.logError(error);
+                    throw new Error(`Failed to generate commit message after ${this.MAX_RETRIES} attempts: ${this.getErrorMessage(error)}`);
+                }
+                console.warn(`Attempt ${attempt} failed. Retrying in ${this.RETRY_DELAY / 1000} seconds...`);
+                await this.delay(this.RETRY_DELAY);
+            }
         }
+        throw new Error('Unexpected error occurred');
+    }
+
+    private static delay(ms: number): Promise<void> {
+        return new Promise(resolve => setTimeout(resolve, ms));
+    }
+
+    private static logError(error: unknown): void {
+        if (axios.isAxiosError(error)) {
+            console.error('Axios error:', {
+                message: error.message,
+                response: error.response?.data,
+                status: error.response?.status,
+                headers: error.response?.headers,
+            });
+        } else {
+            console.error('Non-Axios error:', error);
+        }
+    }
+
+    private static getErrorMessage(error: unknown): string {
+        if (axios.isAxiosError(error)) {
+            return `${error.message} (Status: ${error.response?.status})`;
+        }
+        return error instanceof Error ? error.message : String(error);
     }
 
     private static cleanCommitMessage(message: string): string {
