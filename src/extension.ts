@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 import * as child_process from 'child_process';
-import axios, { AxiosError } from 'axios';
+import axios from 'axios';
 import { longCommitInstructions, shortCommitInstructions, customInstructions } from './commitInstructions';
 
 // Constants
@@ -57,13 +57,24 @@ class GitService {
 class AIService {
     private static MAX_RETRIES = 3;
     private static RETRY_DELAY = 1000; // 1 second
+    private static MAX_DIFF_LENGTH = 10000; // Limit diff to 10000 characters
 
     static async generateCommitMessage(diff: string): Promise<string> {
         const language = this.getCommitLanguage();
         const messageLength = this.getCommitMessageLength();
-        const prompt = this.generatePrompt(diff, language, messageLength);
+        const truncatedDiff = this.truncateDiff(diff);
+        const prompt = this.generatePrompt(truncatedDiff, language, messageLength);
 
         return this.generateWithGemini(prompt);
+    }
+
+    private static truncateDiff(diff: string): string {
+        if (diff.length > this.MAX_DIFF_LENGTH) {
+            console.log(`Original diff length: ${diff.length}. Truncating to ${this.MAX_DIFF_LENGTH} characters.`);
+            return diff.substring(0, this.MAX_DIFF_LENGTH) + "\n...(truncated)";
+        }
+        console.log(`Diff length: ${diff.length} characters`);
+        return diff;
     }
 
     private static getApiKey(): string {
@@ -144,14 +155,21 @@ class AIService {
 
         for (let attempt = 1; attempt <= this.MAX_RETRIES; attempt++) {
             try {
+                console.log(`Attempt ${attempt}: Sending request to Gemini API`);
                 const response = await axios.post(GEMINI_API_URL, payload, { headers });
+                console.log('Gemini API response received successfully');
                 return this.cleanCommitMessage(response.data.candidates[0].content.parts[0].text);
             } catch (error) {
+                console.error(`Attempt ${attempt} failed:`, error);
+                if (axios.isAxiosError(error) && error.response) {
+                    console.error('Error data:', error.response.data);
+                    console.error('Error status:', error.response.status);
+                    console.error('Error headers:', error.response.headers);
+                }
                 if (attempt === this.MAX_RETRIES) {
-                    this.logError(error);
                     throw new Error(`Failed to generate commit message after ${this.MAX_RETRIES} attempts: ${this.getErrorMessage(error)}`);
                 }
-                console.warn(`Attempt ${attempt} failed. Retrying in ${this.RETRY_DELAY / 1000} seconds...`);
+                console.warn(`Retrying in ${this.RETRY_DELAY / 1000} seconds...`);
                 await this.delay(this.RETRY_DELAY);
             }
         }
@@ -162,22 +180,12 @@ class AIService {
         return new Promise(resolve => setTimeout(resolve, ms));
     }
 
-    private static logError(error: unknown): void {
-        if (axios.isAxiosError(error)) {
-            console.error('Axios error:', {
-                message: error.message,
-                response: error.response?.data,
-                status: error.response?.status,
-                headers: error.response?.headers,
-            });
-        } else {
-            console.error('Non-Axios error:', error);
-        }
-    }
-
     private static getErrorMessage(error: unknown): string {
         if (axios.isAxiosError(error)) {
-            return `${error.message} (Status: ${error.response?.status})`;
+            if (error.response) {
+                return `${error.message} (Status: ${error.response.status}). Response data: ${JSON.stringify(error.response.data)}`;
+            }
+            return error.message;
         }
         return error instanceof Error ? error.message : String(error);
     }
@@ -216,7 +224,7 @@ async function generateAndSetCommitMessage() {
     try {
         Logger.log('Fetching Git diff...');
         const diff = await GitService.getDiff();
-        Logger.log('Git diff fetched successfully');
+        Logger.log(`Git diff fetched successfully. Length: ${diff.length} characters`);
 
         Logger.log('Generating commit message...');
         const commitMessage = await AIService.generateCommitMessage(diff);
@@ -227,6 +235,7 @@ async function generateAndSetCommitMessage() {
         Logger.log('Commit message set successfully');
     } catch (error) {
         Logger.error(`Error in command execution: ${error}`);
+        vscode.window.showErrorMessage(`Failed to generate commit message: ${error}`);
     }
 }
 

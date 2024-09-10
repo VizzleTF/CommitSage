@@ -9,7 +9,8 @@ GeminiCommit is a Visual Studio Code extension that automatically generates mean
 - Easy-to-use button in the Source Control view
 - Customizable API key for Google AI integration
 - Supports both English and Russian languages for commit messages
-- Choose between short and long commit message styles
+- Choose between short, long, and custom commit message styles
+- Select from different Gemini AI models for message generation
 
 ## Installation
 
@@ -76,27 +77,31 @@ Before using the extension, you need to set up your Google AI API key and config
 4. Enter your Google AI API key in the "Gemini Commit: Google Api Key" field.
 5. (Optional) Choose your preferred language for commit messages in the "Gemini Commit: Commit Language" dropdown.
 6. (Optional) Select your preferred commit message length in the "Gemini Commit: Commit Message Length" dropdown.
+7. (Optional) Choose your preferred Gemini AI model in the "Gemini Commit: Gemini Model" dropdown.
 
 ### Available Settings
 
 - **Gemini Commit: Google Api Key**: Your Google AI API key for accessing the Gemini AI service.
 - **Gemini Commit: Commit Language**: Choose between "english" and "russian" for the language of generated commit messages.
-- **Gemini Commit: Commit Message Length**: Choose between "short" and "long" for the style of generated commit messages.
+- **Gemini Commit: Commit Message Length**: Choose between "short", "long", and "custom" for the style of generated commit messages.
   - Short: Concise, single-line commit messages (up to 50 characters).
   - Long: More detailed commit messages with up to 3 lines, providing more context about the changes.
+  - Custom: Use your own custom instructions for generating commit messages.
+- **Gemini Commit: Gemini Model**: Select the Gemini AI model to use for generating commit messages. Options include "gemini-1.0-pro", "gemini-1.5-pro", and "gemini-1.5-flash".
+- **Gemini Commit: Custom Instructions**: If you selected "custom" for the commit message length, you can provide your own instructions here for generating commit messages.
 
 ## Usage
 
 1. Stage your changes in Git as you normally would.
 2. In the Source Control view, look for the "GeminiCommit" section.
-3. Click on the "Generate Commit Message" button.
+3. Click on the "Generate Commit Message" button (now using the git-commit icon).
 4. The extension will analyze your staged changes and generate a commit message.
 5. The generated message will be automatically inserted into the commit message input box.
 6. Review and edit the message if needed, then commit as usual.
 
 ## Requirements
 
-- Visual Studio Code version 1.75.0 or higher
+- Visual Studio Code version 1.80.0 or higher (>=1.26.0 reqiure VSCode version 1.93.0 or higher 
 - Git installed and configured in your workspace
 - Active Google AI API key
 - For building from source:
@@ -104,6 +109,9 @@ Before using the extension, you need to set up your Google AI API key and config
   - Basic knowledge of TypeScript and VS Code extension development
 
 ## Known Issues
+
+- If you encounter a 403 error, it may be due to API key issues or rate limiting. The extension now provides more detailed error information to help troubleshoot these issues.
+- Some users may experience network-related errors (like ECONNRESET). The extension now includes a retry mechanism to handle temporary network issues.
 
 Please report any issues or suggest improvements on our [GitHub Issues](https://github.com/VizzleTF/GeminiCommit/issues) page.
 
@@ -141,6 +149,8 @@ If you encounter any problems or have any questions, please open an issue on the
 5. Введите ваш API ключ Google AI в поле "Gemini Commit: Google Api Key".
 6. (Опционально) Выберите предпочитаемый язык для сообщений коммитов в выпадающем списке "Gemini Commit: Commit Language".
 7. (Опционально) Выберите предпочитаемую длину сообщений коммитов в выпадающем списке "Gemini Commit: Commit Message Length".
+8. (Опционально) Выберите предпочитаемую модель Gemini AI в выпадающем списке "Gemini Commit: Gemini Model".
+9. (Опционально) Если вы выбрали "custom" для длины сообщения коммита, введите ваши собственные инструкции в поле "Gemini Commit: Custom Instructions".
 
 ---
 
