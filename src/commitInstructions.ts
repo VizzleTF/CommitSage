@@ -1,83 +1,129 @@
-export const longCommitInstructions = `As an expert developer specializing in creating informative and detailed Git commit messages, your task is to analyze the provided git diff output and generate a comprehensive commit message. {languageInstruction} Follow these instructions carefully:
+export const englishShortInstructions = `Generate a concise Git commit message based on the provided diff. Follow these rules:
+1. Use the format: <type>: <description>
+2. Types: feat, fix, docs, style, refactor, test, chore
+3. Keep the entire message under 50 characters
+4. Use imperative mood (e.g., "Add" not "Added")
+5. Focus on the overall change, not specific details
+6. Do not mention file names or line numbers
 
-1. Analyze the git diff thoroughly:
-   * Identify ALL files that have been modified, added, or deleted.
-   * Understand the nature of EACH change (e.g., feature addition, bug fix, refactoring, documentation update).
-   * Determine the overall purpose or goal of the changes.
-   * Note any significant implementation details or architectural changes across ALL modifications.
+Few shot examples:
+1. Diff: Added new user authentication feature
+   Message: feat: Add user authentication
 
-2. Determine the commit type based on the following conditions:
-   * feature: Only when adding a new feature.
-   * fix: When fixing a bug.
-   * docs: When updating documentation.
-   * style: When changing elements styles or design and/or making changes to the code style (formatting, missing semicolons, etc.) without changing the code logic.
-   * test: When adding or updating tests.
-   * chore: When making changes to the build process or auxiliary tools and libraries.
-   * revert: When undoing a previous commit.
+2. Diff: Fixed bug in payment processing
+   Message: fix: Resolve payment processing issue
 
-3. Create a concise commit message with the following structure:
-   * Start with the commit type, followed by a colon and a space.
-   * Each subsequent line describes a distinct, important change or aspect of the changes.
-   * Start each line of the message (after the type) with a capitalized verb in the past tense.
-   * Focus on describing what was changed and why, briefly.
-   * Aim to cover the most significant changes.
+3. Diff: Updated README with new installation steps
+   Message: docs: Update installation instructions
 
-4. Additional guidelines:
-   * Use 1 to 3 lines total (including the type line), depending on the scope of changes.
-   * No blank lines between the lines of the commit message.
-   * Keep each line between 20-50 characters (excluding the type).
-   * Use extremely concise language, avoiding unnecessary words.
-   * Prioritize breadth over depth - mention more changes rather than explaining few in detail.
-   * Avoid technical jargon unless absolutely necessary.
-   * Do not include specific file names or line numbers from the diff.
+4. Diff: Reformatted code to follow style guide
+   Message: style: Apply consistent code formatting
 
-5. FewShots examples:
-Example 1:
-feature: Added user statistics calc
-Implemented data aggregation
-Optimized query performance
+5. Diff: Restructured database queries for efficiency
+   Message: refactor: Optimize database queries`;
 
-Example 2:
-fix: Resolved login button issue
-Improved mobile responsiveness
+export const englishLongInstructions = `Create a detailed Git commit message based on the provided diff. Follow these guidelines:
+1. First line: <type>: <short summary> (50 chars or less)
+2. Types: feat, fix, docs, style, refactor, test, chore
+3. Leave a blank line after the first line
+4. Subsequent lines: detailed description (wrap at 72 chars)
+5. Use imperative mood in all lines
+6. Explain what and why, not how
+7. Mention significant changes and their impact
+8. Do not mention specific file names or line numbers
+9. Maximum 5 lines total (including blank line)
 
-Example 3:
-docs: Updated API authentication docs
-Clarified OAuth2 flow steps
+Few shot examples:
+1. Diff: Implemented user registration and login functionality
+   Message: feat: Add user authentication system
 
-6. Output:
-   * Provide the complete commit message (1-3 lines, including the type).
-   * No additional formatting or explanations.`;
+   Implement secure user registration and login processes
+   Integrate email verification for new accounts
+   Enhance overall application security
 
-export const shortCommitInstructions = `You are an expert developer specialist in creating commits messages.
-Your only goal is to retrieve a single commit message. 
-Based on the provided user changes, combine them in ONE SINGLE commit message retrieving the global idea, following strictly the next rules:
-- Assign the commit {type} according to the next conditions: 
-feat: Only when adding a new feature.
-fix: When fixing a bug. 
-docs: When updating documentation. 
-style: When changing elements styles or design and/or making changes to the code style (formatting, missing semicolons, etc.) without changing the code logic.
-test: When adding or updating tests. 
-chore: When making changes to the build process or auxiliary tools and libraries. 
-revert: When undoing a previous commit.
-refactor: When restructuring code without changing its external behavior, or is any of the other refactor types.
-- Do not add any issues numeration, explain your output nor introduce your answer.
-- Output directly only one commit message in plain text with the next format: type: commit_message.
-- Be as concise as possible, keep the message under 50 characters.
+2. Diff: Fixed critical bug causing data loss during backup
+   Message: fix: Resolve data loss issue in backup process
 
-FewShots examples:
-Example 1:
-Diff: Added user profile page and avatar upload feature
-Output: feat: Add user profile and avatar upload
+   Identify and patch vulnerability in backup routine
+   Implement additional data integrity checks
+   Improve error handling and logging for backups
 
-Example 2:
-Diff: Fixed a critical security vulnerability in the authentication system
-Output: fix: Patch auth system security flaw
+3. Diff: Updated API documentation with new endpoints
+   Message: docs: Enhance API documentation
 
-Example 3:
-Diff: Updated the README with new installation instructions
-Output: docs: Update README installation guide
+   Add descriptions for newly implemented API endpoints
+   Include usage examples and response formats
+   Update authentication requirements section
 
-{languageInstruction}`;
+4. Diff: Refactored database access layer for better performance
+   Message: refactor: Optimize database operations
+
+   Implement connection pooling for improved efficiency
+   Rewrite inefficient queries using proper indexing
+   Add caching layer for frequently accessed data`;
+
+export const russianShortInstructions = `Создайте краткое сообщение коммита Git на основе предоставленного diff. Следуйте этим правилам:
+1. Используйте формат: <тип>: <описание>
+2. Типы: feat, fix, docs, style, refactor, test, chore
+3. Ограничьте всё сообщение 50 символами
+4. Используйте прошедшее время (например, "Добавил", а не "Добавить")
+5. Сосредоточьтесь на общем изменении, а не на конкретных деталях
+6. Не упоминайте имена файлов или номера строк
+
+Примеры:
+1. Diff: Добавлена новая функция аутентификации пользователей
+   Сообщение: feat: Добавил аутентификацию пользователей
+
+2. Diff: Исправлен баг в обработке платежей
+   Сообщение: fix: Исправил обработку платежей
+
+3. Diff: Обновлен README с новыми шагами установки
+   Сообщение: docs: Обновил инструкции по установке
+
+4. Diff: Отформатирован код в соответствии с руководством по стилю
+   Сообщение: style: Применил единый стиль кода
+
+5. Diff: Реструктурированы запросы к базе данных для эффективности
+   Сообщение: refactor: Оптимизировал запросы к БД`;
+
+export const russianLongInstructions = `Создайте подробное сообщение коммита Git на основе предоставленного diff. Следуйте этим указаниям:
+1. Первая строка: <тип>: <краткое резюме> (не более 50 символов)
+2. Типы: feat, fix, docs, style, refactor, test, chore
+3. Оставьте пустую строку после первой строки
+4. Последующие строки: подробное описание (перенос на 72 символах)
+5. Используйте прошедшее время во всех строках
+6. Объясните что и почему, а не как
+7. Упомяните значительные изменения и их влияние
+8. Не упоминайте конкретные имена файлов или номера строк
+9. Максимум 5 строк всего (включая пустую строку)
+
+Примеры:
+1. Diff: Реализована функциональность регистрации и входа пользователей
+   Сообщение: feat: Добавил систему аутентификации пользователей
+
+   Реализовал безопасные процессы регистрации и входа
+   Интегрировал проверку электронной почты для новых аккаунтов
+   Повысил общую безопасность приложения
+
+2. Diff: Исправлен критический баг, вызывающий потерю данных при резервном копировании
+   Сообщение: fix: Устранил проблему потери данных при резервировании
+
+   Обнаружил и исправил уязвимость в процессе резервирования
+   Внедрил дополнительные проверки целостности данных
+   Улучшил обработку ошибок и логирование для резервных копий
+
+3. Diff: Обновлена документация API с новыми эндпоинтами
+   Сообщение: docs: Улучшил документацию API
+
+   Добавил описания для недавно реализованных эндпоинтов API
+   Включил примеры использования и форматы ответов
+   Обновил раздел требований аутентификации
+
+4. Diff: Рефакторинг уровня доступа к базе данных для улучшения производительности
+   Сообщение: refactor: Оптимизировал операции с базой данных
+
+   Реализовал пул соединений для повышения эффективности
+   Переписал неэффективные запросы с использованием индексов
+   Добавил уровень кэширования для часто запрашиваемых данных`;
 
 export const customInstructions = "{customInstructions}";
