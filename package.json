@@ -74,7 +74,7 @@
                         "gemini-1.5-flash"
                     ],
                     "default": "gemini-1.5-flash",
-                    "description": "Select Gemini model for commit message generation. Options: gemini-1.0-pro, gemini-1.5-pro, gemini-1.5-flash"
+                    "description": "Select Gemini model for commit message generation"
                 },
                 "geminiCommit.commitLanguage": {
                     "type": "string",
@@ -98,7 +98,7 @@
                 "geminiCommit.customInstructions": {
                     "type": "string",
                     "default": "",
-                    "description": "Custom instructions for commit message generation"
+                    "description": "Custom instructions for commit message generation (used when commitMessageLength is set to 'custom')"
                 }
             }
         }

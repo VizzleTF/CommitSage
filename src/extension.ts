@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
 import * as child_process from 'child_process';
 import axios from 'axios';
-import { longCommitInstructions, shortCommitInstructions, customInstructions } from './commitInstructions';
+import { englishShortInstructions, englishLongInstructions, russianShortInstructions, russianLongInstructions, customInstructions } from './commitInstructions';
 
 // Constants
 const EXTENSION_NAME = 'GeminiCommit';
@@ -109,25 +109,29 @@ class AIService {
     }
 
     private static generatePrompt(diff: string, language: string, messageLength: string): string {
-        const languageInstruction = language === 'russian' ?
-            'Generate the commit message in Russian.' :
-            'Generate the commit message in English.';
-
         let instructions;
-        switch (messageLength) {
-            case 'short':
-                instructions = shortCommitInstructions;
+        switch (`${language}-${messageLength}`) {
+            case 'english-short':
+                instructions = englishShortInstructions;
+                break;
+            case 'english-long':
+                instructions = englishLongInstructions;
+                break;
+            case 'russian-short':
+                instructions = russianShortInstructions;
+                break;
+            case 'russian-long':
+                instructions = russianLongInstructions;
                 break;
             case 'custom':
                 instructions = customInstructions.replace('{customInstructions}', this.getCustomInstructions());
                 break;
-            case 'long':
             default:
-                instructions = longCommitInstructions;
+                instructions = englishShortInstructions;
         }
 
-        return `${instructions.replace('{languageInstruction}', languageInstruction)}
-
+        return `${instructions}
+    
         Git diff to analyze:
         ${diff}
         
