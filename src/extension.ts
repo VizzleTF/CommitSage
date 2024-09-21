@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 import { spawn } from 'child_process';
 import axios from 'axios';
+import * as path from 'path'; // Добавленный импорт
 import {
     englishShortInstructions,
     englishLongInstructions,
@@ -8,6 +9,7 @@ import {
     russianLongInstructions,
     customInstructions
 } from './commitInstructions';
+import { analyzeFileChanges } from './gitBlameAnalyzer';
 
 // Constants
 const EXTENSION_NAME = 'GeminiCommit';
@@ -104,14 +106,14 @@ class ConfigService {
 class GitService {
     static getDiff = async (repoPath: string): Promise<string> => {
         Logger.log(`Getting diff for repository: ${repoPath}`);
-        const diff = await this.executeGitCommand('diff', repoPath);
+        const diff = await this.executeGitCommand(['diff'], repoPath);
         if (!diff.trim()) throw new Error(ERROR_MESSAGES.NO_CHANGES);
         return diff;
     };
 
-    private static executeGitCommand = (command: string, cwd: string): Promise<string> =>
+    private static executeGitCommand = (args: string[], cwd: string): Promise<string> =>
         new Promise((resolve, reject) => {
-            const childProcess = spawn('git', [command], { cwd });
+            const childProcess = spawn('git', args, { cwd });
             let stdout = '';
             let stderr = '';
 
@@ -119,7 +121,7 @@ class GitService {
             childProcess.stderr.on('data', (data) => { stderr += data; });
             childProcess.on('close', (code) => {
                 code !== 0
-                    ? reject(new Error(`Git ${command} failed with code ${code}: ${stderr}`))
+                    ? reject(new Error(`Git ${args.join(' ')} failed with code ${code}: ${stderr}`))
                     : resolve(stdout);
             });
         });
@@ -150,16 +152,26 @@ class GitService {
         if (!selected) throw new Error(ERROR_MESSAGES.NO_REPO_SELECTED);
         return selected.repository;
     };
+
+    static getChangedFiles = async (repoPath: string): Promise<string[]> => {
+        const output = await this.executeGitCommand(['status', '--porcelain'], repoPath);
+        return output.split('\n')
+            .filter(line => line.trim() !== '')
+            .map(line => line.substring(3).trim());
+    };
 }
 
 // Prompt Service
 class PromptService {
-    static generatePrompt = (diff: string, language: string, messageLength: string): string => {
+    static generatePrompt = (diff: string, blameAnalysis: string, language: string, messageLength: string): string => {
         const instructions = this.getInstructions(language, messageLength);
         return `${instructions}
       
       Git diff to analyze:
       ${diff}
+      
+      Git blame analysis:
+      ${blameAnalysis}
       
       Please provide ONLY the commit message, without any additional text or explanations.`;
     };
@@ -184,12 +196,13 @@ class PromptService {
 class AIService {
     static generateCommitMessage = async (
         diff: string,
+        blameAnalysis: string,
         progress: vscode.Progress<{ message?: string; increment?: number }>
     ): Promise<string> => {
         const language = ConfigService.getCommitLanguage();
         const messageLength = ConfigService.getCommitMessageLength();
         const truncatedDiff = this.truncateDiff(diff);
-        const prompt = PromptService.generatePrompt(truncatedDiff, language, messageLength);
+        const prompt = PromptService.generatePrompt(truncatedDiff, blameAnalysis, language, messageLength);
 
         progress.report({ message: "Generating commit message...", increment: 50 });
         return this.generateWithGemini(prompt, progress);
@@ -203,7 +216,6 @@ class AIService {
         Logger.log(`Diff length: ${diff.length} characters`);
         return diff;
     };
-
     private static generateWithGemini = async (
         prompt: string,
         progress: vscode.Progress<{ message?: string; increment?: number }>,
@@ -321,8 +333,22 @@ const generateAndSetCommitMessage = async () => {
             const diff = await GitService.getDiff(selectedRepo.rootUri.fsPath);
             Logger.log(`Git diff fetched successfully. Length: ${diff.length} characters`);
 
-            progress.report({ message: "Analyzing diff...", increment: 25 });
-            const commitMessage = await AIService.generateCommitMessage(diff, progress);
+            progress.report({ message: "Analyzing changes...", increment: 25 });
+            const changedFiles = await GitService.getChangedFiles(selectedRepo.rootUri.fsPath);
+            let blameAnalysis = '';
+            for (const file of changedFiles) {
+                const filePath = vscode.Uri.file(path.join(selectedRepo.rootUri.fsPath, file));
+                try {
+                    const fileBlameAnalysis = await analyzeFileChanges(filePath.fsPath);
+                    blameAnalysis += `File: ${file}\n${fileBlameAnalysis}\n\n`;
+                } catch (error) {
+                    Logger.error(`Error analyzing file ${file}:`, error as Error);
+                    blameAnalysis += `File: ${file}\nUnable to analyze: ${(error as Error).message}\n\n`;
+                }
+            }
+
+            progress.report({ message: "Generating commit message...", increment: 50 });
+            const commitMessage = await AIService.generateCommitMessage(diff, blameAnalysis, progress);
             Logger.log('Commit message generated successfully');
 
             progress.report({ message: "Setting commit message...", increment: 75 });
