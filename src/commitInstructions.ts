@@ -1,6 +1,16 @@
 export const englishShortInstructions = `Generate a concise Git commit message based on the provided diff. Follow these rules:
 1. Use the format: <type>: <description>
-2. Types: feat, fix, docs, style, refactor, test, chore
+2. Types:
+- feat: for new features or significant updates
+- fix: for bug fixes
+- docs: for documentation changes
+- style: for formatting, missing semi-colons, etc.
+- refactor: for restructuring code without changing its behavior
+- test: for adding or changing tests
+- chore: for small tasks, maintenance, or trivial changes
+- perf: for performance improvements
+- ci: for CI/CD pipeline updates
+- build: for changes that affect the build system or dependencies
 3. Keep the entire message under 50 characters
 4. Use imperative mood (e.g., "Add" not "Added")
 5. Focus on the overall change, not specific details
@@ -24,7 +34,17 @@ Few shot examples:
 
 export const englishLongInstructions = `Create a detailed Git commit message based on the provided diff. Follow these guidelines:
 1. First line: <type>: <short summary> (50 chars or less)
-2. Types: feat, fix, docs, style, refactor, test, chore
+2. Types:
+- feat: for new features or significant updates
+- fix: for bug fixes
+- docs: for documentation changes
+- style: for formatting, missing semi-colons, etc.
+- refactor: for restructuring code without changing its behavior
+- test: for adding or changing tests
+- chore: for small tasks, maintenance, or trivial changes
+- perf: for performance improvements
+- ci: for CI/CD pipeline updates
+- build: for changes that affect the build system or dependencies
 3. Leave a blank line after the first line
 4. Subsequent lines: detailed description (wrap at 72 chars)
 5. Use imperative mood in all lines
@@ -64,7 +84,17 @@ Few shot examples:
 
 export const russianShortInstructions = `Создайте краткое сообщение коммита Git на основе предоставленного diff. Следуйте этим правилам:
 1. Используйте формат: <тип>: <описание>
-2. Типы: feat, fix, docs, style, refactor, test, chore
+2. Типы:
+- feat: for new features or significant updates
+- fix: for bug fixes
+- docs: for documentation changes
+- style: for formatting, missing semi-colons, etc.
+- refactor: for restructuring code without changing its behavior
+- test: for adding or changing tests
+- chore: for small tasks, maintenance, or trivial changes
+- perf: for performance improvements
+- ci: for CI/CD pipeline updates
+- build: for changes that affect the build system or dependencies
 3. Ограничьте всё сообщение 50 символами
 4. Используйте прошедшее время (например, "Добавил", а не "Добавить")
 5. Сосредоточьтесь на общем изменении, а не на конкретных деталях
@@ -88,7 +118,17 @@ export const russianShortInstructions = `Создайте краткое соо�
 
 export const russianLongInstructions = `Создайте подробное сообщение коммита Git на основе предоставленного diff. Следуйте этим указаниям:
 1. Первая строка: <тип>: <краткое резюме> (не более 50 символов)
-2. Типы: feat, fix, docs, style, refactor, test, chore
+2. Типы:
+- feat: for new features or significant updates
+- fix: for bug fixes
+- docs: for documentation changes
+- style: for formatting, missing semi-colons, etc.
+- refactor: for restructuring code without changing its behavior
+- test: for adding or changing tests
+- chore: for small tasks, maintenance, or trivial changes
+- perf: for performance improvements
+- ci: for CI/CD pipeline updates
+- build: for changes that affect the build system or dependencies
 3. Оставьте пустую строку после первой строки
 4. Последующие строки: подробное описание (перенос на 72 символах)
 5. Используйте прошедшее время во всех строках
