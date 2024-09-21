@@ -61,11 +61,6 @@
         "configuration": {
             "title": "GeminiCommit",
             "properties": {
-                "geminiCommit.googleApiKey": {
-                    "type": "string",
-                    "default": "",
-                    "description": "API Key for Google AI service"
-                },
                 "geminiCommit.geminiModel": {
                     "type": "string",
                     "enum": [
