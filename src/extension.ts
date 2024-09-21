@@ -22,16 +22,9 @@ class Logger {
 
 // Git Service
 class GitService {
-    static async getDiff(): Promise<string> {
-        const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
-        if (!workspaceFolder) {
-            throw new Error('No workspace folder open');
-        }
-
-        const rootPath = workspaceFolder.uri.fsPath;
-        Logger.log(`Workspace root path: ${rootPath}`);
-
-        return this.executeGitCommand('diff', rootPath);
+    static async getDiff(repoPath: string): Promise<string> {
+        Logger.log(`Getting diff for repository: ${repoPath}`);
+        return this.executeGitCommand('diff', repoPath);
     }
 
     private static async executeGitCommand(command: string, cwd: string): Promise<string> {
@@ -255,8 +248,36 @@ async function generateAndSetCommitMessage() {
         cancellable: false
     }, async (progress) => {
         try {
+            const gitExtension = vscode.extensions.getExtension<GitExtension>('vscode.git');
+            if (!gitExtension) {
+                throw new Error('Git extension not found');
+            }
+            const git = gitExtension.exports.getAPI(1);
+            const repos = git.repositories;
+
+            if (repos.length === 0) {
+                throw new Error('No Git repositories found');
+            }
+
+            let selectedRepo: Repository | undefined;
+            if (repos.length > 1) {
+                const repoOptions = repos.map(repo => ({
+                    label: repo.rootUri.fsPath,
+                    repository: repo
+                }));
+                const selected = await vscode.window.showQuickPick(repoOptions, {
+                    placeHolder: 'Select the repository to generate commit message'
+                });
+                if (!selected) {
+                    throw new Error('No repository selected');
+                }
+                selectedRepo = selected.repository;
+            } else {
+                selectedRepo = repos[0];
+            }
+
             progress.report({ message: "Fetching Git diff...", increment: 0 });
-            const diff = await GitService.getDiff();
+            const diff = await GitService.getDiff(selectedRepo.rootUri.fsPath);
             Logger.log(`Git diff fetched successfully. Length: ${diff.length} characters`);
 
             progress.report({ message: "Analyzing diff...", increment: 25 });
@@ -264,33 +285,16 @@ async function generateAndSetCommitMessage() {
             Logger.log('Commit message generated successfully');
 
             progress.report({ message: "Setting commit message...", increment: 75 });
-            await setCommitMessage(commitMessage);
+            selectedRepo.inputBox.value = commitMessage;
             Logger.log('Commit message set successfully');
 
             progress.report({ message: "Done!", increment: 100 });
+            vscode.window.showInformationMessage('Commit message set in selected Git repository.');
         } catch (error) {
             Logger.error(`Error in command execution: ${error}`);
             vscode.window.showErrorMessage(`Failed to generate commit message: ${error}`);
         }
     });
-}
-
-async function setCommitMessage(commitMessage: string): Promise<void> {
-    const gitExtension = vscode.extensions.getExtension<GitExtension>('vscode.git');
-
-    if (!gitExtension) {
-        throw new Error('Git extension not found');
-    }
-
-    const git = gitExtension.exports.getAPI(1);
-
-    const repos = git.repositories;
-    if (repos.length === 0) {
-        throw new Error('No Git repositories found');
-    }
-
-    repos[0].inputBox.value = commitMessage;
-    vscode.window.showInformationMessage('Commit message set in Git Source Control view.');
 }
 
 // Extension Activation and Deactivation
@@ -319,6 +323,7 @@ interface GitAPI {
 }
 
 interface Repository {
+    rootUri: vscode.Uri;
     inputBox: {
         value: string;
     };
