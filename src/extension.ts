@@ -20,6 +20,7 @@ const DEFAULT_GEMINI_MODEL = 'gemini-1.5-flash';
 const DEFAULT_COMMIT_LANGUAGE = 'english';
 const DEFAULT_COMMIT_MESSAGE_LENGTH = 'long';
 const GEMINI_API_BASE_URL = 'https://generativelanguage.googleapis.com/v1beta/models';
+const API_KEY_SECRET_KEY = 'geminicommit.apiKey';
 const ERROR_MESSAGES = {
     NO_GIT_EXTENSION: 'Git extension not found. Please make sure it is installed and enabled.',
     NO_REPOSITORIES: 'No Git repositories found in the current workspace.',
@@ -50,6 +51,11 @@ class Logger {
 // Configuration Service
 class ConfigService {
     private static cache = new Map<string, any>();
+    private static secretStorage: vscode.SecretStorage;
+
+    static initialize(context: vscode.ExtensionContext): void {
+        this.secretStorage = context.secrets;
+    }
 
     static getConfig = <T>(key: string, defaultValue: T): T => {
         if (!this.cache.has(key)) {
@@ -59,10 +65,24 @@ class ConfigService {
         return this.cache.get(key);
     };
 
-    static getApiKey = (): string => {
-        const key = this.getConfig<string>('googleApiKey', '');
-        if (!key) throw new Error(ERROR_MESSAGES.API_KEY_NOT_SET);
+    static getApiKey = async (): Promise<string> => {
+        let key = await this.secretStorage.get(API_KEY_SECRET_KEY);
+        if (!key) {
+            key = await vscode.window.showInputBox({
+                prompt: 'Enter your Google API Key',
+                ignoreFocusOut: true,
+                password: true
+            });
+            if (!key) {
+                throw new Error(ERROR_MESSAGES.API_KEY_NOT_SET);
+            }
+            await this.secretStorage.store(API_KEY_SECRET_KEY, key);
+        }
         return key;
+    };
+
+    static setApiKey = async (key: string): Promise<void> => {
+        await this.secretStorage.store(API_KEY_SECRET_KEY, key);
     };
 
     static getGeminiModel = (): string =>
@@ -189,7 +209,7 @@ class AIService {
         progress: vscode.Progress<{ message?: string; increment?: number }>,
         attempt: number = 1
     ): Promise<string> => {
-        const apiKey = ConfigService.getApiKey();
+        const apiKey = await ConfigService.getApiKey();
         const model = ConfigService.getGeminiModel();
         const GEMINI_API_URL = `${GEMINI_API_BASE_URL}/${model}:generateContent`;
 
@@ -322,12 +342,28 @@ const generateAndSetCommitMessage = async () => {
 export const activate = (context: vscode.ExtensionContext): void => {
     Logger.log(`${EXTENSION_NAME} extension is now active!`);
 
+    ConfigService.initialize(context);
+
     const generateCommitMessageCommand = vscode.commands.registerCommand(COMMAND_ID, generateAndSetCommitMessage);
 
     const treeDataProvider = new GeminiCommitTreeDataProvider();
     const treeView = vscode.window.createTreeView(VIEW_ID, { treeDataProvider });
 
     context.subscriptions.push(generateCommitMessageCommand, treeView);
+
+    // Register command to set API key
+    const setApiKeyCommand = vscode.commands.registerCommand('geminicommit.setApiKey', async () => {
+        const key = await vscode.window.showInputBox({
+            prompt: 'Enter your Google API Key',
+            ignoreFocusOut: true,
+            password: true
+        });
+        if (key) {
+            await ConfigService.setApiKey(key);
+            vscode.window.showInformationMessage('API key has been set successfully.');
+        }
+    });
+    context.subscriptions.push(setApiKeyCommand);
 };
 
 export const deactivate = (): void => {
