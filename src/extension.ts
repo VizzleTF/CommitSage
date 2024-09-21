@@ -1,7 +1,13 @@
 import * as vscode from 'vscode';
-import * as child_process from 'child_process';
+import { spawn } from 'child_process';
 import axios from 'axios';
-import { englishShortInstructions, englishLongInstructions, russianShortInstructions, russianLongInstructions, customInstructions } from './commitInstructions';
+import {
+    englishShortInstructions,
+    englishLongInstructions,
+    russianShortInstructions,
+    russianLongInstructions,
+    customInstructions
+} from './commitInstructions';
 
 // Constants
 const EXTENSION_NAME = 'GeminiCommit';
@@ -14,185 +20,152 @@ const DEFAULT_GEMINI_MODEL = 'gemini-1.5-flash';
 const DEFAULT_COMMIT_LANGUAGE = 'english';
 const DEFAULT_COMMIT_MESSAGE_LENGTH = 'long';
 const GEMINI_API_BASE_URL = 'https://generativelanguage.googleapis.com/v1beta/models';
+const ERROR_MESSAGES = {
+    NO_GIT_EXTENSION: 'Git extension not found. Please make sure it is installed and enabled.',
+    NO_REPOSITORIES: 'No Git repositories found in the current workspace.',
+    NO_CHANGES: 'No changes detected in the repository.',
+    NO_REPO_SELECTED: 'No repository selected. Operation cancelled.',
+    EMPTY_COMMIT_MESSAGE: 'Generated commit message is empty.',
+    API_KEY_NOT_SET: 'Google API key is not set. Please set it in the extension settings.'
+};
 
 // Types
-interface GitExtension {
-    getAPI(version: number): GitAPI;
-}
-
-interface GitAPI {
-    repositories: Repository[];
-}
-
-interface Repository {
-    rootUri: vscode.Uri;
-    inputBox: {
-        value: string;
-    };
-}
-
-interface ErrorWithResponse extends Error {
-    response?: {
-        status: number;
-        data: any;
-    };
-}
+type GitExtension = { getAPI(version: number): GitAPI };
+type GitAPI = { repositories: Repository[] };
+type Repository = { rootUri: vscode.Uri; inputBox: { value: string } };
+type ErrorWithResponse = Error & { response?: { status: number; data: any } };
 
 // Logger
 class Logger {
-    static log(message: string): void {
+    static log = (message: string): void =>
         console.log(`[${EXTENSION_NAME}] ${message}`);
-    }
 
-    static error(message: string, error?: Error): void {
+    static error = (message: string, error?: Error): void => {
         console.error(`[${EXTENSION_NAME}] ${message}`);
-        if (error && error.stack) {
-            console.error(`Stack trace: ${error.stack}`);
-        }
+        error?.stack && console.error(`Stack trace: ${error.stack}`);
         vscode.window.showErrorMessage(message);
-    }
+    };
 }
 
 // Configuration Service
 class ConfigService {
-    private static cache: Map<string, any> = new Map();
+    private static cache = new Map<string, any>();
 
-    static getConfig<T>(key: string, defaultValue: T): T {
+    static getConfig = <T>(key: string, defaultValue: T): T => {
         if (!this.cache.has(key)) {
-            const value = vscode.workspace.getConfiguration('geminiCommit').get<T>(key, defaultValue);
+            const value = vscode.workspace.getConfiguration('geminiCommit').get<T>(key) ?? defaultValue;
             this.cache.set(key, value);
         }
         return this.cache.get(key);
-    }
+    };
 
-    static getApiKey(): string {
+    static getApiKey = (): string => {
         const key = this.getConfig<string>('googleApiKey', '');
-        if (!key) {
-            throw new Error('Google API key is not set. Please set it in the extension settings.');
-        }
+        if (!key) throw new Error(ERROR_MESSAGES.API_KEY_NOT_SET);
         return key;
-    }
+    };
 
-    static getGeminiModel(): string {
-        return this.getConfig<string>('geminiModel', DEFAULT_GEMINI_MODEL);
-    }
+    static getGeminiModel = (): string =>
+        this.getConfig<string>('geminiModel', DEFAULT_GEMINI_MODEL);
 
-    static getCommitLanguage(): string {
-        return this.getConfig<string>('commitLanguage', DEFAULT_COMMIT_LANGUAGE);
-    }
+    static getCommitLanguage = (): string =>
+        this.getConfig<string>('commitLanguage', DEFAULT_COMMIT_LANGUAGE);
 
-    static getCommitMessageLength(): string {
-        return this.getConfig<string>('commitMessageLength', DEFAULT_COMMIT_MESSAGE_LENGTH);
-    }
+    static getCommitMessageLength = (): string =>
+        this.getConfig<string>('commitMessageLength', DEFAULT_COMMIT_MESSAGE_LENGTH);
 
-    static getCustomInstructions(): string {
-        return this.getConfig<string>('customInstructions', '');
-    }
+    static getCustomInstructions = (): string =>
+        this.getConfig<string>('customInstructions', '');
 
-    static clearCache(): void {
-        this.cache.clear();
-    }
+    static clearCache = (): void => this.cache.clear();
 }
 
 // Git Service
 class GitService {
-    static async getDiff(repoPath: string): Promise<string> {
+    static getDiff = async (repoPath: string): Promise<string> => {
         Logger.log(`Getting diff for repository: ${repoPath}`);
         const diff = await this.executeGitCommand('diff', repoPath);
-        if (!diff.trim()) {
-            throw new Error('No changes detected in the repository.');
-        }
+        if (!diff.trim()) throw new Error(ERROR_MESSAGES.NO_CHANGES);
         return diff;
-    }
+    };
 
-    private static executeGitCommand(command: string, cwd: string): Promise<string> {
-        return new Promise<string>((resolve, reject) => {
-            const childProcess = child_process.spawn('git', [command], { cwd });
+    private static executeGitCommand = (command: string, cwd: string): Promise<string> =>
+        new Promise((resolve, reject) => {
+            const childProcess = spawn('git', [command], { cwd });
             let stdout = '';
             let stderr = '';
 
-            childProcess.stdout.on('data', (data) => {
-                stdout += data;
-            });
-
-            childProcess.stderr.on('data', (data) => {
-                stderr += data;
-            });
-
+            childProcess.stdout.on('data', (data) => { stdout += data; });
+            childProcess.stderr.on('data', (data) => { stderr += data; });
             childProcess.on('close', (code) => {
-                if (code !== 0) {
-                    reject(new Error(`Git ${command} failed with code ${code}: ${stderr}`));
-                } else {
-                    resolve(stdout);
-                }
+                code !== 0
+                    ? reject(new Error(`Git ${command} failed with code ${code}: ${stderr}`))
+                    : resolve(stdout);
             });
         });
-    }
 
-    static async getRepositories(): Promise<Repository[]> {
+    static getRepositories = async (): Promise<Repository[]> => {
         const gitExtension = vscode.extensions.getExtension<GitExtension>('vscode.git');
-        if (!gitExtension) {
-            throw new Error('Git extension not found. Please make sure it is installed and enabled.');
-        }
+        if (!gitExtension) throw new Error(ERROR_MESSAGES.NO_GIT_EXTENSION);
+
         const git = gitExtension.exports.getAPI(1);
         const repos = git.repositories;
-        if (repos.length === 0) {
-            throw new Error('No Git repositories found in the current workspace.');
-        }
-        return repos;
-    }
+        if (repos.length === 0) throw new Error(ERROR_MESSAGES.NO_REPOSITORIES);
 
-    static async selectRepository(repos: Repository[]): Promise<Repository> {
-        if (repos.length === 1) {
-            return repos[0];
-        }
+        return repos;
+    };
+
+    static selectRepository = async (repos: Repository[]): Promise<Repository> => {
+        if (repos.length === 1) return repos[0];
+
         const repoOptions = repos.map(repo => ({
             label: repo.rootUri.fsPath,
             repository: repo
         }));
+
         const selected = await vscode.window.showQuickPick(repoOptions, {
             placeHolder: 'Select the repository to generate commit message'
         });
-        if (!selected) {
-            throw new Error('No repository selected. Operation cancelled.');
-        }
+
+        if (!selected) throw new Error(ERROR_MESSAGES.NO_REPO_SELECTED);
         return selected.repository;
-    }
+    };
 }
 
 // Prompt Service
 class PromptService {
-    static generatePrompt(diff: string, language: string, messageLength: string): string {
+    static generatePrompt = (diff: string, language: string, messageLength: string): string => {
         const instructions = this.getInstructions(language, messageLength);
         return `${instructions}
-    
-        Git diff to analyze:
-        ${diff}
-        
-        Please provide ONLY the commit message, without any additional text or explanations.`;
-    }
+      
+      Git diff to analyze:
+      ${diff}
+      
+      Please provide ONLY the commit message, without any additional text or explanations.`;
+    };
 
-    private static getInstructions(language: string, messageLength: string): string {
-        switch (`${language}-${messageLength}`) {
-            case 'english-short':
-                return englishShortInstructions;
-            case 'english-long':
-                return englishLongInstructions;
-            case 'russian-short':
-                return russianShortInstructions;
-            case 'russian-long':
-                return russianLongInstructions;
-            case 'custom':
-                return customInstructions.replace('{customInstructions}', ConfigService.getCustomInstructions());
-            default:
-                return englishShortInstructions;
-        }
-    }
+    private static getInstructions = (language: string, messageLength: string): string => {
+        type InstructionKey = 'english-short' | 'english-long' | 'russian-short' | 'russian-long' | 'custom';
+        const key = `${language}-${messageLength}` as InstructionKey;
+
+        const instructionsMap: Record<InstructionKey, string> = {
+            'english-short': englishShortInstructions,
+            'english-long': englishLongInstructions,
+            'russian-short': russianShortInstructions,
+            'russian-long': russianLongInstructions,
+            'custom': customInstructions.replace('{customInstructions}', ConfigService.getCustomInstructions())
+        };
+
+        return instructionsMap[key] ?? englishShortInstructions;
+    };
 }
 
 // AI Service
 class AIService {
-    static async generateCommitMessage(diff: string, progress: vscode.Progress<{ message?: string; increment?: number }>): Promise<string> {
+    static generateCommitMessage = async (
+        diff: string,
+        progress: vscode.Progress<{ message?: string; increment?: number }>
+    ): Promise<string> => {
         const language = ConfigService.getCommitLanguage();
         const messageLength = ConfigService.getCommitMessageLength();
         const truncatedDiff = this.truncateDiff(diff);
@@ -200,18 +173,22 @@ class AIService {
 
         progress.report({ message: "Generating commit message...", increment: 50 });
         return this.generateWithGemini(prompt, progress);
-    }
+    };
 
-    private static truncateDiff(diff: string): string {
+    private static truncateDiff = (diff: string): string => {
         if (diff.length > MAX_DIFF_LENGTH) {
             Logger.log(`Original diff length: ${diff.length}. Truncating to ${MAX_DIFF_LENGTH} characters.`);
-            return diff.substring(0, MAX_DIFF_LENGTH) + "\n...(truncated)";
+            return `${diff.substring(0, MAX_DIFF_LENGTH)}\n...(truncated)`;
         }
         Logger.log(`Diff length: ${diff.length} characters`);
         return diff;
-    }
+    };
 
-    private static async generateWithGemini(prompt: string, progress: vscode.Progress<{ message?: string; increment?: number }>, attempt: number = 1): Promise<string> {
+    private static generateWithGemini = async (
+        prompt: string,
+        progress: vscode.Progress<{ message?: string; increment?: number }>,
+        attempt: number = 1
+    ): Promise<string> => {
         const apiKey = ConfigService.getApiKey();
         const model = ConfigService.getGeminiModel();
         const GEMINI_API_URL = `${GEMINI_API_BASE_URL}/${model}:generateContent`;
@@ -233,13 +210,11 @@ class AIService {
         try {
             Logger.log(`Attempt ${attempt}: Sending request to Gemini API`);
             progress.report({ message: `Attempt ${attempt}: Generating commit message...`, increment: 10 });
-            const response = await axios.post(GEMINI_API_URL, payload, { headers });
+            const { data } = await axios.post(GEMINI_API_URL, payload, { headers });
             Logger.log('Gemini API response received successfully');
             progress.report({ message: "Commit message generated successfully", increment: 100 });
-            const commitMessage = this.cleanCommitMessage(response.data.candidates[0].content.parts[0].text);
-            if (!commitMessage.trim()) {
-                throw new Error('Generated commit message is empty.');
-            }
+            const commitMessage = this.cleanCommitMessage(data.candidates[0].content.parts[0].text);
+            if (!commitMessage.trim()) throw new Error(ERROR_MESSAGES.EMPTY_COMMIT_MESSAGE);
             return commitMessage;
         } catch (error) {
             Logger.error(`Attempt ${attempt} failed:`, error as Error);
@@ -255,20 +230,18 @@ class AIService {
 
             throw new Error(`Failed to generate commit message: ${errorMessage}`);
         }
-    }
+    };
 
-    private static calculateRetryDelay(attempt: number): number {
-        return Math.min(INITIAL_RETRY_DELAY_MS * Math.pow(2, attempt - 1), 10000);
-    }
+    private static calculateRetryDelay = (attempt: number): number =>
+        Math.min(INITIAL_RETRY_DELAY_MS * Math.pow(2, attempt - 1), 10000);
 
-    private static delay(ms: number): Promise<void> {
-        return new Promise(resolve => setTimeout(resolve, ms));
-    }
+    private static delay = (ms: number): Promise<void> =>
+        new Promise(resolve => setTimeout(resolve, ms));
 
-    private static handleApiError(error: ErrorWithResponse): { errorMessage: string, shouldRetry: boolean } {
+    private static handleApiError = (error: ErrorWithResponse): { errorMessage: string, shouldRetry: boolean } => {
         if (error.response) {
-            const status = error.response.status;
-            const responseData = JSON.stringify(error.response.data);
+            const { status, data } = error.response;
+            const responseData = JSON.stringify(data);
 
             if (status === 403) {
                 return {
@@ -288,39 +261,33 @@ class AIService {
             };
         }
         return { errorMessage: error.message, shouldRetry: true };
-    }
+    };
 
-    private static cleanCommitMessage(message: string): string {
-        return message
+    private static cleanCommitMessage = (message: string): string =>
+        message
             .replace(/^["']|["']$/g, '')
             .replace(/^(Here'?s? (is )?(a )?)?commit message:?\s*/i, '')
             .replace(/\n{3,}/g, '\n\n')
             .trim();
-    }
 }
 
 // Tree Data Provider
 class GeminiCommitTreeDataProvider implements vscode.TreeDataProvider<vscode.TreeItem> {
-    getTreeItem(element: vscode.TreeItem): vscode.TreeItem {
-        return element;
-    }
+    getTreeItem = (element: vscode.TreeItem): vscode.TreeItem => element;
 
-    getChildren(element?: vscode.TreeItem): Thenable<vscode.TreeItem[]> {
-        if (element) {
-            return Promise.resolve([]);
-        } else {
-            const generateButton = new vscode.TreeItem("Generate Commit Message");
-            generateButton.command = {
-                command: COMMAND_ID,
-                title: `${EXTENSION_NAME}: Generate Message`
-            };
-            return Promise.resolve([generateButton]);
-        }
-    }
+    getChildren = (element?: vscode.TreeItem): Thenable<vscode.TreeItem[]> => {
+        if (element) return Promise.resolve([]);
+        const generateButton = new vscode.TreeItem("Generate Commit Message");
+        generateButton.command = {
+            command: COMMAND_ID,
+            title: `${EXTENSION_NAME}: Generate Message`
+        };
+        return Promise.resolve([generateButton]);
+    };
 }
 
 // Main Extension Functions
-async function generateAndSetCommitMessage() {
+const generateAndSetCommitMessage = async () => {
     await vscode.window.withProgress({
         location: vscode.ProgressLocation.Notification,
         title: "Generating Commit Message",
@@ -349,10 +316,10 @@ async function generateAndSetCommitMessage() {
             vscode.window.showErrorMessage(`Failed to generate commit message: ${(error as Error).message}`);
         }
     });
-}
+};
 
 // Extension Activation and Deactivation
-export function activate(context: vscode.ExtensionContext) {
+export const activate = (context: vscode.ExtensionContext): void => {
     Logger.log(`${EXTENSION_NAME} extension is now active!`);
 
     const generateCommitMessageCommand = vscode.commands.registerCommand(COMMAND_ID, generateAndSetCommitMessage);
@@ -361,9 +328,9 @@ export function activate(context: vscode.ExtensionContext) {
     const treeView = vscode.window.createTreeView(VIEW_ID, { treeDataProvider });
 
     context.subscriptions.push(generateCommitMessageCommand, treeView);
-}
+};
 
-export function deactivate() {
+export const deactivate = (): void => {
     Logger.log(`${EXTENSION_NAME} extension is now deactivated.`);
     ConfigService.clearCache();
-}
+};
