@@ -59,13 +59,14 @@ class AIService {
     private static RETRY_DELAY = 1000; // 1 second
     private static MAX_DIFF_LENGTH = 10000; // Limit diff to 10000 characters
 
-    static async generateCommitMessage(diff: string): Promise<string> {
+    static async generateCommitMessage(diff: string, progress: vscode.Progress<{ message?: string; increment?: number }>): Promise<string> {
         const language = this.getCommitLanguage();
         const messageLength = this.getCommitMessageLength();
         const truncatedDiff = this.truncateDiff(diff);
         const prompt = this.generatePrompt(truncatedDiff, language, messageLength);
 
-        return this.generateWithGemini(prompt);
+        progress.report({ message: "Generating commit message...", increment: 50 });
+        return this.generateWithGemini(prompt, progress);
     }
 
     private static truncateDiff(diff: string): string {
@@ -138,7 +139,7 @@ class AIService {
         Please provide ONLY the commit message, without any additional text or explanations.`;
     }
 
-    private static async generateWithGemini(prompt: string): Promise<string> {
+    private static async generateWithGemini(prompt: string, progress: vscode.Progress<{ message?: string; increment?: number }>): Promise<string> {
         const apiKey = this.getApiKey();
         const model = this.getGeminiModel();
         const GEMINI_API_URL = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
@@ -160,20 +161,21 @@ class AIService {
         for (let attempt = 1; attempt <= this.MAX_RETRIES; attempt++) {
             try {
                 console.log(`Attempt ${attempt}: Sending request to Gemini API`);
+                progress.report({ message: `Attempt ${attempt}: Generating commit message...`, increment: 10 });
                 const response = await axios.post(GEMINI_API_URL, payload, { headers });
                 console.log('Gemini API response received successfully');
+                progress.report({ message: "Commit message generated successfully", increment: 100 });
                 return this.cleanCommitMessage(response.data.candidates[0].content.parts[0].text);
             } catch (error) {
                 console.error(`Attempt ${attempt} failed:`, error);
-                if (axios.isAxiosError(error) && error.response) {
-                    console.error('Error data:', error.response.data);
-                    console.error('Error status:', error.response.status);
-                    console.error('Error headers:', error.response.headers);
+                const { errorMessage, shouldRetry } = this.getErrorMessage(error);
+
+                if (!shouldRetry || attempt === this.MAX_RETRIES) {
+                    throw new Error(`Failed to generate commit message: ${errorMessage}`);
                 }
-                if (attempt === this.MAX_RETRIES) {
-                    throw new Error(`Failed to generate commit message after ${this.MAX_RETRIES} attempts: ${this.getErrorMessage(error)}`);
-                }
+
                 console.warn(`Retrying in ${this.RETRY_DELAY / 1000} seconds...`);
+                progress.report({ message: `Retrying in ${this.RETRY_DELAY / 1000} seconds...`, increment: 0 });
                 await this.delay(this.RETRY_DELAY);
             }
         }
@@ -184,14 +186,36 @@ class AIService {
         return new Promise(resolve => setTimeout(resolve, ms));
     }
 
-    private static getErrorMessage(error: unknown): string {
+    private static getErrorMessage(error: unknown): { errorMessage: string, shouldRetry: boolean } {
         if (axios.isAxiosError(error)) {
             if (error.response) {
-                return `${error.message} (Status: ${error.response.status}). Response data: ${JSON.stringify(error.response.data)}`;
+                const status = error.response.status;
+                const responseData = JSON.stringify(error.response.data);
+
+                // Check for specific error codes
+                if (status === 403) {
+                    return {
+                        errorMessage: `Access forbidden. Please check your API key. (Status: ${status})`,
+                        shouldRetry: false
+                    };
+                } else if (status === 429) {
+                    return {
+                        errorMessage: `Rate limit exceeded. Please try again later. (Status: ${status})`,
+                        shouldRetry: false
+                    };
+                }
+
+                return {
+                    errorMessage: `${error.message} (Status: ${status}). Response data: ${responseData}`,
+                    shouldRetry: true
+                };
             }
-            return error.message;
+            return { errorMessage: error.message, shouldRetry: true };
         }
-        return error instanceof Error ? error.message : String(error);
+        return {
+            errorMessage: error instanceof Error ? error.message : String(error),
+            shouldRetry: true
+        };
     }
 
     private static cleanCommitMessage(message: string): string {
@@ -225,22 +249,30 @@ class GeminiCommitTreeDataProvider implements vscode.TreeDataProvider<vscode.Tre
 
 // Main Extension Functions
 async function generateAndSetCommitMessage() {
-    try {
-        Logger.log('Fetching Git diff...');
-        const diff = await GitService.getDiff();
-        Logger.log(`Git diff fetched successfully. Length: ${diff.length} characters`);
+    await vscode.window.withProgress({
+        location: vscode.ProgressLocation.Notification,
+        title: "Generating Commit Message",
+        cancellable: false
+    }, async (progress) => {
+        try {
+            progress.report({ message: "Fetching Git diff...", increment: 0 });
+            const diff = await GitService.getDiff();
+            Logger.log(`Git diff fetched successfully. Length: ${diff.length} characters`);
 
-        Logger.log('Generating commit message...');
-        const commitMessage = await AIService.generateCommitMessage(diff);
-        Logger.log('Commit message generated successfully');
+            progress.report({ message: "Analyzing diff...", increment: 25 });
+            const commitMessage = await AIService.generateCommitMessage(diff, progress);
+            Logger.log('Commit message generated successfully');
 
-        Logger.log('Setting commit message in Source Control view...');
-        await setCommitMessage(commitMessage);
-        Logger.log('Commit message set successfully');
-    } catch (error) {
-        Logger.error(`Error in command execution: ${error}`);
-        vscode.window.showErrorMessage(`Failed to generate commit message: ${error}`);
-    }
+            progress.report({ message: "Setting commit message...", increment: 75 });
+            await setCommitMessage(commitMessage);
+            Logger.log('Commit message set successfully');
+
+            progress.report({ message: "Done!", increment: 100 });
+        } catch (error) {
+            Logger.error(`Error in command execution: ${error}`);
+            vscode.window.showErrorMessage(`Failed to generate commit message: ${error}`);
+        }
+    });
 }
 
 async function setCommitMessage(commitMessage: string): Promise<void> {
