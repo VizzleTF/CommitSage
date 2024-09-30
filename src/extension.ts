@@ -98,17 +98,28 @@ class GitService {
 
 // Prompt Service
 class PromptService {
-    static generatePrompt = (diff: string, blameAnalysis: string, language: string, messageLength: string): string => {
+    static generatePrompt = (diff: string, blameAnalysis: string, refs: string, language: string, messageLength: string): string => {
         const instructions = this.getInstructions(language, messageLength);
-        return `${instructions}
+        let prompt = `${instructions}
       
       Git diff to analyze:
       ${diff}
       
       Git blame analysis:
-      ${blameAnalysis}
+      ${blameAnalysis}`;
+
+        if (refs) {
+            prompt += `
+      
+      References to include:
+      ${refs}`;
+        }
+
+        prompt += `
       
       Please provide ONLY the commit message, without any additional text or explanations.`;
+
+        return prompt;
     };
 
     private static getInstructions = (language: string, messageLength: string): string => {
@@ -132,12 +143,13 @@ class AIService {
     static generateCommitMessage = async (
         diff: string,
         blameAnalysis: string,
+        refs: string,
         progress: vscode.Progress<{ message?: string; increment?: number }>
     ): Promise<{ message: string, model: string }> => {
         const language = ConfigService.getCommitLanguage();
         const messageLength = ConfigService.getCommitMessageLength();
         const truncatedDiff = this.truncateDiff(diff);
-        const prompt = PromptService.generatePrompt(truncatedDiff, blameAnalysis, language, messageLength);
+        const prompt = PromptService.generatePrompt(truncatedDiff, blameAnalysis, refs, language, messageLength);
 
         progress.report({ message: "Generating commit message...", increment: 50 });
 
@@ -288,8 +300,16 @@ const generateAndSetCommitMessage = async () => {
                 }
             }
 
+            let refs = '';
+            if (ConfigService.shouldPromptForRefs()) {
+                refs = await vscode.window.showInputBox({
+                    prompt: "Enter refs (e.g., issue numbers) if applicable",
+                    placeHolder: "e.g., #123, JIRA-456"
+                }) || '';
+            }
+
             progress.report({ message: "Generating commit message...", increment: 50 });
-            const { message: commitMessage, model } = await AIService.generateCommitMessage(diff, blameAnalysis, progress);
+            const { message: commitMessage, model } = await AIService.generateCommitMessage(diff, blameAnalysis, refs, progress);
             Logger.log('Commit message generated successfully');
 
             progress.report({ message: "Setting commit message...", increment: 75 });

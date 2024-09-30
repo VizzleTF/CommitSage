@@ -91,4 +91,8 @@ export class ConfigService {
         this.cache.clear();
         Logger.log('Configuration cache cleared');
     }
+
+    static shouldPromptForRefs(): boolean {
+        return this.getConfig<boolean>('promptForRefs', false);
+    }
 }
