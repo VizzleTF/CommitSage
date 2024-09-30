@@ -1,11 +1,11 @@
-import { ConfigService } from './configService';
+import { ConfigService } from '../utils/configService';
 import {
     englishShortInstructions,
     englishLongInstructions,
     russianShortInstructions,
     russianLongInstructions,
     customInstructions
-} from './commitInstructions';
+} from '../commitInstructions';
 
 export class PromptService {
     static generatePrompt(diff: string, blameAnalysis: string, language: string, messageLength: string): string {
