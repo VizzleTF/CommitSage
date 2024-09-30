@@ -69,6 +69,16 @@
         "configuration": {
             "title": "GeminiCommit",
             "properties": {
+                "geminiCommit.useCustomEndpoint": {
+                    "type": "boolean",
+                    "default": false,
+                    "description": "Use a custom endpoint for AI-generated commit messages"
+                },
+                "geminiCommit.promptForRefs": {
+                    "type": "boolean",
+                    "default": false,
+                    "description": "Prompt for entering refs (e.g., issue numbers) when generating commit messages"
+                },
                 "geminiCommit.geminiModel": {
                     "type": "string",
                     "enum": [
@@ -102,11 +112,6 @@
                     "type": "string",
                     "default": "",
                     "description": "Custom instructions for commit message generation (used when commitMessageLength is set to 'custom')"
-                },
-                "geminiCommit.useCustomEndpoint": {
-                    "type": "boolean",
-                    "default": false,
-                    "description": "Use a custom endpoint for AI-generated commit messages"
                 },
                 "geminiCommit.customEndpoint": {
                     "type": "string",
