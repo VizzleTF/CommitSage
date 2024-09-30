@@ -2,7 +2,7 @@
     "name": "geminicommit",
     "displayName": "Gemini Commit",
     "description": "Automatically generate commit messages using AI",
-    "version": "1.4.2",
+    "version": "1.5.0",
     "publisher": "VizzleTF",
     "repository": {
         "type": "git",
@@ -132,23 +132,21 @@
         "watch": "tsc -watch -p ./",
         "pretest": "npm run compile && npm run lint",
         "lint": "eslint src --ext ts",
-        "test": "node ./out/test/runTest.js",
         "package": "vsce package"
     },
     "devDependencies": {
-        "@types/vscode": "^1.93.0",
-        "@types/glob": "7.2.0",
+        "@types/glob": "^7.2.0",
         "@types/mocha": "^10.0.7",
         "@types/node": "^20.11.10",
-        "eslint": "^8.56.0",
+        "@types/vscode": "^1.93.0",
         "@typescript-eslint/eslint-plugin": "^7.0.0",
         "@typescript-eslint/parser": "^7.18.0",
-        "glob": "^8.1.0",
-        "minimatch": "3.1.2",
-        "mocha": "^10.2.0",
-        "typescript": "^5.3.3",
         "@vscode/test-electron": "^2.3.9",
-        "@vscode/vsce": "^3.1.0"
+        "@vscode/vsce": "^3.1.0",
+        "eslint": "^8.56.0",
+        "glob": "^8.1.0",
+        "mocha": "^10.2.0",
+        "typescript": "^5.3.3"
     },
     "dependencies": {
         "axios": "^1.6.7"

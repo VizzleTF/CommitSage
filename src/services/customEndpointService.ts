@@ -1,13 +1,14 @@
 import axios from 'axios';
 import * as vscode from 'vscode';
-import { Logger } from './logger';
-import { ConfigService } from './configService';
+import { Logger } from '../utils/logger';
+import { ConfigService } from '../utils/configService';
+import { ProgressReporter, CommitMessage } from '../models/types';
 
 export class CustomEndpointService {
     static async generateCommitMessage(
         prompt: string,
-        progress: vscode.Progress<{ message?: string; increment?: number }>
-    ): Promise<{ message: string, model: string }> {
+        progress: ProgressReporter
+    ): Promise<CommitMessage> {
         const apiKey = await ConfigService.getCustomApiKey();
         const endpoint = ConfigService.getCustomEndpoint();
         const model = ConfigService.getCustomModel();

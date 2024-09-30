@@ -1,12 +1,12 @@
 import * as vscode from 'vscode';
 import { spawn } from 'child_process';
-import { Logger } from './logger';
+import { Logger } from '../utils/logger';
 import {
     GitExtensionNotFoundError,
     NoRepositoriesFoundError,
     NoChangesDetectedError,
     NoRepositorySelectedError
-} from './errors';
+} from '../models/errors';
 
 export class GitService {
     static async getDiff(repoPath: string): Promise<string> {
