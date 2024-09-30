@@ -10,6 +10,9 @@ import {
     customInstructions
 } from './commitInstructions';
 import { analyzeFileChanges } from './gitBlameAnalyzer';
+import { CustomEndpointService } from './customEndpoint';
+import { Logger } from './logger';
+import { ConfigService } from './configService';
 
 // Constants
 const EXTENSION_NAME = 'GeminiCommit';
@@ -18,12 +21,7 @@ const VIEW_ID = 'geminiCommitView';
 const MAX_RETRIES = 3;
 const INITIAL_RETRY_DELAY_MS = 1000;
 const MAX_DIFF_LENGTH = 10000;
-const DEFAULT_GEMINI_MODEL = 'gemini-1.5-flash';
-const DEFAULT_COMMIT_LANGUAGE = 'english';
-const DEFAULT_COMMIT_MESSAGE_LENGTH = 'long';
 const GEMINI_API_BASE_URL = 'https://generativelanguage.googleapis.com/v1beta/models';
-const API_KEY_SECRET_KEY = 'geminicommit.apiKey';
-const CUSTOM_API_KEY_SECRET_KEY = 'geminicommit.customApiKey';
 const ERROR_MESSAGES = {
     NO_GIT_EXTENSION: 'Git extension not found. Please make sure it is installed and enabled.',
     NO_REPOSITORIES: 'No Git repositories found in the current workspace.',
@@ -38,99 +36,6 @@ type GitExtension = { getAPI(version: number): GitAPI };
 type GitAPI = { repositories: Repository[] };
 type Repository = { rootUri: vscode.Uri; inputBox: { value: string } };
 type ErrorWithResponse = Error & { response?: { status: number; data: any } };
-
-// Logger
-class Logger {
-    static log = (message: string): void =>
-        console.log(`[${EXTENSION_NAME}] ${message}`);
-
-    static error = (message: string, error?: Error): void => {
-        console.error(`[${EXTENSION_NAME}] ${message}`);
-        error?.stack && console.error(`Stack trace: ${error.stack}`);
-        vscode.window.showErrorMessage(message);
-    };
-}
-
-// Configuration Service
-class ConfigService {
-    private static cache = new Map<string, any>();
-    private static secretStorage: vscode.SecretStorage;
-
-    static initialize(context: vscode.ExtensionContext): void {
-        this.secretStorage = context.secrets;
-    }
-
-    static getConfig = <T>(key: string, defaultValue: T): T => {
-        if (!this.cache.has(key)) {
-            const value = vscode.workspace.getConfiguration('geminiCommit').get<T>(key) ?? defaultValue;
-            this.cache.set(key, value);
-        }
-        return this.cache.get(key);
-    };
-
-    static getApiKey = async (): Promise<string> => {
-        let key = await this.secretStorage.get(API_KEY_SECRET_KEY);
-        if (!key) {
-            key = await vscode.window.showInputBox({
-                prompt: 'Enter your Google API Key',
-                ignoreFocusOut: true,
-                password: true
-            });
-            if (!key) {
-                throw new Error(ERROR_MESSAGES.API_KEY_NOT_SET);
-            }
-            await this.secretStorage.store(API_KEY_SECRET_KEY, key);
-        }
-        return key;
-    };
-
-    static setApiKey = async (key: string): Promise<void> => {
-        await this.secretStorage.store(API_KEY_SECRET_KEY, key);
-    };
-
-    static getCustomApiKey = async (): Promise<string> => {
-        let key = await this.secretStorage.get(CUSTOM_API_KEY_SECRET_KEY);
-        if (!key) {
-            key = await vscode.window.showInputBox({
-                prompt: 'Enter your Custom API Key',
-                ignoreFocusOut: true,
-                password: true
-            });
-            if (!key) {
-                throw new Error(ERROR_MESSAGES.API_KEY_NOT_SET);
-            }
-            await this.secretStorage.store(CUSTOM_API_KEY_SECRET_KEY, key);
-        }
-        return key;
-    };
-
-    static setCustomApiKey = async (key: string): Promise<void> => {
-        await this.secretStorage.store(CUSTOM_API_KEY_SECRET_KEY, key);
-    };
-
-    static getGeminiModel = (): string =>
-        this.getConfig<string>('geminiModel', DEFAULT_GEMINI_MODEL);
-
-    static getCommitLanguage = (): string =>
-        this.getConfig<string>('commitLanguage', DEFAULT_COMMIT_LANGUAGE);
-
-    static getCommitMessageLength = (): string =>
-        this.getConfig<string>('commitMessageLength', DEFAULT_COMMIT_MESSAGE_LENGTH);
-
-    static getCustomInstructions = (): string =>
-        this.getConfig<string>('customInstructions', '');
-
-    static useCustomEndpoint = (): boolean =>
-        this.getConfig<boolean>('useCustomEndpoint', false);
-
-    static getCustomEndpoint = (): string =>
-        this.getConfig<string>('customEndpoint', '');
-
-    static getCustomModel = (): string =>
-        this.getConfig<string>('customModel', '');
-
-    static clearCache = (): void => this.cache.clear();
-}
 
 // Git Service
 class GitService {
@@ -228,7 +133,7 @@ class AIService {
         diff: string,
         blameAnalysis: string,
         progress: vscode.Progress<{ message?: string; increment?: number }>
-    ): Promise<string> => {
+    ): Promise<{ message: string, model: string }> => {
         const language = ConfigService.getCommitLanguage();
         const messageLength = ConfigService.getCommitMessageLength();
         const truncatedDiff = this.truncateDiff(diff);
@@ -237,7 +142,7 @@ class AIService {
         progress.report({ message: "Generating commit message...", increment: 50 });
 
         if (ConfigService.useCustomEndpoint()) {
-            return this.generateWithCustomEndpoint(prompt, progress);
+            return CustomEndpointService.generateCommitMessage(prompt, progress);
         } else {
             return this.generateWithGemini(prompt, progress);
         }
@@ -256,7 +161,7 @@ class AIService {
         prompt: string,
         progress: vscode.Progress<{ message?: string; increment?: number }>,
         attempt: number = 1
-    ): Promise<string> => {
+    ): Promise<{ message: string, model: string }> => {
         const apiKey = await ConfigService.getApiKey();
         const model = ConfigService.getGeminiModel();
         const GEMINI_API_URL = `${GEMINI_API_BASE_URL}/${model}:generateContent`;
@@ -283,7 +188,7 @@ class AIService {
             progress.report({ message: "Commit message generated successfully", increment: 100 });
             const commitMessage = this.cleanCommitMessage(data.candidates[0].content.parts[0].text);
             if (!commitMessage.trim()) throw new Error(ERROR_MESSAGES.EMPTY_COMMIT_MESSAGE);
-            return commitMessage;
+            return { message: commitMessage, model };
         } catch (error) {
             Logger.error(`Attempt ${attempt} failed:`, error as Error);
             const { errorMessage, shouldRetry } = this.handleApiError(error as ErrorWithResponse);
@@ -294,50 +199,6 @@ class AIService {
                 progress.report({ message: `Retrying in ${delayMs / 1000} seconds...`, increment: 0 });
                 await this.delay(delayMs);
                 return this.generateWithGemini(prompt, progress, attempt + 1);
-            }
-
-            throw new Error(`Failed to generate commit message: ${errorMessage}`);
-        }
-    };
-
-    private static generateWithCustomEndpoint = async (
-        prompt: string,
-        progress: vscode.Progress<{ message?: string; increment?: number }>,
-        attempt: number = 1
-    ): Promise<string> => {
-        const apiKey = await ConfigService.getCustomApiKey();
-        const endpoint = ConfigService.getCustomEndpoint();
-        const model = ConfigService.getCustomModel();
-
-        const payload = {
-            model: model,
-            messages: [{ role: "user", content: prompt }]
-        };
-
-        const headers = {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${apiKey}`
-        };
-
-        try {
-            Logger.log(`Attempt ${attempt}: Sending request to custom endpoint`);
-            progress.report({ message: `Attempt ${attempt}: Generating commit message...`, increment: 10 });
-            const { data } = await axios.post(endpoint, payload, { headers });
-            Logger.log('Custom endpoint response received successfully');
-            progress.report({ message: "Commit message generated successfully", increment: 100 });
-            const commitMessage = this.cleanCommitMessage(data.choices[0].message.content);
-            if (!commitMessage.trim()) throw new Error(ERROR_MESSAGES.EMPTY_COMMIT_MESSAGE);
-            return commitMessage;
-        } catch (error) {
-            Logger.error(`Attempt ${attempt} failed:`, error as Error);
-            const { errorMessage, shouldRetry } = this.handleApiError(error as ErrorWithResponse);
-
-            if (shouldRetry && attempt < MAX_RETRIES) {
-                const delayMs = this.calculateRetryDelay(attempt);
-                Logger.log(`Retrying in ${delayMs / 1000} seconds...`);
-                progress.report({ message: `Retrying in ${delayMs / 1000} seconds...`, increment: 0 });
-                await this.delay(delayMs);
-                return this.generateWithCustomEndpoint(prompt, progress, attempt + 1);
             }
 
             throw new Error(`Failed to generate commit message: ${errorMessage}`);
@@ -428,7 +289,7 @@ const generateAndSetCommitMessage = async () => {
             }
 
             progress.report({ message: "Generating commit message...", increment: 50 });
-            const commitMessage = await AIService.generateCommitMessage(diff, blameAnalysis, progress);
+            const { message: commitMessage, model } = await AIService.generateCommitMessage(diff, blameAnalysis, progress);
             Logger.log('Commit message generated successfully');
 
             progress.report({ message: "Setting commit message...", increment: 75 });
@@ -436,7 +297,7 @@ const generateAndSetCommitMessage = async () => {
             Logger.log('Commit message set successfully');
 
             progress.report({ message: "Done!", increment: 100 });
-            vscode.window.showInformationMessage('Commit message set in selected Git repository.');
+            vscode.window.showInformationMessage(`Commit message set in selected Git repository. Generated using ${model} model.`);
         } catch (error) {
             Logger.error('Error in command execution:', error as Error);
             vscode.window.showErrorMessage(`Failed to generate commit message: ${(error as Error).message}`);
