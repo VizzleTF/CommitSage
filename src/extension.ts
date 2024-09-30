@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
 import { spawn } from 'child_process';
 import axios from 'axios';
-import * as path from 'path'; // Добавленный импорт
+import * as path from 'path';
 import {
     englishShortInstructions,
     englishLongInstructions,
@@ -23,13 +23,14 @@ const DEFAULT_COMMIT_LANGUAGE = 'english';
 const DEFAULT_COMMIT_MESSAGE_LENGTH = 'long';
 const GEMINI_API_BASE_URL = 'https://generativelanguage.googleapis.com/v1beta/models';
 const API_KEY_SECRET_KEY = 'geminicommit.apiKey';
+const CUSTOM_API_KEY_SECRET_KEY = 'geminicommit.customApiKey';
 const ERROR_MESSAGES = {
     NO_GIT_EXTENSION: 'Git extension not found. Please make sure it is installed and enabled.',
     NO_REPOSITORIES: 'No Git repositories found in the current workspace.',
     NO_CHANGES: 'No changes detected in the repository.',
     NO_REPO_SELECTED: 'No repository selected. Operation cancelled.',
     EMPTY_COMMIT_MESSAGE: 'Generated commit message is empty.',
-    API_KEY_NOT_SET: 'Google API key is not set. Please set it in the extension settings.'
+    API_KEY_NOT_SET: 'API key is not set. Please set it in the extension settings.'
 };
 
 // Types
@@ -87,6 +88,26 @@ class ConfigService {
         await this.secretStorage.store(API_KEY_SECRET_KEY, key);
     };
 
+    static getCustomApiKey = async (): Promise<string> => {
+        let key = await this.secretStorage.get(CUSTOM_API_KEY_SECRET_KEY);
+        if (!key) {
+            key = await vscode.window.showInputBox({
+                prompt: 'Enter your Custom API Key',
+                ignoreFocusOut: true,
+                password: true
+            });
+            if (!key) {
+                throw new Error(ERROR_MESSAGES.API_KEY_NOT_SET);
+            }
+            await this.secretStorage.store(CUSTOM_API_KEY_SECRET_KEY, key);
+        }
+        return key;
+    };
+
+    static setCustomApiKey = async (key: string): Promise<void> => {
+        await this.secretStorage.store(CUSTOM_API_KEY_SECRET_KEY, key);
+    };
+
     static getGeminiModel = (): string =>
         this.getConfig<string>('geminiModel', DEFAULT_GEMINI_MODEL);
 
@@ -98,6 +119,15 @@ class ConfigService {
 
     static getCustomInstructions = (): string =>
         this.getConfig<string>('customInstructions', '');
+
+    static useCustomEndpoint = (): boolean =>
+        this.getConfig<boolean>('useCustomEndpoint', false);
+
+    static getCustomEndpoint = (): string =>
+        this.getConfig<string>('customEndpoint', '');
+
+    static getCustomModel = (): string =>
+        this.getConfig<string>('customModel', '');
 
     static clearCache = (): void => this.cache.clear();
 }
@@ -205,7 +235,12 @@ class AIService {
         const prompt = PromptService.generatePrompt(truncatedDiff, blameAnalysis, language, messageLength);
 
         progress.report({ message: "Generating commit message...", increment: 50 });
-        return this.generateWithGemini(prompt, progress);
+
+        if (ConfigService.useCustomEndpoint()) {
+            return this.generateWithCustomEndpoint(prompt, progress);
+        } else {
+            return this.generateWithGemini(prompt, progress);
+        }
     };
 
     private static truncateDiff = (diff: string): string => {
@@ -216,6 +251,7 @@ class AIService {
         Logger.log(`Diff length: ${diff.length} characters`);
         return diff;
     };
+
     private static generateWithGemini = async (
         prompt: string,
         progress: vscode.Progress<{ message?: string; increment?: number }>,
@@ -258,6 +294,50 @@ class AIService {
                 progress.report({ message: `Retrying in ${delayMs / 1000} seconds...`, increment: 0 });
                 await this.delay(delayMs);
                 return this.generateWithGemini(prompt, progress, attempt + 1);
+            }
+
+            throw new Error(`Failed to generate commit message: ${errorMessage}`);
+        }
+    };
+
+    private static generateWithCustomEndpoint = async (
+        prompt: string,
+        progress: vscode.Progress<{ message?: string; increment?: number }>,
+        attempt: number = 1
+    ): Promise<string> => {
+        const apiKey = await ConfigService.getCustomApiKey();
+        const endpoint = ConfigService.getCustomEndpoint();
+        const model = ConfigService.getCustomModel();
+
+        const payload = {
+            model: model,
+            messages: [{ role: "user", content: prompt }]
+        };
+
+        const headers = {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${apiKey}`
+        };
+
+        try {
+            Logger.log(`Attempt ${attempt}: Sending request to custom endpoint`);
+            progress.report({ message: `Attempt ${attempt}: Generating commit message...`, increment: 10 });
+            const { data } = await axios.post(endpoint, payload, { headers });
+            Logger.log('Custom endpoint response received successfully');
+            progress.report({ message: "Commit message generated successfully", increment: 100 });
+            const commitMessage = this.cleanCommitMessage(data.choices[0].message.content);
+            if (!commitMessage.trim()) throw new Error(ERROR_MESSAGES.EMPTY_COMMIT_MESSAGE);
+            return commitMessage;
+        } catch (error) {
+            Logger.error(`Attempt ${attempt} failed:`, error as Error);
+            const { errorMessage, shouldRetry } = this.handleApiError(error as ErrorWithResponse);
+
+            if (shouldRetry && attempt < MAX_RETRIES) {
+                const delayMs = this.calculateRetryDelay(attempt);
+                Logger.log(`Retrying in ${delayMs / 1000} seconds...`);
+                progress.report({ message: `Retrying in ${delayMs / 1000} seconds...`, increment: 0 });
+                await this.delay(delayMs);
+                return this.generateWithCustomEndpoint(prompt, progress, attempt + 1);
             }
 
             throw new Error(`Failed to generate commit message: ${errorMessage}`);
@@ -390,6 +470,20 @@ export const activate = (context: vscode.ExtensionContext): void => {
         }
     });
     context.subscriptions.push(setApiKeyCommand);
+
+    // Register command to set custom API key
+    const setCustomApiKeyCommand = vscode.commands.registerCommand('geminicommit.setCustomApiKey', async () => {
+        const key = await vscode.window.showInputBox({
+            prompt: 'Enter your Custom API Key',
+            ignoreFocusOut: true,
+            password: true
+        });
+        if (key) {
+            await ConfigService.setCustomApiKey(key);
+            vscode.window.showInformationMessage('Custom API key has been set successfully.');
+        }
+    });
+    context.subscriptions.push(setCustomApiKeyCommand);
 };
 
 export const deactivate = (): void => {
