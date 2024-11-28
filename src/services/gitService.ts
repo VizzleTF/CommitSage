@@ -9,10 +9,13 @@ import {
 } from '../models/errors';
 
 export class GitService {
-    static async getDiff(repoPath: string): Promise<string> {
-        Logger.log(`Getting diff for repository: ${repoPath}`);
-        const diff = await this.executeGitCommand(['diff'], repoPath);
-        if (!diff.trim()) throw new NoChangesDetectedError();
+    static async getDiff(repoPath: string, onlyStaged: boolean = false): Promise<string> {
+        Logger.log(`Getting diff for repository: ${repoPath}, onlyStaged: ${onlyStaged}`);
+        const diffCommand = onlyStaged ? ['diff', '--staged'] : ['diff'];
+        const diff = await this.executeGitCommand(diffCommand, repoPath);
+        if (!diff.trim()) {
+            throw new NoChangesDetectedError(onlyStaged ? 'No staged changes detected.' : 'No changes detected.');
+        }
         return diff;
     }
 
@@ -59,10 +62,12 @@ export class GitService {
         return selected.repository;
     }
 
-    static async getChangedFiles(repoPath: string): Promise<string[]> {
-        const output = await this.executeGitCommand(['status', '--porcelain'], repoPath);
+    static async getChangedFiles(repoPath: string, onlyStaged: boolean = false): Promise<string[]> {
+        const statusCommand = ['status', '--porcelain'];
+        const output = await this.executeGitCommand(statusCommand, repoPath);
         return output.split('\n')
             .filter(line => line.trim() !== '')
+            .filter(line => !onlyStaged || line[0] === 'M' || line[0] === 'A' || line[0] === 'D' || line[0] === 'R')
             .map(line => line.substring(3).trim());
     }
 }

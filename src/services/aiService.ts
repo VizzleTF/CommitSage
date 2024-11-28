@@ -155,13 +155,14 @@ export async function generateAndSetCommitMessage(): Promise<void> {
             }
 
             const repoPath = selectedRepo.rootUri.fsPath;
+            const onlyStagedChanges = ConfigService.getOnlyStagedChanges();
 
-            progress.report({ message: "Fetching Git diff...", increment: 0 });
-            const diff = await GitService.getDiff(repoPath);
+            progress.report({ message: `Fetching Git diff${onlyStagedChanges ? ' (staged changes only)' : ''}...`, increment: 0 });
+            const diff = await GitService.getDiff(repoPath, onlyStagedChanges);
             Logger.log(`Git diff fetched successfully. Length: ${diff.length} characters`);
 
             progress.report({ message: "Analyzing changes...", increment: 25 });
-            const changedFiles = await GitService.getChangedFiles(repoPath);
+            const changedFiles = await GitService.getChangedFiles(repoPath, onlyStagedChanges);
             let blameAnalysis = '';
             for (const file of changedFiles) {
                 const filePath = vscode.Uri.file(path.join(repoPath, file));

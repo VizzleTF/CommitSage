@@ -13,8 +13,8 @@ export class NoRepositoriesFoundError extends Error {
 }
 
 export class NoChangesDetectedError extends Error {
-    constructor() {
-        super('No changes detected in the repository.');
+    constructor(message: string = 'No changes detected.') {
+        super(message);
         this.name = 'NoChangesDetectedError';
     }
 }
