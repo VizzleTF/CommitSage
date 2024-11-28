@@ -95,4 +95,8 @@ export class ConfigService {
     static shouldPromptForRefs(): boolean {
         return this.getConfig<boolean>('promptForRefs', false);
     }
+
+    static getOnlyStagedChanges(): boolean {
+        return this.getConfig<boolean>('onlyStagedChanges', false);
+    }
 }

@@ -122,6 +122,11 @@
                     "type": "string",
                     "default": "",
                     "description": "Model name to use with the custom endpoint"
+                },
+                "geminiCommit.onlyStagedChanges": {
+                    "type": "boolean",
+                    "default": false,
+                    "description": "Generate commit message only for staged changes"
                 }
             }
         }
