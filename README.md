@@ -7,10 +7,9 @@ GeminiCommit is a VSCode extension that automatically generates commit messages 
 ![GeminiCommit in action](example.gif)
 
 ## Features
-
 - AI-powered commit message generation
 - Support for Google's Gemini AI and custom endpoints
-- English and Russian language support
+- Multi-language support (English and Russian, with more languages available upon request)
 - Customizable message styles (short, long, custom)
 - Option to include references (e.g., issue numbers)
 - Secure API key storage
@@ -53,8 +52,7 @@ Key settings:
 Contributions welcome! See [CONTRIBUTING.md](CONTRIBUTING.md) for details.
 
 ## Support
-
-For issues or questions, please use our [GitHub Issues](https://github.com/VizzleTF/GeminiCommit/issues).
+For issues, questions, or feature requests including additional language support, please use our [GitHub Issues](https://github.com/VizzleTF/GeminiCommit/issues).
 
 ## License
 
