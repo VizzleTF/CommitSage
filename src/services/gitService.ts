@@ -12,13 +12,22 @@ export class GitService {
     static async getDiff(repoPath: string, onlyStaged: boolean = false): Promise<string> {
         Logger.log(`Getting diff for repository: ${repoPath}, onlyStaged: ${onlyStaged}`);
 
+        const stagedDiff = await this.executeGitCommand(['diff', '--staged'], repoPath);
+
+        if (stagedDiff.trim()) {
+            return stagedDiff;
+        }
+
+        if (onlyStaged) {
+            throw new NoChangesDetectedError('No staged changes detected.');
+        }
+
+        const unstaged = await this.executeGitCommand(['diff'], repoPath);
+
         const untrackedFiles = await this.getUntrackedFiles(repoPath);
 
-        const diffCommand = onlyStaged ? ['diff', '--staged'] : ['diff'];
-        const diff = await this.executeGitCommand(diffCommand, repoPath);
-
         let untrackedContent = '';
-        if (!onlyStaged && untrackedFiles.length > 0) {
+        if (untrackedFiles.length > 0) {
             for (const file of untrackedFiles) {
                 untrackedContent += `diff --git a/${file} b/${file}\n`;
                 untrackedContent += `new file mode 100644\n`;
@@ -39,10 +48,10 @@ export class GitService {
             }
         }
 
-        const combinedDiff = diff + (untrackedContent ? '\n' + untrackedContent : '');
+        const combinedDiff = unstaged + (untrackedContent ? '\n' + untrackedContent : '');
 
         if (!combinedDiff.trim()) {
-            throw new NoChangesDetectedError(onlyStaged ? 'No staged changes detected.' : 'No changes detected.');
+            throw new NoChangesDetectedError('No changes detected.');
         }
 
         return combinedDiff;
