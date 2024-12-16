@@ -11,12 +11,47 @@ import {
 export class GitService {
     static async getDiff(repoPath: string, onlyStaged: boolean = false): Promise<string> {
         Logger.log(`Getting diff for repository: ${repoPath}, onlyStaged: ${onlyStaged}`);
+
+        const untrackedFiles = await this.getUntrackedFiles(repoPath);
+
         const diffCommand = onlyStaged ? ['diff', '--staged'] : ['diff'];
         const diff = await this.executeGitCommand(diffCommand, repoPath);
-        if (!diff.trim()) {
+
+        let untrackedContent = '';
+        if (!onlyStaged && untrackedFiles.length > 0) {
+            for (const file of untrackedFiles) {
+                untrackedContent += `diff --git a/${file} b/${file}\n`;
+                untrackedContent += `new file mode 100644\n`;
+                untrackedContent += `--- /dev/null\n`;
+                untrackedContent += `+++ b/${file}\n`;
+
+                try {
+                    const fileContent = await this.executeGitCommand(['show', `:${file}`], repoPath).catch(() => '');
+                    if (fileContent) {
+                        untrackedContent += fileContent.split('\n')
+                            .map(line => `+${line}`)
+                            .join('\n');
+                        untrackedContent += '\n';
+                    }
+                } catch (error) {
+                    Logger.log(`Error reading content of ${file}: ${error}`);
+                }
+            }
+        }
+
+        const combinedDiff = diff + (untrackedContent ? '\n' + untrackedContent : '');
+
+        if (!combinedDiff.trim()) {
             throw new NoChangesDetectedError(onlyStaged ? 'No staged changes detected.' : 'No changes detected.');
         }
-        return diff;
+
+        return combinedDiff;
+    }
+
+    private static async getUntrackedFiles(repoPath: string): Promise<string[]> {
+        const command = ['ls-files', '--others', '--exclude-standard'];
+        const output = await this.executeGitCommand(command, repoPath);
+        return output.split('\n').filter(line => line.trim() !== '');
     }
 
     private static executeGitCommand(args: string[], cwd: string): Promise<string> {
