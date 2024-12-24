@@ -107,14 +107,26 @@ GeminiCommit - расширение VSCode для автоматической �
 3. Укажите название модели (например, "gpt-3.5-turbo" для OpenAI)
 4. Используйте палитру команд (Ctrl+Shift+P) для установки API ключа
 
-## Requirements & Support
+## Community & Support
 
+### 📢 Stay Updated
+- [Telegram Channel](https://t.me/geminicommit) - Release announcements and updates
+- [Telegram Group](https://t.me/+0qCa4b-tw703ZDRi) - Community discussions and support
+
+### 🤝 Get Help
+- Report issues on [GitHub Issues](https://github.com/VizzleTF/GeminiCommit/issues)
+- Join our Telegram community for:
+  - Quick support
+  - Feature discussions
+  - Community updates
+
+### 🛠 Technical Requirements
 - VS Code 1.93.0+
 - Git
 - Google AI API key or custom endpoint
----
-- For issues, questions, or feature requests including additional language support, please use our [Telegram](https://t.me/+0qCa4b-tw703ZDRi) or [GitHub Issues](https://github.com/VizzleTF/GeminiCommit/issues) 
-- Contributions welcome! See [CONTRIBUTING.md](CONTRIBUTING.md) for details
+
+### 👥 Contributing
+Contributions are welcome! See [CONTRIBUTING.md](CONTRIBUTING.md) for details
 
 ## License
 
