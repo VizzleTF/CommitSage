@@ -1,7 +1,7 @@
 {
     "name": "geminicommit",
     "displayName": "Gemini Commit",
-    "description": "Automatically generate commit messages using AI",
+    "description": "Free AI commit messages using Gemini or custom LLM",
     "version": "1.6.4",
     "publisher": "VizzleTF",
     "repository": {
