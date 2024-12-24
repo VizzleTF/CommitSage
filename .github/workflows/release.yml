@@ -48,14 +48,24 @@ jobs:
         SECOND_LATEST_TAG=$(git describe --tags --abbrev=0 $LATEST_TAG^)
         NOTES=$(git log $SECOND_LATEST_TAG..$LATEST_TAG --pretty=format:"- %s")
         
+        # Добавляем пометку о security релизе если это он
         if echo "$NOTES" | grep -q "security patch release"; then
           NOTES="🔒 Security Patch Release\n\nThis release contains important security updates.\n\nChanges:\n$NOTES"
+          TELEGRAM_PREFIX="🔒 Security Update!"
         else
           NOTES="Changes:\n$NOTES"
+          TELEGRAM_PREFIX="🚀 New Release!"
         fi
+        
+        # Форматируем сообщение для Telegram
+        TELEGRAM_MSG="$TELEGRAM_PREFIX\n\nGeminiCommit ${LATEST_TAG}\n\n${NOTES}"
         
         echo "NOTES<<EOF" >> $GITHUB_OUTPUT
         echo "$NOTES" >> $GITHUB_OUTPUT
+        echo "EOF" >> $GITHUB_OUTPUT
+        
+        echo "TELEGRAM_MSG<<EOF" >> $GITHUB_OUTPUT
+        echo "$TELEGRAM_MSG" >> $GITHUB_OUTPUT
         echo "EOF" >> $GITHUB_OUTPUT
 
     - name: Create Release
@@ -104,6 +114,18 @@ jobs:
         registryUrl: https://marketplace.visualstudio.com
         extensionFile: ./geminicommit-${{ steps.get_version.outputs.VERSION }}.vsix
         packagePath: ''
+
+    - name: Send Telegram Notification
+      if: success()
+      uses: appleboy/telegram-action@master
+      with:
+        to: ${{ secrets.TELEGRAM_CHAT_ID }}
+        token: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+        format: markdown
+        message: |
+          ${{ steps.release_notes.outputs.TELEGRAM_MSG }}
+          
+          [Download from Marketplace](https://marketplace.visualstudio.com/items?itemName=VizzleTF.geminicommit)
 
     - name: Notify on Security Release
       if: ${{ contains(steps.release_notes.outputs.NOTES, '🔒 Security Patch Release') }}

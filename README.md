@@ -113,7 +113,7 @@ GeminiCommit - расширение VSCode для автоматической �
 - Git
 - Google AI API key or custom endpoint
 ---
-- For issues, questions, or feature requests including additional language support, please use our [GitHub Issues](https://github.com/VizzleTF/GeminiCommit/issues)
+- For issues, questions, or feature requests including additional language support, please use our [Telegram](https://t.me/+0qCa4b-tw703ZDRi) or [GitHub Issues](https://github.com/VizzleTF/GeminiCommit/issues) 
 - Contributions welcome! See [CONTRIBUTING.md](CONTRIBUTING.md) for details
 
 ## License
