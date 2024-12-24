@@ -47,17 +47,21 @@ jobs:
         LATEST_TAG=$(git describe --tags --abbrev=0)
         SECOND_LATEST_TAG=$(git describe --tags --abbrev=0 $LATEST_TAG^)
         
+        # Получаем список изменений и очищаем его
         CHANGES=$(git log $SECOND_LATEST_TAG..$LATEST_TAG --pretty=format:"- %s")
+        # Удаляем экранированные переносы строк и "Changes:"
         CLEAN_CHANGES=$(echo "$CHANGES" | sed 's/\\n/\n/g' | sed 's/^Changes://g')
         
+        # Определяем тип релиза
         if echo "$CLEAN_CHANGES" | grep -q "security patch release"; then
-          PREFIX="🔒 Security Update!"
+          PREFIX="# 🔒 Security Update!"
           RELEASE_NOTE="This release contains important security updates."
         else
-          PREFIX="🚀 New Release!"
+          PREFIX="# 🚀 New Release!"
           RELEASE_NOTE=""
         fi
         
+        # Формируем финальное сообщение для Telegram
         cat << EOF > telegram_message.txt
         $PREFIX
 
