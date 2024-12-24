@@ -111,7 +111,7 @@ GeminiCommit - расширение VSCode для автоматической �
 
 ### 📢 Stay Updated
 - [Telegram Channel](https://t.me/geminicommit) - Release announcements and updates
-- [Telegram Group](https://t.me/+0qCa4b-tw703ZDRi) - Community discussions and support
+- [Telegram Group](https://t.me/gemini_commit) - Community discussions and support
 
 ### 🤝 Get Help
 - Report issues on [GitHub Issues](https://github.com/VizzleTF/GeminiCommit/issues)
