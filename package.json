@@ -25,6 +25,7 @@
         "AI Assistant",
         "AI",
         "Autocommit",
+        "LLM",
         "Git"
     ],
     "activationEvents": [
