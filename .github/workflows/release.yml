@@ -57,8 +57,12 @@ jobs:
           TELEGRAM_PREFIX="🚀 New Release!"
         fi
         
-        # Форматируем сообщение для Telegram
-        TELEGRAM_MSG="$TELEGRAM_PREFIX\n\nGeminiCommit ${LATEST_TAG}\n\n${NOTES}"
+        TELEGRAM_MSG="${TELEGRAM_PREFIX}
+
+        GeminiCommit ${LATEST_TAG}
+
+        Changes:
+        ${NOTES}"
         
         echo "NOTES<<EOF" >> $GITHUB_OUTPUT
         echo "$NOTES" >> $GITHUB_OUTPUT
@@ -126,6 +130,8 @@ jobs:
           ${{ steps.release_notes.outputs.TELEGRAM_MSG }}
           
           [Download from Marketplace](https://marketplace.visualstudio.com/items?itemName=VizzleTF.geminicommit)
+          
+          Join our [community chat](https://t.me/+0qCa4b-tw703ZDRi) for discussions and support!
 
     - name: Notify on Security Release
       if: ${{ contains(steps.release_notes.outputs.NOTES, '🔒 Security Patch Release') }}
