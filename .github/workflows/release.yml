@@ -46,31 +46,48 @@ jobs:
       run: |
         LATEST_TAG=$(git describe --tags --abbrev=0)
         SECOND_LATEST_TAG=$(git describe --tags --abbrev=0 $LATEST_TAG^)
-        NOTES=$(git log $SECOND_LATEST_TAG..$LATEST_TAG --pretty=format:"- %s")
         
-        # Добавляем пометку о security релизе если это он
-        if echo "$NOTES" | grep -q "security patch release"; then
-          NOTES="🔒 Security Patch Release\n\nThis release contains important security updates.\n\nChanges:\n$NOTES"
-          TELEGRAM_PREFIX="🔒 Security Update!"
+        CHANGES=$(git log $SECOND_LATEST_TAG..$LATEST_TAG --pretty=format:"- %s")
+        CLEAN_CHANGES=$(echo "$CHANGES" | sed 's/\\n/\n/g' | sed 's/^Changes://g')
+        
+        if echo "$CLEAN_CHANGES" | grep -q "security patch release"; then
+          PREFIX="🔒 Security Update!"
+          RELEASE_NOTE="This release contains important security updates."
         else
-          NOTES="Changes:\n$NOTES"
-          TELEGRAM_PREFIX="🚀 New Release!"
+          PREFIX="🚀 New Release!"
+          RELEASE_NOTE=""
         fi
         
-        TELEGRAM_MSG="${TELEGRAM_PREFIX}
+        cat << EOF > telegram_message.txt
+        $PREFIX
 
         GeminiCommit ${LATEST_TAG}
 
         Changes:
-        ${NOTES}"
-        
-        echo "NOTES<<EOF" >> $GITHUB_OUTPUT
-        echo "$NOTES" >> $GITHUB_OUTPUT
-        echo "EOF" >> $GITHUB_OUTPUT
+        $CLEAN_CHANGES
+
+        [Download from Marketplace](https://marketplace.visualstudio.com/items?itemName=VizzleTF.geminicommit)
+
+        Join our [community chat](https://t.me/+0qCa4b-tw703ZDRi) for discussions and support!
+        EOF
         
         echo "TELEGRAM_MSG<<EOF" >> $GITHUB_OUTPUT
-        echo "$TELEGRAM_MSG" >> $GITHUB_OUTPUT
+        cat telegram_message.txt >> $GITHUB_OUTPUT
         echo "EOF" >> $GITHUB_OUTPUT
+        
+        if [ -n "$RELEASE_NOTE" ]; then
+          echo "NOTES<<EOF" >> $GITHUB_OUTPUT
+          echo "$RELEASE_NOTE" >> $GITHUB_OUTPUT
+          echo "" >> $GITHUB_OUTPUT
+          echo "Changes:" >> $GITHUB_OUTPUT
+          echo "$CLEAN_CHANGES" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+        else
+          echo "NOTES<<EOF" >> $GITHUB_OUTPUT
+          echo "Changes:" >> $GITHUB_OUTPUT
+          echo "$CLEAN_CHANGES" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+        fi
 
     - name: Create Release
       env:
@@ -126,12 +143,7 @@ jobs:
         to: ${{ secrets.TELEGRAM_CHAT_ID }}
         token: ${{ secrets.TELEGRAM_BOT_TOKEN }}
         format: markdown
-        message: |
-          ${{ steps.release_notes.outputs.TELEGRAM_MSG }}
-          
-          [Download from Marketplace](https://marketplace.visualstudio.com/items?itemName=VizzleTF.geminicommit)
-          
-          Join our [community chat](https://t.me/+0qCa4b-tw703ZDRi) for discussions and support!
+        message_file: telegram_message.txt
 
     - name: Notify on Security Release
       if: ${{ contains(steps.release_notes.outputs.NOTES, '🔒 Security Patch Release') }}
