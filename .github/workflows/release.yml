@@ -65,7 +65,7 @@ jobs:
         cat << EOF > telegram_message.txt
         $PREFIX
 
-        GeminiCommit ${LATEST_TAG}
+        GeminiCommit _${LATEST_TAG}_
 
         Changes:
         $CLEAN_CHANGES
