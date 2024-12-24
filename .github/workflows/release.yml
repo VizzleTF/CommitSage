@@ -54,10 +54,10 @@ jobs:
         
         # Определяем тип релиза
         if echo "$CLEAN_CHANGES" | grep -q "security patch release"; then
-          PREFIX="# 🔒 Security Update!"
+          PREFIX="*🔒 Security Update!*"
           RELEASE_NOTE="This release contains important security updates."
         else
-          PREFIX="# 🚀 New Release!"
+          PREFIX="*🚀 New Release!*"
           RELEASE_NOTE=""
         fi
         
