@@ -26,6 +26,11 @@ jobs:
     - name: Install dependencies
       run: npm install
 
+    - name: Check dependencies compatibility
+      run: |
+        npm audit
+        npm outdated || true
+
     - name: Compile extension
       run: npm run compile
 
@@ -42,6 +47,13 @@ jobs:
         LATEST_TAG=$(git describe --tags --abbrev=0)
         SECOND_LATEST_TAG=$(git describe --tags --abbrev=0 $LATEST_TAG^)
         NOTES=$(git log $SECOND_LATEST_TAG..$LATEST_TAG --pretty=format:"- %s")
+        
+        if echo "$NOTES" | grep -q "security patch release"; then
+          NOTES="🔒 Security Patch Release\n\nThis release contains important security updates.\n\nChanges:\n$NOTES"
+        else
+          NOTES="Changes:\n$NOTES"
+        fi
+        
         echo "NOTES<<EOF" >> $GITHUB_OUTPUT
         echo "$NOTES" >> $GITHUB_OUTPUT
         echo "EOF" >> $GITHUB_OUTPUT
@@ -92,3 +104,21 @@ jobs:
         registryUrl: https://marketplace.visualstudio.com
         extensionFile: ./geminicommit-${{ steps.get_version.outputs.VERSION }}.vsix
         packagePath: ''
+
+    - name: Notify on Security Release
+      if: ${{ contains(steps.release_notes.outputs.NOTES, '🔒 Security Patch Release') }}
+      uses: actions/github-script@v6
+      with:
+        script: |
+          const issue = await github.rest.issues.create({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            title: `Security Release v${process.env.VERSION} Published`,
+            body: `A new security patch release v${process.env.VERSION} has been published to address critical vulnerabilities.
+                  
+                  Release Notes:
+                  ${{ steps.release_notes.outputs.NOTES }}
+                  
+                  The extension has been automatically updated in the Visual Studio Marketplace.`,
+            labels: ['security']
+          });
