@@ -69,17 +69,46 @@
         "configuration": {
             "title": "GeminiCommit",
             "properties": {
-                "geminiCommit.useCustomEndpoint": {
+                "geminiCommit.commit.promptForRefs": {
                     "type": "boolean",
                     "default": false,
-                    "description": "Use a custom endpoint for AI-generated commit messages"
+                    "description": "Prompt for entering refs (e.g., issue numbers) when generating commit messages",
+                    "order": 1
                 },
-                "geminiCommit.promptForRefs": {
+                "geminiCommit.commit.commitLanguage": {
+                    "type": "string",
+                    "enum": [
+                        "english",
+                        "russian"
+                    ],
+                    "default": "english",
+                    "description": "Language for generated commit messages",
+                    "order": 2
+                },
+                "geminiCommit.commit.commitMessageLength": {
+                    "type": "string",
+                    "enum": [
+                        "short",
+                        "long",
+                        "custom"
+                    ],
+                    "default": "long",
+                    "description": "Length of generated commit messages or use custom instructions",
+                    "order": 3
+                },
+                "geminiCommit.commit.customInstructions": {
+                    "type": "string",
+                    "default": "",
+                    "description": "Custom instructions for commit message generation (used when commitMessageLength is set to 'custom')",
+                    "order": 4
+                },
+                "geminiCommit.commit.onlyStagedChanges": {
                     "type": "boolean",
                     "default": false,
-                    "description": "Prompt for entering refs (e.g., issue numbers) when generating commit messages"
+                    "description": "Generate commit message only for staged changes",
+                    "order": 5
                 },
-                "geminiCommit.geminiModel": {
+                "geminiCommit.gemini.model": {
                     "type": "string",
                     "enum": [
                         "gemini-1.0-pro",
@@ -88,46 +117,26 @@
                         "gemini-2.0-flash-exp"
                     ],
                     "default": "gemini-1.5-flash",
-                    "description": "Select Gemini model for commit message generation"
+                    "description": "Select Gemini model for commit message generation",
+                    "order": 6
                 },
-                "geminiCommit.commitLanguage": {
-                    "type": "string",
-                    "enum": [
-                        "english",
-                        "russian"
-                    ],
-                    "default": "english",
-                    "description": "Language for generated commit messages"
-                },
-                "geminiCommit.commitMessageLength": {
-                    "type": "string",
-                    "enum": [
-                        "short",
-                        "long",
-                        "custom"
-                    ],
-                    "default": "long",
-                    "description": "Length of generated commit messages"
-                },
-                "geminiCommit.customInstructions": {
-                    "type": "string",
-                    "default": "",
-                    "description": "Custom instructions for commit message generation (used when commitMessageLength is set to 'custom')"
-                },
-                "geminiCommit.customEndpoint": {
-                    "type": "string",
-                    "default": "",
-                    "description": "Custom endpoint URL for AI-generated commit messages"
-                },
-                "geminiCommit.customModel": {
-                    "type": "string",
-                    "default": "",
-                    "description": "Model name to use with the custom endpoint"
-                },
-                "geminiCommit.onlyStagedChanges": {
+                "geminiCommit.custom.useCustomEndpoint": {
                     "type": "boolean",
                     "default": false,
-                    "description": "Generate commit message only for staged changes"
+                    "description": "Use a custom endpoint for AI-generated commit messages",
+                    "order": 7
+                },
+                "geminiCommit.custom.endpoint": {
+                    "type": "string",
+                    "default": "",
+                    "description": "Custom endpoint URL for AI-generated commit messages",
+                    "order": 8
+                },
+                "geminiCommit.custom.model": {
+                    "type": "string",
+                    "default": "",
+                    "description": "Model name to use with the custom endpoint",
+                    "order": 9
                 }
             }
         }

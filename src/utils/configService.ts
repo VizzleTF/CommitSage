@@ -4,17 +4,28 @@ import { Logger } from './logger';
 export class ConfigService {
     private static cache = new Map<string, any>();
     private static secretStorage: vscode.SecretStorage;
+    private static configurationListener: vscode.Disposable;
 
     static initialize(context: vscode.ExtensionContext): void {
         this.secretStorage = context.secrets;
+
+        this.configurationListener = vscode.workspace.onDidChangeConfiguration(event => {
+            if (event.affectsConfiguration('geminiCommit')) {
+                this.clearCache();
+                Logger.log('Configuration changed, cache cleared');
+            }
+        });
+
+        context.subscriptions.push(this.configurationListener);
     }
 
-    static getConfig<T>(key: string, defaultValue: T): T {
-        if (!this.cache.has(key)) {
-            const value = vscode.workspace.getConfiguration('geminiCommit').get<T>(key) ?? defaultValue;
-            this.cache.set(key, value);
+    static getConfig<T>(section: string, key: string, defaultValue: T): T {
+        const cacheKey = `${section}.${key}`;
+        if (!this.cache.has(cacheKey)) {
+            const value = vscode.workspace.getConfiguration('geminiCommit').get<T>(`${section}.${key}`) ?? defaultValue;
+            this.cache.set(cacheKey, value);
         }
-        return this.cache.get(key);
+        return this.cache.get(cacheKey);
     }
 
     static async getApiKey(): Promise<string> {
@@ -60,31 +71,31 @@ export class ConfigService {
     }
 
     static getGeminiModel(): string {
-        return this.getConfig<string>('geminiModel', 'gemini-1.5-flash');
+        return this.getConfig<string>('gemini', 'model', 'gemini-1.5-flash');
     }
 
     static getCommitLanguage(): string {
-        return this.getConfig<string>('commitLanguage', 'english');
+        return this.getConfig<string>('commit', 'commitLanguage', 'english');
     }
 
     static getCommitMessageLength(): string {
-        return this.getConfig<string>('commitMessageLength', 'long');
+        return this.getConfig<string>('commit', 'commitMessageLength', 'long');
     }
 
     static getCustomInstructions(): string {
-        return this.getConfig<string>('customInstructions', '');
+        return this.getConfig<string>('commit', 'customInstructions', '');
     }
 
     static useCustomEndpoint(): boolean {
-        return this.getConfig<boolean>('useCustomEndpoint', false);
+        return this.getConfig<boolean>('custom', 'useCustomEndpoint', false);
     }
 
     static getCustomEndpoint(): string {
-        return this.getConfig<string>('customEndpoint', '');
+        return this.getConfig<string>('custom', 'endpoint', '');
     }
 
     static getCustomModel(): string {
-        return this.getConfig<string>('customModel', '');
+        return this.getConfig<string>('custom', 'model', '');
     }
 
     static clearCache(): void {
@@ -93,10 +104,10 @@ export class ConfigService {
     }
 
     static shouldPromptForRefs(): boolean {
-        return this.getConfig<boolean>('promptForRefs', false);
+        return this.getConfig<boolean>('commit', 'promptForRefs', false);
     }
 
     static getOnlyStagedChanges(): boolean {
-        return this.getConfig<boolean>('onlyStagedChanges', false);
+        return this.getConfig<boolean>('commit', 'onlyStagedChanges', false);
     }
 }
