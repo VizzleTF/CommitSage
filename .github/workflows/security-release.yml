@@ -1,0 +1,100 @@
+name: Security Updates Auto-Release
+
+on:
+  pull_request:
+    types: [opened, reopened, synchronize]
+    paths:
+      - 'package-lock.json'
+      - 'package.json'
+
+jobs:
+  check-security:
+    runs-on: ubuntu-latest
+    if: github.actor == 'dependabot[bot]'
+    permissions:
+      contents: write
+      pull-requests: write
+    outputs:
+      has_critical: ${{ steps.check.outputs.has_critical }}
+      new_version: ${{ steps.version.outputs.new_version }}
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+          
+      - name: Check for critical vulnerabilities
+        id: check
+        run: |
+          # Проверяем наличие критических уязвимостей
+          if npm audit | grep -i 'critical'; then
+            echo "has_critical=true" >> $GITHUB_OUTPUT
+          else
+            echo "has_critical=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Bump patch version
+        if: steps.check.outputs.has_critical == 'true'
+        id: version
+        run: |
+          # Читаем текущую версию
+          CURRENT_VERSION=$(node -p "require('./package.json').version")
+          # Увеличиваем patch версию
+          NEW_VERSION=$(echo $CURRENT_VERSION | awk -F. '{$NF = $NF + 1;} 1' | sed 's/ /./g')
+          # Обновляем package.json
+          sed -i "s/\"version\": \"$CURRENT_VERSION\"/\"version\": \"$NEW_VERSION\"/" package.json
+          echo "new_version=$NEW_VERSION" >> $GITHUB_OUTPUT
+
+  auto-release:
+    needs: check-security
+    if: needs.check-security.outputs.has_critical == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+          
+      - name: Install dependencies
+        run: npm install
+        
+      - name: Compile extension
+        run: npm run compile
+        
+      - name: Package extension
+        run: npm run package
+
+      - name: Create Pull Request
+        uses: peter-evans/create-pull-request@v5
+        with:
+          commit-message: "chore: security patch release v${{ needs.check-security.outputs.new_version }}"
+          title: "Security Patch Release v${{ needs.check-security.outputs.new_version }}"
+          body: |
+            Automated security patch release to address critical vulnerabilities.
+            
+            This PR was automatically created to:
+            1. Bump version to ${{ needs.check-security.outputs.new_version }}
+            2. Update dependencies with security fixes
+            
+            After merging, a new release will be automatically created.
+          branch: security-patch-release
+          base: main
+          labels: security,automated-pr
+          
+      - name: Auto approve PR
+        run: gh pr review --approve "$PR_URL"
+        env:
+          PR_URL: ${{ github.event.pull_request.html_url }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Enable auto-merge
+        run: gh pr merge --auto --merge "$PR_URL"
+        env:
+          PR_URL: ${{ github.event.pull_request.html_url }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
