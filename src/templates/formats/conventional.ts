@@ -2,90 +2,70 @@ export const conventionalTemplate = {
     en: `Generate a commit message following the Conventional Commits format:
 <type>[optional scope]: <description>
 
-[body with changes as bullet points]
+[optional body with bullet points]
 
 Rules:
 1. First line: type(scope): description (max 50 chars)
-- Type must be one of: feat|fix|docs|style|refactor|perf|test|build|ci|chore
-- Scope is optional and should be area of the change
-- Description should be clear and concise
+2. For small changes use only first line
+3. For complex changes list key points in body:
+   - Each line starts with "- "
+   - Each line max 50 chars
 
-2. Body format:
-- Each change on a new line
-- Start each line with "- "
-- Each line max 50 chars
-- Focus on what was changed
-- Use imperative mood
-
-Types guide:
-feat: New feature or significant enhancement
+Types:
+feat: New feature
 fix: Bug fix
-docs: Documentation changes
-style: Code formatting/style only
-refactor: Code change without behavior change
-perf: Performance improvement
-test: Adding/updating tests
-build: Build system or dependencies
+docs: Documentation
+style: Formatting
+refactor: Code restructuring
+perf: Performance
+test: Testing
+build: Build/dependencies
 ci: CI/CD changes
-chore: General maintenance
+chore: Maintenance
 
 Examples:
-feat(auth): add Google OAuth login
+Small change:
+feat(api): add user profile endpoint
 
-- Implement OAuth2 authentication flow
-- Add user profile data fetching
-- Create secure token storage
-- Update login UI components
+Complex change:
+feat(auth): implement user authentication
 
-fix(api): resolve data caching issue
-
-- Fix cache invalidation logic
-- Add cache timeout checks
-- Update error handling
-`,
+- Add OAuth2 provider integration
+- Create auth service module
+- Add session storage`,
 
     ru: `Создайте сообщение коммита в формате Conventional Commits:
 <тип>[область]: <описание>
 
-[тело с изменениями как список]
+[опциональное тело со списком изменений]
 
 Правила:
 1. Первая строка: тип(область): описание (макс 50 символов)
-- Тип должен быть одним из: feat|fix|docs|style|refactor|perf|test|build|ci|chore
-- Область опциональна и должна указывать на место изменений
-- Описание должно быть чётким и кратким
+2. Для небольших изменений только первая строка
+3. Для сложных изменений список ключевых моментов:
+   - Каждая строка начинается с "- "
+   - Каждая строка макс 50 символов
 
-2. Формат тела:
-- Каждое изменение с новой строки
-- Начинать каждую строку с "- "
-- Каждая строка макс 50 символов
-- Фокус на том, что изменилось
-- Использовать повелительное наклонение
-
-Типы изменений:
+Типы:
 feat: Новая функциональность
 fix: Исправление ошибки
-docs: Изменения в документации
-style: Форматирование кода
-refactor: Рефакторинг кода
-perf: Улучшение производительности
-test: Добавление/обновление тестов
-build: Система сборки или зависимости
-ci: Изменения в CI/CD
-chore: Общие изменения
+docs: Документация
+style: Форматирование
+refactor: Реструктуризация кода
+perf: Производительность
+test: Тестирование
+build: Сборка/зависимости
+ci: CI/CD изменения
+chore: Обслуживание
 
 Примеры:
-feat(auth): добавить вход через Google OAuth
+Небольшое изменение:
+feat(api): добавить эндпоинт профиля пользователя
 
-- Реализовать поток аутентификации OAuth2
-- Добавить получение данных профиля
-- Создать безопасное хранение токенов
-- Обновить компоненты UI входа
+Сложное изменение:
+feat(auth): внедрить аутентификацию пользователей
 
-fix(api): исправить проблему с кешированием
-
-- Исправить логику инвалидации кеша
-- Добавить проверки таймаута кеша
-- Обновить обработку ошибок
-`
+- Добавить интеграцию с OAuth2
+- Создать модуль сервиса авторизации
+- Добавить хранение сессий`
 };
