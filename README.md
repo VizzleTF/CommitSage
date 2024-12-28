@@ -6,30 +6,68 @@ GeminiCommit is a VSCode extension that automatically generates commit messages 
 
 ![GeminiCommit in action](example.gif)
 
-[Features](#features) • [Quick Start & Usage](#quick-start--usage) • [Gemini Models & Custom Endpoints](#gemini-models--custom-endpoints) • [Example Messages](#example-messages)
+[Features](#features) • [Quick Start & Usage](#quick-start--usage) • [Commit Formats](#commit-formats) • [Gemini Models & Custom Endpoints](#gemini-models--custom-endpoints) • [Example Messages](#example-messages)
 
 ## Features
 - AI-powered commit message generation
+- Multiple commit message formats (Conventional, Angular, Karma, Semantic, Emoji)
 - Support for Google's Gemini AI and custom endpoints (OpenAI API)
 - Multi-language support (English and Russian, with more languages available upon request)
-- Customizable message styles (short, long, custom)
+- Customizable commit message instructions
 - Option to include references (e.g., issue numbers)
 - Secure API key storage
 
 ## Quick Start & Usage
 
 1. Install from [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=VizzleTF.geminicommit)
-1. Set up API key:
+2. Set up API key:
    - For Gemini AI: Get key from [Google AI Studio](https://aistudio.google.com/app/apikey)
    - For custom endpoint: Configure in settings
-1. Use Command Palette (Ctrl+Shift+P) to set API key
-1. Configure preferences in VS Code settings
----
-1. Stage your changes in Git
-1. Click "Generate Commit Message" in Source Control view
-1. (Optional) Enter references if prompted
-1. Review and edit the generated message
-1. Commit as usual
+3. Use Command Palette (Ctrl+Shift+P) to set API key
+4. Configure preferences in VS Code settings:
+   - Select your preferred commit format
+   - Choose language
+   - Enable custom instructions if needed
+5. Stage your changes in Git
+6. Click "Generate Commit Message" in Source Control view
+7. (Optional) Enter references if prompted
+8. Review and edit the generated message
+9. Commit as usual
+
+## Commit Formats
+
+The extension supports multiple commit message formats:
+
+1. **Conventional Commits** (default)
+   ```
+   <type>[optional scope]: <description>
+   
+   [optional body with bullet points]
+   ```
+
+2. **Angular**
+   ```
+   <type>(<scope>): <short summary>
+   
+   [optional body with bullet points]
+   ```
+
+3. **Karma**
+   ```
+   <type>(<scope>): <message>
+   ```
+
+4. **Semantic**
+   ```
+   type: message
+   ```
+
+5. **Emoji**
+   ```
+   :emoji: message
+   ```
+
+Each format has its own set of types and rules. For small changes, only the header line is generated. For complex changes, a detailed body with bullet points is included.
 
 ## Gemini Models & Custom Endpoints
 
@@ -52,19 +90,19 @@ To configure a custom endpoint:
 
 ## Example Messages
 
-Short format:
-```
-feat: add user authentication system
-```
 
-Long format:
+Conventional format (complex change):
 ```
 feat(auth): implement user authentication system
 
 - Add JWT token-based authentication
 - Create login/register endpoints
-- Implement password hashing
 - Add session management
+```
+
+Emoji format:
+```
+✨ add real-time collaboration feature
 ```
 
 ---
@@ -76,17 +114,31 @@ GeminiCommit - расширение VSCode для автоматической �
 ### Быстрый старт & Использование
 
 1. Установите из [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=VizzleTF.geminicommit)
-1. Настройте API ключ:
+2. Настройте API ключ:
    - Для Gemini AI: Получите ключ на [Google AI Studio](https://aistudio.google.com/app/apikey)
    - Для пользовательского сервиса: Настройте в настройках
-1. Используйте палитру команд (Ctrl+Shift+P) для установки API ключа
-1. Настройте предпочтения в настройках VS Code
----
-1. Подготовьте изменения в Git
-1. Нажмите "Generate Commit Message" в панели Source Control
-1. (Опционально) Введите ссылки, если запрошено
-1. Просмотрите и отредактируйте сгенерированное сообщение
-1. Сделайте коммит как обычно
+3. Используйте палитру команд (Ctrl+Shift+P) для установки API ключа
+4. Настройте предпочтения в настройках VS Code:
+   - Выберите предпочтительный формат коммитов
+   - Выберите язык
+   - При необходимости включите пользовательские инструкции
+5. Подготовьте изменения в Git
+6. Нажмите "Generate Commit Message" в панели Source Control
+7. (Опционально) Введите ссылки, если запрошено
+8. Просмотрите и отредактируйте сгенерированное сообщение
+9. Сделайте коммит как обычно
+
+### Форматы коммитов
+
+Расширение поддерживает несколько форматов сообщений коммитов:
+
+1. **Conventional Commits** (по умолчанию)
+2. **Angular**
+3. **Karma**
+4. **Semantic**
+5. **Emoji**
+
+Каждый формат имеет свой набор типов и правил. Для небольших изменений генерируется только заголовок, для сложных изменений добавляется детальное описание с пунктами.
 
 ### Модели & Эндпоинты
 

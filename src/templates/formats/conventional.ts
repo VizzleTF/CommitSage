@@ -11,28 +11,32 @@ Rules:
    - Each line starts with "- "
    - Each line max 50 chars
 
-Types:
-feat: New feature
-fix: Bug fix
-docs: Documentation
-style: Formatting
-refactor: Code restructuring
-perf: Performance
-test: Testing
-build: Build/dependencies
-ci: CI/CD changes
-chore: Maintenance
+Type selection rules:
+- docs: ANY changes to documentation files (*.md, docs/*)
+- feat: New features or significant functional changes
+- fix: Bug fixes and error corrections
+- style: Formatting, semicolons, etc (no code change)
+- refactor: Code changes that don't fix bugs or add features
+- perf: Performance improvements
+- test: Adding or updating tests
+- build: Build system or dependencies
+- ci: CI/CD changes
+- chore: Other maintenance tasks
 
 Examples:
-Small change:
-feat(api): add user profile endpoint
+Documentation change:
+docs: update installation and usage guides
 
-Complex change:
-feat(auth): implement user authentication
+- Add new features description
+- Update configuration section
+- Add usage examples
 
-- Add OAuth2 provider integration
+Feature change:
+feat(auth): add user authentication
+
+- Implement OAuth2 provider integration
 - Create auth service module
-- Add session storage`,
+- Add session management`,
 
     ru: `Создайте сообщение коммита в формате Conventional Commits:
 <тип>[область]: <описание>
@@ -46,26 +50,30 @@ feat(auth): implement user authentication
    - Каждая строка начинается с "- "
    - Каждая строка макс 50 символов
 
-Типы:
-feat: Новая функциональность
-fix: Исправление ошибки
-docs: Документация
-style: Форматирование
-refactor: Реструктуризация кода
-perf: Производительность
-test: Тестирование
-build: Сборка/зависимости
-ci: CI/CD изменения
-chore: Обслуживание
+Правила выбора типа:
+- docs: ЛЮБЫЕ изменения в документации (*.md, docs/*)
+- feat: Новая функциональность или значимые изменения
+- fix: Исправление ошибок
+- style: Форматирование, точки с запятой и т.д.
+- refactor: Изменения кода без новой функциональности
+- perf: Улучшения производительности
+- test: Добавление или обновление тестов
+- build: Система сборки или зависимости
+- ci: Изменения в CI/CD
+- chore: Другие задачи обслуживания
 
 Примеры:
-Небольшое изменение:
-feat(api): добавить эндпоинт профиля пользователя
+Изменение документации:
+docs: обновить руководство по установке и использованию
 
-Сложное изменение:
-feat(auth): внедрить аутентификацию пользователей
+- Добавить описание новых функций
+- Обновить раздел конфигурации
+- Добавить примеры использования
 
-- Добавить интеграцию с OAuth2
+Новая функциональность:
+feat(auth): добавить аутентификацию пользователей
+
+- Внедрить интеграцию с OAuth2
 - Создать модуль сервиса авторизации
-- Добавить хранение сессий`
+- Добавить управление сессиями`
 };
