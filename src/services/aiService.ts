@@ -7,7 +7,7 @@ import { CommitMessage, ProgressReporter } from '../models/types';
 import { CustomEndpointService } from './customEndpointService';
 import { PromptService } from './promptService';
 import { GitService } from './gitService';
-import { analyzeFileChanges } from '../gitBlameAnalyzer';
+import { analyzeFileChanges } from './gitBlameAnalyzer';
 
 const MAX_RETRIES = 3;
 const INITIAL_RETRY_DELAY_MS = 1000;
@@ -22,10 +22,8 @@ export class AIService {
         blameAnalysis: string,
         progress: ProgressReporter
     ): Promise<CommitMessage> {
-        const language = ConfigService.getCommitLanguage();
-        const messageLength = ConfigService.getCommitMessageLength();
         const truncatedDiff = this.truncateDiff(diff);
-        const prompt = PromptService.generatePrompt(truncatedDiff, blameAnalysis, language, messageLength);
+        const prompt = PromptService.generatePrompt(truncatedDiff, blameAnalysis);
 
         progress.report({ message: "Generating commit message...", increment: 50 });
 

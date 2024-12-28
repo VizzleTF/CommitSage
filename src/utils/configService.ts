@@ -78,8 +78,12 @@ export class ConfigService {
         return this.getConfig<string>('commit', 'commitLanguage', 'english');
     }
 
-    static getCommitMessageLength(): string {
-        return this.getConfig<string>('commit', 'commitMessageLength', 'long');
+    static getCommitFormat(): string {
+        return this.getConfig<string>('commit', 'commitFormat', 'conventional');
+    }
+
+    static useCustomInstructions(): boolean {
+        return this.getConfig<boolean>('commit', 'useCustomInstructions', false);
     }
 
     static getCustomInstructions(): string {
