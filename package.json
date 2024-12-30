@@ -163,6 +163,7 @@
         "watch": "tsc -watch -p ./",
         "pretest": "npm run compile && npm run lint",
         "lint": "eslint src --ext ts",
+        "lint:fix": "eslint src --ext ts --fix",
         "package": "vsce package"
     },
     "devDependencies": {
