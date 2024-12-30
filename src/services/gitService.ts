@@ -10,7 +10,7 @@ import {
 
 export class GitService {
     static async getDiff(repoPath: string, onlyStaged: boolean = false): Promise<string> {
-        Logger.log(`Getting diff for repository: ${repoPath}, onlyStaged: ${onlyStaged}`);
+        void Logger.log(`Getting diff for repository: ${repoPath}, onlyStaged: ${onlyStaged}`);
 
         const stagedDiff = await this.executeGitCommand(['diff', '--staged'], repoPath);
 
@@ -23,7 +23,6 @@ export class GitService {
         }
 
         const unstaged = await this.executeGitCommand(['diff'], repoPath);
-
         const untrackedFiles = await this.getUntrackedFiles(repoPath);
 
         let untrackedContent = '';
@@ -43,7 +42,8 @@ export class GitService {
                         untrackedContent += '\n';
                     }
                 } catch (error) {
-                    Logger.log(`Error reading content of ${file}: ${error}`);
+                    const errorMessage = error instanceof Error ? error.message : String(error);
+                    void Logger.log(`Error reading content of ${file}: ${errorMessage}`);
                 }
             }
         }
@@ -72,26 +72,35 @@ export class GitService {
             childProcess.stdout.on('data', (data) => { stdout += data; });
             childProcess.stderr.on('data', (data) => { stderr += data; });
             childProcess.on('close', (code) => {
-                code !== 0
-                    ? reject(new Error(`Git ${args.join(' ')} failed with code ${code}: ${stderr}`))
-                    : resolve(stdout);
+                if (code !== 0) {
+                    reject(new Error(`Git ${args.join(' ')} failed with code ${code}: ${stderr}`));
+                } else {
+                    resolve(stdout);
+                }
             });
         });
     }
 
     static async getRepositories(): Promise<vscode.SourceControl[]> {
-        const gitExtension = vscode.extensions.getExtension<GitExtension>('vscode.git');
-        if (!gitExtension) throw new GitExtensionNotFoundError();
+        const extension = vscode.extensions.getExtension<GitExtension>('vscode.git');
+        if (!extension) {
+            throw new GitExtensionNotFoundError();
+        }
 
-        const git = gitExtension.exports.getAPI(1);
-        const repos = git.repositories;
-        if (repos.length === 0) throw new NoRepositoriesFoundError();
+        const gitExtension = await extension.activate();
+        const git = gitExtension.getAPI(1);
 
-        return repos;
+        if (!git?.repositories?.length) {
+            throw new NoRepositoriesFoundError();
+        }
+
+        return git.repositories;
     }
 
     static async selectRepository(repos: vscode.SourceControl[]): Promise<vscode.SourceControl> {
-        if (repos.length === 1) return repos[0];
+        if (repos.length === 1) {
+            return repos[0];
+        }
 
         const repoOptions = repos.map(repo => ({
             label: repo.rootUri ? repo.rootUri.fsPath : 'Unknown repository path',
@@ -102,7 +111,9 @@ export class GitService {
             placeHolder: 'Select the repository to generate commit message'
         });
 
-        if (!selected) throw new NoRepositorySelectedError();
+        if (!selected) {
+            throw new NoRepositorySelectedError();
+        }
         return selected.repository;
     }
 
@@ -117,9 +128,7 @@ export class GitService {
 }
 
 interface GitExtension {
-    getAPI(version: number): GitAPI;
-}
-
-interface GitAPI {
-    repositories: vscode.SourceControl[];
+    getAPI(version: 1): {
+        repositories: vscode.SourceControl[];
+    };
 }

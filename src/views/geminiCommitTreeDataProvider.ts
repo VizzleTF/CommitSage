@@ -4,7 +4,7 @@ export class GeminiCommitTreeDataProvider implements vscode.TreeDataProvider<vsc
     getTreeItem = (element: vscode.TreeItem): vscode.TreeItem => element;
 
     getChildren = (element?: vscode.TreeItem): Thenable<vscode.TreeItem[]> => {
-        if (element) return Promise.resolve([]);
+        if (element) {return Promise.resolve([]);}
         const generateButton = new vscode.TreeItem("Generate Commit Message");
         generateButton.command = {
             command: 'geminicommit.generateCommitMessage',

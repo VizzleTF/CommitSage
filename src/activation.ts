@@ -13,40 +13,47 @@ export function activate(context: vscode.ExtensionContext): void {
 
     ConfigService.initialize(context);
 
-    const generateCommitMessageCommand = vscode.commands.registerCommand(COMMAND_ID, generateAndSetCommitMessage);
+    const generateCommitMessageCommand = vscode.commands.registerCommand(
+        COMMAND_ID,
+        generateAndSetCommitMessage
+    );
 
     const treeDataProvider = new GeminiCommitTreeDataProvider();
     const treeView = vscode.window.createTreeView(VIEW_ID, { treeDataProvider });
 
     context.subscriptions.push(generateCommitMessageCommand, treeView);
 
-    registerApiKeyCommands(context);
+    void registerApiKeyCommands(context);
 }
 
 function registerApiKeyCommands(context: vscode.ExtensionContext): void {
-    const setApiKeyCommand = vscode.commands.registerCommand('geminicommit.setApiKey', async () => {
-        const key = await vscode.window.showInputBox({
-            prompt: 'Enter your Google API Key',
-            ignoreFocusOut: true,
-            password: true
-        });
-        if (key) {
-            await ConfigService.setApiKey(key);
-            vscode.window.showInformationMessage('API key has been set successfully.');
+    const setApiKeyCommand = vscode.commands.registerCommand(
+        'geminicommit.setApiKey',
+        async () => {
+            const key = await vscode.window.showInputBox({
+                prompt: 'Enter your Google API Key',
+                ignoreFocusOut: true,
+                password: true
+            });
+            if (key) {
+                await ConfigService.setApiKey(key);
+            }
         }
-    });
+    );
 
-    const setCustomApiKeyCommand = vscode.commands.registerCommand('geminicommit.setCustomApiKey', async () => {
-        const key = await vscode.window.showInputBox({
-            prompt: 'Enter your Custom API Key',
-            ignoreFocusOut: true,
-            password: true
-        });
-        if (key) {
-            await ConfigService.setCustomApiKey(key);
-            vscode.window.showInformationMessage('Custom API key has been set successfully.');
+    const setCustomApiKeyCommand = vscode.commands.registerCommand(
+        'geminicommit.setCustomApiKey',
+        async () => {
+            const key = await vscode.window.showInputBox({
+                prompt: 'Enter your Custom API Key',
+                ignoreFocusOut: true,
+                password: true
+            });
+            if (key) {
+                await ConfigService.setCustomApiKey(key);
+            }
         }
-    });
+    );
 
     context.subscriptions.push(setApiKeyCommand, setCustomApiKeyCommand);
 }

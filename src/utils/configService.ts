@@ -3,8 +3,10 @@ import { Logger } from './logger';
 import { ApiKeyValidator } from './apiKeyValidator';
 import { AiServiceError, ConfigurationError } from '../models/errors';
 
+type CacheValue = string | boolean | number;
+
 export class ConfigService {
-    private static cache = new Map<string, any>();
+    private static cache = new Map<string, CacheValue>();
     private static secretStorage: vscode.SecretStorage;
     private static configurationListener: vscode.Disposable;
 
@@ -14,26 +16,26 @@ export class ConfigService {
         this.configurationListener = vscode.workspace.onDidChangeConfiguration(event => {
             if (event.affectsConfiguration('geminiCommit')) {
                 this.clearCache();
-                Logger.log('Configuration changed, cache cleared');
+                void Logger.log('Configuration changed, cache cleared');
             }
         });
 
         context.subscriptions.push(this.configurationListener);
-        Logger.log('ConfigService initialized');
+        void Logger.log('ConfigService initialized');
     }
 
-    static getConfig<T>(section: string, key: string, defaultValue: T): T {
+    static getConfig<T extends CacheValue>(section: string, key: string, defaultValue: T): T {
         try {
             const cacheKey = `${section}.${key}`;
             if (!this.cache.has(cacheKey)) {
                 const config = vscode.workspace.getConfiguration('geminiCommit');
                 const value = config.get<T>(`${section}.${key}`) ?? defaultValue;
                 this.cache.set(cacheKey, value);
-                Logger.log(`Config loaded: ${cacheKey} = ${JSON.stringify(value)}`);
+                void Logger.log(`Config loaded: ${cacheKey} = ${JSON.stringify(value)}`);
             }
-            return this.cache.get(cacheKey);
+            return this.cache.get(cacheKey) as T;
         } catch (error) {
-            Logger.error(`Error getting config ${section}.${key}:`, error as Error);
+            void Logger.error(`Error getting config ${section}.${key}:`, error as Error);
             return defaultValue;
         }
     }
@@ -48,9 +50,9 @@ export class ConfigService {
                     ignoreFocusOut: true,
                     password: true,
                     validateInput: (value: string) => {
-                        if (!value) return 'API key cannot be empty';
-                        if (value.length < 32) return 'API key is too short';
-                        if (!/^[A-Za-z0-9_-]+$/.test(value)) return 'API key contains invalid characters';
+                        if (!value) { return 'API key cannot be empty'; }
+                        if (value.length < 32) { return 'API key is too short'; }
+                        if (!/^[A-Za-z0-9_-]+$/.test(value)) { return 'API key contains invalid characters'; }
                         return null;
                     }
                 });
@@ -64,7 +66,7 @@ export class ConfigService {
 
             return key;
         } catch (error) {
-            Logger.error('Error getting API key:', error as Error);
+            void Logger.error('Error getting API key:', error as Error);
             throw new AiServiceError('Failed to get API key: ' + (error as Error).message);
         }
     }
@@ -74,12 +76,12 @@ export class ConfigService {
             await ApiKeyValidator.validateGeminiApiKey(key);
 
             await this.secretStorage.store('geminicommit.apiKey', key);
-            Logger.log('Google API key has been validated and set');
+            void Logger.log('Google API key has been validated and set');
 
-            vscode.window.showInformationMessage('Google API key has been successfully validated and saved');
+            await vscode.window.showInformationMessage('Google API key has been successfully validated and saved');
         } catch (error) {
-            Logger.error('Failed to validate and set Google API key:', error as Error);
-            vscode.window.showErrorMessage(`Failed to set API key: ${(error as Error).message}`);
+            void Logger.error('Failed to validate and set Google API key:', error as Error);
+            await vscode.window.showErrorMessage(`Failed to set API key: ${(error as Error).message}`);
             throw error;
         }
     }
@@ -99,9 +101,9 @@ export class ConfigService {
                     ignoreFocusOut: true,
                     password: true,
                     validateInput: (value: string) => {
-                        if (!value) return 'API key cannot be empty';
-                        if (value.length < 32) return 'API key is too short';
-                        if (!/^[A-Za-z0-9_-]+$/.test(value)) return 'API key contains invalid characters';
+                        if (!value) { return 'API key cannot be empty'; }
+                        if (value.length < 32) { return 'API key is too short'; }
+                        if (!/^[A-Za-z0-9_-]+$/.test(value)) { return 'API key contains invalid characters'; }
                         return null;
                     }
                 });
@@ -115,7 +117,7 @@ export class ConfigService {
 
             return key;
         } catch (error) {
-            Logger.error('Error getting custom API key:', error as Error);
+            void Logger.error('Error getting custom API key:', error as Error);
             throw new AiServiceError('Failed to get custom API key: ' + (error as Error).message);
         }
     }
@@ -128,14 +130,12 @@ export class ConfigService {
             }
 
             await ApiKeyValidator.validateCustomApiKey(key, endpoint);
-
             await this.secretStorage.store('geminicommit.customApiKey', key);
-            Logger.log('Custom API key has been validated and set');
-
-            vscode.window.showInformationMessage('Custom API key has been successfully validated and saved');
+            void Logger.log('Custom API key has been validated and set');
+            await vscode.window.showInformationMessage('Custom API key has been successfully validated and saved');
         } catch (error) {
-            Logger.error('Failed to validate and set custom API key:', error as Error);
-            vscode.window.showErrorMessage(`Failed to set custom API key: ${(error as Error).message}`);
+            void Logger.error('Failed to validate and set custom API key:', error as Error);
+            await vscode.window.showErrorMessage(`Failed to set custom API key: ${(error as Error).message}`);
             throw error;
         }
     }
@@ -143,10 +143,10 @@ export class ConfigService {
     static async removeApiKey(): Promise<void> {
         try {
             await this.secretStorage.delete('geminicommit.apiKey');
-            Logger.log('Google API key has been removed');
-            vscode.window.showInformationMessage('Google API key has been removed');
+            void Logger.log('Google API key has been removed');
+            await vscode.window.showInformationMessage('Google API key has been removed');
         } catch (error) {
-            Logger.error('Error removing Google API key:', error as Error);
+            void Logger.error('Error removing Google API key:', error as Error);
             throw error;
         }
     }
@@ -154,10 +154,10 @@ export class ConfigService {
     static async removeCustomApiKey(): Promise<void> {
         try {
             await this.secretStorage.delete('geminicommit.customApiKey');
-            Logger.log('Custom API key has been removed');
-            vscode.window.showInformationMessage('Custom API key has been removed');
+            void Logger.log('Custom API key has been removed');
+            await vscode.window.showInformationMessage('Custom API key has been removed');
         } catch (error) {
-            Logger.error('Error removing custom API key:', error as Error);
+            void Logger.error('Error removing custom API key:', error as Error);
             throw error;
         }
     }
@@ -212,7 +212,7 @@ export class ConfigService {
 
     static clearCache(): void {
         this.cache.clear();
-        Logger.log('Configuration cache cleared');
+        void Logger.log('Configuration cache cleared');
     }
 
     static dispose(): void {
@@ -220,6 +220,6 @@ export class ConfigService {
             this.configurationListener.dispose();
         }
         this.clearCache();
-        Logger.log('ConfigService disposed');
+        void Logger.log('ConfigService disposed');
     }
 }

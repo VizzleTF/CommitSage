@@ -63,6 +63,14 @@
                 "format": [
                     "PascalCase"
                 ]
+            },
+            {
+                "selector": "objectLiteralProperty",
+                "filter": {
+                    "regex": "^(content-type|x-goog-api-key|Authorization)$",
+                    "match": true
+                },
+                "format": null
             }
         ],
         "@typescript-eslint/semi": [
