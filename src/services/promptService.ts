@@ -1,4 +1,4 @@
-import { CommitFormat, Language, getTemplate } from '../templates';
+import { CommitFormat, getTemplate } from '../templates';
 import { ConfigService } from '../utils/configService';
 
 export class PromptService {

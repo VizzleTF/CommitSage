@@ -1,8 +1,20 @@
 import axios from 'axios';
-import * as vscode from 'vscode';
 import { Logger } from '../utils/logger';
 import { ConfigService } from '../utils/configService';
 import { ProgressReporter, CommitMessage } from '../models/types';
+
+interface CustomApiResponse {
+    choices: Array<{
+        message: {
+            content: string;
+        };
+    }>;
+}
+
+interface ApiHeaders {
+    contentType: string;
+    authBearer: string;
+}
 
 export class CustomEndpointService {
     static async generateCommitMessage(
@@ -18,30 +30,43 @@ export class CustomEndpointService {
             messages: [{ role: "user", content: prompt }]
         };
 
-        const headers = {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${apiKey}`
+        const headers: ApiHeaders = {
+            contentType: 'application/json',
+            authBearer: `Bearer ${apiKey}`
         };
 
         try {
-            Logger.log('Sending request to custom endpoint');
+            void Logger.log('Sending request to custom endpoint');
             progress.report({ message: 'Generating commit message...', increment: 50 });
-            const { data } = await axios.post(endpoint, payload, { headers });
-            Logger.log('Custom endpoint response received successfully');
+
+            const requestHeaders = {
+                contentType: headers.contentType,
+                authorization: headers.authBearer
+            };
+
+            const response = await axios.post<CustomApiResponse>(endpoint, payload, {
+                headers: {
+                    'content-type': requestHeaders.contentType,
+                    'authorization': requestHeaders.authorization
+                }
+            });
+
+            void Logger.log('Custom endpoint response received successfully');
             progress.report({ message: 'Commit message generated successfully', increment: 100 });
-            const message = this.extractCommitMessage(data);
+
+            const message = this.extractCommitMessage(response.data);
             return { message, model };
         } catch (error) {
-            Logger.error('Error generating commit message with custom endpoint:', error as Error);
+            void Logger.error('Error generating commit message with custom endpoint:', error as Error);
             throw new Error(`Failed to generate commit message: ${(error as Error).message}`);
         }
     }
 
-    private static extractCommitMessage(data: any): string {
-        // Adjust this method based on the expected response format from your custom endpoint
-        if (data.choices && data.choices[0] && data.choices[0].message) {
-            return data.choices[0].message.content.trim();
+    private static extractCommitMessage(response: CustomApiResponse): string {
+        if (!response.choices?.[0]?.message?.content) {
+            throw new Error('Unexpected response format from custom endpoint');
         }
-        throw new Error('Unexpected response format from custom endpoint');
+
+        return response.choices[0].message.content.trim();
     }
 }

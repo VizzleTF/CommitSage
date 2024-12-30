@@ -8,13 +8,13 @@ export class Logger {
         this.outputChannel.appendLine(`[${timestamp}] ${message}`);
     }
 
-    static error(message: string, error?: Error): void {
+    static async error(message: string, error?: Error): Promise<void> {
         const timestamp = new Date().toISOString();
         this.outputChannel.appendLine(`[${timestamp}] ERROR: ${message}`);
         if (error) {
             this.outputChannel.appendLine(`Stack trace: ${error.stack}`);
         }
-        vscode.window.showErrorMessage(`GeminiCommit: ${message}`);
+        await vscode.window.showErrorMessage(`GeminiCommit: ${message}`);
     }
 
     static show(): void {

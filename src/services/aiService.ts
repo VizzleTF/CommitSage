@@ -14,7 +14,29 @@ const INITIAL_RETRY_DELAY_MS = 1000;
 const MAX_DIFF_LENGTH = 10000;
 const GEMINI_API_BASE_URL = 'https://generativelanguage.googleapis.com/v1beta/models';
 
-type ErrorWithResponse = Error & { response?: { status: number; data: any } };
+interface GeminiResponse {
+    candidates: Array<{
+        content: {
+            parts: Array<{
+                text: string;
+            }>;
+        };
+    }>;
+}
+
+interface ApiErrorResponse {
+    status: number;
+    data: unknown;
+}
+
+type ErrorWithResponse = Error & {
+    response?: ApiErrorResponse;
+};
+
+interface ApiHeaders {
+    contentType: string;
+    xGoogApiKey: string;
+}
 
 export class AIService {
     static async generateCommitMessage(
@@ -34,17 +56,17 @@ export class AIService {
                 return await this.generateWithGemini(prompt, progress);
             }
         } catch (error) {
-            Logger.error('Failed to generate commit message:', error as Error);
+            void Logger.error('Failed to generate commit message:', error as Error);
             throw new Error(`Failed to generate commit message: ${(error as Error).message}`);
         }
     }
 
     private static truncateDiff(diff: string): string {
         if (diff.length > MAX_DIFF_LENGTH) {
-            Logger.log(`Original diff length: ${diff.length}. Truncating to ${MAX_DIFF_LENGTH} characters.`);
+            void Logger.log(`Original diff length: ${diff.length}. Truncating to ${MAX_DIFF_LENGTH} characters.`);
             return `${diff.substring(0, MAX_DIFF_LENGTH)}\n...(truncated)`;
         }
-        Logger.log(`Diff length: ${diff.length} characters`);
+        void Logger.log(`Diff length: ${diff.length} characters`);
         return diff;
     }
 
@@ -57,6 +79,16 @@ export class AIService {
         const model = ConfigService.getGeminiModel();
         const GEMINI_API_URL = `${GEMINI_API_BASE_URL}/${model}:generateContent`;
 
+        const headers: ApiHeaders = {
+            contentType: 'application/json',
+            xGoogApiKey: apiKey
+        };
+
+        const requestHeaders = {
+            contentType: headers.contentType,
+            xGoogApiKey: headers.xGoogApiKey
+        };
+
         const payload = {
             contents: [{ parts: [{ text: prompt }] }],
             generationConfig: {
@@ -66,27 +98,39 @@ export class AIService {
                 maxOutputTokens: 1024,
             },
         };
-        const headers = {
-            'Content-Type': 'application/json',
-            'x-goog-api-key': apiKey
-        };
 
         try {
-            Logger.log(`Attempt ${attempt}: Sending request to Gemini API`);
+            void Logger.log(`Attempt ${attempt}: Sending request to Gemini API`);
             progress.report({ message: `Attempt ${attempt}: Generating commit message...`, increment: 10 });
-            const { data } = await axios.post(GEMINI_API_URL, payload, { headers });
-            Logger.log('Gemini API response received successfully');
+
+            const response = await axios.post<GeminiResponse>(GEMINI_API_URL, payload, {
+                headers: {
+                    'content-type': requestHeaders.contentType,
+                    'x-goog-api-key': requestHeaders.xGoogApiKey
+                }
+            });
+
+            void Logger.log('Gemini API response received successfully');
             progress.report({ message: "Commit message generated successfully", increment: 100 });
-            const commitMessage = this.cleanCommitMessage(data.candidates[0].content.parts[0].text);
-            if (!commitMessage.trim()) throw new Error("Generated commit message is empty.");
+
+            const responseData = response.data;
+            if (!responseData.candidates?.[0]?.content?.parts?.[0]?.text) {
+                throw new Error("Invalid response format from Gemini API");
+            }
+
+            const commitMessage = this.cleanCommitMessage(responseData.candidates[0].content.parts[0].text);
+            if (!commitMessage.trim()) {
+                throw new Error("Generated commit message is empty.");
+            }
+
             return { message: commitMessage, model };
         } catch (error) {
-            Logger.error(`Attempt ${attempt} failed:`, error as Error);
+            void Logger.error(`Attempt ${attempt} failed:`, error as Error);
             const { errorMessage, shouldRetry } = this.handleApiError(error as ErrorWithResponse);
 
             if (shouldRetry && attempt < MAX_RETRIES) {
                 const delayMs = this.calculateRetryDelay(attempt);
-                Logger.log(`Retrying in ${delayMs / 1000} seconds...`);
+                void Logger.log(`Retrying in ${delayMs / 1000} seconds...`);
                 progress.report({ message: `Retrying in ${delayMs / 1000} seconds...`, increment: 0 });
                 await this.delay(delayMs);
                 return this.generateWithGemini(prompt, progress, attempt + 1);
@@ -104,10 +148,10 @@ export class AIService {
         return new Promise(resolve => setTimeout(resolve, ms));
     }
 
-    private static handleApiError(error: ErrorWithResponse): { errorMessage: string, shouldRetry: boolean } {
+    private static handleApiError(error: ErrorWithResponse): { errorMessage: string; shouldRetry: boolean } {
         if (error.response) {
-            const { status, data } = error.response;
-            const responseData = JSON.stringify(data);
+            const { status } = error.response;
+            const responseData = JSON.stringify(error.response.data);
 
             if (status === 403) {
                 return {
@@ -157,7 +201,7 @@ export async function generateAndSetCommitMessage(): Promise<void> {
 
             progress.report({ message: `Fetching Git diff${onlyStagedChanges ? ' (staged changes only)' : ''}...`, increment: 0 });
             const diff = await GitService.getDiff(repoPath, onlyStagedChanges);
-            Logger.log(`Git diff fetched successfully. Length: ${diff.length} characters`);
+            void Logger.log(`Git diff fetched successfully. Length: ${diff.length} characters`);
 
             progress.report({ message: "Analyzing changes...", increment: 25 });
             const changedFiles = await GitService.getChangedFiles(repoPath, onlyStagedChanges);
@@ -168,14 +212,14 @@ export async function generateAndSetCommitMessage(): Promise<void> {
                     const fileBlameAnalysis = await analyzeFileChanges(filePath.fsPath);
                     blameAnalysis += `File: ${file}\n${fileBlameAnalysis}\n\n`;
                 } catch (error) {
-                    Logger.error(`Error analyzing file ${file}:`, error as Error);
+                    void Logger.error(`Error analyzing file ${file}:`, error as Error);
                     blameAnalysis += `File: ${file}\nUnable to analyze: ${(error as Error).message}\n\n`;
                 }
             }
 
             progress.report({ message: "Generating commit message...", increment: 50 });
             const { message: commitMessage, model } = await AIService.generateCommitMessage(diff, blameAnalysis, progress);
-            Logger.log('Commit message generated successfully');
+            void Logger.log('Commit message generated successfully');
 
             let finalMessage = commitMessage;
 
@@ -192,13 +236,15 @@ export async function generateAndSetCommitMessage(): Promise<void> {
 
             progress.report({ message: "Setting commit message...", increment: 75 });
             selectedRepo.inputBox.value = finalMessage;
-            Logger.log('Commit message set successfully');
+            void Logger.log('Commit message set successfully');
 
             progress.report({ message: "Done!", increment: 100 });
-            vscode.window.showInformationMessage(`Commit message set in selected Git repository. Generated using ${model} model.`);
+            await vscode.window.showInformationMessage(
+                `Commit message set in selected Git repository. Generated using ${model} model.`
+            );
         } catch (error) {
-            Logger.error('Error in command execution:', error as Error);
-            vscode.window.showErrorMessage(`Failed to generate commit message: ${(error as Error).message}`);
+            void Logger.error('Error in command execution:', error as Error);
+            await vscode.window.showErrorMessage(`Failed to generate commit message: ${(error as Error).message}`);
         }
     });
 }
