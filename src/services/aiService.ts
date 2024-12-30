@@ -183,12 +183,16 @@ export class AIService {
 }
 
 export async function generateAndSetCommitMessage(): Promise<void> {
-    await vscode.window.withProgress({
-        location: vscode.ProgressLocation.Notification,
-        title: "Generating Commit Message",
-        cancellable: false
-    }, async (progress) => {
-        try {
+    let notificationHandle: vscode.Progress<{ message?: string; increment?: number }> | undefined;
+
+    try {
+        await vscode.window.withProgress({
+            location: vscode.ProgressLocation.Notification,
+            title: "Generating Commit Message",
+            cancellable: false
+        }, async (progress) => {
+            notificationHandle = progress;
+
             const repos = await GitService.getRepositories();
             const selectedRepo = await GitService.selectRepository(repos);
 
@@ -238,13 +242,24 @@ export async function generateAndSetCommitMessage(): Promise<void> {
             selectedRepo.inputBox.value = finalMessage;
             void Logger.log('Commit message set successfully');
 
-            progress.report({ message: "Done!", increment: 100 });
-            await vscode.window.showInformationMessage(
-                `Commit message set in selected Git repository. Generated using ${model} model.`
+            progress.report({ message: "", increment: 100 });
+
+            await new Promise(resolve => setTimeout(resolve, 100));
+
+            void vscode.window.showInformationMessage(
+                `Commit message set successfully (${model})`,
+                { modal: false }
             );
-        } catch (error) {
-            void Logger.error('Error in command execution:', error as Error);
-            await vscode.window.showErrorMessage(`Failed to generate commit message: ${(error as Error).message}`);
+        });
+    } catch (error) {
+        if (notificationHandle) {
+            notificationHandle.report({ message: "" });
         }
-    });
+
+        void Logger.error('Error in command execution:', error as Error);
+        void vscode.window.showErrorMessage(
+            `Error: ${(error as Error).message}`,
+            { modal: false }
+        );
+    }
 }
