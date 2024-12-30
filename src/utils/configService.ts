@@ -1,5 +1,7 @@
 import * as vscode from 'vscode';
 import { Logger } from './logger';
+import { ApiKeyValidator } from './apiKeyValidator';
+import { AiServiceError, ConfigurationError } from '../models/errors';
 
 export class ConfigService {
     private static cache = new Map<string, any>();
@@ -17,57 +19,147 @@ export class ConfigService {
         });
 
         context.subscriptions.push(this.configurationListener);
+        Logger.log('ConfigService initialized');
     }
 
     static getConfig<T>(section: string, key: string, defaultValue: T): T {
-        const cacheKey = `${section}.${key}`;
-        if (!this.cache.has(cacheKey)) {
-            const value = vscode.workspace.getConfiguration('geminiCommit').get<T>(`${section}.${key}`) ?? defaultValue;
-            this.cache.set(cacheKey, value);
+        try {
+            const cacheKey = `${section}.${key}`;
+            if (!this.cache.has(cacheKey)) {
+                const config = vscode.workspace.getConfiguration('geminiCommit');
+                const value = config.get<T>(`${section}.${key}`) ?? defaultValue;
+                this.cache.set(cacheKey, value);
+                Logger.log(`Config loaded: ${cacheKey} = ${JSON.stringify(value)}`);
+            }
+            return this.cache.get(cacheKey);
+        } catch (error) {
+            Logger.error(`Error getting config ${section}.${key}:`, error as Error);
+            return defaultValue;
         }
-        return this.cache.get(cacheKey);
     }
 
     static async getApiKey(): Promise<string> {
-        let key = await this.secretStorage.get('geminicommit.apiKey');
-        if (!key) {
-            key = await vscode.window.showInputBox({
-                prompt: 'Enter your Google API Key',
-                ignoreFocusOut: true,
-                password: true
-            });
+        try {
+            let key = await this.secretStorage.get('geminicommit.apiKey');
+
             if (!key) {
-                throw new Error('API key is not set');
+                key = await vscode.window.showInputBox({
+                    prompt: 'Enter your Google API Key',
+                    ignoreFocusOut: true,
+                    password: true,
+                    validateInput: (value: string) => {
+                        if (!value) return 'API key cannot be empty';
+                        if (value.length < 32) return 'API key is too short';
+                        if (!/^[A-Za-z0-9_-]+$/.test(value)) return 'API key contains invalid characters';
+                        return null;
+                    }
+                });
+
+                if (!key) {
+                    throw new ConfigurationError('API key input was cancelled');
+                }
+
+                await this.setApiKey(key);
             }
-            await this.setApiKey(key);
+
+            return key;
+        } catch (error) {
+            Logger.error('Error getting API key:', error as Error);
+            throw new AiServiceError('Failed to get API key: ' + (error as Error).message);
         }
-        return key;
     }
 
     static async setApiKey(key: string): Promise<void> {
-        await this.secretStorage.store('geminicommit.apiKey', key);
-        Logger.log('API key has been set');
+        try {
+            await ApiKeyValidator.validateGeminiApiKey(key);
+
+            await this.secretStorage.store('geminicommit.apiKey', key);
+            Logger.log('Google API key has been validated and set');
+
+            vscode.window.showInformationMessage('Google API key has been successfully validated and saved');
+        } catch (error) {
+            Logger.error('Failed to validate and set Google API key:', error as Error);
+            vscode.window.showErrorMessage(`Failed to set API key: ${(error as Error).message}`);
+            throw error;
+        }
     }
 
     static async getCustomApiKey(): Promise<string> {
-        let key = await this.secretStorage.get('geminicommit.customApiKey');
-        if (!key) {
-            key = await vscode.window.showInputBox({
-                prompt: 'Enter your Custom API Key',
-                ignoreFocusOut: true,
-                password: true
-            });
+        try {
+            let key = await this.secretStorage.get('geminicommit.customApiKey');
+
             if (!key) {
-                throw new Error('Custom API key is not set');
+                const endpoint = this.getCustomEndpoint();
+                if (!endpoint) {
+                    throw new ConfigurationError('Custom endpoint URL is not set');
+                }
+
+                key = await vscode.window.showInputBox({
+                    prompt: 'Enter your Custom API Key',
+                    ignoreFocusOut: true,
+                    password: true,
+                    validateInput: (value: string) => {
+                        if (!value) return 'API key cannot be empty';
+                        if (value.length < 32) return 'API key is too short';
+                        if (!/^[A-Za-z0-9_-]+$/.test(value)) return 'API key contains invalid characters';
+                        return null;
+                    }
+                });
+
+                if (!key) {
+                    throw new ConfigurationError('Custom API key input was cancelled');
+                }
+
+                await this.setCustomApiKey(key);
             }
-            await this.setCustomApiKey(key);
+
+            return key;
+        } catch (error) {
+            Logger.error('Error getting custom API key:', error as Error);
+            throw new AiServiceError('Failed to get custom API key: ' + (error as Error).message);
         }
-        return key;
     }
 
     static async setCustomApiKey(key: string): Promise<void> {
-        await this.secretStorage.store('geminicommit.customApiKey', key);
-        Logger.log('Custom API key has been set');
+        try {
+            const endpoint = this.getCustomEndpoint();
+            if (!endpoint) {
+                throw new ConfigurationError('Custom endpoint URL is not set');
+            }
+
+            await ApiKeyValidator.validateCustomApiKey(key, endpoint);
+
+            await this.secretStorage.store('geminicommit.customApiKey', key);
+            Logger.log('Custom API key has been validated and set');
+
+            vscode.window.showInformationMessage('Custom API key has been successfully validated and saved');
+        } catch (error) {
+            Logger.error('Failed to validate and set custom API key:', error as Error);
+            vscode.window.showErrorMessage(`Failed to set custom API key: ${(error as Error).message}`);
+            throw error;
+        }
+    }
+
+    static async removeApiKey(): Promise<void> {
+        try {
+            await this.secretStorage.delete('geminicommit.apiKey');
+            Logger.log('Google API key has been removed');
+            vscode.window.showInformationMessage('Google API key has been removed');
+        } catch (error) {
+            Logger.error('Error removing Google API key:', error as Error);
+            throw error;
+        }
+    }
+
+    static async removeCustomApiKey(): Promise<void> {
+        try {
+            await this.secretStorage.delete('geminicommit.customApiKey');
+            Logger.log('Custom API key has been removed');
+            vscode.window.showInformationMessage('Custom API key has been removed');
+        } catch (error) {
+            Logger.error('Error removing custom API key:', error as Error);
+            throw error;
+        }
     }
 
     static getGeminiModel(): string {
@@ -102,16 +194,32 @@ export class ConfigService {
         return this.getConfig<string>('custom', 'model', '');
     }
 
-    static clearCache(): void {
-        this.cache.clear();
-        Logger.log('Configuration cache cleared');
-    }
-
     static shouldPromptForRefs(): boolean {
         return this.getConfig<boolean>('commit', 'promptForRefs', false);
     }
 
     static getOnlyStagedChanges(): boolean {
         return this.getConfig<boolean>('commit', 'onlyStagedChanges', false);
+    }
+
+    static getMaxRetries(): number {
+        return this.getConfig<number>('general', 'maxRetries', 3);
+    }
+
+    static getInitialRetryDelay(): number {
+        return this.getConfig<number>('general', 'initialRetryDelayMs', 1000);
+    }
+
+    static clearCache(): void {
+        this.cache.clear();
+        Logger.log('Configuration cache cleared');
+    }
+
+    static dispose(): void {
+        if (this.configurationListener) {
+            this.configurationListener.dispose();
+        }
+        this.clearCache();
+        Logger.log('ConfigService disposed');
     }
 }
