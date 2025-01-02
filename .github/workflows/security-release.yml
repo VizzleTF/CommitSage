@@ -71,7 +71,7 @@ jobs:
         run: npm run package
 
       - name: Create Pull Request
-        uses: peter-evans/create-pull-request@v5
+        uses: peter-evans/create-pull-request@v7
         with:
           commit-message: "chore: security patch release v${{ needs.check-security.outputs.new_version }}"
           title: "Security Patch Release v${{ needs.check-security.outputs.new_version }}"
