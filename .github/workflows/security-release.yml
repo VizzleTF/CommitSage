@@ -18,7 +18,7 @@ jobs:
       has_critical: ${{ steps.check.outputs.has_critical }}
       new_version: ${{ steps.version.outputs.new_version }}
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       
       - name: Setup Node.js
         uses: actions/setup-node@v3
@@ -52,7 +52,7 @@ jobs:
     if: needs.check-security.outputs.has_critical == 'true'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           fetch-depth: 0
       
