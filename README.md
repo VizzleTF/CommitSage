@@ -113,6 +113,7 @@ GeminiCommit - расширение VSCode для автоматической �
 
 ### Быстрый старт & Использование
 
+0. Если вы из России проверьте, что адрес 'generativelanguage.googleapis.com' не выдает 400 ошибку (User location is not supported for the API use.). Используйте VPN для этого домена.
 1. Установите из [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=VizzleTF.geminicommit)
 2. Настройте API ключ:
    - Для Gemini AI: Получите ключ на [Google AI Studio](https://aistudio.google.com/app/apikey)
