@@ -7,6 +7,10 @@ updates:
     ignore:
       - dependency-name: "@types/vscode"
     versioning-strategy: increase
+    groups:
+      typescript-eslint:
+        patterns:
+          - "@typescript-eslint/*"
     commit-message:
       prefix: "chore"
       include: "scope"
