@@ -203,63 +203,120 @@ export async function generateAndSetCommitMessage(): Promise<void> {
             const repoPath = selectedRepo.rootUri.fsPath;
             const onlyStagedChanges = ConfigService.getOnlyStagedChanges();
 
+            // Проверяем наличие staged изменений
+            const hasStagedChanges = await GitService.hasStagedChanges(repoPath);
+
             progress.report({ message: `Fetching Git diff${onlyStagedChanges ? ' (staged changes only)' : ''}...`, increment: 0 });
-            const diff = await GitService.getDiff(repoPath, onlyStagedChanges);
-            void Logger.log(`Git diff fetched successfully. Length: ${diff.length} characters`);
 
-            progress.report({ message: "Analyzing changes...", increment: 25 });
-            const changedFiles = await GitService.getChangedFiles(repoPath, onlyStagedChanges);
-            let blameAnalysis = '';
-            for (const file of changedFiles) {
-                const filePath = vscode.Uri.file(path.join(repoPath, file));
-                try {
-                    const fileBlameAnalysis = await analyzeFileChanges(filePath.fsPath);
-                    blameAnalysis += `File: ${file}\n${fileBlameAnalysis}\n\n`;
-                } catch (error) {
-                    void Logger.error(`Error analyzing file ${file}:`, error as Error);
-                    blameAnalysis += `File: ${file}\nUnable to analyze: ${(error as Error).message}\n\n`;
+            try {
+                const diff = await GitService.getDiff(repoPath, onlyStagedChanges);
+                void Logger.log(`Git diff fetched successfully. Length: ${diff.length} characters`);
+
+                progress.report({ message: "Analyzing changes...", increment: 25 });
+                const changedFiles = await GitService.getChangedFiles(repoPath, onlyStagedChanges);
+                let blameAnalysis = '';
+                for (const file of changedFiles) {
+                    const filePath = vscode.Uri.file(path.join(repoPath, file));
+                    try {
+                        const fileBlameAnalysis = await analyzeFileChanges(filePath.fsPath);
+                        blameAnalysis += `File: ${file}\n${fileBlameAnalysis}\n\n`;
+                    } catch (error) {
+                        void Logger.error(`Error analyzing file ${file}:`, error as Error);
+                        blameAnalysis += `File: ${file}\nUnable to analyze: ${(error as Error).message}\n\n`;
+                    }
+                }
+
+                progress.report({ message: "Generating commit message...", increment: 50 });
+                const { message: commitMessage, model } = await AIService.generateCommitMessage(diff, blameAnalysis, progress);
+                void Logger.log('Commit message generated successfully');
+
+                let finalMessage = commitMessage;
+
+                if (ConfigService.shouldPromptForRefs()) {
+                    const refs = await vscode.window.showInputBox({
+                        prompt: "Enter references (e.g., issue numbers) to be added below the commit message",
+                        placeHolder: "e.g., #123, JIRA-456"
+                    });
+
+                    if (refs) {
+                        finalMessage += `\n\n${refs}`;
+                    }
+                }
+
+                progress.report({ message: "Setting commit message...", increment: 75 });
+                selectedRepo.inputBox.value = finalMessage;
+                void Logger.log('Commit message set successfully');
+
+                // Авто-коммит, если включен
+                if (ConfigService.getAutoCommitEnabled()) {
+                    if (!finalMessage.trim()) {
+                        void Logger.error('Commit message is empty. Skipping auto-commit.');
+                        return;
+                    }
+
+                    progress.report({ message: "Checking Git configuration...", increment: 80 });
+                    try {
+                        await GitService.checkGitConfig(repoPath);
+                    } catch (error) {
+                        void Logger.error('Git configuration error:', error as Error);
+                        throw error;
+                    }
+
+                    progress.report({ message: "Committing changes...", increment: 85 });
+                    try {
+                        await GitService.commitChanges(selectedRepo, finalMessage);
+                        void Logger.log('Changes committed successfully');
+                    } catch (error) {
+                        void Logger.error('Failed to commit changes:', error as Error);
+                        throw error;
+                    }
+
+                    // Авто-пуш, если включен
+                    if (ConfigService.getAutoPushEnabled()) {
+                        progress.report({ message: "Pushing changes...", increment: 95 });
+                        try {
+                            await GitService.pushChanges(selectedRepo);
+                            void Logger.log('Changes pushed successfully');
+                        } catch (error) {
+                            void Logger.error('Failed to push changes:', error as Error);
+                            throw error;
+                        }
+                    }
+                }
+
+                progress.report({ message: "", increment: 100 });
+
+                await new Promise(resolve => setTimeout(resolve, 100));
+
+                void vscode.window.showInformationMessage(
+                    `Commit message set successfully (${model})`,
+                    { modal: false }
+                );
+            } catch (error) {
+                const errorMessage = (error as Error).message;
+                if (errorMessage.includes('No staged changes detected') && !onlyStagedChanges) {
+                    // Если нет staged изменений и не включен режим "только staged",
+                    // продолжаем выполнение для создания коммита с флагом -a
+                    void Logger.log('No staged changes detected, proceeding with -a commit');
+                } else {
+                    throw error;
                 }
             }
-
-            progress.report({ message: "Generating commit message...", increment: 50 });
-            const { message: commitMessage, model } = await AIService.generateCommitMessage(diff, blameAnalysis, progress);
-            void Logger.log('Commit message generated successfully');
-
-            let finalMessage = commitMessage;
-
-            if (ConfigService.shouldPromptForRefs()) {
-                const refs = await vscode.window.showInputBox({
-                    prompt: "Enter references (e.g., issue numbers) to be added below the commit message",
-                    placeHolder: "e.g., #123, JIRA-456"
-                });
-
-                if (refs) {
-                    finalMessage += `\n\n${refs}`;
-                }
-            }
-
-            progress.report({ message: "Setting commit message...", increment: 75 });
-            selectedRepo.inputBox.value = finalMessage;
-            void Logger.log('Commit message set successfully');
-
-            progress.report({ message: "", increment: 100 });
-
-            await new Promise(resolve => setTimeout(resolve, 100));
-
-            void vscode.window.showInformationMessage(
-                `Commit message set successfully (${model})`,
-                { modal: false }
-            );
         });
     } catch (error) {
         if (notificationHandle) {
             notificationHandle.report({ message: "" });
         }
 
+        const errorMessage = (error as Error).message;
         void Logger.error('Error in command execution:', error as Error);
-        void vscode.window.showErrorMessage(
-            `Error: ${(error as Error).message}`,
-            { modal: false }
-        );
+
+        if (errorMessage.includes('No staged changes to commit') && ConfigService.getOnlyStagedChanges()) {
+            void vscode.window.showErrorMessage('No staged changes to commit. Please stage your changes first.');
+        } else if (errorMessage.includes('Git user.name or user.email is not configured')) {
+            void vscode.window.showErrorMessage('Git user.name or user.email is not configured. Please configure Git before committing.');
+        } else {
+            void vscode.window.showErrorMessage(`Error: ${errorMessage}`);
+        }
     }
 }

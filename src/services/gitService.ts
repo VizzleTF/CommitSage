@@ -125,6 +125,75 @@ export class GitService {
             .filter(line => !onlyStaged || line[0] === 'M' || line[0] === 'A' || line[0] === 'D' || line[0] === 'R')
             .map(line => line.substring(3).trim());
     }
+
+    static async hasStagedChanges(repoPath: string): Promise<boolean> {
+        try {
+            const statusOutput = await this.executeGitCommand(['status', '--porcelain'], repoPath);
+            return statusOutput.split('\n').some(line =>
+                line.trim() !== '' && ['M', 'A', 'D', 'R'].includes(line[0])
+            );
+        } catch (error) {
+            void Logger.error('Error checking staged changes:', error as Error);
+            return false;
+        }
+    }
+
+    static async commitChanges(repo: vscode.SourceControl, message: string): Promise<void> {
+        const repoPath = repo.rootUri?.fsPath;
+        if (!repoPath) {
+            throw new Error('Repository path is undefined');
+        }
+
+        const hasStagedChanges = await this.hasStagedChanges(repoPath);
+        const commitArgs = hasStagedChanges ?
+            ['commit', '-m', message] :
+            ['commit', '-a', '-m', message];
+
+        return new Promise((resolve, reject) => {
+            const childProcess = spawn('git', commitArgs, { cwd: repoPath });
+
+            childProcess.on('close', (code) => {
+                if (code === 0) {
+                    resolve();
+                } else {
+                    reject(new Error(`Git commit failed with code ${code}`));
+                }
+            });
+        });
+    }
+
+    static async pushChanges(repo: vscode.SourceControl): Promise<void> {
+        return new Promise((resolve, reject) => {
+            const childProcess = spawn('git', ['push'], {
+                cwd: repo.rootUri?.fsPath
+            });
+
+            childProcess.on('close', (code) => {
+                if (code === 0) {
+                    resolve();
+                } else {
+                    reject(new Error(`Git push failed with code ${code}`));
+                }
+            });
+        });
+    }
+
+    static async checkGitConfig(repoPath: string): Promise<void> {
+        return new Promise(async (resolve, reject) => {
+            try {
+                const userName = await this.executeGitCommand(['config', 'user.name'], repoPath);
+                const userEmail = await this.executeGitCommand(['config', 'user.email'], repoPath);
+
+                if (!userName.trim() || !userEmail.trim()) {
+                    reject(new Error('Git user.name or user.email is not configured.'));
+                } else {
+                    resolve();
+                }
+            } catch (error) {
+                reject(error);
+            }
+        });
+    }
 }
 
 interface GitExtension {

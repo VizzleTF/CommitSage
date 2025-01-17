@@ -124,6 +124,18 @@
                     "description": "Generate commit message only for staged changes",
                     "order": 6
                 },
+                "geminiCommit.commit.autoCommit": {
+                    "type": "boolean",
+                    "default": false,
+                    "description": "Automatically commit changes after generating the commit message.",
+                    "order": 6
+                },
+                "geminiCommit.commit.autoPush": {
+                    "type": "boolean",
+                    "default": false,
+                    "description": "Automatically push changes after committing.",
+                    "order": 6
+                },
                 "geminiCommit.gemini.model": {
                     "type": "string",
                     "enum": [
