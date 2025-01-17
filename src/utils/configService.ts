@@ -222,4 +222,12 @@ export class ConfigService {
         this.clearCache();
         void Logger.log('ConfigService disposed');
     }
+
+    static getAutoCommitEnabled(): boolean {
+        return this.getConfig<boolean>('commit', 'autoCommit', false);
+    }
+
+    static getAutoPushEnabled(): boolean {
+        return this.getConfig<boolean>('commit', 'autoPush', false);
+    }
 }
