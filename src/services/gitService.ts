@@ -138,6 +138,18 @@ export class GitService {
         }
     }
 
+    static async hasUntrackedFiles(repoPath: string): Promise<boolean> {
+        try {
+            const statusOutput = await this.executeGitCommand(['status', '--porcelain'], repoPath);
+            return statusOutput.split('\n').some(line =>
+                line.trim() !== '' && line.startsWith('??')
+            );
+        } catch (error) {
+            void Logger.error('Error checking untracked files:', error as Error);
+            return false;
+        }
+    }
+
     static async commitChanges(repo: vscode.SourceControl, message: string): Promise<void> {
         const repoPath = repo.rootUri?.fsPath;
         if (!repoPath) {
@@ -145,6 +157,12 @@ export class GitService {
         }
 
         const hasStagedChanges = await this.hasStagedChanges(repoPath);
+        const hasUntrackedFiles = await this.hasUntrackedFiles(repoPath);
+
+        if (hasUntrackedFiles && !hasStagedChanges) {
+            await this.executeGitCommand(['add', '.'], repoPath);
+        }
+
         const commitArgs = hasStagedChanges ?
             ['commit', '-m', message] :
             ['commit', '-a', '-m', message];
