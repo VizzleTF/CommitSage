@@ -8,6 +8,7 @@ import { CustomEndpointService } from './customEndpointService';
 import { PromptService } from './promptService';
 import { GitService } from './gitService';
 import { analyzeFileChanges } from './gitBlameAnalyzer';
+import { SettingsValidator } from './settingsValidator';
 
 const MAX_RETRIES = 3;
 const INITIAL_RETRY_DELAY_MS = 1000;
@@ -186,6 +187,8 @@ export async function generateAndSetCommitMessage(): Promise<void> {
     let notificationHandle: vscode.Progress<{ message?: string; increment?: number }> | undefined;
 
     try {
+        await SettingsValidator.validateAllSettings();
+
         await vscode.window.withProgress({
             location: vscode.ProgressLocation.Notification,
             title: "Generating Commit Message",

@@ -210,6 +210,43 @@ export class ConfigService {
         return this.getConfig<number>('general', 'initialRetryDelayMs', 1000);
     }
 
+    static getAutoCommitEnabled(): boolean {
+        return this.getConfig<boolean>('commit', 'autoCommit', false);
+    }
+
+    static getAutoPushEnabled(): boolean {
+        return this.getConfig<boolean>('commit', 'autoPush', false);
+    }
+
+    static async validateAutoPushState(): Promise<void> {
+        const isAutoPushEnabled = this.getAutoPushEnabled();
+        const isAutoCommitEnabled = this.getAutoCommitEnabled();
+
+        if (isAutoPushEnabled && !isAutoCommitEnabled) {
+            const selection = await vscode.window.showWarningMessage(
+                'Auto Push requires Auto Commit to be enabled. Choose an action:',
+                'Enable Auto Commit',
+                'Disable Auto Push',
+                'Open Settings'
+            );
+
+            if (selection === 'Enable Auto Commit') {
+                const config = vscode.workspace.getConfiguration('geminiCommit');
+                await config.update('commit.autoCommit', true, true);
+                void Logger.log('Auto Commit has been enabled');
+            } else if (selection === 'Disable Auto Push') {
+                const config = vscode.workspace.getConfiguration('geminiCommit');
+                await config.update('commit.autoPush', false, true);
+                void Logger.log('Auto Push has been disabled');
+            } else if (selection === 'Open Settings') {
+                void vscode.commands.executeCommand(
+                    'workbench.action.openSettings',
+                    'geminiCommit.commit'
+                );
+            }
+        }
+    }
+
     static clearCache(): void {
         this.cache.clear();
         void Logger.log('Configuration cache cleared');
@@ -221,13 +258,5 @@ export class ConfigService {
         }
         this.clearCache();
         void Logger.log('ConfigService disposed');
-    }
-
-    static getAutoCommitEnabled(): boolean {
-        return this.getConfig<boolean>('commit', 'autoCommit', false);
-    }
-
-    static getAutoPushEnabled(): boolean {
-        return this.getConfig<boolean>('commit', 'autoPush', false);
     }
 }

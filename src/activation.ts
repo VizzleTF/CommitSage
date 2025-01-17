@@ -3,6 +3,7 @@ import { Logger } from './utils/logger';
 import { ConfigService } from './utils/configService';
 import { GeminiCommitTreeDataProvider } from './views/geminiCommitTreeDataProvider';
 import { generateAndSetCommitMessage } from './services/aiService';
+import { SettingsValidator } from './services/settingsValidator';
 
 const EXTENSION_NAME = 'GeminiCommit';
 const COMMAND_ID = 'geminicommit.generateCommitMessage';
@@ -12,6 +13,8 @@ export function activate(context: vscode.ExtensionContext): void {
     Logger.log(`${EXTENSION_NAME} extension is now active!`);
 
     ConfigService.initialize(context);
+
+    void SettingsValidator.validateAllSettings();
 
     const generateCommitMessageCommand = vscode.commands.registerCommand(
         COMMAND_ID,
