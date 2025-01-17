@@ -1,5 +1,3 @@
-export class test { }
-
 export class GitExtensionNotFoundError extends Error {
     constructor() {
         super('Git extension not found. Please make sure it is installed and enabled.');

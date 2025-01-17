@@ -6,7 +6,7 @@ GeminiCommit is a VSCode extension that automatically generates commit messages 
 
 ![GeminiCommit in action](example.gif)
 
-[Features](#features) • [Quick Start & Usage](#quick-start--usage) • [Commit Formats](#commit-formats) • [Gemini Models & Custom Endpoints](#gemini-models--custom-endpoints) • [Example Messages](#example-messages)
+[Features](#features) • [Quick Start & Usage](#quick-start--usage) • [Settings](#settings) • [Commit Formats](#commit-formats) • [Gemini Models & Custom Endpoints](#gemini-models--custom-endpoints) • [Example Messages](#example-messages)
 
 ## Features
 - AI-powered commit message generation
@@ -16,6 +16,8 @@ GeminiCommit is a VSCode extension that automatically generates commit messages 
 - Customizable commit message instructions
 - Option to include references (e.g., issue numbers)
 - Secure API key storage
+- Automatic commit and push functionality
+- Flexible commit workflow support (staged/unstaged changes)
 
 ## Quick Start & Usage
 
@@ -28,11 +30,55 @@ GeminiCommit is a VSCode extension that automatically generates commit messages 
    - Select your preferred commit format
    - Choose language
    - Enable custom instructions if needed
-5. Stage your changes in Git
-6. Click "Generate Commit Message" in Source Control view
-7. (Optional) Enter references if prompted
-8. Review and edit the generated message
-9. Commit as usual
+   - Configure commit behavior:
+     - "Only Staged Changes": When enabled, commits only staged changes
+     - When disabled:
+       - If there are staged changes, commits only those
+       - If no staged changes, commits all modified files using `git commit -a`
+     - "Auto Commit": Automatically creates a commit after generating the message
+     - "Auto Push": When enabled (and Auto Commit is enabled), automatically pushes changes after commit
+5. Click "Generate Commit Message" in Source Control view
+6. (Optional) Enter references if prompted
+7. Review and edit the generated message
+8. Commit/push is performed automatically based on your settings
+
+## Settings
+
+### Commit Message Generation
+- **Commit Language** (`geminiCommit.commit.commitLanguage`):
+  - Languages: English (default) or Russian
+  - Note: Some formats may have limited support for non-English languages
+
+- **Commit Format** (`geminiCommit.commit.commitFormat`):
+  - Available formats: Conventional (default), Angular, Karma, Semantic, Emoji
+  - Each format has its own structure and rules
+  
+- **Custom Instructions**:
+  - Enable with `geminiCommit.commit.useCustomInstructions`
+  - Set instructions in `geminiCommit.commit.customInstructions`
+  - Must not be empty when enabled
+
+### References
+- **Prompt for Refs** (`geminiCommit.commit.promptForRefs`):
+  - When enabled, prompts for issue numbers or references
+  - Consider disabling when using Auto Commit to avoid interrupting the flow
+
+### Commit Behavior
+- **Only Staged Changes** (`geminiCommit.commit.onlyStagedChanges`):
+  - When `true`: Only commits changes that have been staged with `git add`
+  - When `false`: 
+    - If there are staged changes, commits only those changes
+    - If there are no staged changes, commits all tracked modified files using `git commit -a`
+
+### Automation
+- **Auto Commit** (`geminiCommit.commit.autoCommit`):
+  - When `true`: Automatically creates a commit after generating the message
+  - When `false`: Only generates and sets the commit message, leaving manual commit control to you
+
+- **Auto Push** (`geminiCommit.commit.autoPush`):
+  - When `true`: Automatically pushes changes after commit (requires Auto Commit to be enabled)
+  - When `false`: Leaves manual push control to you
+  - Note: This setting only works when Auto Commit is enabled. If Auto Push is enabled while Auto Commit is disabled, you'll see a warning message with a quick link to settings
 
 ## Commit Formats
 
@@ -88,8 +134,13 @@ To configure a custom endpoint:
 3. Set your model name (e.g., "gpt-3.5-turbo" for OpenAI)
 4. Use Command Palette (Ctrl+Shift+P) to set API key
 
-## Example Messages
+### Configuration Requirements
+When using custom endpoint:
+- Both endpoint URL and model name must be configured
+- Appropriate API key must be set
+- Extension will warn if configuration is incomplete
 
+## Example Messages
 
 Conventional format (complex change):
 ```
@@ -123,11 +174,18 @@ GeminiCommit - расширение VSCode для автоматической �
    - Выберите предпочтительный формат коммитов
    - Выберите язык
    - При необходимости включите пользовательские инструкции
-5. Подготовьте изменения в Git
-6. Нажмите "Generate Commit Message" в панели Source Control
-7. (Опционально) Введите ссылки, если запрошено
-8. Просмотрите и отредактируйте сгенерированное сообщение
-9. Сделайте коммит как обычно
+   - Настройте поведение коммитов:
+     - "Only Staged Changes": Когда включено, коммитит только staged изменения
+     - Когда выключено:
+       - Если есть staged изменения, коммитит только их
+       - Если нет staged изменений, коммитит все измененные файлы используя `git commit -a`
+     - "Auto Commit": Когда включено, автоматически создает коммит после генерации сообщения
+     - "Auto Push": Когда включено (и включен Auto Commit), автоматически пушит изменения после коммита.
+       При включенном Auto Push без Auto Commit вы увидите предупреждение с быстрой ссылкой на настройки
+5. Нажмите "Generate Commit Message" в панели Source Control
+6. (Опционально) Введите ссылки, если запрошено
+7. Просмотрите и отредактируйте сгенерированное сообщение
+8. Коммит и пуш выполняются автоматически в соответствии с вашими настройками
 
 ### Форматы коммитов
 

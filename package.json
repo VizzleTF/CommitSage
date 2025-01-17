@@ -73,7 +73,7 @@
                 "geminiCommit.commit.promptForRefs": {
                     "type": "boolean",
                     "default": false,
-                    "description": "Prompt for entering refs (e.g., issue numbers) when generating commit messages",
+                    "description": "Prompt for entering refs (e.g., issue numbers) when generating commit messages. Note: This may interrupt automatic commit flow if Auto Commit is enabled",
                     "order": 1
                 },
                 "geminiCommit.commit.commitLanguage": {
@@ -83,7 +83,7 @@
                         "russian"
                     ],
                     "default": "english",
-                    "description": "Language for generated commit messages",
+                    "description": "Language for generated commit messages. Some commit formats may have limited support for non-English languages",
                     "order": 2
                 },
                 "geminiCommit.commit.commitFormat": {
@@ -96,45 +96,45 @@
                         "emoji"
                     ],
                     "enumDescriptions": [
-                        "Description:\ntype(scope): description\n\nbody\n\nfooter",
-                        "Description:\ntype(scope): short summary\n\nbody\n\nfooter",
-                        "Description:\ntype(scope): message",
-                        "Description:\ntype: message",
-                        "Description:\n:emoji: message"
+                        "type(scope): description\n\nbody\n\nfooter",
+                        "type(scope): short summary\n\nbody\n\nfooter",
+                        "type(scope): message",
+                        "type: message",
+                        ":emoji: message"
                     ],
                     "default": "conventional",
-                    "description": "Format style for commit messages",
+                    "description": "Format style for commit messages. All formats support English, some may have limited support for other languages",
                     "order": 3
                 },
                 "geminiCommit.commit.useCustomInstructions": {
                     "type": "boolean",
                     "default": false,
-                    "description": "Use custom instructions for commit message generation",
+                    "description": "Use custom instructions for commit message generation. When enabled, customInstructions must not be empty",
                     "order": 4
                 },
                 "geminiCommit.commit.customInstructions": {
                     "type": "string",
                     "default": "",
-                    "description": "Custom instructions for commit message generation (used when commitMessageLength is set to 'custom')",
+                    "description": "Custom instructions for commit message generation. Required when useCustomInstructions is enabled",
                     "order": 5
                 },
                 "geminiCommit.commit.onlyStagedChanges": {
                     "type": "boolean",
                     "default": false,
-                    "description": "Generate commit message only for staged changes",
+                    "description": "Generate commit message only for staged changes. When disabled: commits staged changes if present, otherwise commits all tracked changes",
                     "order": 6
                 },
                 "geminiCommit.commit.autoCommit": {
                     "type": "boolean",
                     "default": false,
-                    "description": "Automatically commit changes after generating the commit message.",
-                    "order": 6
+                    "description": "Automatically commit changes after generating the message. Consider disabling promptForRefs when using this feature",
+                    "order": 7
                 },
                 "geminiCommit.commit.autoPush": {
                     "type": "boolean",
                     "default": false,
-                    "description": "Automatically push changes after committing.",
-                    "order": 6
+                    "description": "Automatically push changes after committing. Requires Auto Commit to be enabled. Will be ignored if Auto Commit is disabled",
+                    "order": 8
                 },
                 "geminiCommit.gemini.model": {
                     "type": "string",
@@ -145,26 +145,26 @@
                         "gemini-2.0-flash-exp"
                     ],
                     "default": "gemini-1.5-flash",
-                    "description": "Select Gemini model for commit message generation",
-                    "order": 7
+                    "description": "Select Gemini model for commit message generation. Only used when custom endpoint is not enabled",
+                    "order": 9
                 },
                 "geminiCommit.custom.useCustomEndpoint": {
                     "type": "boolean",
                     "default": false,
-                    "description": "Use a custom endpoint for AI-generated commit messages",
-                    "order": 8
+                    "description": "Use a custom endpoint for AI-generated commit messages. Requires both endpoint URL and model name to be configured",
+                    "order": 10
                 },
                 "geminiCommit.custom.endpoint": {
                     "type": "string",
                     "default": "",
-                    "description": "Custom endpoint URL for AI-generated commit messages",
-                    "order": 9
+                    "description": "Custom endpoint URL (e.g., 'https://api.openai.com/v1' for OpenAI). Required when useCustomEndpoint is enabled",
+                    "order": 11
                 },
                 "geminiCommit.custom.model": {
                     "type": "string",
                     "default": "",
-                    "description": "Model name to use with the custom endpoint",
-                    "order": 10
+                    "description": "Model name for custom endpoint (e.g., 'gpt-3.5-turbo' for OpenAI). Required when useCustomEndpoint is enabled",
+                    "order": 12
                 }
             }
         }
