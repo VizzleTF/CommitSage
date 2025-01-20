@@ -11,6 +11,7 @@ export class ConfigService {
     private static disposables: vscode.Disposable[] = [];
 
     static async initialize(context: vscode.ExtensionContext): Promise<void> {
+        void Logger.log('Initializing ConfigService');
         this.secretStorage = context.secrets;
 
         const configListener = vscode.workspace.onDidChangeConfiguration(event => {
@@ -22,12 +23,14 @@ export class ConfigService {
 
         this.disposables.push(configListener);
         context.subscriptions.push(...this.disposables);
+        void Logger.log('ConfigService initialized successfully');
     }
 
     static getConfig<T extends CacheValue>(section: string, key: string, defaultValue: T): T {
         try {
             const cacheKey = `${section}.${key}`;
             if (!this.cache.has(cacheKey)) {
+                void Logger.log(`Loading config for ${cacheKey}`);
                 const config = vscode.workspace.getConfiguration('geminiCommit');
                 const value = config.inspect<T>(`${section}.${key}`);
 

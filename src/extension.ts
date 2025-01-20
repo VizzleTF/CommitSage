@@ -7,10 +7,13 @@ import { generateAndSetCommitMessage } from './services/aiService';
 import { SettingsValidator } from './services/settingsValidator';
 
 export async function activate(context: vscode.ExtensionContext): Promise<void> {
+    void Logger.log('Starting extension activation');
+
     await ConfigService.initialize(context);
     await Logger.initialize(context);
 
     try {
+        void Logger.log('Validating Git extension');
         await GitService.validateGitExtension();
         await GitService.initialize(context);
     } catch (error) {
@@ -18,6 +21,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         return;
     }
 
+    void Logger.log('Registering commands and views');
     context.subscriptions.push(
         vscode.commands.registerCommand('geminicommit.generateCommitMessage', generateAndSetCommitMessage),
         vscode.commands.registerCommand('geminicommit.setApiKey', () => ConfigService.promptForApiKey()),
@@ -40,11 +44,12 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     );
 
     void SettingsValidator.validateAllSettings();
-    void Logger.log('GeminiCommit extension activated');
+    void Logger.log('Extension activated successfully');
 }
 
 export function deactivate(): void {
-    void Logger.log('GeminiCommit extension deactivated');
+    void Logger.log('Deactivating extension');
     ConfigService.dispose();
     Logger.dispose();
+    void Logger.log('Extension deactivated successfully');
 }

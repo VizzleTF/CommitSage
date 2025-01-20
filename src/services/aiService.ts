@@ -188,6 +188,7 @@ export async function generateAndSetCommitMessage(): Promise<void> {
 
     try {
         await SettingsValidator.validateAllSettings();
+        void Logger.log('Starting commit message generation process');
 
         await vscode.window.withProgress({
             location: vscode.ProgressLocation.Notification,
@@ -200,14 +201,18 @@ export async function generateAndSetCommitMessage(): Promise<void> {
             const selectedRepo = await GitService.selectRepository(repos);
 
             if (!selectedRepo || !selectedRepo.rootUri) {
+                void Logger.error('Repository selection failed: No repository or root URI');
                 throw new Error('No repository selected or repository has no root URI.');
             }
 
             const repoPath = selectedRepo.rootUri.fsPath;
-            const onlyStagedChanges = ConfigService.getOnlyStagedChanges();
+            void Logger.log(`Selected repository: ${repoPath}`);
 
-            // Проверяем наличие staged изменений
+            const onlyStagedChanges = ConfigService.getOnlyStagedChanges();
+            void Logger.log(`Only staged changes mode: ${onlyStagedChanges}`);
+
             const hasStagedChanges = await GitService.hasChanges(repoPath, 'staged');
+            void Logger.log(`Has staged changes: ${hasStagedChanges}`);
 
             progress.report({ message: `Fetching Git diff${onlyStagedChanges ? ' (staged changes only)' : ''}...`, increment: 0 });
 
@@ -217,12 +222,15 @@ export async function generateAndSetCommitMessage(): Promise<void> {
 
                 progress.report({ message: "Analyzing changes...", increment: 25 });
                 const changedFiles = await GitService.getChangedFiles(repoPath, onlyStagedChanges);
+                void Logger.log(`Analyzing ${changedFiles.length} changed files`);
+
                 let blameAnalysis = '';
                 for (const file of changedFiles) {
                     const filePath = vscode.Uri.file(path.join(repoPath, file));
                     try {
                         const fileBlameAnalysis = await analyzeFileChanges(filePath.fsPath);
                         blameAnalysis += `File: ${file}\n${fileBlameAnalysis}\n\n`;
+                        void Logger.log(`Blame analysis completed for: ${file}`);
                     } catch (error) {
                         void Logger.error(`Error analyzing file ${file}:`, error as Error);
                         blameAnalysis += `File: ${file}\nUnable to analyze: ${(error as Error).message}\n\n`;
@@ -231,11 +239,12 @@ export async function generateAndSetCommitMessage(): Promise<void> {
 
                 progress.report({ message: "Generating commit message...", increment: 50 });
                 const { message: commitMessage, model } = await AIService.generateCommitMessage(diff, blameAnalysis, progress);
-                void Logger.log('Commit message generated successfully');
+                void Logger.log(`Commit message generated using ${model} model`);
 
                 let finalMessage = commitMessage;
 
                 if (ConfigService.shouldPromptForRefs()) {
+                    void Logger.log('Prompting for references');
                     const refs = await vscode.window.showInputBox({
                         prompt: "Enter references (e.g., issue numbers) to be added below the commit message",
                         placeHolder: "e.g., #123, JIRA-456"
@@ -243,52 +252,38 @@ export async function generateAndSetCommitMessage(): Promise<void> {
 
                     if (refs) {
                         finalMessage += `\n\n${refs}`;
+                        void Logger.log('References added to commit message');
                     }
                 }
 
                 progress.report({ message: "Setting commit message...", increment: 75 });
                 selectedRepo.inputBox.value = finalMessage;
-                void Logger.log('Commit message set successfully');
+                void Logger.log('Commit message set in input box');
 
-                // Авто-коммит, если включен
                 if (ConfigService.getAutoCommitEnabled()) {
+                    void Logger.log('Auto-commit is enabled, proceeding with commit');
                     if (!finalMessage.trim()) {
-                        void Logger.error('Commit message is empty. Skipping auto-commit.');
+                        void Logger.error('Empty commit message detected, aborting auto-commit');
                         return;
                     }
 
                     progress.report({ message: "Checking Git configuration...", increment: 80 });
-                    try {
-                        await GitService.checkGitConfig(repoPath);
-                    } catch (error) {
-                        void Logger.error('Git configuration error:', error as Error);
-                        throw error;
-                    }
+                    await GitService.checkGitConfig(repoPath);
+                    void Logger.log('Git configuration validated');
 
                     progress.report({ message: "Committing changes...", increment: 85 });
-                    try {
-                        await GitService.commitChanges(selectedRepo, finalMessage);
-                        void Logger.log('Changes committed successfully');
-                    } catch (error) {
-                        void Logger.error('Failed to commit changes:', error as Error);
-                        throw error;
-                    }
+                    await GitService.commitChanges(selectedRepo, finalMessage);
+                    void Logger.log('Changes committed successfully');
 
-                    // Авто-пуш, если включен
                     if (ConfigService.getAutoPushEnabled()) {
+                        void Logger.log('Auto-push is enabled, proceeding with push');
                         progress.report({ message: "Pushing changes...", increment: 95 });
-                        try {
-                            await GitService.pushChanges(selectedRepo);
-                            void Logger.log('Changes pushed successfully');
-                        } catch (error) {
-                            void Logger.error('Failed to push changes:', error as Error);
-                            throw error;
-                        }
+                        await GitService.pushChanges(selectedRepo);
+                        void Logger.log('Changes pushed successfully');
                     }
                 }
 
                 progress.report({ message: "", increment: 100 });
-
                 await new Promise(resolve => setTimeout(resolve, 100));
 
                 void vscode.window.showInformationMessage(
@@ -298,8 +293,6 @@ export async function generateAndSetCommitMessage(): Promise<void> {
             } catch (error) {
                 const errorMessage = (error as Error).message;
                 if (errorMessage.includes('No staged changes detected') && !onlyStagedChanges) {
-                    // Если нет staged изменений и не включен режим "только staged",
-                    // продолжаем выполнение для создания коммита с флагом -a
                     void Logger.log('No staged changes detected, proceeding with -a commit');
                 } else {
                     throw error;
