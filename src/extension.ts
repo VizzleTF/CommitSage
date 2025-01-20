@@ -2,10 +2,9 @@ import * as vscode from 'vscode';
 import { GitService } from './services/gitService';
 import { Logger } from './utils/logger';
 import { ConfigService } from './utils/configService';
-import { generateAndSetCommitMessage } from './services/aiService';
+import { CommitMessageUI } from './services/aiService';
 import { SettingsValidator } from './services/settingsValidator';
 import { TelemetryService } from './services/telemetryService';
-import { messages } from './utils/constants';
 
 export async function activate(context: vscode.ExtensionContext): Promise<void> {
     void Logger.log('Starting extension activation');
@@ -29,7 +28,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         context.subscriptions.push(
             vscode.commands.registerCommand('geminicommit.generateCommitMessage', async () => {
                 try {
-                    await generateAndSetCommitMessage();
+                    await CommitMessageUI.generateAndSetCommitMessage();
                 } catch (error) {
                     void Logger.error('Error in generateCommitMessage command:', error as Error);
                     void vscode.window.showErrorMessage(`Error: ${(error as Error).message}`);

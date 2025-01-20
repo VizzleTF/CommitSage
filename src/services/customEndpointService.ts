@@ -11,10 +11,7 @@ interface CustomApiResponse {
     }>;
 }
 
-interface ApiHeaders {
-    contentType: string;
-    authBearer: string;
-}
+type ApiHeaders = Record<string, string>;
 
 export class CustomEndpointService {
     static async generateCommitMessage(
@@ -31,25 +28,15 @@ export class CustomEndpointService {
         };
 
         const headers: ApiHeaders = {
-            contentType: 'application/json',
-            authBearer: `Bearer ${apiKey}`
+            'content-type': 'application/json',
+            'authorization': `Bearer ${apiKey}`
         };
 
         try {
             void Logger.log('Sending request to custom endpoint');
             progress.report({ message: 'Generating commit message...', increment: 50 });
 
-            const requestHeaders = {
-                contentType: headers.contentType,
-                authorization: headers.authBearer
-            };
-
-            const response = await axios.post<CustomApiResponse>(endpoint, payload, {
-                headers: {
-                    'content-type': requestHeaders.contentType,
-                    'authorization': requestHeaders.authorization
-                }
-            });
+            const response = await axios.post<CustomApiResponse>(endpoint, payload, { headers });
 
             void Logger.log('Custom endpoint response received successfully');
             progress.report({ message: 'Commit message generated successfully', increment: 100 });

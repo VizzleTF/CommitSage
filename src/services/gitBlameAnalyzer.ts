@@ -2,6 +2,8 @@ import * as vscode from 'vscode';
 import { spawn } from 'child_process';
 import * as path from 'path';
 import * as fs from 'fs';
+import { Logger } from '../utils/logger';
+import { errorMessages } from '../utils/constants';
 
 interface BlameInfo {
     commit: string;
@@ -10,95 +12,125 @@ interface BlameInfo {
     line: string;
 }
 
-export class GitBlameAnalyzer {
-    private static async getGitBlame(filePath: string): Promise<BlameInfo[]> {
-        return new Promise((resolve, reject) => {
-            if (!fs.existsSync(filePath)) {
-                reject(new Error(`File does not exist: ${filePath}`));
-                return;
-            }
+interface GitProcessResult<T> {
+    data: T;
+    stderr: string[];
+}
 
-            const blame: BlameInfo[] = [];
-            const gitProcess = spawn('git', ['blame', '--line-porcelain', path.basename(filePath)], {
+export class GitBlameAnalyzer {
+    private static async executeGitCommand<T>(
+        command: string[],
+        filePath: string,
+        processOutput: (data: Buffer) => T,
+        ignoreFileNotFound = false
+    ): Promise<GitProcessResult<T>> {
+        if (!ignoreFileNotFound && !fs.existsSync(filePath)) {
+            throw new Error(`${errorMessages.fileNotFound}: ${filePath}`);
+        }
+
+        return new Promise((resolve, reject) => {
+            const gitProcess = spawn('git', command, {
                 cwd: path.dirname(filePath)
             });
 
-            let currentBlame: Partial<BlameInfo> = {};
+            let result: T;
+            const stderr: string[] = [];
 
             gitProcess.stdout.on('data', (data: Buffer) => {
-                const lines = data.toString().split('\n');
-                lines.forEach((line: string) => {
-                    if (line.startsWith('author ')) {
-                        currentBlame.author = line.substring(7);
-                    } else if (line.startsWith('committer-time ')) {
-                        currentBlame.date = new Date(parseInt(line.substring(15)) * 1000).toISOString();
-                    } else if (line.startsWith('\t')) {
-                        currentBlame.line = line.substring(1);
-                        blame.push(currentBlame as BlameInfo);
-                        currentBlame = {};
-                    } else if (line.match(/^[0-9a-f]{40}/)) {
-                        currentBlame.commit = line.split(' ')[0];
-                    }
-                });
+                result = processOutput(data);
             });
 
             gitProcess.stderr.on('data', (data: Buffer) => {
-                console.error(`Git blame stderr: ${data.toString()}`);
+                const errorMessage = data.toString();
+                stderr.push(errorMessage);
+                void Logger.error(`Git command stderr: ${errorMessage}`);
             });
 
             gitProcess.on('close', (code) => {
-                if (code === 0) {
-                    resolve(blame);
+                if (code === 0 || (ignoreFileNotFound && code === 128)) {
+                    resolve({ data: result, stderr });
                 } else {
-                    reject(new Error(`Git blame process exited with code ${code}`));
+                    reject(new Error(`Git process exited with code ${code}`));
                 }
             });
         });
     }
 
-    private static async getDiff(repoPath: string, filePath: string): Promise<string> {
-        return new Promise((resolve, reject) => {
-            const gitProcess = spawn('git', ['diff', '--', path.basename(filePath)], { cwd: path.dirname(filePath) });
-            let diff = '';
+    private static async getGitBlame(filePath: string): Promise<BlameInfo[]> {
+        if (!fs.existsSync(filePath)) {
+            void Logger.log(`Skipping blame for non-existent file: ${filePath}`);
+            return [];
+        }
 
-            gitProcess.stdout.on('data', (data: Buffer) => {
-                diff += data.toString();
-            });
+        const processBlameOutput = (data: Buffer): BlameInfo[] => {
+            const blame: BlameInfo[] = [];
+            let currentBlame: Partial<BlameInfo> = {};
 
-            gitProcess.stderr.on('data', (data: Buffer) => {
-                console.error(`Git diff stderr: ${data.toString()}`);
-            });
-
-            gitProcess.on('close', (code) => {
-                if (code === 0) {
-                    resolve(diff);
-                } else {
-                    reject(new Error(`Git diff process exited with code ${code}`));
+            const lines = data.toString().split('\n');
+            lines.forEach((line: string) => {
+                if (line.startsWith('author ')) {
+                    currentBlame.author = line.substring(7);
+                } else if (line.startsWith('committer-time ')) {
+                    currentBlame.date = new Date(parseInt(line.substring(15)) * 1000).toISOString();
+                } else if (line.startsWith('\t')) {
+                    currentBlame.line = line.substring(1);
+                    blame.push(currentBlame as BlameInfo);
+                    currentBlame = {};
+                } else if (line.match(/^[0-9a-f]{40}/)) {
+                    currentBlame.commit = line.split(' ')[0];
                 }
             });
-        });
+
+            return blame;
+        };
+
+        const { data } = await this.executeGitCommand(
+            ['blame', '--line-porcelain', path.basename(filePath)],
+            filePath,
+            processBlameOutput
+        );
+
+        return data;
+    }
+
+    private static async getDiff(repoPath: string, filePath: string): Promise<string> {
+        const processDiffOutput = (data: Buffer): string => data.toString();
+
+        try {
+            const { data } = await this.executeGitCommand(
+                ['diff', '--', path.basename(filePath)],
+                filePath,
+                processDiffOutput,
+                true // Ignore if file doesn't exist (for moved/deleted files)
+            );
+
+            return data;
+        } catch (error) {
+            void Logger.log(`Could not get diff for ${filePath}, might be moved/deleted`);
+            return '';
+        }
     }
 
     static async analyzeChanges(repoPath: string, filePath: string): Promise<string> {
         try {
-            console.log(`Analyzing changes for file: ${filePath}`);
-
-            if (!fs.existsSync(filePath)) {
-                throw new Error(`File does not exist: ${filePath}`);
-            }
+            void Logger.log(`Analyzing changes for file: ${filePath}`);
 
             const blame = await this.getGitBlame(filePath);
-            console.log(`Git blame completed for ${filePath}`);
+            void Logger.log(`Git blame completed for ${filePath}`);
 
             const diff = await this.getDiff(repoPath, filePath);
-            console.log(`Git diff completed for ${filePath}`);
+            void Logger.log(`Git diff completed for ${filePath}`);
+
+            if (!blame.length && !diff) {
+                return `File ${path.basename(filePath)} was moved or deleted`;
+            }
 
             const changedLines = this.parseChangedLines(diff);
             const blameAnalysis = this.analyzeBlameInfo(blame, changedLines);
 
             return this.formatAnalysis(blameAnalysis);
         } catch (error) {
-            console.error('Error in GitBlameAnalyzer:', error);
+            void Logger.error('Error in GitBlameAnalyzer:', error as Error);
             throw error;
         }
     }
@@ -151,20 +183,5 @@ export class GitBlameAnalyzer {
         });
 
         return result;
-    }
-}
-
-// Usage in the extension
-export async function analyzeFileChanges(filePath: string): Promise<string> {
-    const workspaceFolder = vscode.workspace.getWorkspaceFolder(vscode.Uri.file(filePath));
-    if (!workspaceFolder) {
-        throw new Error('File is not part of a workspace');
-    }
-
-    try {
-        return await GitBlameAnalyzer.analyzeChanges(workspaceFolder.uri.fsPath, filePath);
-    } catch (error) {
-        console.error(`Error analyzing file changes for ${filePath}:`, error);
-        return `Unable to analyze changes for ${filePath}: ${(error as Error).message}`;
     }
 }

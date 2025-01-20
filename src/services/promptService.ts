@@ -34,16 +34,4 @@ Please provide ONLY the commit message, without any additional text or explanati
                 return 'Please write the commit message in English.';
         }
     }
-
-    static getCommitFormatPrompt(format: string): string {
-        switch (format.toLowerCase()) {
-            case 'conventional':
-                return 'Use Conventional Commits format: type(scope): description';
-            case 'gitmoji':
-                return 'Use Gitmoji format: :emoji: description';
-            case 'basic':
-            default:
-                return 'Use basic format: description';
-        }
-    }
 }

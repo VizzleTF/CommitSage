@@ -5,11 +5,8 @@ import { AiServiceError, ConfigurationError } from '../models/errors';
 
 type CacheValue = string | boolean | number;
 
-export type CommitLanguage =
-    | 'english'
-    | 'russian'
-    | 'chinese'
-    | 'japanese';
+export type CommitLanguage = typeof SUPPORTED_LANGUAGES[number];
+const SUPPORTED_LANGUAGES = ['english', 'russian', 'chinese', 'japanese'] as const;
 
 export class ConfigService {
     private static cache = new Map<string, CacheValue>();
@@ -303,5 +300,9 @@ export class ConfigService {
         if (key) {
             await this.setCustomApiKey(key);
         }
+    }
+
+    static isTelemetryEnabled(): boolean {
+        return this.getConfig<boolean>('telemetry', 'enabled', true);
     }
 }
