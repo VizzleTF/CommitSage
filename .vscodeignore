@@ -1,0 +1,28 @@
+.vscode/**
+.vscode-test/**
+src/**
+.gitignore
+.env
+.eslintrc.json
+**/tsconfig.json
+**/.eslintrc.json
+**/*.map
+**/*.ts
+node_modules/**
+.github/**
+.git/**
+release.sh
+eslint.config.mjs
+
+# Keep only production dependencies
+!node_modules/@amplitude/analytics-node/**
+!node_modules/axios/**
+
+# Keep dist folder
+!dist/**
+
+# Keep necessary documentation
+!README.md
+!LICENSE.txt
+!icon.png
+!example.gif 
