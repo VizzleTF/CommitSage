@@ -18,6 +18,7 @@ GeminiCommit is a VSCode extension that automatically generates commit messages 
 - Secure API key storage
 - Automatic commit and push functionality
 - Flexible commit workflow support (staged/unstaged changes)
+- Keyboard shortcut support (default: Ctrl+G / Cmd+G on macOS)
 
 ## Quick Start & Usage
 
@@ -37,7 +38,9 @@ GeminiCommit is a VSCode extension that automatically generates commit messages 
        - If no staged changes, commits all modified files using `git commit -a`
      - "Auto Commit": Automatically creates a commit after generating the message
      - "Auto Push": When enabled (and Auto Commit is enabled), automatically pushes changes after commit
-5. Click "Generate Commit Message" in Source Control view
+5. Generate commit message using:
+   - Click "Generate Commit Message" in Source Control view, or
+   - Use keyboard shortcut Ctrl+G (Cmd+G on macOS)
 6. (Optional) Enter references if prompted
 7. Review and edit the generated message
 8. Commit/push is performed automatically based on your settings
@@ -189,7 +192,9 @@ GeminiCommit - расширение VSCode для автоматической �
      - "Auto Commit": Когда включено, автоматически создает коммит после генерации сообщения
      - "Auto Push": Когда включено (и включен Auto Commit), автоматически пушит изменения после коммита.
        При включенном Auto Push без Auto Commit вы увидите предупреждение с быстрой ссылкой на настройки
-5. Нажмите "Generate Commit Message" в панели Source Control
+5. Сгенерируйте сообщение коммита:
+   - Нажмите "Generate Commit Message" в панели Source Control, или
+   - Используйте горячие клавиши Ctrl+G (Cmd+G на macOS)
 6. (Опционально) Введите ссылки, если запрошено
 7. Просмотрите и отредактируйте сгенерированное сообщение
 8. Коммит и пуш выполняются автоматически в соответствии с вашими настройками
