@@ -2,7 +2,7 @@
     "name": "geminicommit",
     "displayName": "Gemini Commit",
     "description": "Free AI commit messages using Gemini or custom LLM",
-    "version": "1.9.0",
+    "version": "1.9.1",
     "publisher": "VizzleTF",
     "repository": {
         "type": "git",
