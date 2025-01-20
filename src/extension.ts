@@ -5,6 +5,7 @@ import { ConfigService } from './utils/configService';
 import { generateAndSetCommitMessage } from './services/aiService';
 import { SettingsValidator } from './services/settingsValidator';
 import { TelemetryService } from './services/telemetryService';
+import { messages } from './utils/constants';
 
 export async function activate(context: vscode.ExtensionContext): Promise<void> {
     void Logger.log('Starting extension activation');

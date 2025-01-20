@@ -10,6 +10,7 @@ import { GitService } from './gitService';
 import { analyzeFileChanges } from './gitBlameAnalyzer';
 import { SettingsValidator } from './settingsValidator';
 import { TelemetryService } from '../services/telemetryService';
+import { errorMessages } from '../utils/constants';
 
 const MAX_RETRIES = 3;
 const INITIAL_RETRY_DELAY_MS = 1000;
@@ -138,22 +139,38 @@ export class AIService {
             switch (status) {
                 case 403:
                     return {
-                        errorMessage: 'Access forbidden. Please check your API key.',
+                        errorMessage: errorMessages.apiError.replace('{0}', 'Access forbidden. Please check your API key.'),
                         shouldRetry: false
                     };
                 case 429:
                     return {
-                        errorMessage: 'Rate limit exceeded. Please try again later.',
+                        errorMessage: errorMessages.apiError.replace('{0}', 'Rate limit exceeded. Please try again later.'),
+                        shouldRetry: true
+                    };
+                case 500:
+                    return {
+                        errorMessage: errorMessages.apiError.replace('{0}', 'Server error. Please try again later.'),
                         shouldRetry: true
                     };
                 default:
                     return {
-                        errorMessage: `${error.message} (Status: ${status})`,
+                        errorMessage: errorMessages.apiError.replace('{0}', `API returned status ${status}. ${responseData}`),
                         shouldRetry: status >= 500
                     };
             }
         }
-        return { errorMessage: error.message, shouldRetry: true };
+
+        if (error.message.includes('ECONNREFUSED') || error.message.includes('ETIMEDOUT')) {
+            return {
+                errorMessage: errorMessages.networkError.replace('{0}', 'Connection failed. Please check your internet connection.'),
+                shouldRetry: true
+            };
+        }
+
+        return {
+            errorMessage: errorMessages.networkError.replace('{0}', error.message),
+            shouldRetry: false
+        };
     }
 
     private static cleanCommitMessage(message: string): string {
