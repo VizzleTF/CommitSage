@@ -206,26 +206,17 @@ export class GitService {
             .map(line => line.substring(3).trim());
     }
 
-    static async hasStagedChanges(repoPath: string): Promise<boolean> {
+    static async hasChanges(repoPath: string, type: 'staged' | 'untracked'): Promise<boolean> {
         try {
             const statusOutput = await this.executeGitCommand(['status', '--porcelain'], repoPath);
-            return statusOutput.split('\n').some(line =>
-                line.trim() !== '' && ['M', 'A', 'D', 'R'].includes(line[0])
-            );
+            return statusOutput.split('\n').some(line => {
+                if (type === 'staged') {
+                    return line.trim() !== '' && ['M', 'A', 'D', 'R'].includes(line[0]);
+                }
+                return line.trim() !== '' && line.startsWith('??');
+            });
         } catch (error) {
-            void Logger.error('Error checking staged changes:', error as Error);
-            return false;
-        }
-    }
-
-    static async hasUntrackedFiles(repoPath: string): Promise<boolean> {
-        try {
-            const statusOutput = await this.executeGitCommand(['status', '--porcelain'], repoPath);
-            return statusOutput.split('\n').some(line =>
-                line.trim() !== '' && line.startsWith('??')
-            );
-        } catch (error) {
-            void Logger.error('Error checking untracked files:', error as Error);
+            void Logger.error(`Error checking ${type} changes:`, error as Error);
             return false;
         }
     }
@@ -237,8 +228,8 @@ export class GitService {
         }
 
         try {
-            const hasStagedChanges = await this.hasStagedChanges(repoPath);
-            const hasUntrackedFiles = await this.hasUntrackedFiles(repoPath);
+            const hasStagedChanges = await this.hasChanges(repoPath, 'staged');
+            const hasUntrackedFiles = await this.hasChanges(repoPath, 'untracked');
 
             if (!hasStagedChanges && !hasUntrackedFiles) {
                 throw new NoChangesDetectedError();
@@ -277,20 +268,12 @@ export class GitService {
     }
 
     static async checkGitConfig(repoPath: string): Promise<void> {
-        return new Promise(async (resolve, reject) => {
-            try {
-                const userName = await this.executeGitCommand(['config', 'user.name'], repoPath);
-                const userEmail = await this.executeGitCommand(['config', 'user.email'], repoPath);
+        const userName = await this.executeGitCommand(['config', 'user.name'], repoPath);
+        const userEmail = await this.executeGitCommand(['config', 'user.email'], repoPath);
 
-                if (!userName.trim() || !userEmail.trim()) {
-                    reject(new Error('Git user.name or user.email is not configured.'));
-                } else {
-                    resolve();
-                }
-            } catch (error) {
-                reject(error);
-            }
-        });
+        if (!userName.trim() || !userEmail.trim()) {
+            throw new Error('Git user.name or user.email is not configured.');
+        }
     }
 
     static async validateGitExtension(): Promise<void> {
@@ -329,6 +312,13 @@ export class GitService {
             return repos[0];
         }
         return this.selectRepository(repos);
+    }
+
+    static getSourceControl(): vscode.SourceControl {
+        if (!this.sourceControl) {
+            throw new Error('Source control not initialized');
+        }
+        return this.sourceControl;
     }
 }
 

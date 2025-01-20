@@ -20,6 +20,8 @@ export class GeminiCommitTreeDataProvider implements vscode.TreeDataProvider<vsc
             tooltip: 'Generate a commit message using AI'
         };
 
+        generateButton.contextValue = 'generateCommitMessage';
+
         generateButton.iconPath = new vscode.ThemeIcon('git-commit');
 
         return [generateButton];

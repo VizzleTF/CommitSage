@@ -207,7 +207,7 @@ export async function generateAndSetCommitMessage(): Promise<void> {
             const onlyStagedChanges = ConfigService.getOnlyStagedChanges();
 
             // Проверяем наличие staged изменений
-            const hasStagedChanges = await GitService.hasStagedChanges(repoPath);
+            const hasStagedChanges = await GitService.hasChanges(repoPath, 'staged');
 
             progress.report({ message: `Fetching Git diff${onlyStagedChanges ? ' (staged changes only)' : ''}...`, increment: 0 });
 
