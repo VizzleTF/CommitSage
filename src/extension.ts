@@ -38,9 +38,26 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
             vscode.commands.registerCommand('geminicommit.setApiKey', () => ConfigService.promptForApiKey()),
             vscode.commands.registerCommand('geminicommit.setCustomApiKey', () => ConfigService.promptForCustomApiKey()),
             vscode.commands.registerCommand('geminicommit.acceptInput', async () => {
-                const message = GitService.getSourceControl().inputBox.value;
-                if (message) {
-                    await GitService.commitChanges(GitService.getSourceControl(), message);
+                try {
+                    const message = await vscode.window.showInputBox({
+                        prompt: 'Enter commit message',
+                        placeHolder: 'Type your commit message'
+                    });
+                    if (message) {
+                        await GitService.commitChanges(message);
+                    }
+                } catch (error) {
+                    void Logger.error('Error in commit command:', error as Error);
+                    void vscode.window.showErrorMessage(`Error: ${(error as Error).message}`);
+                }
+            }),
+            vscode.commands.registerCommand('geminicommit.pushChanges', async () => {
+                try {
+                    await GitService.pushChanges();
+                    void vscode.window.showInformationMessage('Successfully pushed changes to remote');
+                } catch (error) {
+                    void Logger.error('Error pushing changes:', error as Error);
+                    void vscode.window.showErrorMessage(`Failed to push changes: ${(error as Error).message}`);
                 }
             })
         );

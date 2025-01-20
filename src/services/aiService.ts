@@ -280,19 +280,23 @@ export async function generateAndSetCommitMessage(): Promise<void> {
                     void Logger.log('Git configuration validated');
 
                     progress.report({ message: "Committing changes...", increment: 85 });
-                    await GitService.commitChanges(selectedRepo, finalMessage);
+                    await GitService.commitChanges(finalMessage);
                     void Logger.log('Changes committed successfully');
 
                     if (ConfigService.getAutoPushEnabled()) {
                         void Logger.log('Auto-push is enabled, proceeding with push');
                         progress.report({ message: "Pushing changes...", increment: 95 });
-                        await GitService.pushChanges(selectedRepo);
+                        await GitService.pushChanges();
                         void Logger.log('Changes pushed successfully');
                     }
 
-                    void TelemetryService.sendEvent('auto_commit_completed', {
+                    void TelemetryService.sendEvent('commit_message_applied', {
+                        model,
+                        messageLength: finalMessage.length,
                         autoPushEnabled: ConfigService.getAutoPushEnabled()
                     });
+
+                    progress.report({ message: "Done!", increment: 100 });
                 }
 
                 progress.report({ message: "", increment: 100 });

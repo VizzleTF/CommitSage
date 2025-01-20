@@ -38,7 +38,7 @@
         "commands": [
             {
                 "command": "geminicommit.generateCommitMessage",
-                "title": "GeminiCommit: Generate Message",
+                "title": "GeminiCommit: Generate Commit Message",
                 "icon": "$(rocket)"
             },
             {
@@ -48,6 +48,16 @@
             {
                 "command": "geminicommit.setCustomApiKey",
                 "title": "GeminiCommit: Set Custom API Key"
+            },
+            {
+                "command": "geminicommit.acceptInput",
+                "title": "GeminiCommit: Commit Changes",
+                "icon": "$(check)"
+            },
+            {
+                "command": "geminicommit.pushChanges",
+                "title": "GeminiCommit: Push Changes",
+                "icon": "$(cloud-upload)"
             }
         ],
         "menus": {
@@ -55,6 +65,16 @@
                 {
                     "when": "scmProvider == git",
                     "command": "geminicommit.generateCommitMessage",
+                    "group": "navigation"
+                },
+                {
+                    "when": "scmProvider == git",
+                    "command": "geminicommit.acceptInput",
+                    "group": "navigation"
+                },
+                {
+                    "when": "scmProvider == git",
+                    "command": "geminicommit.pushChanges",
                     "group": "navigation"
                 }
             ]
