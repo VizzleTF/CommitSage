@@ -13,7 +13,7 @@ import { TelemetryService } from '../services/telemetryService';
 
 const MAX_RETRIES = 3;
 const INITIAL_RETRY_DELAY_MS = 1000;
-const MAX_DIFF_LENGTH = 10000;
+const MAX_DIFF_LENGTH = 100000;
 const GEMINI_API_BASE_URL = 'https://generativelanguage.googleapis.com/v1beta/models';
 
 interface GeminiResponse {

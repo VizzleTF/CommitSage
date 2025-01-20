@@ -1,5 +1,5 @@
 export const karmaTemplate = {
-    en: `Generate a commit message following the Karma format:
+    english: `Generate a commit message following the Karma format:
 <type>(<scope>): <message>
 
 Types:
@@ -14,7 +14,7 @@ Types:
 Example:
 chore(ci): update deployment script to Node 16`,
 
-    ru: `Создайте сообщение коммита в формате Karma:
+    russian: `Создайте сообщение коммита в формате Karma:
 <тип>(<область>): <сообщение>
 
 Типы:
@@ -29,7 +29,7 @@ chore(ci): update deployment script to Node 16`,
 Пример:
 chore(ci): обновить скрипт деплоя до Node 16`,
 
-    cn: `生成符合 Karma 格式的提交信息：
+    chinese: `生成符合 Karma 格式的提交信息：
 <类型>(<范围>): <信息>
 
 类型：

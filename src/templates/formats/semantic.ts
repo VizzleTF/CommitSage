@@ -1,5 +1,5 @@
 export const semanticTemplate = {
-    en: `Generate a commit message following the Semantic format:
+    english: `Generate a commit message following the Semantic format:
 type: message
 
 Types:
@@ -14,7 +14,7 @@ Types:
 Example:
 feat: add user avatar upload functionality`,
 
-    ru: `Создайте сообщение коммита в формате Semantic:
+    russian: `Создайте сообщение коммита в формате Semantic:
 тип: сообщение
 
 Типы:
@@ -29,7 +29,7 @@ feat: add user avatar upload functionality`,
 Пример:
 feat: добавить загрузку аватара пользователя`,
 
-    cn: `生成符合语义化格式的提交信息：
+    chinese: `生成符合语义化格式的提交信息：
 类型: 信息
 
 类型：
