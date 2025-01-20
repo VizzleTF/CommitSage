@@ -10,91 +10,69 @@ import {
 import { TelemetryService } from './telemetryService';
 
 export class GitService {
-    private static sourceControl: vscode.SourceControl;
-    private static indexGroup: vscode.SourceControlResourceGroup;
-    private static workingTreeGroup: vscode.SourceControlResourceGroup;
-
     static async initialize(context: vscode.ExtensionContext): Promise<void> {
         try {
             void Logger.log('Initializing Git service');
-            this.sourceControl = vscode.scm.createSourceControl('geminicommit', 'GeminiCommit');
-            this.indexGroup = this.sourceControl.createResourceGroup('index', 'Staged Changes');
-            this.workingTreeGroup = this.sourceControl.createResourceGroup('workingTree', 'Changes');
-
-            this.sourceControl.inputBox.placeholder = 'Type commit message (Ctrl+Enter to commit)';
-            this.sourceControl.acceptInputCommand = {
-                command: 'geminicommit.acceptInput',
-                title: 'Accept Input',
-                tooltip: 'Commit changes'
-            };
-
-            context.subscriptions.push(this.sourceControl);
+            await this.validateGitExtension();
             void Logger.log('Git service initialized successfully');
-            await this.refreshSourceControl();
         } catch (error) {
             void Logger.error('Failed to initialize Git service:', error as Error);
             throw error;
         }
     }
 
-    private static async refreshSourceControl(): Promise<void> {
+    static async commitChanges(message: string): Promise<void> {
         try {
             const repo = await this.getActiveRepository();
             if (!repo?.rootUri) {
-                void Logger.log('No active repository found during refresh');
-                return;
+                throw new Error('No active repository found');
             }
 
-            void Logger.log(`Refreshing source control for ${repo.rootUri.fsPath}`);
-            const [indexStates, workingStates] = await Promise.all([
-                this.getStagedResourceStates(repo.rootUri.fsPath),
-                this.getUnstagedResourceStates(repo.rootUri.fsPath)
-            ]);
+            const repoPath = repo.rootUri.fsPath;
+            const hasStagedChanges = await this.hasChanges(repoPath, 'staged');
+            const hasUntrackedFiles = await this.hasChanges(repoPath, 'untracked');
 
-            this.indexGroup.resourceStates = indexStates;
-            this.workingTreeGroup.resourceStates = workingStates;
-            void Logger.log(`Source control refreshed: ${indexStates.length} staged, ${workingStates.length} unstaged items`);
+            if (!hasStagedChanges && !hasUntrackedFiles) {
+                throw new NoChangesDetectedError();
+            }
+
+            if (hasUntrackedFiles && !hasStagedChanges) {
+                await this.executeGitCommand(['add', '.'], repoPath);
+            }
+
+            const commitArgs = hasStagedChanges ?
+                ['commit', '-m', message] :
+                ['commit', '-a', '-m', message];
+
+            await this.executeGitCommand(commitArgs, repoPath);
+            void vscode.window.showInformationMessage('Changes committed successfully');
+
+            void TelemetryService.sendEvent('commit_completed', {
+                hasStaged: hasStagedChanges,
+                hasUntracked: hasUntrackedFiles,
+                messageLength: message.length
+            });
         } catch (error) {
-            void Logger.error('Failed to refresh source control:', error as Error);
+            void TelemetryService.sendEvent('commit_failed', {
+                error: (error as Error).message
+            });
+            void Logger.error('Failed to commit changes:', error as Error);
+            throw error;
         }
     }
 
-    private static async getStagedResourceStates(repoPath: string): Promise<vscode.SourceControlResourceState[]> {
-        const diff = await this.executeGitCommand(['diff', '--staged', '--name-status'], repoPath);
-        return this.parseGitStatus(diff, repoPath, true);
-    }
+    static async pushChanges(): Promise<void> {
+        try {
+            const repo = await this.getActiveRepository();
+            if (!repo?.rootUri) {
+                throw new Error('No active repository found');
+            }
 
-    private static async getUnstagedResourceStates(repoPath: string): Promise<vscode.SourceControlResourceState[]> {
-        const diff = await this.executeGitCommand(['diff', '--name-status'], repoPath);
-        return this.parseGitStatus(diff, repoPath, false);
-    }
-
-    private static parseGitStatus(
-        output: string,
-        repoPath: string,
-        staged: boolean
-    ): vscode.SourceControlResourceState[] {
-        return output.split('\n')
-            .filter(line => line.trim())
-            .map(line => {
-                const [status, ...filePaths] = line.split('\t');
-                const filePath = filePaths.join('\t');
-
-                return {
-                    resourceUri: vscode.Uri.file(`${repoPath}/${filePath}`),
-                    decorations: {
-                        strikeThrough: status === 'D',
-                        tooltip: this.getStatusText(status),
-                        light: { iconPath: this.getIconPath(status) },
-                        dark: { iconPath: this.getIconPath(status) }
-                    },
-                    command: {
-                        command: staged ? 'git.unstage' : 'git.stage',
-                        title: staged ? 'Unstage Changes' : 'Stage Changes',
-                        arguments: [vscode.Uri.file(`${repoPath}/${filePath}`)]
-                    }
-                };
-            });
+            await this.executeGitCommand(['push'], repo.rootUri.fsPath);
+        } catch (error) {
+            void Logger.error('Failed to push changes:', error as Error);
+            throw error;
+        }
     }
 
     static async getDiff(repoPath: string, onlyStaged: boolean = false): Promise<string> {
@@ -151,6 +129,39 @@ export class GitService {
         return output.split('\n').filter(line => line.trim() !== '');
     }
 
+    static async hasChanges(repoPath: string, type: 'staged' | 'untracked'): Promise<boolean> {
+        try {
+            const statusOutput = await this.executeGitCommand(['status', '--porcelain'], repoPath);
+            return statusOutput.split('\n').some(line => {
+                if (type === 'staged') {
+                    return line.trim() !== '' && ['M', 'A', 'D', 'R'].includes(line[0]);
+                }
+                return line.trim() !== '' && line.startsWith('??');
+            });
+        } catch (error) {
+            void Logger.error(`Error checking ${type} changes:`, error as Error);
+            return false;
+        }
+    }
+
+    static async getChangedFiles(repoPath: string, onlyStaged: boolean = false): Promise<string[]> {
+        const statusCommand = ['status', '--porcelain'];
+        const output = await this.executeGitCommand(statusCommand, repoPath);
+        return output.split('\n')
+            .filter(line => line.trim() !== '')
+            .filter(line => !onlyStaged || line[0] === 'M' || line[0] === 'A' || line[0] === 'D' || line[0] === 'R')
+            .map(line => line.substring(3).trim());
+    }
+
+    static async checkGitConfig(repoPath: string): Promise<void> {
+        const userName = await this.executeGitCommand(['config', 'user.name'], repoPath);
+        const userEmail = await this.executeGitCommand(['config', 'user.email'], repoPath);
+
+        if (!userName.trim() || !userEmail.trim()) {
+            throw new Error('Git user.name or user.email is not configured.');
+        }
+    }
+
     private static executeGitCommand(args: string[], cwd: string): Promise<string> {
         return new Promise((resolve, reject) => {
             const childProcess = spawn('git', args, { cwd });
@@ -205,131 +216,6 @@ export class GitService {
         return selected.repository;
     }
 
-    static async getChangedFiles(repoPath: string, onlyStaged: boolean = false): Promise<string[]> {
-        const statusCommand = ['status', '--porcelain'];
-        const output = await this.executeGitCommand(statusCommand, repoPath);
-        return output.split('\n')
-            .filter(line => line.trim() !== '')
-            .filter(line => !onlyStaged || line[0] === 'M' || line[0] === 'A' || line[0] === 'D' || line[0] === 'R')
-            .map(line => line.substring(3).trim());
-    }
-
-    static async hasChanges(repoPath: string, type: 'staged' | 'untracked'): Promise<boolean> {
-        try {
-            const statusOutput = await this.executeGitCommand(['status', '--porcelain'], repoPath);
-            return statusOutput.split('\n').some(line => {
-                if (type === 'staged') {
-                    return line.trim() !== '' && ['M', 'A', 'D', 'R'].includes(line[0]);
-                }
-                return line.trim() !== '' && line.startsWith('??');
-            });
-        } catch (error) {
-            void Logger.error(`Error checking ${type} changes:`, error as Error);
-            return false;
-        }
-    }
-
-    static async commitChanges(repo: vscode.SourceControl, message: string): Promise<void> {
-        const repoPath = repo.rootUri?.fsPath;
-        if (!repoPath) {
-            void Logger.error('Cannot commit: Repository path is undefined');
-            throw new Error('Repository path is undefined');
-        }
-
-        void Logger.log(`Committing changes in ${repoPath}`);
-        try {
-            const hasStagedChanges = await this.hasChanges(repoPath, 'staged');
-            const hasUntrackedFiles = await this.hasChanges(repoPath, 'untracked');
-
-            void TelemetryService.sendEvent('commit_started', {
-                hasStaged: hasStagedChanges,
-                hasUntracked: hasUntrackedFiles
-            });
-
-            if (!hasStagedChanges && !hasUntrackedFiles) {
-                throw new NoChangesDetectedError();
-            }
-
-            if (hasUntrackedFiles && !hasStagedChanges) {
-                await this.executeGitCommand(['add', '.'], repoPath);
-            }
-
-            const commitArgs = hasStagedChanges ?
-                ['commit', '-m', message] :
-                ['commit', '-a', '-m', message];
-
-            await this.executeGitCommand(commitArgs, repoPath);
-            void Logger.log('Changes committed successfully');
-
-            void TelemetryService.sendEvent('commit_completed', {
-                hasStaged: hasStagedChanges,
-                hasUntracked: hasUntrackedFiles,
-                messageLength: message.length
-            });
-        } catch (error) {
-            void TelemetryService.sendEvent('commit_failed', {
-                error: (error as Error).message
-            });
-            void Logger.error('Failed to commit changes:', error as Error);
-            throw error;
-        }
-    }
-
-    static async pushChanges(repo: vscode.SourceControl): Promise<void> {
-        return new Promise((resolve, reject) => {
-            const childProcess = spawn('git', ['push'], {
-                cwd: repo.rootUri?.fsPath
-            });
-
-            childProcess.on('close', (code) => {
-                if (code === 0) {
-                    resolve();
-                } else {
-                    reject(new Error(`Git push failed with code ${code}`));
-                }
-            });
-        });
-    }
-
-    static async checkGitConfig(repoPath: string): Promise<void> {
-        const userName = await this.executeGitCommand(['config', 'user.name'], repoPath);
-        const userEmail = await this.executeGitCommand(['config', 'user.email'], repoPath);
-
-        if (!userName.trim() || !userEmail.trim()) {
-            throw new Error('Git user.name or user.email is not configured.');
-        }
-    }
-
-    static async validateGitExtension(): Promise<void> {
-        const extension = vscode.extensions.getExtension<GitExtension>('vscode.git');
-        if (!extension) {
-            throw new GitExtensionNotFoundError();
-        }
-        await extension.activate();
-    }
-
-    private static getStatusText(status: string): string {
-        switch (status[0]) {
-            case 'A': return 'Added';
-            case 'M': return 'Modified';
-            case 'D': return 'Deleted';
-            case 'R': return 'Renamed';
-            case 'C': return 'Copied';
-            case 'U': return 'Updated';
-            default: return 'Unknown';
-        }
-    }
-
-    private static getIconPath(status: string): vscode.ThemeIcon {
-        switch (status[0]) {
-            case 'A': return new vscode.ThemeIcon('diff-added');
-            case 'M': return new vscode.ThemeIcon('diff-modified');
-            case 'D': return new vscode.ThemeIcon('diff-removed');
-            case 'R': return new vscode.ThemeIcon('diff-renamed');
-            default: return new vscode.ThemeIcon('diff-modified');
-        }
-    }
-
     private static async getActiveRepository(): Promise<vscode.SourceControl | undefined> {
         const repos = await this.getRepositories();
         if (repos.length === 1) {
@@ -338,11 +224,12 @@ export class GitService {
         return this.selectRepository(repos);
     }
 
-    static getSourceControl(): vscode.SourceControl {
-        if (!this.sourceControl) {
-            throw new Error('Source control not initialized');
+    static async validateGitExtension(): Promise<void> {
+        const extension = vscode.extensions.getExtension<GitExtension>('vscode.git');
+        if (!extension) {
+            throw new GitExtensionNotFoundError();
         }
-        return this.sourceControl;
+        await extension.activate();
     }
 }
 
