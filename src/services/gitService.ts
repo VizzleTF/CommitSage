@@ -14,14 +14,12 @@ export class GitService {
     private static workingTreeGroup: vscode.SourceControlResourceGroup;
 
     static async initialize(context: vscode.ExtensionContext): Promise<void> {
+        void Logger.log('Initializing Git service');
         this.sourceControl = vscode.scm.createSourceControl('geminicommit', 'GeminiCommit');
         this.indexGroup = this.sourceControl.createResourceGroup('index', 'Staged Changes');
         this.workingTreeGroup = this.sourceControl.createResourceGroup('workingTree', 'Changes');
 
-        // Set up input box for commit messages
         this.sourceControl.inputBox.placeholder = 'Type commit message (Ctrl+Enter to commit)';
-
-        // Handle commit action when user presses Ctrl+Enter
         this.sourceControl.acceptInputCommand = {
             command: 'geminicommit.acceptInput',
             title: 'Accept Input',
@@ -29,16 +27,19 @@ export class GitService {
         };
 
         context.subscriptions.push(this.sourceControl);
-
-        // Initial refresh of resource states
+        void Logger.log('Git service initialized successfully');
         await this.refreshSourceControl();
     }
 
     private static async refreshSourceControl(): Promise<void> {
         try {
             const repo = await this.getActiveRepository();
-            if (!repo?.rootUri) return;
+            if (!repo?.rootUri) {
+                void Logger.log('No active repository found during refresh');
+                return;
+            }
 
+            void Logger.log(`Refreshing source control for ${repo.rootUri.fsPath}`);
             const [indexStates, workingStates] = await Promise.all([
                 this.getStagedResourceStates(repo.rootUri.fsPath),
                 this.getUnstagedResourceStates(repo.rootUri.fsPath)
@@ -46,6 +47,7 @@ export class GitService {
 
             this.indexGroup.resourceStates = indexStates;
             this.workingTreeGroup.resourceStates = workingStates;
+            void Logger.log(`Source control refreshed: ${indexStates.length} staged, ${workingStates.length} unstaged items`);
         } catch (error) {
             void Logger.error('Failed to refresh source control:', error as Error);
         }
@@ -90,7 +92,7 @@ export class GitService {
     }
 
     static async getDiff(repoPath: string, onlyStaged: boolean = false): Promise<string> {
-        void Logger.log(`Getting diff for repository: ${repoPath}, onlyStaged: ${onlyStaged}`);
+        void Logger.log(`Getting diff for ${repoPath} (onlyStaged: ${onlyStaged})`);
 
         const stagedDiff = await this.executeGitCommand(['diff', '--staged'], repoPath);
 
@@ -224,9 +226,11 @@ export class GitService {
     static async commitChanges(repo: vscode.SourceControl, message: string): Promise<void> {
         const repoPath = repo.rootUri?.fsPath;
         if (!repoPath) {
+            void Logger.error('Cannot commit: Repository path is undefined');
             throw new Error('Repository path is undefined');
         }
 
+        void Logger.log(`Committing changes in ${repoPath}`);
         try {
             const hasStagedChanges = await this.hasChanges(repoPath, 'staged');
             const hasUntrackedFiles = await this.hasChanges(repoPath, 'untracked');
