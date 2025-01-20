@@ -29,9 +29,15 @@ export class ConfigService {
             const cacheKey = `${section}.${key}`;
             if (!this.cache.has(cacheKey)) {
                 const config = vscode.workspace.getConfiguration('geminiCommit');
-                const value = config.get<T>(`${section}.${key}`) ?? defaultValue;
-                this.cache.set(cacheKey, value);
-                void Logger.log(`Config loaded: ${cacheKey} = ${JSON.stringify(value)}`);
+                const value = config.inspect<T>(`${section}.${key}`);
+
+                const effectiveValue = value?.workspaceValue ??
+                    value?.globalValue ??
+                    value?.defaultValue ??
+                    defaultValue;
+
+                this.cache.set(cacheKey, effectiveValue);
+                void Logger.log(`Config loaded: ${cacheKey} = ${JSON.stringify(effectiveValue)}`);
             }
             return this.cache.get(cacheKey) as T;
         } catch (error) {
@@ -224,25 +230,31 @@ export class ConfigService {
 
         if (isAutoPushEnabled && !isAutoCommitEnabled) {
             const selection = await vscode.window.showWarningMessage(
-                'Auto Push requires Auto Commit to be enabled. Choose an action:',
-                'Enable Auto Commit',
-                'Disable Auto Push',
-                'Open Settings'
+                'Auto Push requires Auto Commit to be enabled.',
+                {
+                    modal: true,
+                    detail: 'Choose how to resolve this configuration conflict'
+                },
+                { title: 'Enable Auto Commit', isCloseAffordance: false },
+                { title: 'Disable Auto Push', isCloseAffordance: false },
+                { title: 'Open Settings', isCloseAffordance: true }
             );
 
-            if (selection === 'Enable Auto Commit') {
-                const config = vscode.workspace.getConfiguration('geminiCommit');
-                await config.update('commit.autoCommit', true, true);
-                void Logger.log('Auto Commit has been enabled');
-            } else if (selection === 'Disable Auto Push') {
-                const config = vscode.workspace.getConfiguration('geminiCommit');
-                await config.update('commit.autoPush', false, true);
-                void Logger.log('Auto Push has been disabled');
-            } else if (selection === 'Open Settings') {
-                void vscode.commands.executeCommand(
-                    'workbench.action.openSettings',
-                    'geminiCommit.commit'
-                );
+            const config = vscode.workspace.getConfiguration('geminiCommit');
+
+            switch (selection?.title) {
+                case 'Enable Auto Commit':
+                    await config.update('commit.autoCommit', true, vscode.ConfigurationTarget.Global);
+                    break;
+                case 'Disable Auto Push':
+                    await config.update('commit.autoPush', false, vscode.ConfigurationTarget.Global);
+                    break;
+                case 'Open Settings':
+                    await vscode.commands.executeCommand(
+                        'workbench.action.openSettings',
+                        '@ext:VizzleTF.geminicommit commit'
+                    );
+                    break;
             }
         }
     }

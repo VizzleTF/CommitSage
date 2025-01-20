@@ -18,22 +18,28 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         return;
     }
 
-    const commands = [
+    context.subscriptions.push(
         vscode.commands.registerCommand('geminicommit.generateCommitMessage', generateAndSetCommitMessage),
         vscode.commands.registerCommand('geminicommit.setApiKey', () => ConfigService.promptForApiKey()),
-        vscode.commands.registerCommand('geminicommit.setCustomApiKey', () => ConfigService.promptForCustomApiKey())
-    ];
+        vscode.commands.registerCommand('geminicommit.setCustomApiKey', () => ConfigService.promptForCustomApiKey()),
+        vscode.commands.registerCommand('geminicommit.acceptInput', async () => {
+            const message = GitService.getSourceControl().inputBox.value;
+            if (message) {
+                await GitService.commitChanges(GitService.getSourceControl(), message);
+            }
+        })
+    );
 
     const treeDataProvider = new GeminiCommitTreeDataProvider();
-    const treeView = vscode.window.createTreeView('geminiCommitView', {
-        treeDataProvider,
-        showCollapseAll: false
-    });
-
-    context.subscriptions.push(...commands, treeView);
+    context.subscriptions.push(
+        vscode.window.createTreeView('geminiCommitView', {
+            treeDataProvider,
+            showCollapseAll: false,
+            canSelectMany: false
+        })
+    );
 
     void SettingsValidator.validateAllSettings();
-
     void Logger.log('GeminiCommit extension activated');
 }
 
