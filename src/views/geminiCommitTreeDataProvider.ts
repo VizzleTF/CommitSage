@@ -1,17 +1,31 @@
 import * as vscode from 'vscode';
 
 export class GeminiCommitTreeDataProvider implements vscode.TreeDataProvider<vscode.TreeItem> {
-    getTreeItem = (element: vscode.TreeItem): vscode.TreeItem => element;
+    private _onDidChangeTreeData = new vscode.EventEmitter<vscode.TreeItem | undefined>();
+    readonly onDidChangeTreeData = this._onDidChangeTreeData.event;
 
-    getChildren = (element?: vscode.TreeItem): Promise<vscode.TreeItem[]> => {
-        if (element) {
-            return Promise.resolve([]);
-        }
-        const generateButton = new vscode.TreeItem("Generate Commit Message");
+    getTreeItem(element: vscode.TreeItem): vscode.TreeItem {
+        return element;
+    }
+
+    async getChildren(_element?: vscode.TreeItem): Promise<vscode.TreeItem[]> {
+        const generateButton = new vscode.TreeItem(
+            "Generate Commit Message",
+            vscode.TreeItemCollapsibleState.None
+        );
+
         generateButton.command = {
             command: 'geminicommit.generateCommitMessage',
-            title: 'GeminiCommit: Generate Message'
+            title: 'Generate Commit Message',
+            tooltip: 'Generate a commit message using AI'
         };
-        return Promise.resolve([generateButton]);
-    };
+
+        generateButton.iconPath = new vscode.ThemeIcon('git-commit');
+
+        return [generateButton];
+    }
+
+    refresh(): void {
+        this._onDidChangeTreeData.fire(undefined);
+    }
 }

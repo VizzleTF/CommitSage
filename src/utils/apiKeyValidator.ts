@@ -99,6 +99,19 @@ export class ApiKeyValidator {
         }
     }
 
+    static validateApiKey(value: string): string | null {
+        if (!value) {
+            return 'API key cannot be empty';
+        }
+        if (value.length < 32) {
+            return 'API key is too short';
+        }
+        if (!/^[A-Za-z0-9_-]+$/.test(value)) {
+            return 'API key contains invalid characters';
+        }
+        return null;
+    }
+
     private static isKeyFormatValid(key: string): boolean {
         if (!key || typeof key !== 'string') {
             void Logger.error('API key must be a non-empty string');
