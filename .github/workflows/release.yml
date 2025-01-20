@@ -132,7 +132,7 @@ jobs:
 
     - name: Publish to Visual Studio Marketplace
       env:
-        VSCE_PAT: ${{ secrets.VSCE_PAT }}
+        VSCE_PAT: ${{ secrets.VS_MARKETPLACE_TOKEN }}
       run: npx vsce publish -p $VSCE_PAT
 
     - name: Send Telegram Notification
