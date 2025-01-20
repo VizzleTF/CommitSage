@@ -12,7 +12,7 @@ GeminiCommit is a VSCode extension that automatically generates commit messages 
 - AI-powered commit message generation
 - Multiple commit message formats (Conventional, Angular, Karma, Semantic, Emoji)
 - Support for Google's Gemini AI and custom endpoints (OpenAI API)
-- Multi-language support (English, Russian, Chinese, with more languages available upon request)
+- Multi-language support (English, Russian, Chinese, Japanese, with more languages available upon request)
 - Customizable commit message instructions
 - Option to include references (e.g., issue numbers)
 - Secure API key storage
@@ -46,8 +46,8 @@ GeminiCommit is a VSCode extension that automatically generates commit messages 
 
 ### Commit Message Generation
 - **Commit Language** (`geminiCommit.commit.commitLanguage`):
-  - Languages: English (default), Russian, Chinese
-  - Note: Some formats may have limited support for non-English languages
+  - Languages: English (default), Russian, Chinese, Japanese
+  - Note: All commit formats now fully support all available languages
 
 - **Commit Format** (`geminiCommit.commit.commitFormat`):
   - Available formats: Conventional (default), Angular, Karma, Semantic, Emoji
@@ -249,10 +249,3 @@ Contributions are welcome! See [CONTRIBUTING.md](CONTRIBUTING.md) for details
 ## License
 
 This project is licensed under the MIT License. See [LICENSE](LICENSE) for details.
-
-### Приватность и телеметрия
-- **Телеметрия** (`geminiCommit.telemetry.enabled`):
-  - Когда включено: Собирает анонимные данные об использовании для улучшения расширения
-  - Когда выключено: Данные телеметрии не собираются
-  - Собираемые данные: Использование функций, частота ошибок, метрики производительности
-  - Личная информация и содержимое кода никогда не собираются
