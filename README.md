@@ -12,7 +12,7 @@ GeminiCommit is a VSCode extension that automatically generates commit messages 
 - AI-powered commit message generation
 - Multiple commit message formats (Conventional, Angular, Karma, Semantic, Emoji)
 - Support for Google's Gemini AI and custom endpoints (OpenAI API)
-- Multi-language support (English and Russian, with more languages available upon request)
+- Multi-language support (English, Russian, Chinese, with more languages available upon request)
 - Customizable commit message instructions
 - Option to include references (e.g., issue numbers)
 - Secure API key storage
@@ -46,7 +46,7 @@ GeminiCommit is a VSCode extension that automatically generates commit messages 
 
 ### Commit Message Generation
 - **Commit Language** (`geminiCommit.commit.commitLanguage`):
-  - Languages: English (default) or Russian
+  - Languages: English (default), Russian, Chinese
   - Note: Some formats may have limited support for non-English languages
 
 - **Commit Format** (`geminiCommit.commit.commitFormat`):
@@ -79,6 +79,13 @@ GeminiCommit is a VSCode extension that automatically generates commit messages 
   - When `true`: Automatically pushes changes after commit (requires Auto Commit to be enabled)
   - When `false`: Leaves manual push control to you
   - Note: This setting only works when Auto Commit is enabled. If Auto Push is enabled while Auto Commit is disabled, you'll see a warning message with a quick link to settings
+
+### Privacy & Telemetry
+- **Telemetry** (`geminiCommit.telemetry.enabled`):
+  - When `true`: Collects anonymous usage data to improve the extension
+  - When `false`: No telemetry data is collected
+  - Data collected: Feature usage, error rates, performance metrics
+  - No personal information or code content is ever collected
 
 ## Commit Formats
 
@@ -242,3 +249,10 @@ Contributions are welcome! See [CONTRIBUTING.md](CONTRIBUTING.md) for details
 ## License
 
 This project is licensed under the MIT License. See [LICENSE](LICENSE) for details.
+
+### Приватность и телеметрия
+- **Телеметрия** (`geminiCommit.telemetry.enabled`):
+  - Когда включено: Собирает анонимные данные об использовании для улучшения расширения
+  - Когда выключено: Данные телеметрии не собираются
+  - Собираемые данные: Использование функций, частота ошибок, метрики производительности
+  - Личная информация и содержимое кода никогда не собираются
