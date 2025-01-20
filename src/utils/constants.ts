@@ -5,13 +5,11 @@ export const messages = {
     settingMessage: "Setting commit message...",
     done: "Done!",
     success: "Commit message generated using {0} model",
-    commandExecution: "Error in command execution:",
-    generateCommitMessage: "Failed to generate commit message",
+    noStagedChanges: "No staged changes to commit. Please stage your changes first.",
+    gitConfigError: "Git user.name or user.email is not configured. Please configure Git before committing.",
     checkingGitConfig: "Checking Git configuration...",
     committing: "Committing changes...",
-    pushing: "Pushing changes...",
-    noStagedChanges: "No staged changes to commit. Please stage your changes first.",
-    gitConfigError: "Git user.name or user.email is not configured. Please configure Git before committing."
+    pushing: "Pushing changes..."
 };
 
 export const errorMessages = {
@@ -19,5 +17,6 @@ export const errorMessages = {
     generateCommitMessage: 'Failed to generate commit message',
     apiError: 'API error: {0}',
     networkError: 'Network error: {0}',
-    configError: 'Configuration error: {0}'
+    configError: 'Configuration error: {0}',
+    fileNotFound: 'File does not exist'
 };

@@ -1,5 +1,5 @@
 import * as vscode from 'vscode';
-import axios from 'axios';
+import axios, { AxiosError } from 'axios';
 import * as path from 'path';
 import { ConfigService } from '../utils/configService';
 import { Logger } from '../utils/logger';
@@ -7,15 +7,14 @@ import { CommitMessage, ProgressReporter } from '../models/types';
 import { CustomEndpointService } from './customEndpointService';
 import { PromptService } from './promptService';
 import { GitService } from './gitService';
-import { analyzeFileChanges } from './gitBlameAnalyzer';
+import { GitBlameAnalyzer } from './gitBlameAnalyzer';
 import { SettingsValidator } from './settingsValidator';
 import { TelemetryService } from '../services/telemetryService';
 import { errorMessages } from '../utils/constants';
 
-const MAX_RETRIES = 3;
-const INITIAL_RETRY_DELAY_MS = 1000;
 const MAX_DIFF_LENGTH = 100000;
 const GEMINI_API_BASE_URL = 'https://generativelanguage.googleapis.com/v1beta/models';
+const MAX_RETRY_BACKOFF = 10000; // Maximum retry delay in milliseconds
 
 interface GeminiResponse {
     candidates: Array<{
@@ -32,8 +31,22 @@ interface ApiErrorResponse {
     data: unknown;
 }
 
-type ErrorWithResponse = Error & {
+type ErrorWithResponse = AxiosError & {
     response?: ApiErrorResponse;
+};
+
+interface GenerationConfig {
+    temperature: number;
+    topK: number;
+    topP: number;
+    maxOutputTokens: number;
+}
+
+const DEFAULT_GENERATION_CONFIG: GenerationConfig = {
+    temperature: 0.7,
+    topK: 40,
+    topP: 0.95,
+    maxOutputTokens: 1024,
 };
 
 export class AIService {
@@ -75,60 +88,78 @@ export class AIService {
     ): Promise<CommitMessage> {
         const apiKey = await ConfigService.getApiKey();
         const model = ConfigService.getGeminiModel();
-        const GEMINI_API_URL = `${GEMINI_API_BASE_URL}/${model}:generateContent`;
+        const apiUrl = `${GEMINI_API_BASE_URL}/${model}:generateContent`;
 
-        const headers = {
-            'content-type': 'application/json',
-            'x-goog-api-key': apiKey
+        const requestConfig = {
+            headers: {
+                'content-type': 'application/json',
+                'x-goog-api-key': apiKey
+            },
+            timeout: 30000 // 30 seconds timeout
         };
 
         const payload = {
             contents: [{ parts: [{ text: prompt }] }],
-            generationConfig: {
-                temperature: 0.7,
-                topK: 40,
-                topP: 0.95,
-                maxOutputTokens: 1024,
-            },
+            generationConfig: DEFAULT_GENERATION_CONFIG,
         };
 
         try {
             void Logger.log(`Attempt ${attempt}: Sending request to Gemini API`);
-            const progressMessage = attempt === 1
-                ? "Generating commit message..."
-                : `Retry attempt ${attempt}/${MAX_RETRIES}...`;
-            progress.report({ message: progressMessage, increment: 10 });
+            await this.updateProgressForAttempt(progress, attempt);
 
-            const response = await axios.post<GeminiResponse>(GEMINI_API_URL, payload, { headers });
+            const response = await axios.post<GeminiResponse>(apiUrl, payload, requestConfig);
 
             void Logger.log('Gemini API response received successfully');
             progress.report({ message: "Processing generated message...", increment: 100 });
 
-            const responseData = response.data;
-            if (!responseData.candidates?.[0]?.content?.parts?.[0]?.text) {
-                throw new Error("Invalid response format from Gemini API");
-            }
-
-            const commitMessage = this.cleanCommitMessage(responseData.candidates[0].content.parts[0].text);
-            if (!commitMessage.trim()) {
-                throw new Error("Generated commit message is empty.");
-            }
+            const commitMessage = this.extractCommitMessage(response.data);
+            void Logger.log(`Commit message generated using ${model} model`);
+            void TelemetryService.sendEvent('message_generation_completed');
 
             return { message: commitMessage, model };
         } catch (error) {
-            void Logger.error(`Generation attempt ${attempt} failed:`, error as Error);
-            const { errorMessage, shouldRetry } = this.handleApiError(error as ErrorWithResponse);
-
-            if (shouldRetry && attempt < MAX_RETRIES) {
-                const delayMs = this.calculateRetryDelay(attempt);
-                void Logger.log(`Retrying in ${delayMs / 1000} seconds...`);
-                progress.report({ message: `Waiting ${delayMs / 1000} seconds before retry...`, increment: 0 });
-                await this.delay(delayMs);
-                return this.generateWithGemini(prompt, progress, attempt + 1);
-            }
-
-            throw new Error(`Failed to generate commit message: ${errorMessage}`);
+            return await this.handleGenerationError(error as ErrorWithResponse, prompt, progress, attempt);
         }
+    }
+
+    private static async updateProgressForAttempt(progress: ProgressReporter, attempt: number): Promise<void> {
+        const progressMessage = attempt === 1
+            ? "Generating commit message..."
+            : `Retry attempt ${attempt}/${ConfigService.getMaxRetries()}...`;
+        progress.report({ message: progressMessage, increment: 10 });
+    }
+
+    private static extractCommitMessage(response: GeminiResponse): string {
+        if (!response.candidates?.[0]?.content?.parts?.[0]?.text) {
+            throw new Error("Invalid response format from Gemini API");
+        }
+
+        const commitMessage = this.cleanCommitMessage(response.candidates[0].content.parts[0].text);
+        if (!commitMessage.trim()) {
+            throw new Error("Generated commit message is empty.");
+        }
+
+        return commitMessage;
+    }
+
+    private static async handleGenerationError(
+        error: ErrorWithResponse,
+        prompt: string,
+        progress: ProgressReporter,
+        attempt: number
+    ): Promise<CommitMessage> {
+        void Logger.error(`Generation attempt ${attempt} failed:`, error);
+        const { errorMessage, shouldRetry } = this.handleApiError(error);
+
+        if (shouldRetry && attempt < ConfigService.getMaxRetries()) {
+            const delayMs = this.calculateRetryDelay(attempt);
+            void Logger.log(`Retrying in ${delayMs / 1000} seconds...`);
+            progress.report({ message: `Waiting ${delayMs / 1000} seconds before retry...`, increment: 0 });
+            await this.delay(delayMs);
+            return this.generateWithGemini(prompt, progress, attempt + 1);
+        }
+
+        throw new Error(`Failed to generate commit message: ${errorMessage}`);
     }
 
     private static handleApiError(error: ErrorWithResponse): { errorMessage: string; shouldRetry: boolean } {
@@ -182,7 +213,8 @@ export class AIService {
     }
 
     private static calculateRetryDelay(attempt: number): number {
-        return Math.min(INITIAL_RETRY_DELAY_MS * Math.pow(2, attempt - 1), 10000);
+        const initialDelay = ConfigService.getInitialRetryDelay();
+        return Math.min(initialDelay * Math.pow(2, attempt - 1), MAX_RETRY_BACKOFF);
     }
 
     private static delay(ms: number): Promise<void> {
@@ -190,180 +222,138 @@ export class AIService {
     }
 }
 
-export async function generateAndSetCommitMessage(): Promise<void> {
-    let notificationHandle: vscode.Progress<{ message?: string; increment?: number }> | undefined;
+// Separate the UI handling logic
+export class CommitMessageUI {
+    static async generateAndSetCommitMessage(): Promise<void> {
+        let model = 'unknown';
+        try {
+            await this.initializeAndValidate();
+            await this.executeWithProgress(async progress => {
+                const result = await this.generateAndApplyMessage(progress);
+                model = result.model;
+            });
+            void vscode.window.showInformationMessage(`Message generated using ${model}`);
+        } catch (error) {
+            await this.handleError(error as Error);
+        }
+    }
 
-    try {
+    private static async initializeAndValidate(): Promise<void> {
         await SettingsValidator.validateAllSettings();
         void Logger.log('Starting commit message generation process');
         void TelemetryService.sendEvent('generate_message_started');
+    }
 
-        await vscode.window.withProgress({
+    private static async executeWithProgress(
+        action: (progress: vscode.Progress<{ message?: string; increment?: number }>) => Promise<void>
+    ): Promise<void> {
+        return vscode.window.withProgress({
             location: vscode.ProgressLocation.Notification,
             title: "Generating Commit Message",
             cancellable: false
         }, async (progress) => {
-            notificationHandle = progress;
+            try {
+                await action(progress);
+                progress.report({ increment: 100 });
+            } finally {
+                // Ensure progress is completed
+                progress.report({ increment: 100 });
+            }
+        });
+    }
 
-            const repos = await GitService.getRepositories();
-            const selectedRepo = await GitService.selectRepository(repos);
+    private static async generateAndApplyMessage(
+        progress: vscode.Progress<{ message?: string; increment?: number }>
+    ): Promise<{ model: string }> {
+        try {
+            progress.report({ message: "Fetching Git changes...", increment: 0 });
 
-            if (!selectedRepo || !selectedRepo.rootUri) {
-                void Logger.error('Repository selection failed: No repository or root URI');
-                throw new Error('No repository selected or repository has no root URI.');
+            const repo = await GitService.getActiveRepository();
+            if (!repo?.rootUri) {
+                throw new Error('No active repository found');
             }
 
-            const repoPath = selectedRepo.rootUri.fsPath;
-            void Logger.log(`Selected repository: ${repoPath}`);
-
+            const repoPath = repo.rootUri.fsPath;
             const onlyStagedChanges = ConfigService.getOnlyStagedChanges();
+            void Logger.log(`Selected repository: ${repoPath}`);
             void Logger.log(`Only staged changes mode: ${onlyStagedChanges}`);
 
-            const hasStagedChanges = await GitService.hasChanges(repoPath, 'staged');
-            void Logger.log(`Has staged changes: ${hasStagedChanges}`);
+            const diff = await GitService.getDiff(repoPath, onlyStagedChanges);
+            void Logger.log(`Git diff fetched successfully. Length: ${diff.length} characters`);
 
-            progress.report({ message: `Fetching Git diff${onlyStagedChanges ? ' (staged changes only)' : ''}...`, increment: 0 });
+            progress.report({ message: "Analyzing code changes...", increment: 25 });
+            const changedFiles = await GitService.getChangedFiles(repoPath, onlyStagedChanges);
+            void Logger.log(`Analyzing ${changedFiles.length} changed files`);
 
-            try {
-                const diff = await GitService.getDiff(repoPath, onlyStagedChanges);
-                void Logger.log(`Git diff fetched successfully. Length: ${diff.length} characters`);
+            const blameAnalysis = await this.analyzeChanges(repoPath, changedFiles);
+            void Logger.log(`Diff length: ${diff.length} characters`);
 
-                progress.report({ message: "Analyzing changes...", increment: 25 });
-                const changedFiles = await GitService.getChangedFiles(repoPath, onlyStagedChanges);
-                void Logger.log(`Analyzing ${changedFiles.length} changed files`);
+            const { message, model } = await AIService.generateCommitMessage(diff, blameAnalysis, progress);
 
-                let blameAnalysis = '';
-                for (const file of changedFiles) {
-                    const filePath = vscode.Uri.file(path.join(repoPath, file));
-                    try {
-                        const fileBlameAnalysis = await analyzeFileChanges(filePath.fsPath);
-                        blameAnalysis += `File: ${file}\n${fileBlameAnalysis}\n\n`;
-                        void Logger.log(`Blame analysis completed for: ${file}`);
-                    } catch (error) {
-                        void Logger.error(`Error analyzing file ${file}:`, error as Error);
-                        blameAnalysis += `File: ${file}\nUnable to analyze: ${(error as Error).message}\n\n`;
-                    }
-                }
+            progress.report({ message: "Setting commit message...", increment: 90 });
+            await this.setCommitMessage(message);
 
-                progress.report({ message: "Generating commit message...", increment: 50 });
-                const { message: commitMessage, model } = await AIService.generateCommitMessage(diff, blameAnalysis, progress);
-                void Logger.log(`Commit message generated using ${model} model`);
-                void TelemetryService.sendEvent('message_generated', {
-                    model,
-                    diffLength: diff.length,
-                    messageLength: commitMessage.length,
-                    changedFilesCount: changedFiles.length
-                });
+            void Logger.log(`Commit message generated using ${model} model`);
+            void TelemetryService.sendEvent('message_generation_completed');
 
-                let finalMessage = commitMessage;
-
-                if (ConfigService.shouldPromptForRefs()) {
-                    void Logger.log('Prompting for references');
-                    const refs = await vscode.window.showInputBox({
-                        prompt: "Enter references (e.g., issue numbers) to be added below the commit message",
-                        placeHolder: "e.g., #123, JIRA-456"
-                    });
-
-                    if (refs) {
-                        finalMessage += `\n\n${refs}`;
-                        void Logger.log('References added to commit message');
-                    }
-                }
-
-                progress.report({ message: "Setting commit message...", increment: 75 });
-                selectedRepo.inputBox.value = finalMessage;
-                void Logger.log('Commit message set in input box');
-
-                if (ConfigService.getAutoCommitEnabled()) {
-                    void Logger.log('Auto-commit is enabled, proceeding with commit');
-                    if (!finalMessage.trim()) {
-                        void Logger.error('Empty commit message detected, aborting auto-commit');
-                        return;
-                    }
-
-                    progress.report({ message: "Checking Git configuration...", increment: 80 });
-                    await GitService.checkGitConfig(repoPath);
-                    void Logger.log('Git configuration validated');
-
-                    progress.report({ message: "Committing changes...", increment: 85 });
-                    await GitService.commitChanges(finalMessage);
-                    void Logger.log('Changes committed successfully');
-
-                    if (ConfigService.getAutoPushEnabled()) {
-                        void Logger.log('Auto-push is enabled, proceeding with push');
-                        progress.report({ message: "Pushing changes...", increment: 95 });
-                        await GitService.pushChanges();
-                        void Logger.log('Changes pushed successfully');
-                    }
-
-                    void TelemetryService.sendEvent('commit_message_applied', {
-                        model,
-                        messageLength: finalMessage.length,
-                        autoPushEnabled: ConfigService.getAutoPushEnabled()
-                    });
-
-                    progress.report({ message: "Done!", increment: 100 });
-                }
-
-                progress.report({ message: "", increment: 100 });
-
-                void vscode.window.showInformationMessage(
-                    `Message generated using ${model}`,
-                    { modal: false }
-                );
-            } catch (error) {
-                const errorMessage = (error as Error).message;
-                if (errorMessage.includes('No staged changes detected') && !onlyStagedChanges) {
-                    void Logger.log('No staged changes detected, proceeding with -a commit');
-                } else {
-                    throw error;
-                }
-            }
-        });
-    } catch (error) {
-        void TelemetryService.sendEvent('generate_message_failed', {
-            error: (error as Error).message
-        });
-        if (notificationHandle) {
-            notificationHandle.report({ message: "" });
+            return { model };
+        } catch (error) {
+            void Logger.error('Error in generateAndApplyMessage:', error as Error);
+            throw error;
         }
+    }
 
-        const errorMessage = (error as Error).message;
-        void Logger.error('Error in command execution:', error as Error);
+    private static async handleError(error: Error): Promise<void> {
+        void Logger.error('Error generating commit message:', error);
+        void TelemetryService.sendEvent('message_generation_failed', {
+            error: error.message
+        });
+        void vscode.window.showErrorMessage(`Error: ${error.message}`);
+    }
 
-        if (errorMessage.includes('No staged changes to commit') && ConfigService.getOnlyStagedChanges()) {
-            const message = await vscode.window.showErrorMessage(
-                'No staged changes to commit. Please stage your changes first.',
-                { modal: false },
-                'Try Again'
-            );
-
-            if (message === 'Try Again') {
-                void generateAndSetCommitMessage();
+    private static async analyzeChanges(repoPath: string, changedFiles: string[]): Promise<string> {
+        let blameAnalysis = '';
+        for (const file of changedFiles) {
+            const filePath = vscode.Uri.file(path.join(repoPath, file));
+            try {
+                const workspaceFolder = vscode.workspace.getWorkspaceFolder(filePath);
+                if (!workspaceFolder) {
+                    void Logger.error(`File is not part of workspace: ${file}`);
+                    blameAnalysis += `File: ${file}\nUnable to analyze: File is not part of workspace\n\n`;
+                    continue;
+                }
+                const fileBlameAnalysis = await GitBlameAnalyzer.analyzeChanges(workspaceFolder.uri.fsPath, filePath.fsPath);
+                blameAnalysis += `File: ${file}\n${fileBlameAnalysis}\n\n`;
+                void Logger.log(`Blame analysis completed for: ${file}`);
+            } catch (error) {
+                void Logger.error(`Error analyzing file ${file}:`, error as Error);
+                blameAnalysis += `File: ${file}\nUnable to analyze: ${(error as Error).message}\n\n`;
             }
-        } else if (errorMessage.includes('Git user.name or user.email is not configured')) {
-            const message = await vscode.window.showErrorMessage(
-                'Git user.name or user.email is not configured. Please configure Git before committing.',
-                { modal: false },
-                'Open Git Config',
-                'Try Again'
-            );
+        }
+        return blameAnalysis;
+    }
 
-            if (message === 'Open Git Config') {
-                void vscode.commands.executeCommand('workbench.action.openGlobalSettings', 'git.user');
-            } else if (message === 'Try Again') {
-                void generateAndSetCommitMessage();
-            }
-        } else {
-            const message = await vscode.window.showErrorMessage(
-                `Error: ${errorMessage}`,
-                { modal: false },
-                'Try Again'
-            );
+    private static async setCommitMessage(message: string): Promise<void> {
+        const repo = await GitService.getActiveRepository();
+        if (!repo?.rootUri) {
+            throw new Error('No active repository found');
+        }
+        repo.inputBox.value = message;
+        void Logger.log('Commit message set in input box');
 
-            if (message === 'Try Again') {
-                void generateAndSetCommitMessage();
-            }
+        if (ConfigService.getAutoCommitEnabled()) {
+            await this.handleAutoCommit(repo.rootUri.fsPath, message);
+        }
+    }
+
+    private static async handleAutoCommit(repoPath: string, message: string): Promise<void> {
+        void Logger.log('Auto commit enabled, committing changes');
+        await GitService.commitChanges(message);
+
+        if (ConfigService.getAutoPushEnabled()) {
+            void Logger.log('Auto push enabled, pushing changes');
+            await GitService.pushChanges();
+            void Logger.log('Changes pushed successfully');
         }
     }
 }

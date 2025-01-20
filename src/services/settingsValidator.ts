@@ -125,18 +125,4 @@ export class SettingsValidator {
             }
         }
     }
-
-    static validateCommitLanguage(language: string): void {
-        const validLanguages = [
-            'english',
-            'russian',
-            'chinese',
-            'japanese'
-        ];
-
-        if (!validLanguages.includes(language)) {
-            throw new Error(`Invalid commit language: ${language}. Valid options are: ${validLanguages.join(', ')}`);
-        }
-    }
-
 }

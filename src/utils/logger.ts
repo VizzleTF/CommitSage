@@ -9,15 +9,13 @@ export class Logger {
 
     static log(message: string): void {
         const timestamp = new Date().toISOString();
-        this.outputChannel.appendLine(`[${timestamp}] ${message}`);
+        this.outputChannel.appendLine(`[${timestamp}] [INFO] ${message}`);
     }
 
     static async error(message: string, error?: Error): Promise<void> {
         const timestamp = new Date().toISOString();
-        this.outputChannel.appendLine(`[${timestamp}] ERROR: ${message}`);
-        if (error) {
-            this.outputChannel.appendLine(`Stack trace: ${error.stack}`);
-        }
+        const errorMessage = error ? `: ${error.message}\n${error.stack}` : '';
+        this.outputChannel.appendLine(`[${timestamp}] [ERROR] ${message}${errorMessage}`);
 
         await vscode.window.showErrorMessage(
             `GeminiCommit: ${message}`,
@@ -31,12 +29,13 @@ export class Logger {
         });
     }
 
-    static show(): void {
-        this.outputChannel.show();
+    static warn(message: string): void {
+        const timestamp = new Date().toISOString();
+        this.outputChannel.appendLine(`[${timestamp}] [WARN] ${message}`);
     }
 
-    static clear(): void {
-        this.outputChannel.clear();
+    static show(): void {
+        this.outputChannel.show();
     }
 
     static dispose(): void {
