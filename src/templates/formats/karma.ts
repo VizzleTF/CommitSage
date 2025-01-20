@@ -27,5 +27,20 @@ chore(ci): update deployment script to Node 16`,
 - chore: Обслуживание
 
 Пример:
-chore(ci): обновить скрипт деплоя до Node 16`
+chore(ci): обновить скрипт деплоя до Node 16`,
+
+    cn: `生成符合 Karma 格式的提交信息：
+<类型>(<范围>): <信息>
+
+类型：
+
+feat: 新功能
+fix: Bug 修复
+docs: 文档更改
+style: 格式化、缺少分号等
+refactor: 代码重构
+test: 添加测试
+chore: 维护
+示例：
+chore(ci): 更新部署脚本至 Node 16`
 };
