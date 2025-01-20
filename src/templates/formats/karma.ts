@@ -33,14 +33,29 @@ chore(ci): обновить скрипт деплоя до Node 16`,
 <类型>(<范围>): <信息>
 
 类型：
+- feat: 新功能
+- fix: Bug 修复
+- docs: 文档更改
+- style: 格式化、缺少分号等
+- refactor: 代码重构
+- test: 添加测试
+- chore: 维护
 
-feat: 新功能
-fix: Bug 修复
-docs: 文档更改
-style: 格式化、缺少分号等
-refactor: 代码重构
-test: 添加测试
-chore: 维护
 示例：
-chore(ci): 更新部署脚本至 Node 16`
+chore(ci): 更新部署脚本至 Node 16`,
+
+    japanese: `Karma形式のコミットメッセージを生成してください：
+<タイプ>(<スコープ>): <メッセージ>
+
+タイプ：
+- feat: 新機能
+- fix: バグ修正
+- docs: ドキュメント変更
+- style: フォーマット、セミコロンの欠落など
+- refactor: コードリファクタリング
+- test: テストの追加
+- chore: メンテナンス
+
+例：
+chore(ci): デプロイスクリプトをNode 16に更新`
 };
