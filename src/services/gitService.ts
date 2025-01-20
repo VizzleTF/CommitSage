@@ -7,6 +7,7 @@ import {
     NoChangesDetectedError,
     NoRepositorySelectedError
 } from '../models/errors';
+import { TelemetryService } from './telemetryService';
 
 export class GitService {
     private static sourceControl: vscode.SourceControl;
@@ -14,21 +15,26 @@ export class GitService {
     private static workingTreeGroup: vscode.SourceControlResourceGroup;
 
     static async initialize(context: vscode.ExtensionContext): Promise<void> {
-        void Logger.log('Initializing Git service');
-        this.sourceControl = vscode.scm.createSourceControl('geminicommit', 'GeminiCommit');
-        this.indexGroup = this.sourceControl.createResourceGroup('index', 'Staged Changes');
-        this.workingTreeGroup = this.sourceControl.createResourceGroup('workingTree', 'Changes');
+        try {
+            void Logger.log('Initializing Git service');
+            this.sourceControl = vscode.scm.createSourceControl('geminicommit', 'GeminiCommit');
+            this.indexGroup = this.sourceControl.createResourceGroup('index', 'Staged Changes');
+            this.workingTreeGroup = this.sourceControl.createResourceGroup('workingTree', 'Changes');
 
-        this.sourceControl.inputBox.placeholder = 'Type commit message (Ctrl+Enter to commit)';
-        this.sourceControl.acceptInputCommand = {
-            command: 'geminicommit.acceptInput',
-            title: 'Accept Input',
-            tooltip: 'Commit changes'
-        };
+            this.sourceControl.inputBox.placeholder = 'Type commit message (Ctrl+Enter to commit)';
+            this.sourceControl.acceptInputCommand = {
+                command: 'geminicommit.acceptInput',
+                title: 'Accept Input',
+                tooltip: 'Commit changes'
+            };
 
-        context.subscriptions.push(this.sourceControl);
-        void Logger.log('Git service initialized successfully');
-        await this.refreshSourceControl();
+            context.subscriptions.push(this.sourceControl);
+            void Logger.log('Git service initialized successfully');
+            await this.refreshSourceControl();
+        } catch (error) {
+            void Logger.error('Failed to initialize Git service:', error as Error);
+            throw error;
+        }
     }
 
     private static async refreshSourceControl(): Promise<void> {
@@ -235,6 +241,11 @@ export class GitService {
             const hasStagedChanges = await this.hasChanges(repoPath, 'staged');
             const hasUntrackedFiles = await this.hasChanges(repoPath, 'untracked');
 
+            void TelemetryService.sendEvent('commit_started', {
+                hasStaged: hasStagedChanges,
+                hasUntracked: hasUntrackedFiles
+            });
+
             if (!hasStagedChanges && !hasUntrackedFiles) {
                 throw new NoChangesDetectedError();
             }
@@ -249,7 +260,16 @@ export class GitService {
 
             await this.executeGitCommand(commitArgs, repoPath);
             void Logger.log('Changes committed successfully');
+
+            void TelemetryService.sendEvent('commit_completed', {
+                hasStaged: hasStagedChanges,
+                hasUntracked: hasUntrackedFiles,
+                messageLength: message.length
+            });
         } catch (error) {
+            void TelemetryService.sendEvent('commit_failed', {
+                error: (error as Error).message
+            });
             void Logger.error('Failed to commit changes:', error as Error);
             throw error;
         }

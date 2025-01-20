@@ -9,6 +9,7 @@ import { PromptService } from './promptService';
 import { GitService } from './gitService';
 import { analyzeFileChanges } from './gitBlameAnalyzer';
 import { SettingsValidator } from './settingsValidator';
+import { TelemetryService } from '../services/telemetryService';
 
 const MAX_RETRIES = 3;
 const INITIAL_RETRY_DELAY_MS = 1000;
@@ -189,6 +190,7 @@ export async function generateAndSetCommitMessage(): Promise<void> {
     try {
         await SettingsValidator.validateAllSettings();
         void Logger.log('Starting commit message generation process');
+        void TelemetryService.sendEvent('generate_message_started');
 
         await vscode.window.withProgress({
             location: vscode.ProgressLocation.Notification,
@@ -240,6 +242,12 @@ export async function generateAndSetCommitMessage(): Promise<void> {
                 progress.report({ message: "Generating commit message...", increment: 50 });
                 const { message: commitMessage, model } = await AIService.generateCommitMessage(diff, blameAnalysis, progress);
                 void Logger.log(`Commit message generated using ${model} model`);
+                void TelemetryService.sendEvent('message_generated', {
+                    model,
+                    diffLength: diff.length,
+                    messageLength: commitMessage.length,
+                    changedFilesCount: changedFiles.length
+                });
 
                 let finalMessage = commitMessage;
 
@@ -281,6 +289,10 @@ export async function generateAndSetCommitMessage(): Promise<void> {
                         await GitService.pushChanges(selectedRepo);
                         void Logger.log('Changes pushed successfully');
                     }
+
+                    void TelemetryService.sendEvent('auto_commit_completed', {
+                        autoPushEnabled: ConfigService.getAutoPushEnabled()
+                    });
                 }
 
                 progress.report({ message: "", increment: 100 });
@@ -300,6 +312,9 @@ export async function generateAndSetCommitMessage(): Promise<void> {
             }
         });
     } catch (error) {
+        void TelemetryService.sendEvent('generate_message_failed', {
+            error: (error as Error).message
+        });
         if (notificationHandle) {
             notificationHandle.report({ message: "" });
         }

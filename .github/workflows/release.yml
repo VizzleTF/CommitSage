@@ -21,20 +21,17 @@ jobs:
     - name: Setup Node.js
       uses: actions/setup-node@v4
       with:
-        node-version: '18'
+        node-version: '20'
 
     - name: Install dependencies
-      run: npm install
+      run: npm ci
 
-    - name: Check dependencies compatibility
-      run: |
-        npm audit
-        npm outdated || true
-
-    - name: Compile extension
+    - name: Build
+      env:
+        POSTHOG_API_KEY: ${{ secrets.POSTHOG_API_KEY }}
       run: npm run compile
 
-    - name: Package extension
+    - name: Package Extension
       run: npm run package
 
     - name: Get version from package.json
@@ -134,12 +131,9 @@ jobs:
           }
 
     - name: Publish to Visual Studio Marketplace
-      uses: HaaLeo/publish-vscode-extension@v1
-      with:
-        pat: ${{ secrets.VS_MARKETPLACE_TOKEN }}
-        registryUrl: https://marketplace.visualstudio.com
-        extensionFile: ./geminicommit-${{ steps.get_version.outputs.VERSION }}.vsix
-        packagePath: ''
+      env:
+        VSCE_PAT: ${{ secrets.VSCE_PAT }}
+      run: npx vsce publish -p $VSCE_PAT
 
     - name: Send Telegram Notification
       if: success()
