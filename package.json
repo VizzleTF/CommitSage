@@ -198,7 +198,7 @@
         "@typescript-eslint/parser": "^8.19.0",
         "@vscode/test-electron": "^2.3.9",
         "@vscode/vsce": "^3.2.1",
-        "eslint": "^9.17.0",
+        "eslint": "^9.18.0",
         "glob": "^11.0.0",
         "mocha": "^11.0.1",
         "typescript": "^5.7.2",
