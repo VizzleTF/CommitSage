@@ -4,15 +4,20 @@ export const messages = {
     generating: "Generating commit message...",
     settingMessage: "Setting commit message...",
     done: "Done!",
-    success: "Commit message set in selected Git repository. Generated using {0} model.",
+    success: "Commit message generated using {0} model",
     commandExecution: "Error in command execution:",
-    generateCommitMessage: "Failed to generate commit message"
+    generateCommitMessage: "Failed to generate commit message",
+    checkingGitConfig: "Checking Git configuration...",
+    committing: "Committing changes...",
+    pushing: "Pushing changes...",
+    noStagedChanges: "No staged changes to commit. Please stage your changes first.",
+    gitConfigError: "Git user.name or user.email is not configured. Please configure Git before committing."
 };
 
 export const errorMessages = {
     commandExecution: 'Error in command execution:',
     generateCommitMessage: 'Failed to generate commit message',
-    noStagedChanges: 'No staged changes to commit. Please stage your changes first.',
-    gitConfigMissing: 'Git user.name or user.email is not configured. Please configure Git before committing.',
-    genericError: 'An error occurred: {0}'
+    apiError: 'API error: {0}',
+    networkError: 'Network error: {0}',
+    configError: 'Configuration error: {0}'
 };
