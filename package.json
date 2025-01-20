@@ -59,6 +59,14 @@
                 }
             ]
         },
+        "keybindings": [
+            {
+                "command": "geminicommit.generateCommitMessage",
+                "key": "ctrl+g",
+                "mac": "cmd+g",
+                "when": "scmProvider == git"
+            }
+        ],
         "configuration": {
             "title": "GeminiCommit",
             "properties": {
