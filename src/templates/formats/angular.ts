@@ -1,5 +1,5 @@
 export const angularTemplate = {
-    en: `Generate a commit message following the Angular format:
+    english: `Generate a commit message following the Angular format:
 <type>(<scope>): <short summary>
 
 [optional body with bullet points]
@@ -32,7 +32,7 @@ refactor(core): optimize database queries
 - Add connection pooling
 - Update error handling`,
 
-    ru: `Создайте сообщение коммита в формате Angular:
+    russian: `Создайте сообщение коммита в формате Angular:
 <тип>(<область>): <краткое описание>
 
 [опциональное тело со списком изменений]
@@ -65,7 +65,7 @@ refactor(core): оптимизировать запросы к БД
 - Добавить пул соединений
 - Обновить обработку ошибок`,
 
-    cn: `生成符合 Angular 格式的提交信息：
+    chinese: `生成符合 Angular 格式的提交信息：
 <类型>(<范围>): <简短概述>
 
 [可选正文，包含要点]

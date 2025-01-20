@@ -3,13 +3,14 @@ import { angularTemplate } from './formats/angular';
 import { karmaTemplate } from './formats/karma';
 import { semanticTemplate } from './formats/semantic';
 import { emojiTemplate } from './formats/emoji';
+import type { CommitLanguage } from '../utils/configService';
 
 export interface CommitTemplate {
     [key: string]: string;
 }
 
 export type CommitFormat = 'conventional' | 'angular' | 'karma' | 'semantic' | 'emoji';
-export type Language = 'en' | 'ru' | 'cn';
+export type Language = CommitLanguage;
 
 const templates: Record<CommitFormat, CommitTemplate> = {
     conventional: conventionalTemplate,

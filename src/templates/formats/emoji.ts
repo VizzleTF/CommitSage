@@ -1,5 +1,5 @@
 export const emojiTemplate = {
-    en: `Generate a commit message following the Emoji format:
+    english: `Generate a commit message following the Emoji format:
 :emoji: commit message
 
 Common emojis:
@@ -17,7 +17,7 @@ Example:
 ✨ add real-time collaboration feature
 🐛 fix authentication token expiration`,
 
-    ru: `Создайте сообщение коммита в формате Emoji:
+    russian: `Создайте сообщение коммита в формате Emoji:
 :emoji: сообщение коммита
 
 Часто используемые эмодзи:
@@ -35,7 +35,7 @@ Example:
 ✨ добавить функцию совместной работы в реальном времени
 🐛 исправить срок действия токена аутентификации`,
 
-    cn: `生成符合 Emoji 格式的提交信息：
+    chinese: `生成符合 Emoji 格式的提交信息：
 :emoji: 提交信息
 
 常用表情符号：

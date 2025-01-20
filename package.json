@@ -80,7 +80,8 @@
                     "type": "string",
                     "enum": [
                         "english",
-                        "russian"
+                        "russian",
+                        "chinese"
                     ],
                     "default": "english",
                     "description": "Language for generated commit messages. Some commit formats may have limited support for non-English languages",

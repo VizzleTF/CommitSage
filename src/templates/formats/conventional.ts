@@ -1,5 +1,5 @@
 export const conventionalTemplate = {
-    en: `Generate a commit message following the Conventional Commits format:
+    english: `Generate a commit message following the Conventional Commits format:
 <type>[optional scope]: <description>
 
 [optional body with bullet points]
@@ -38,7 +38,7 @@ feat(auth): add user authentication
 - Create auth service module
 - Add session management`,
 
-    ru: `Создайте сообщение коммита в формате Conventional Commits:
+    russian: `Создайте сообщение коммита в формате Conventional Commits:
 <тип>[область]: <описание>
 
 [опциональное тело со списком изменений]
@@ -77,7 +77,7 @@ feat(auth): добавить аутентификацию пользовател
 - Создать модуль сервиса авторизации
 - Добавить управление сессиями`,
 
-    cn: `生成符合约定式提交（Conventional Commits）格式的提交信息：
+    chinese: `生成符合约定式提交（Conventional Commits）格式的提交信息：
 <类型>[可选范围]: <描述>
 
 [可选正文，包含要点]
@@ -87,7 +87,7 @@ feat(auth): добавить аутентификацию пользовател
 第一行：类型(范围): 描述（最多50个字符）
 对于小改动，仅使用第一行
 对于复杂改动，在正文中列出关键点：
-每行以“- ”开头
+每行以"- "开头
 每行最多50个字符
 类型选择规则：
 
