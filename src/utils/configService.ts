@@ -8,20 +8,20 @@ type CacheValue = string | boolean | number;
 export class ConfigService {
     private static cache = new Map<string, CacheValue>();
     private static secretStorage: vscode.SecretStorage;
-    private static configurationListener: vscode.Disposable;
+    private static disposables: vscode.Disposable[] = [];
 
-    static initialize(context: vscode.ExtensionContext): void {
+    static async initialize(context: vscode.ExtensionContext): Promise<void> {
         this.secretStorage = context.secrets;
 
-        this.configurationListener = vscode.workspace.onDidChangeConfiguration(event => {
+        const configListener = vscode.workspace.onDidChangeConfiguration(event => {
             if (event.affectsConfiguration('geminiCommit')) {
                 this.clearCache();
                 void Logger.log('Configuration changed, cache cleared');
             }
         });
 
-        context.subscriptions.push(this.configurationListener);
-        void Logger.log('ConfigService initialized');
+        this.disposables.push(configListener);
+        context.subscriptions.push(...this.disposables);
     }
 
     static getConfig<T extends CacheValue>(section: string, key: string, defaultValue: T): T {
@@ -253,10 +253,34 @@ export class ConfigService {
     }
 
     static dispose(): void {
-        if (this.configurationListener) {
-            this.configurationListener.dispose();
-        }
+        this.disposables.forEach(d => void d.dispose());
+        this.disposables = [];
         this.clearCache();
-        void Logger.log('ConfigService disposed');
+    }
+
+    static async promptForApiKey(): Promise<void> {
+        const key = await vscode.window.showInputBox({
+            prompt: 'Enter your Google API Key',
+            ignoreFocusOut: true,
+            password: true,
+            validateInput: ApiKeyValidator.validateApiKey
+        });
+
+        if (key) {
+            await this.setApiKey(key);
+        }
+    }
+
+    static async promptForCustomApiKey(): Promise<void> {
+        const key = await vscode.window.showInputBox({
+            prompt: 'Enter your Custom API Key',
+            ignoreFocusOut: true,
+            password: true,
+            validateInput: ApiKeyValidator.validateApiKey
+        });
+
+        if (key) {
+            await this.setCustomApiKey(key);
+        }
     }
 }

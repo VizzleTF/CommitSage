@@ -3,6 +3,10 @@ import * as vscode from 'vscode';
 export class Logger {
     private static readonly outputChannel: vscode.OutputChannel = vscode.window.createOutputChannel('GeminiCommit');
 
+    static async initialize(_context: vscode.ExtensionContext): Promise<void> {
+        this.log('Logger initialized');
+    }
+
     static log(message: string): void {
         const timestamp = new Date().toISOString();
         this.outputChannel.appendLine(`[${timestamp}] ${message}`);
@@ -23,5 +27,9 @@ export class Logger {
 
     static clear(): void {
         this.outputChannel.clear();
+    }
+
+    static dispose(): void {
+        this.outputChannel.dispose();
     }
 }
