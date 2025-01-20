@@ -130,7 +130,8 @@ export class SettingsValidator {
         const validLanguages = [
             'english',
             'russian',
-            'chinese'
+            'chinese',
+            'japanese'
         ];
 
         if (!validLanguages.includes(language)) {

@@ -28,6 +28,8 @@ Please provide ONLY the commit message, without any additional text or explanati
                 return 'Пожалуйста, напиши сообщение коммита на русском языке.';
             case 'chinese':
                 return '请用中文写提交信息。';
+            case 'japanese':
+                return 'コミットメッセージを日本語で書いてください。';
             default:
                 return 'Please write the commit message in English.';
         }

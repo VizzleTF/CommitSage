@@ -81,7 +81,8 @@
                     "enum": [
                         "english",
                         "russian",
-                        "chinese"
+                        "chinese",
+                        "japanese"
                     ],
                     "default": "english",
                     "description": "Language for generated commit messages. Some commit formats may have limited support for non-English languages",

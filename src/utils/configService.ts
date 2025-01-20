@@ -8,7 +8,8 @@ type CacheValue = string | boolean | number;
 export type CommitLanguage =
     | 'english'
     | 'russian'
-    | 'chinese';
+    | 'chinese'
+    | 'japanese';
 
 export class ConfigService {
     private static cache = new Map<string, CacheValue>();
