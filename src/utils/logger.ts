@@ -18,7 +18,17 @@ export class Logger {
         if (error) {
             this.outputChannel.appendLine(`Stack trace: ${error.stack}`);
         }
-        await vscode.window.showErrorMessage(`GeminiCommit: ${message}`);
+
+        await vscode.window.showErrorMessage(
+            `GeminiCommit: ${message}`,
+            { modal: false },
+            'Show Details',
+            'OK'
+        ).then(selection => {
+            if (selection === 'Show Details') {
+                this.show();
+            }
+        });
     }
 
     static show(): void {

@@ -35,11 +35,6 @@ type ErrorWithResponse = Error & {
     response?: ApiErrorResponse;
 };
 
-interface ApiHeaders {
-    contentType: string;
-    xGoogApiKey: string;
-}
-
 export class AIService {
     static async generateCommitMessage(
         diff: string,
@@ -81,14 +76,9 @@ export class AIService {
         const model = ConfigService.getGeminiModel();
         const GEMINI_API_URL = `${GEMINI_API_BASE_URL}/${model}:generateContent`;
 
-        const headers: ApiHeaders = {
-            contentType: 'application/json',
-            xGoogApiKey: apiKey
-        };
-
-        const requestHeaders = {
-            contentType: headers.contentType,
-            xGoogApiKey: headers.xGoogApiKey
+        const headers = {
+            'content-type': 'application/json',
+            'x-goog-api-key': apiKey
         };
 
         const payload = {
@@ -103,17 +93,15 @@ export class AIService {
 
         try {
             void Logger.log(`Attempt ${attempt}: Sending request to Gemini API`);
-            progress.report({ message: `Attempt ${attempt}: Generating commit message...`, increment: 10 });
+            const progressMessage = attempt === 1
+                ? "Generating commit message..."
+                : `Retry attempt ${attempt}/${MAX_RETRIES}...`;
+            progress.report({ message: progressMessage, increment: 10 });
 
-            const response = await axios.post<GeminiResponse>(GEMINI_API_URL, payload, {
-                headers: {
-                    'content-type': requestHeaders.contentType,
-                    'x-goog-api-key': requestHeaders.xGoogApiKey
-                }
-            });
+            const response = await axios.post<GeminiResponse>(GEMINI_API_URL, payload, { headers });
 
             void Logger.log('Gemini API response received successfully');
-            progress.report({ message: "Commit message generated successfully", increment: 100 });
+            progress.report({ message: "Processing generated message...", increment: 100 });
 
             const responseData = response.data;
             if (!responseData.candidates?.[0]?.content?.parts?.[0]?.text) {
@@ -127,13 +115,13 @@ export class AIService {
 
             return { message: commitMessage, model };
         } catch (error) {
-            void Logger.error(`Attempt ${attempt} failed:`, error as Error);
+            void Logger.error(`Generation attempt ${attempt} failed:`, error as Error);
             const { errorMessage, shouldRetry } = this.handleApiError(error as ErrorWithResponse);
 
             if (shouldRetry && attempt < MAX_RETRIES) {
                 const delayMs = this.calculateRetryDelay(attempt);
                 void Logger.log(`Retrying in ${delayMs / 1000} seconds...`);
-                progress.report({ message: `Retrying in ${delayMs / 1000} seconds...`, increment: 0 });
+                progress.report({ message: `Waiting ${delayMs / 1000} seconds before retry...`, increment: 0 });
                 await this.delay(delayMs);
                 return this.generateWithGemini(prompt, progress, attempt + 1);
             }
@@ -142,35 +130,28 @@ export class AIService {
         }
     }
 
-    private static calculateRetryDelay(attempt: number): number {
-        return Math.min(INITIAL_RETRY_DELAY_MS * Math.pow(2, attempt - 1), 10000);
-    }
-
-    private static delay(ms: number): Promise<void> {
-        return new Promise(resolve => setTimeout(resolve, ms));
-    }
-
     private static handleApiError(error: ErrorWithResponse): { errorMessage: string; shouldRetry: boolean } {
         if (error.response) {
             const { status } = error.response;
             const responseData = JSON.stringify(error.response.data);
 
-            if (status === 403) {
-                return {
-                    errorMessage: `Access forbidden. Please check your API key. (Status: ${status})`,
-                    shouldRetry: false
-                };
-            } else if (status === 429) {
-                return {
-                    errorMessage: `Rate limit exceeded. Please try again later. (Status: ${status})`,
-                    shouldRetry: true
-                };
+            switch (status) {
+                case 403:
+                    return {
+                        errorMessage: 'Access forbidden. Please check your API key.',
+                        shouldRetry: false
+                    };
+                case 429:
+                    return {
+                        errorMessage: 'Rate limit exceeded. Please try again later.',
+                        shouldRetry: true
+                    };
+                default:
+                    return {
+                        errorMessage: `${error.message} (Status: ${status})`,
+                        shouldRetry: status >= 500
+                    };
             }
-
-            return {
-                errorMessage: `${error.message} (Status: ${status}). Response data: ${responseData}`,
-                shouldRetry: status >= 500
-            };
         }
         return { errorMessage: error.message, shouldRetry: true };
     }
@@ -181,6 +162,14 @@ export class AIService {
             .replace(/^(Here'?s? (is )?(a )?)?commit message:?\s*/i, '')
             .replace(/\n{3,}/g, '\n\n')
             .trim();
+    }
+
+    private static calculateRetryDelay(attempt: number): number {
+        return Math.min(INITIAL_RETRY_DELAY_MS * Math.pow(2, attempt - 1), 10000);
+    }
+
+    private static delay(ms: number): Promise<void> {
+        return new Promise(resolve => setTimeout(resolve, ms));
     }
 }
 
@@ -300,10 +289,9 @@ export async function generateAndSetCommitMessage(): Promise<void> {
                 }
 
                 progress.report({ message: "", increment: 100 });
-                await new Promise(resolve => setTimeout(resolve, 100));
 
                 void vscode.window.showInformationMessage(
-                    `Commit message set successfully (${model})`,
+                    `Message generated using ${model}`,
                     { modal: false }
                 );
             } catch (error) {
@@ -327,11 +315,38 @@ export async function generateAndSetCommitMessage(): Promise<void> {
         void Logger.error('Error in command execution:', error as Error);
 
         if (errorMessage.includes('No staged changes to commit') && ConfigService.getOnlyStagedChanges()) {
-            void vscode.window.showErrorMessage('No staged changes to commit. Please stage your changes first.');
+            const message = await vscode.window.showErrorMessage(
+                'No staged changes to commit. Please stage your changes first.',
+                { modal: false },
+                'Try Again'
+            );
+
+            if (message === 'Try Again') {
+                void generateAndSetCommitMessage();
+            }
         } else if (errorMessage.includes('Git user.name or user.email is not configured')) {
-            void vscode.window.showErrorMessage('Git user.name or user.email is not configured. Please configure Git before committing.');
+            const message = await vscode.window.showErrorMessage(
+                'Git user.name or user.email is not configured. Please configure Git before committing.',
+                { modal: false },
+                'Open Git Config',
+                'Try Again'
+            );
+
+            if (message === 'Open Git Config') {
+                void vscode.commands.executeCommand('workbench.action.openGlobalSettings', 'git.user');
+            } else if (message === 'Try Again') {
+                void generateAndSetCommitMessage();
+            }
         } else {
-            void vscode.window.showErrorMessage(`Error: ${errorMessage}`);
+            const message = await vscode.window.showErrorMessage(
+                `Error: ${errorMessage}`,
+                { modal: false },
+                'Try Again'
+            );
+
+            if (message === 'Try Again') {
+                void generateAndSetCommitMessage();
+            }
         }
     }
 }
