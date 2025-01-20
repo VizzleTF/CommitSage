@@ -2,7 +2,6 @@ import * as vscode from 'vscode';
 import { GitService } from './services/gitService';
 import { Logger } from './utils/logger';
 import { ConfigService } from './utils/configService';
-import { GeminiCommitTreeDataProvider } from './views/geminiCommitTreeDataProvider';
 import { generateAndSetCommitMessage } from './services/aiService';
 import { SettingsValidator } from './services/settingsValidator';
 import { TelemetryService } from './services/telemetryService';
@@ -36,45 +35,13 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
                 }
             }),
             vscode.commands.registerCommand('geminicommit.setApiKey', () => ConfigService.promptForApiKey()),
-            vscode.commands.registerCommand('geminicommit.setCustomApiKey', () => ConfigService.promptForCustomApiKey()),
-            vscode.commands.registerCommand('geminicommit.acceptInput', async () => {
-                try {
-                    const message = await vscode.window.showInputBox({
-                        prompt: 'Enter commit message',
-                        placeHolder: 'Type your commit message'
-                    });
-                    if (message) {
-                        await GitService.commitChanges(message);
-                    }
-                } catch (error) {
-                    void Logger.error('Error in commit command:', error as Error);
-                    void vscode.window.showErrorMessage(`Error: ${(error as Error).message}`);
-                }
-            }),
-            vscode.commands.registerCommand('geminicommit.pushChanges', async () => {
-                try {
-                    await GitService.pushChanges();
-                    void vscode.window.showInformationMessage('Successfully pushed changes to remote');
-                } catch (error) {
-                    void Logger.error('Error pushing changes:', error as Error);
-                    void vscode.window.showErrorMessage(`Failed to push changes: ${(error as Error).message}`);
-                }
-            })
+            vscode.commands.registerCommand('geminicommit.setCustomApiKey', () => ConfigService.promptForCustomApiKey())
         );
     } catch (error) {
         void Logger.error('Failed to register commands:', error as Error);
         void vscode.window.showErrorMessage('Failed to register GeminiCommit commands');
         return;
     }
-
-    const treeDataProvider = new GeminiCommitTreeDataProvider();
-    context.subscriptions.push(
-        vscode.window.createTreeView('geminiCommitView', {
-            treeDataProvider,
-            showCollapseAll: false,
-            canSelectMany: false
-        })
-    );
 
     void SettingsValidator.validateAllSettings();
     void TelemetryService.sendEvent('extension_activated');

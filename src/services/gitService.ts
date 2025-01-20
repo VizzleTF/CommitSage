@@ -216,7 +216,7 @@ export class GitService {
         return selected.repository;
     }
 
-    private static async getActiveRepository(): Promise<vscode.SourceControl | undefined> {
+    static async getActiveRepository(): Promise<vscode.SourceControl | undefined> {
         const repos = await this.getRepositories();
         if (repos.length === 1) {
             return repos[0];
