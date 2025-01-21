@@ -4,3 +4,4 @@ GeminiCommit-*
 .env
 .vscode-test/
 *.vsix
+src/constants/apiKeys.ts

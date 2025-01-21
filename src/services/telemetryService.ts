@@ -2,6 +2,7 @@ import * as vscode from 'vscode';
 import * as amplitude from '@amplitude/analytics-node';
 import { Logger } from '../utils/logger';
 import { ConfigService } from '../utils/configService';
+import { AMPLITUDE_API_KEY } from '../constants/apiKeys';
 
 const TELEMETRY_CONFIG = {
     MAX_RETRIES: 3,
@@ -46,14 +47,13 @@ export class TelemetryService {
     static async initialize(context: vscode.ExtensionContext): Promise<void> {
         void Logger.log('Initializing telemetry service');
 
-        const amplitudeApiKey = process.env.AMPLITUDE_API_KEY;
-        if (!amplitudeApiKey) {
-            void Logger.error('Amplitude API key not found');
-            return;
-        }
-
         try {
-            amplitude.init(amplitudeApiKey, {
+            if (!AMPLITUDE_API_KEY) {
+                void Logger.error('Amplitude API key not found');
+                return;
+            }
+
+            amplitude.init(AMPLITUDE_API_KEY, {
                 serverZone: 'EU',
                 flushQueueSize: 1,
                 flushIntervalMillis: 0,
@@ -61,12 +61,10 @@ export class TelemetryService {
             });
 
             this.initialized = true;
-            void Logger.log('Amplitude service initialized');
+            void Logger.log('Amplitude service initialized successfully');
 
-            // Set initial telemetry state
             this.enabled = vscode.env.isTelemetryEnabled && ConfigService.isTelemetryEnabled();
 
-            // Listen for telemetry setting changes
             this.disposables.push(
                 vscode.env.onDidChangeTelemetryEnabled(this.handleTelemetryStateChange.bind(this)),
                 vscode.workspace.onDidChangeConfiguration(e => {
@@ -76,13 +74,11 @@ export class TelemetryService {
                 })
             );
 
-            // Start queue processing
             this.startQueueProcessor();
 
             context.subscriptions.push(...this.disposables);
             void Logger.log('Telemetry service initialized');
 
-            // Send initialization event
             this.sendEvent('extension_activated');
         } catch (error) {
             void Logger.error('Failed to initialize Amplitude:', error as Error);

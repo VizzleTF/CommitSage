@@ -26,9 +26,11 @@ jobs:
     - name: Install dependencies
       run: npm ci
 
+    - name: Set API Key
+      run: |
+        echo "export const AMPLITUDE_API_KEY = '${{ secrets.AMPLITUDE_API_KEY }}';" > src/constants/apiKeys.ts
+
     - name: Build
-      env:
-        AMPLITUDE_API_KEY: ${{ secrets.AMPLITUDE_API_KEY }}
       run: npm run compile
 
     - name: Package Extension
