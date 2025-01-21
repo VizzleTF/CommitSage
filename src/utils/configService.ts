@@ -18,7 +18,7 @@ export class ConfigService {
         this.secretStorage = context.secrets;
 
         const configListener = vscode.workspace.onDidChangeConfiguration(event => {
-            if (event.affectsConfiguration('geminiCommit')) {
+            if (event.affectsConfiguration('commitSage')) {
                 this.clearCache();
                 void Logger.log('Configuration changed, cache cleared');
             }
@@ -34,7 +34,7 @@ export class ConfigService {
             const cacheKey = `${section}.${key}`;
             if (!this.cache.has(cacheKey)) {
                 void Logger.log(`Loading config for ${cacheKey}`);
-                const config = vscode.workspace.getConfiguration('geminiCommit');
+                const config = vscode.workspace.getConfiguration('commitSage');
                 const value = config.inspect<T>(`${section}.${key}`);
 
                 const effectiveValue = value?.workspaceValue ??
@@ -54,7 +54,7 @@ export class ConfigService {
 
     static async getApiKey(): Promise<string> {
         try {
-            let key = await this.secretStorage.get('geminicommit.apiKey');
+            let key = await this.secretStorage.get('commitsage.apiKey');
 
             if (!key) {
                 key = await vscode.window.showInputBox({
@@ -87,7 +87,7 @@ export class ConfigService {
         try {
             await ApiKeyValidator.validateGeminiApiKey(key);
 
-            await this.secretStorage.store('geminicommit.apiKey', key);
+            await this.secretStorage.store('commitsage.apiKey', key);
             void Logger.log('Google API key has been validated and set');
 
             await vscode.window.showInformationMessage('Google API key has been successfully validated and saved');
@@ -100,7 +100,7 @@ export class ConfigService {
 
     static async getCustomApiKey(): Promise<string> {
         try {
-            let key = await this.secretStorage.get('geminicommit.customApiKey');
+            let key = await this.secretStorage.get('commitsage.customApiKey');
 
             if (!key) {
                 const endpoint = this.getCustomEndpoint();
@@ -142,7 +142,7 @@ export class ConfigService {
             }
 
             await ApiKeyValidator.validateCustomApiKey(key, endpoint);
-            await this.secretStorage.store('geminicommit.customApiKey', key);
+            await this.secretStorage.store('commitsage.customApiKey', key);
             void Logger.log('Custom API key has been validated and set');
             await vscode.window.showInformationMessage('Custom API key has been successfully validated and saved');
         } catch (error) {
@@ -154,7 +154,7 @@ export class ConfigService {
 
     static async removeApiKey(): Promise<void> {
         try {
-            await this.secretStorage.delete('geminicommit.apiKey');
+            await this.secretStorage.delete('commitsage.apiKey');
             void Logger.log('Google API key has been removed');
             await vscode.window.showInformationMessage('Google API key has been removed');
         } catch (error) {
@@ -165,7 +165,7 @@ export class ConfigService {
 
     static async removeCustomApiKey(): Promise<void> {
         try {
-            await this.secretStorage.delete('geminicommit.customApiKey');
+            await this.secretStorage.delete('commitsage.customApiKey');
             void Logger.log('Custom API key has been removed');
             await vscode.window.showInformationMessage('Custom API key has been removed');
         } catch (error) {
@@ -246,7 +246,7 @@ export class ConfigService {
                 { title: 'Open Settings', isCloseAffordance: true }
             );
 
-            const config = vscode.workspace.getConfiguration('geminiCommit');
+            const config = vscode.workspace.getConfiguration('commitSage');
 
             switch (selection?.title) {
                 case 'Enable Auto Commit':
@@ -258,7 +258,7 @@ export class ConfigService {
                 case 'Open Settings':
                     await vscode.commands.executeCommand(
                         'workbench.action.openSettings',
-                        '@ext:VizzleTF.geminicommit commit'
+                        '@ext:VizzleTF.commitsage commit'
                     );
                     break;
             }
@@ -304,5 +304,20 @@ export class ConfigService {
 
     static isTelemetryEnabled(): boolean {
         return this.getConfig<boolean>('telemetry', 'enabled', true);
+    }
+
+    private static handleConfigChange(event: vscode.ConfigurationChangeEvent): void {
+        if (event.affectsConfiguration('commitSage')) {
+            void this.loadConfig();
+        }
+    }
+
+    private static async loadConfig(): Promise<void> {
+        const config = vscode.workspace.getConfiguration('commitSage');
+        // ... existing code ...
+    }
+
+    public static getCommandId(): string {
+        return '@ext:VizzleTF.commitsage commit';
     }
 }

@@ -1,7 +1,13 @@
-node_modules*
-dist*
-GeminiCommit-*
-.env
+out
+dist
+node_modules
 .vscode-test/
 *.vsix
+CommitSage-*
+.DS_Store
+coverage
+*.log
+.env
+.env.*
+!.env.example
 src/constants/apiKeys.ts

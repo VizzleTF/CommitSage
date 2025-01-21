@@ -1,64 +1,70 @@
-# Contributing to GeminiCommit
+# Contributing to Commit Sage
 
-We're thrilled that you're interested in contributing to GeminiCommit! This document provides guidelines for contributing to the project.
+We're thrilled that you're interested in contributing to Commit Sage! This document provides guidelines for contributing to the project.
 
 ## Getting Started
 
-1. Fork the repository on GitHub.
-2. Clone your fork locally:
-   ```
-   git clone https://github.com/your-username/GeminiCommit.git
-   ```
-3. Create a branch for your changes:
-   ```
-   git checkout -b your-feature-branch
-   ```
+1. Fork the repository
+2. Clone your fork:
+```bash
+git clone https://github.com/your-username/CommitSage.git
+```
+3. Install dependencies:
+```bash
+npm install
+```
+4. Create a branch for your changes:
+```bash
+git checkout -b feature/your-feature-name
+```
 
-## Setting Up the Development Environment
+## Development
 
-1. Ensure you have Node.js and npm installed.
-2. Install dependencies:
-   ```
-   npm install
-   ```
-3. Open the project in Visual Studio Code.
-
-## Making Changes
-
-1. Make your changes in your feature branch.
-2. Write or update tests for the changes you make (if applicable).
-3. Run the tests to ensure they pass:
-   ```
-   npm test
-   ```
-4. Update documentation if necessary (README.md, inline comments, etc.).
+1. Make your changes
+2. Test your changes:
+```bash
+npm run test
+```
+3. Build the extension:
+```bash
+npm run build
+```
 
 ## Submitting Changes
 
-1. Push your changes to your fork on GitHub.
-2. Submit a pull request to the main GeminiCommit repository.
-3. In your pull request description, explain your changes and the reason for them.
+1. Push your changes to your fork
+2. Submit a pull request to the main Commit Sage repository.
 
-## Coding Conventions
+## Pull Request Guidelines
 
-- Follow the existing code style in the project.
-- Use TypeScript for all new code.
-- Write clear, commented code.
-- Keep your changes focused. If you have multiple unrelated changes, submit them as separate pull requests.
+- Follow the existing code style
+- Include tests for new features
+- Update documentation as needed
+- Keep changes focused and atomic
+- Describe your changes in detail
 
-## Reporting Bugs
+## Code Style
 
-- Use the GitHub Issues page to report bugs.
-- Describe the bug in detail, including steps to reproduce.
-- Include information about your environment (OS, VS Code version, etc.).
+- Use TypeScript
+- Follow ESLint rules
+- Write clear commit messages
+- Add JSDoc comments for public APIs
 
-## Requesting Features
+## Testing
 
-- Use the GitHub Issues page to suggest new features.
-- Clearly describe the feature and its potential benefits.
+- Write unit tests for new features
+- Ensure all tests pass before submitting
+- Test your changes in VS Code
 
-## Code of Conduct
+## Documentation
 
-Please note that this project is released with a [Contributor Code of Conduct](CODE_OF_CONDUCT.md). By participating in this project you agree to abide by its terms.
+- Update README.md for user-facing changes
+- Add JSDoc comments for new functions
+- Keep documentation clear and concise
 
-Thank you for contributing to GeminiCommit!
+## Need Help?
+
+- Join our [Telegram Group](https://t.me/gemini_commit)
+- Ask questions in GitHub Issues
+
+Thank you for contributing to Commit Sage!

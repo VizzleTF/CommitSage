@@ -19,14 +19,14 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         await GitService.initialize(context);
     } catch (error) {
         void Logger.error('Failed during initialization:', error as Error);
-        void vscode.window.showErrorMessage(`GeminiCommit initialization failed: ${(error as Error).message}`);
+        void vscode.window.showErrorMessage(`Commit Sage initialization failed: ${(error as Error).message}`);
         return;
     }
 
     void Logger.log('Registering commands and views');
     try {
-        context.subscriptions.push(
-            vscode.commands.registerCommand('geminicommit.generateCommitMessage', async () => {
+        const disposables = [
+            vscode.commands.registerCommand('commitsage.generateCommitMessage', async () => {
                 try {
                     await CommitMessageUI.generateAndSetCommitMessage();
                 } catch (error) {
@@ -34,12 +34,14 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
                     void vscode.window.showErrorMessage(`Error: ${(error as Error).message}`);
                 }
             }),
-            vscode.commands.registerCommand('geminicommit.setApiKey', () => ConfigService.promptForApiKey()),
-            vscode.commands.registerCommand('geminicommit.setCustomApiKey', () => ConfigService.promptForCustomApiKey())
-        );
+            vscode.commands.registerCommand('commitsage.setApiKey', () => ConfigService.promptForApiKey()),
+            vscode.commands.registerCommand('commitsage.setCustomApiKey', () => ConfigService.promptForCustomApiKey())
+        ];
+
+        context.subscriptions.push(...disposables);
     } catch (error) {
         void Logger.error('Failed to register commands:', error as Error);
-        void vscode.window.showErrorMessage('Failed to register GeminiCommit commands');
+        void vscode.window.showErrorMessage('Failed to register Commit Sage commands');
         return;
     }
 
