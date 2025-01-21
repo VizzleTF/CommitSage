@@ -28,7 +28,7 @@ jobs:
 
     - name: Build
       env:
-        POSTHOG_API_KEY: ${{ secrets.POSTHOG_API_KEY }}
+        AMPLITUDE_API_KEY: ${{ secrets.AMPLITUDE_API_KEY }}
       run: npm run compile
 
     - name: Package Extension
