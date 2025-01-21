@@ -116,7 +116,7 @@ jobs:
             prerelease: false
           });
           
-          const vsixFile = `commitsage-${process.env.VERSION}.vsix`;
+          const vsixFile = `geminicommit-${process.env.VERSION}.vsix`;
           console.log(`Looking for file: ${vsixFile}`);
           
           if (fs.existsSync(vsixFile)) {
