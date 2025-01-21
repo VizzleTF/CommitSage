@@ -1,15 +1,15 @@
 {
-    "name": "geminicommit",
-    "displayName": "Gemini Commit",
+    "name": "commitsage",
+    "displayName": "Commit Sage",
     "description": "Free AI commit messages using Gemini or custom LLM",
     "version": "1.9.8",
     "publisher": "VizzleTF",
     "repository": {
         "type": "git",
-        "url": "https://github.com/VizzleTF/GeminiCommit.git"
+        "url": "https://github.com/VizzleTF/CommitSage.git"
     },
     "bugs": {
-        "url": "https://github.com/VizzleTF/GeminiCommit/issues"
+        "url": "https://github.com/VizzleTF/CommitSage/issues"
     },
     "engines": {
         "vscode": "^1.93.0"
@@ -30,53 +30,59 @@
     ],
     "activationEvents": [
         "onStartupFinished",
-        "onView:geminiCommitView"
+        "onView:commitSageView"
     ],
     "icon": "icon.png",
     "main": "./dist/extension.js",
     "contributes": {
         "commands": [
             {
-                "command": "geminicommit.generateCommitMessage",
-                "title": "GeminiCommit: Generate Commit Message",
-                "icon": "$(rocket)"
+                "command": "commitsage.generateCommitMessage",
+                "title": "Commit Sage: Generate Commit Message",
+                "icon": "./icon.png"
             },
             {
-                "command": "geminicommit.setApiKey",
-                "title": "GeminiCommit: Set Gemini API Key"
+                "command": "commitsage.setApiKey",
+                "title": "Commit Sage: Set Gemini API Key"
             },
             {
-                "command": "geminicommit.setCustomApiKey",
-                "title": "GeminiCommit: Set Custom API Key"
+                "command": "commitsage.setCustomApiKey",
+                "title": "Commit Sage: Set Custom API Key"
             }
         ],
         "menus": {
             "scm/title": [
                 {
                     "when": "scmProvider == git",
-                    "command": "geminicommit.generateCommitMessage",
+                    "command": "commitsage.generateCommitMessage",
                     "group": "navigation"
+                }
+            ],
+            "commandPalette": [
+                {
+                    "command": "commitsage.generateCommitMessage",
+                    "when": "workspaceFolderCount != 0"
                 }
             ]
         },
         "keybindings": [
             {
-                "command": "geminicommit.generateCommitMessage",
+                "command": "commitsage.generateCommitMessage",
                 "key": "ctrl+g",
                 "mac": "cmd+g",
                 "when": "scmProvider == git"
             }
         ],
         "configuration": {
-            "title": "GeminiCommit",
+            "title": "Commit Sage",
             "properties": {
-                "geminiCommit.commit.promptForRefs": {
+                "commitSage.commit.promptForRefs": {
                     "type": "boolean",
                     "default": false,
                     "description": "Prompt for entering refs (e.g., issue numbers) when generating commit messages. Note: This may interrupt automatic commit flow if Auto Commit is enabled",
                     "order": 1
                 },
-                "geminiCommit.commit.commitLanguage": {
+                "commitSage.commit.commitLanguage": {
                     "type": "string",
                     "enum": [
                         "english",
@@ -88,7 +94,7 @@
                     "description": "Language for generated commit messages. Some commit formats may have limited support for non-English languages",
                     "order": 2
                 },
-                "geminiCommit.commit.commitFormat": {
+                "commitSage.commit.commitFormat": {
                     "type": "string",
                     "enum": [
                         "conventional",
@@ -108,37 +114,37 @@
                     "description": "Format style for commit messages. All formats support English, some may have limited support for other languages",
                     "order": 3
                 },
-                "geminiCommit.commit.useCustomInstructions": {
+                "commitSage.commit.useCustomInstructions": {
                     "type": "boolean",
                     "default": false,
                     "description": "Use custom instructions for commit message generation. When enabled, customInstructions must not be empty",
                     "order": 4
                 },
-                "geminiCommit.commit.customInstructions": {
+                "commitSage.commit.customInstructions": {
                     "type": "string",
                     "default": "",
                     "description": "Custom instructions for commit message generation. Required when useCustomInstructions is enabled",
                     "order": 5
                 },
-                "geminiCommit.commit.onlyStagedChanges": {
+                "commitSage.commit.onlyStagedChanges": {
                     "type": "boolean",
                     "default": false,
                     "description": "Generate commit message only for staged changes. When disabled: commits staged changes if present, otherwise commits all tracked changes",
                     "order": 6
                 },
-                "geminiCommit.commit.autoCommit": {
+                "commitSage.commit.autoCommit": {
                     "type": "boolean",
                     "default": false,
                     "description": "Automatically commit changes after generating the message. Consider disabling promptForRefs when using this feature",
                     "order": 7
                 },
-                "geminiCommit.commit.autoPush": {
+                "commitSage.commit.autoPush": {
                     "type": "boolean",
                     "default": false,
                     "description": "Automatically push changes after committing. Requires Auto Commit to be enabled. Will be ignored if Auto Commit is disabled",
                     "order": 8
                 },
-                "geminiCommit.gemini.model": {
+                "commitSage.gemini.model": {
                     "type": "string",
                     "enum": [
                         "gemini-1.0-pro",
@@ -150,32 +156,28 @@
                     "description": "Select Gemini model for commit message generation. Only used when custom endpoint is not enabled",
                     "order": 9
                 },
-                "geminiCommit.custom.useCustomEndpoint": {
+                "commitSage.custom.useCustomEndpoint": {
                     "type": "boolean",
                     "default": false,
                     "description": "Use a custom endpoint for AI-generated commit messages. Requires both endpoint URL and model name to be configured",
                     "order": 10
                 },
-                "geminiCommit.custom.endpoint": {
+                "commitSage.custom.endpoint": {
                     "type": "string",
                     "default": "",
                     "description": "Custom endpoint URL (e.g., 'https://api.openai.com/v1' for OpenAI). Required when useCustomEndpoint is enabled",
                     "order": 11
                 },
-                "geminiCommit.custom.model": {
+                "commitSage.custom.model": {
                     "type": "string",
                     "default": "",
                     "description": "Model name for custom endpoint (e.g., 'gpt-3.5-turbo' for OpenAI). Required when useCustomEndpoint is enabled",
                     "order": 12
                 },
-                "geminiCommit.telemetry.enabled": {
+                "commitSage.telemetry.enabled": {
                     "type": "boolean",
                     "default": true,
-                    "description": "Enable telemetry for GeminiCommit",
-                    "tags": [
-                        "telemetry",
-                        "usesOnlineServices"
-                    ]
+                    "description": "Enable telemetry for Commit Sage"
                 }
             }
         }

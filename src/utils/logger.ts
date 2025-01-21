@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
 
 export class Logger {
-    private static readonly outputChannel: vscode.OutputChannel = vscode.window.createOutputChannel('GeminiCommit');
+    private static readonly outputChannel: vscode.OutputChannel = vscode.window.createOutputChannel('Commit Sage');
 
     static async initialize(_context: vscode.ExtensionContext): Promise<void> {
         this.log('Logger initialized');
@@ -18,7 +18,7 @@ export class Logger {
         this.outputChannel.appendLine(`[${timestamp}] [ERROR] ${message}${errorMessage}`);
 
         await vscode.window.showErrorMessage(
-            `GeminiCommit: ${message}`,
+            `Commit Sage: ${message}`,
             { modal: false },
             'Show Details',
             'OK'
@@ -40,5 +40,13 @@ export class Logger {
 
     static dispose(): void {
         this.outputChannel.dispose();
+    }
+
+    public static showError(message: string, error?: Error): void {
+        this.error(message, error);
+        void vscode.window.showErrorMessage(
+            `Commit Sage: ${message}`,
+            { modal: false }
+        );
     }
 }

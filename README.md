@@ -1,256 +1,155 @@
-# GeminiCommit
+# Commit Sage
 
-<img alt="Visual Studio Marketplace Version" src="https://img.shields.io/visual-studio-marketplace/v/VizzleTF.geminicommit"> <img alt="Visual Studio Marketplace Last Updated" src="https://img.shields.io/visual-studio-marketplace/last-updated/VizzleTF.geminicommit"> <img alt="Visual Studio Marketplace Installs" src="https://img.shields.io/visual-studio-marketplace/i/VizzleTF.geminicommit"> <img alt="Visual Studio Marketplace Rating" src="https://img.shields.io/visual-studio-marketplace/stars/VizzleTF.geminicommit">
+<img alt="Visual Studio Marketplace Version" src="https://img.shields.io/visual-studio-marketplace/v/VizzleTF.commitsage"> <img alt="Visual Studio Marketplace Last Updated" src="https://img.shields.io/visual-studio-marketplace/last-updated/VizzleTF.commitsage"> <img alt="Visual Studio Marketplace Installs" src="https://img.shields.io/visual-studio-marketplace/i/VizzleTF.commitsage"> <img alt="Visual Studio Marketplace Rating" src="https://img.shields.io/visual-studio-marketplace/stars/VizzleTF.commitsage">
 
-GeminiCommit is a VSCode extension that automatically generates commit messages using Google's Gemini AI or an OpenAI API endpoint (OpenAI, Ollama, LocalAI and others).
+Commit Sage is a VSCode extension that automatically generates commit messages using Google's Gemini AI or an OpenAI API endpoint (OpenAI, Ollama, LocalAI and others).
 
-![GeminiCommit in action](example.gif)
-
-[Features](#features) • [Quick Start & Usage](#quick-start--usage) • [Settings](#settings) • [Commit Formats](#commit-formats) • [Gemini Models & Custom Endpoints](#gemini-models--custom-endpoints) • [Example Messages](#example-messages)
+![Commit Sage in action](example.gif)
 
 ## Features
-- AI-powered commit message generation
-- Multiple commit message formats (Conventional, Angular, Karma, Semantic, Emoji)
-- Support for Google's Gemini AI and custom endpoints (OpenAI API)
-- Multi-language support (English, Russian, Chinese, Japanese, with more languages available upon request)
-- Customizable commit message instructions
-- Option to include references (e.g., issue numbers)
-- Secure API key storage
-- Automatic commit and push functionality
-- Flexible commit workflow support (staged/unstaged changes)
-- Keyboard shortcut support (default: Ctrl+G / Cmd+G on macOS)
 
-## Quick Start & Usage
+- 🤖 AI-powered commit message generation
+- 🔄 Support for both Google's Gemini and custom OpenAI-compatible endpoints
+- 🌐 Multiple languages support
+- 🎯 Customizable commit message format
+- ⚡ Fast and efficient
+- 🔒 Secure API key storage
+- 🎨 Custom instructions support
+- 🚀 Auto commit and push support
 
-1. Install from [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=VizzleTF.geminicommit)
-2. Set up API key:
-   - For Gemini AI: Get key from [Google AI Studio](https://aistudio.google.com/app/apikey)
-   - For custom endpoint: Configure in settings
-3. Use Command Palette (Ctrl+Shift+P) to set API key
-4. Configure preferences in VS Code settings:
-   - Select your preferred commit format
-   - Choose language
-   - Enable custom instructions if needed
-   - Configure commit behavior:
-     - "Only Staged Changes": When enabled, commits only staged changes
-     - When disabled:
-       - If there are staged changes, commits only those
-       - If no staged changes, commits all modified files using `git commit -a`
-     - "Auto Commit": Automatically creates a commit after generating the message
-     - "Auto Push": When enabled (and Auto Commit is enabled), automatically pushes changes after commit
-5. Generate commit message using:
-   - Click "Generate Commit Message" in Source Control view, or
-   - Use keyboard shortcut Ctrl+G (Cmd+G on macOS)
-6. (Optional) Enter references if prompted
-7. Review and edit the generated message
-8. Commit/push is performed automatically based on your settings
+## Installation
 
-## Settings
+1. Install from [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=VizzleTF.commitsage)
+2. Get your API key:
+   - For Gemini: Get it from [Google AI Studio](https://makersuite.google.com/app/apikey)
+   - For custom endpoint: Use your OpenAI API key or other compatible service
+3. Set up the API key in VS Code:
+   - Open Command Palette (Ctrl+Shift+P / Cmd+Shift+P)
+   - Type "Commit Sage: Set Gemini API Key" or "Commit Sage: Set Custom API Key"
+   - Enter your API key
 
-### Commit Message Generation
-- **Commit Language** (`geminiCommit.commit.commitLanguage`):
-  - Languages: English (default), Russian, Chinese, Japanese
-  - Note: All commit formats now fully support all available languages
+## Usage
 
-- **Commit Format** (`geminiCommit.commit.commitFormat`):
-  - Available formats: Conventional (default), Angular, Karma, Semantic, Emoji
-  - Each format has its own structure and rules
-  
-- **Custom Instructions**:
-  - Enable with `geminiCommit.commit.useCustomInstructions`
-  - Set instructions in `geminiCommit.commit.customInstructions`
-  - Must not be empty when enabled
+1. Write code
+2. Press button in Source control
+4. Review and confirm generated message
 
-### References
-- **Prompt for Refs** (`geminiCommit.commit.promptForRefs`):
-  - When enabled, prompts for issue numbers or references
-  - Consider disabling when using Auto Commit to avoid interrupting the flow
+## Configuration
 
-### Commit Behavior
-- **Only Staged Changes** (`geminiCommit.commit.onlyStagedChanges`):
-  - When `true`: Only commits changes that have been staged with `git add`
-  - When `false`: 
-    - If there are staged changes, commits only those changes
-    - If there are no staged changes, commits all tracked modified files using `git commit -a`
+### Commit Settings
 
-### Automation
-- **Auto Commit** (`geminiCommit.commit.autoCommit`):
-  - When `true`: Automatically creates a commit after generating the message
-  - When `false`: Only generates and sets the commit message, leaving manual commit control to you
+- **Commit Language** (`commitSage.commit.commitLanguage`):
+  - Language for generated commit messages
+  - Default: English
 
-- **Auto Push** (`geminiCommit.commit.autoPush`):
-  - When `true`: Automatically pushes changes after commit (requires Auto Commit to be enabled)
-  - When `false`: Leaves manual push control to you
-  - Note: This setting only works when Auto Commit is enabled. If Auto Push is enabled while Auto Commit is disabled, you'll see a warning message with a quick link to settings
+- **Commit Format** (`commitSage.commit.commitFormat`):
+  - Format style for commit messages
+  - Options: Conventional, Angular, Karma, Semantic, Emoji
+  - Default: Conventional
 
-### Privacy & Telemetry
-- **Telemetry** (`geminiCommit.telemetry.enabled`):
-  - When `true`: Collects anonymous usage data to improve the extension
-  - When `false`: No telemetry data is collected
-  - Data collected: Feature usage, error rates, performance metrics
-  - No personal information or code content is ever collected
+### Custom Instructions
 
-## Commit Formats
+- Enable with `commitSage.commit.useCustomInstructions`
+- Set instructions in `commitSage.commit.customInstructions`
+- Allows full control over the AI prompt
 
-The extension supports multiple commit message formats:
+### Git Integration
 
-1. **Conventional Commits** (default)
-   ```
-   <type>[optional scope]: <description>
-   
-   [optional body with bullet points]
-   ```
+- **Prompt for Refs** (`commitSage.commit.promptForRefs`):
+  - Ask for issue/PR references
+  - Default: false
 
-2. **Angular**
-   ```
-   <type>(<scope>): <short summary>
-   
-   [optional body with bullet points]
-   ```
+- **Only Staged Changes** (`commitSage.commit.onlyStagedChanges`):
+  - Use only staged changes for message generation
+  - Default: false
+  - When disabled: uses staged changes if present, otherwise all changes
 
-3. **Karma**
-   ```
-   <type>(<scope>): <message>
-   ```
+- **Auto Commit** (`commitSage.commit.autoCommit`):
+  - Automatically commit after message generation
+  - Default: false
 
-4. **Semantic**
-   ```
-   type: message
-   ```
+- **Auto Push** (`commitSage.commit.autoPush`):
+  - Push changes after auto commit
+  - Default: false
+  - Requires Auto Commit to be enabled
 
-5. **Emoji**
-   ```
-   :emoji: message
-   ```
+### AI Model Settings
 
-Each format has its own set of types and rules. For small changes, only the header line is generated. For complex changes, a detailed body with bullet points is included.
+- **Gemini Model** (`commitSage.gemini.model`):
+  - Model for Gemini API
+  - Available free models:
+    - `gemini-1.0-pro`: Base model, good for general use
+    - `gemini-1.5-pro`: Enhanced version with better understanding
+    - `gemini-1.5-flash`: Optimized for speed (default)
+    - `gemini-2.0-flash-exp`: Experimental model with latest improvements
+  - Default: gemini-1.5-flash
 
-## Gemini Models & Custom Endpoints
+### Custom Endpoint Settings
 
-Available free models:
-- `gemini-1.0-pro`: Base model, good for general use
-- `gemini-1.5-pro`: Enhanced version with better understanding
-- `gemini-1.5-flash`: Optimized for speed (default)
-- `gemini-2.0-flash-exp`: Experimental model with latest improvements
----
-The extension supports OpenAI-compatible API endpoints. This allows you to:
-- Use OpenAI API directly
-- Use self-hosted LLMs with OpenAI-compatible API
-- Connect to services like LocalAI, ollama, or other OpenAI API proxies
+- **Use Custom Endpoint** (`commitSage.custom.useCustomEndpoint`):
+  - Use alternative AI provider
+  - Default: false
 
-To configure a custom endpoint:
-1. Enable "Use Custom Endpoint" in settings
-2. Set your endpoint URL (e.g., "https://api.openai.com/v1" for OpenAI)
-3. Set your model name (e.g., "gpt-3.5-turbo" for OpenAI)
-4. Use Command Palette (Ctrl+Shift+P) to set API key
+- **Custom Endpoint URL** (`commitSage.custom.endpoint`):
+  - API endpoint for custom provider
+  - Example: https://api.openai.com/v1
 
-### Configuration Requirements
-When using custom endpoint:
-- Both endpoint URL and model name must be configured
-- Appropriate API key must be set
-- Extension will warn if configuration is incomplete
+- **Custom Model** (`commitSage.custom.model`):
+  - Model name for custom endpoint
+  - Example: gpt-3.5-turbo
 
-## Example Messages
+### Telemetry
 
-Conventional format (complex change):
-```
-feat(auth): implement user authentication system
+- **Telemetry** (`commitSage.telemetry.enabled`):
+  - Usage data collection (only counts commits without any other information)
+  - Default: true
+  - Helps improve the extension
 
-- Add JWT token-based authentication
-- Create login/register endpoints
-- Add session management
-```
+## Support
 
-Emoji format:
-```
-✨ add real-time collaboration feature
-```
-
----
-
-# GeminiCommit (на русском)
-
-GeminiCommit - расширение VSCode для автоматической генерации сообщений коммитов с использованием Gemini AI от Google или OpenAI API (OpenAI, Ollama, LocalAI и другие).
-
-### Быстрый старт & Использование
-
-0. Если вы из России проверьте, что адрес 'generativelanguage.googleapis.com' не выдает 400 ошибку (User location is not supported for the API use.). Используйте VPN для этого домена.
-1. Установите из [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=VizzleTF.geminicommit)
-2. Настройте API ключ:
-   - Для Gemini AI: Получите ключ на [Google AI Studio](https://aistudio.google.com/app/apikey)
-   - Для пользовательского сервиса: Настройте в настройках
-3. Используйте палитру команд (Ctrl+Shift+P) для установки API ключа
-4. Настройте предпочтения в настройках VS Code:
-   - Выберите предпочтительный формат коммитов
-   - Выберите язык
-   - При необходимости включите пользовательские инструкции
-   - Настройте поведение коммитов:
-     - "Only Staged Changes": Когда включено, коммитит только staged изменения
-     - Когда выключено:
-       - Если есть staged изменения, коммитит только их
-       - Если нет staged изменений, коммитит все измененные файлы используя `git commit -a`
-     - "Auto Commit": Когда включено, автоматически создает коммит после генерации сообщения
-     - "Auto Push": Когда включено (и включен Auto Commit), автоматически пушит изменения после коммита.
-       При включенном Auto Push без Auto Commit вы увидите предупреждение с быстрой ссылкой на настройки
-5. Сгенерируйте сообщение коммита:
-   - Нажмите "Generate Commit Message" в панели Source Control, или
-   - Используйте горячие клавиши Ctrl+G (Cmd+G на macOS)
-6. (Опционально) Введите ссылки, если запрошено
-7. Просмотрите и отредактируйте сгенерированное сообщение
-8. Коммит и пуш выполняются автоматически в соответствии с вашими настройками
-
-### Форматы коммитов
-
-Расширение поддерживает несколько форматов сообщений коммитов:
-
-1. **Conventional Commits** (по умолчанию)
-2. **Angular**
-3. **Karma**
-4. **Semantic**
-5. **Emoji**
-
-Каждый формат имеет свой набор типов и правил. Для небольших изменений генерируется только заголовок, для сложных изменений добавляется детальное описание с пунктами.
-
-### Модели & Эндпоинты
-
-Доступные бесплатные модели:
-- `gemini-1.0-pro`: Базовая модель, подходит для общего использования
-- `gemini-1.5-pro`: Улучшенная версия с лучшим пониманием контекста
-- `gemini-1.5-flash`: Оптимизирована для скорости (по умолчанию)
-- `gemini-2.0-flash-exp`: Экспериментальная модель с последними улучшениями
----
-Расширение поддерживает API-эндпоинты, совместимые с OpenAI. Это позволяет:
-- Использовать OpenAI API напрямую
-- Использовать self-hosted LLM с совместимым API
-- Подключаться к сервисам LocalAI, ollama и другим прокси OpenAI API
-
-Для настройки пользовательского эндпоинта:
-1. Включите "Use Custom Endpoint" в настройках
-2. Укажите URL эндпоинта (например, "https://api.openai.com/v1" для OpenAI)
-3. Укажите название модели (например, "gpt-3.5-turbo" для OpenAI)
-4. Используйте палитру команд (Ctrl+Shift+P) для установки API ключа
-
-## Community & Support
-
-### 📢 Stay Updated
 - [Telegram Channel](https://t.me/geminicommit) - Release announcements and updates
 - [Telegram Group](https://t.me/gemini_commit) - Community discussions and support
 
-### 🤝 Get Help
-- Report issues on [GitHub Issues](https://github.com/VizzleTF/GeminiCommit/issues)
-- Join our Telegram community for:
-  - Quick support
-  - Feature discussions
-  - Community updates
+## Contributing
 
-### 🛠 Technical Requirements
-- VS Code 1.93.0+
-- Git
-- Google AI API key or custom endpoint
-
-### 👥 Contributing
-Contributions are welcome! See [CONTRIBUTING.md](CONTRIBUTING.md) for details
+- Report issues on [GitHub Issues](https://github.com/VizzleTF/CommitSage/issues)
+- Pull requests are welcome!
 
 ## License
 
-This project is licensed under the MIT License. See [LICENSE](LICENSE) for details.
+MIT
+
+---
+
+# Commit Sage (на русском)
+
+Commit Sage - расширение VSCode для автоматической генерации сообщений коммитов с использованием Gemini AI от Google или OpenAI API (OpenAI, Ollama, LocalAI и другие).
+
+## Установка
+
+1. Установите из [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=VizzleTF.commitsage)
+2. Получите API ключ:
+   - Для Gemini: [Google AI Studio](https://makersuite.google.com/app/apikey)
+   - Для других: Используйте ключ от OpenAI или другого совместимого сервиса
+3. Настройте ключ в VS Code:
+   - Откройте палитру команд (Ctrl+Shift+P / Cmd+Shift+P)
+   - Введите "Commit Sage: Set Gemini API Key" или "Commit Sage: Set Custom API Key"
+   - Введите ваш API ключ
+
+## Использование
+
+1. Добавьте изменения в Git (git add)
+2. Откройте палитру команд (Ctrl+Shift+P / Cmd+Shift+P)
+3. Введите "Commit Sage: Generate Commit Message"
+4. Проверьте и подтвердите сгенерированное сообщение
+
+## Настройка
+
+Все настройки доступны через:
+- Палитра команд → "Preferences: Open Settings (UI)"
+- Поиск "Commit Sage"
+
+## Поддержка
+
+- [Telegram Канал](https://t.me/geminicommit) - Анонсы обновлений
+- [Telegram Группа](https://t.me/gemini_commit) - Обсуждения и помощь

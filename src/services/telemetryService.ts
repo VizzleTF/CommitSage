@@ -67,11 +67,7 @@ export class TelemetryService {
 
             this.disposables.push(
                 vscode.env.onDidChangeTelemetryEnabled(this.handleTelemetryStateChange.bind(this)),
-                vscode.workspace.onDidChangeConfiguration(e => {
-                    if (e.affectsConfiguration('geminiCommit.telemetry.enabled')) {
-                        this.handleTelemetryStateChange(ConfigService.isTelemetryEnabled());
-                    }
-                })
+                vscode.workspace.onDidChangeConfiguration(this.handleConfigChange.bind(this))
             );
 
             this.startQueueProcessor();
@@ -94,7 +90,7 @@ export class TelemetryService {
 
         const properties: TelemetryEventProperties = {
             vsCodeVersion: vscode.version,
-            extensionVersion: vscode.extensions.getExtension('VizzleTF.geminicommit')?.packageJSON.version,
+            extensionVersion: vscode.extensions.getExtension('VizzleTF.commitsage')?.packageJSON.version,
             platform: process.platform,
             ...customProperties
         };
@@ -171,6 +167,17 @@ export class TelemetryService {
         this.enabled = enabled;
         amplitude.setOptOut(!enabled);
         void Logger.log(`Telemetry enabled state changed to: ${enabled}`);
+    }
+
+    private static handleConfigChange(event: vscode.ConfigurationChangeEvent): void {
+        if (event.affectsConfiguration('commitSage.telemetry.enabled')) {
+            void this.loadConfig();
+        }
+    }
+
+    private static async loadConfig(): Promise<void> {
+        const extensionVersion = vscode.extensions.getExtension('VizzleTF.commitsage')?.packageJSON.version;
+        // ... existing code ...
     }
 
     private static delay(ms: number): Promise<void> {
