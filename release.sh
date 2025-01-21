@@ -39,12 +39,6 @@ case $choice in
 esac
 
 echo "New version will be: $new_version"
-read -p "Do you want to proceed? (y/n): " confirm
-
-if [ "$confirm" != "y" ]; then
-  echo "Operation cancelled. Exiting."
-  exit 0
-fi
 
 # Update package.json
 sed -i '' "s/\"version\": \"$current_version\"/\"version\": \"$new_version\"/" package.json
