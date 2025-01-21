@@ -28,6 +28,7 @@ jobs:
 
     - name: Set API Key
       run: |
+        mkdir -p src/constants
         echo "export const AMPLITUDE_API_KEY = '${{ secrets.AMPLITUDE_API_KEY }}';" > src/constants/apiKeys.ts
 
     - name: Build
