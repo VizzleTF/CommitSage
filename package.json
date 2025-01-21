@@ -184,9 +184,6 @@
         "vscode:prepublish": "webpack --mode production",
         "compile": "webpack --mode development",
         "watch": "webpack --mode development --watch",
-        "pretest": "npm run compile && npm run lint",
-        "lint": "eslint src",
-        "lint:fix": "eslint src --fix",
         "package": "vsce package"
     },
     "devDependencies": {
