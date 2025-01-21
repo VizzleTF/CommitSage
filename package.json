@@ -1,9 +1,9 @@
 {
-    "name": "commitsage",
+    "name": "geminicommit",
     "displayName": "Commit Sage",
     "description": "Free AI commit messages using Gemini or custom LLM",
     "version": "2.0.2",
-    "publisher": "VizzleTF",
+    "publisher": "Ivan K",
     "repository": {
         "type": "git",
         "url": "https://github.com/VizzleTF/CommitSage.git"
