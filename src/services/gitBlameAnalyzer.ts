@@ -22,18 +22,20 @@ export class GitBlameAnalyzer {
         command: string[],
         filePath: string,
         processOutput: (data: Buffer) => T,
-        ignoreFileNotFound = false
+        ignoreFileNotFound = false,
+        repoPath?: string
     ): Promise<GitProcessResult<T>> {
         if (!ignoreFileNotFound && !fs.existsSync(filePath)) {
             throw new Error(`${errorMessages.fileNotFound}: ${filePath}`);
         }
 
-        return new Promise((resolve, reject) => {
-            const gitProcess = spawn('git', command, {
-                cwd: path.dirname(filePath)
-            });
+        // Use repoPath as cwd if provided, otherwise use dirname of filePath
+        const cwd = repoPath || path.dirname(filePath);
 
-            let result: T;
+        return new Promise((resolve, reject) => {
+            const gitProcess = spawn('git', command, { cwd });
+
+            let result: T | undefined;
             const stderr: string[] = [];
 
             gitProcess.stdout.on('data', (data: Buffer) => {
@@ -46,9 +48,15 @@ export class GitBlameAnalyzer {
                 void Logger.error(`Git command stderr: ${errorMessage}`);
             });
 
+            gitProcess.on('error', (error) => {
+                void Logger.error(`Git command error: ${error.message}`);
+                reject(new Error(`Git command failed: ${error.message}`));
+            });
+
             gitProcess.on('close', (code) => {
                 if (code === 0 || (ignoreFileNotFound && code === 128)) {
-                    resolve({ data: result, stderr });
+                    // For deleted files or when no output is produced, provide a safe default
+                    resolve({ data: result ?? processOutput(Buffer.from('')), stderr });
                 } else {
                     reject(new Error(`Git process exited with code ${code}`));
                 }
@@ -56,23 +64,29 @@ export class GitBlameAnalyzer {
         });
     }
 
-    private static async isNewFile(filePath: string): Promise<boolean> {
+    private static async isNewFile(filePath: string, repoPath: string): Promise<boolean> {
         try {
+            // For deleted files, we know they're not new
+            if (!fs.existsSync(filePath)) {
+                return false;
+            }
+
             const processOutput = (data: Buffer): string => data.toString();
             const { data } = await this.executeGitCommand(
-                ['ls-files', path.basename(filePath)],
-                path.dirname(filePath),
+                ['ls-files', path.relative(repoPath, filePath)],
+                filePath,
                 processOutput,
-                true
+                true,
+                repoPath
             );
-            return !data.trim(); // Если файл новый, команда вернет пустую строку
+            return !data.trim(); // If file is new, command will return empty string
         } catch (error) {
             void Logger.error('Error checking if file is new:', error as Error);
-            return true; // В случае ошибки считаем файл новым для безопасности
+            return false; // In case of error, assume file is not new for safety
         }
     }
 
-    private static async getGitBlame(filePath: string): Promise<BlameInfo[]> {
+    private static async getGitBlame(filePath: string, repoPath: string): Promise<BlameInfo[]> {
         if (!fs.existsSync(filePath)) {
             void Logger.log(`Skipping blame for non-existent file: ${filePath}`);
             return [];
@@ -101,9 +115,11 @@ export class GitBlameAnalyzer {
         };
 
         const { data } = await this.executeGitCommand(
-            ['blame', '--line-porcelain', path.basename(filePath)],
+            ['blame', '--line-porcelain', path.relative(repoPath, filePath)],
             filePath,
-            processBlameOutput
+            processBlameOutput,
+            false,
+            repoPath
         );
 
         return data;
@@ -114,10 +130,11 @@ export class GitBlameAnalyzer {
 
         try {
             const { data } = await this.executeGitCommand(
-                ['diff', '--', path.basename(filePath)],
+                ['diff', '--', path.relative(repoPath, filePath)],
                 filePath,
                 processDiffOutput,
-                true
+                true,
+                repoPath
             );
 
             return data;
@@ -129,20 +146,20 @@ export class GitBlameAnalyzer {
 
     static async analyzeChanges(repoPath: string, filePath: string): Promise<string> {
         try {
-            // Проверяем, является ли файл новым
-            if (await this.isNewFile(filePath)) {
+            // For deleted files, we don't need blame analysis
+            if (!fs.existsSync(filePath)) {
+                void Logger.log(`Skipping blame analysis for deleted file: ${filePath}`);
+                return '';
+            }
+
+            // Check if file is new
+            if (await this.isNewFile(filePath, repoPath)) {
                 void Logger.log(`Skipping blame analysis for new file: ${filePath}`);
                 return '';
             }
 
-            // Проверяем существование файла
-            if (!fs.existsSync(filePath)) {
-                void Logger.log(`Skipping blame analysis for non-existent file: ${filePath}`);
-                return '';
-            }
-
             void Logger.log(`Analyzing changes for file: ${filePath}`);
-            const blame = await this.getGitBlame(filePath);
+            const blame = await this.getGitBlame(filePath, repoPath);
 
             if (!blame.length) {
                 return '';
