@@ -56,6 +56,22 @@ export class GitBlameAnalyzer {
         });
     }
 
+    private static async isNewFile(filePath: string): Promise<boolean> {
+        try {
+            const processOutput = (data: Buffer): string => data.toString();
+            const { data } = await this.executeGitCommand(
+                ['ls-files', path.basename(filePath)],
+                path.dirname(filePath),
+                processOutput,
+                true
+            );
+            return !data.trim(); // Если файл новый, команда вернет пустую строку
+        } catch (error) {
+            void Logger.error('Error checking if file is new:', error as Error);
+            return true; // В случае ошибки считаем файл новым для безопасности
+        }
+    }
+
     private static async getGitBlame(filePath: string): Promise<BlameInfo[]> {
         if (!fs.existsSync(filePath)) {
             void Logger.log(`Skipping blame for non-existent file: ${filePath}`);
@@ -101,7 +117,7 @@ export class GitBlameAnalyzer {
                 ['diff', '--', path.basename(filePath)],
                 filePath,
                 processDiffOutput,
-                true // Ignore if file doesn't exist (for moved/deleted files)
+                true
             );
 
             return data;
@@ -113,25 +129,33 @@ export class GitBlameAnalyzer {
 
     static async analyzeChanges(repoPath: string, filePath: string): Promise<string> {
         try {
-            void Logger.log(`Analyzing changes for file: ${filePath}`);
-
-            const blame = await this.getGitBlame(filePath);
-            void Logger.log(`Git blame completed for ${filePath}`);
-
-            const diff = await this.getDiff(repoPath, filePath);
-            void Logger.log(`Git diff completed for ${filePath}`);
-
-            if (!blame.length && !diff) {
-                return `File ${path.basename(filePath)} was moved or deleted`;
+            // Проверяем, является ли файл новым
+            if (await this.isNewFile(filePath)) {
+                void Logger.log(`Skipping blame analysis for new file: ${filePath}`);
+                return '';
             }
 
+            // Проверяем существование файла
+            if (!fs.existsSync(filePath)) {
+                void Logger.log(`Skipping blame analysis for non-existent file: ${filePath}`);
+                return '';
+            }
+
+            void Logger.log(`Analyzing changes for file: ${filePath}`);
+            const blame = await this.getGitBlame(filePath);
+
+            if (!blame.length) {
+                return '';
+            }
+
+            const diff = await this.getDiff(repoPath, filePath);
             const changedLines = this.parseChangedLines(diff);
             const blameAnalysis = this.analyzeBlameInfo(blame, changedLines);
 
             return this.formatAnalysis(blameAnalysis);
         } catch (error) {
             void Logger.error('Error in GitBlameAnalyzer:', error as Error);
-            throw error;
+            return '';
         }
     }
 

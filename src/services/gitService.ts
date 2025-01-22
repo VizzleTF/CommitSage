@@ -1,5 +1,6 @@
 import * as vscode from 'vscode';
 import { spawn } from 'child_process';
+import * as path from 'path';
 import { Logger } from '../utils/logger';
 import {
     GitExtensionNotFoundError,
@@ -93,55 +94,82 @@ export class GitService {
         }
     }
 
-    static async getDiff(repoPath: string, onlyStaged: boolean = false): Promise<string> {
-        void Logger.log(`Getting diff for ${repoPath} (onlyStaged: ${onlyStaged})`);
+    static async getDiff(repoPath: string, onlyStagedChanges: boolean = false): Promise<string> {
+        void Logger.log(`Getting diff for ${repoPath} (onlyStagedChanges: ${onlyStagedChanges})`);
 
         try {
-            // Get staged changes first
+            // Check for staged changes first
             const stagedDiff = await this.executeGitCommand(['diff', '--staged'], repoPath);
+
+            // If onlyStagedChanges is true, return only staged changes
+            if (onlyStagedChanges) {
+                if (!stagedDiff.trim()) {
+                    throw new NoChangesDetectedError('No staged changes detected.');
+                }
+                return stagedDiff;
+            }
+
+            // If there are staged changes, return them (even when onlyStagedChanges is false)
             if (stagedDiff.trim()) {
                 return stagedDiff;
             }
 
-            if (onlyStaged) {
-                throw new NoChangesDetectedError('No staged changes detected.');
+            // Get status of all files
+            const status = await this.executeGitCommand(['status', '--porcelain', '-u'], repoPath);
+            if (!status.trim()) {
+                throw new NoChangesDetectedError('No changes detected.');
             }
 
-            // Get unstaged changes
-            const [unstaged, untrackedFiles] = await Promise.all([
-                this.executeGitCommand(['diff'], repoPath),
-                this.getUntrackedFiles(repoPath)
-            ]);
+            const diffs: string[] = [];
 
-            // Process untracked files in parallel
-            const untrackedContents = await Promise.all(
-                untrackedFiles.map(async file => {
+            // Get unstaged modifications
+            const unstagedDiff = await this.executeGitCommand(['diff'], repoPath);
+            if (unstagedDiff.trim()) {
+                diffs.push(unstagedDiff);
+            }
+
+            // Process each file from status
+            const statusLines = status.split('\n').filter(line => line.trim());
+            for (const line of statusLines) {
+                const [status, ...pathParts] = line.trim().split(' ');
+                const filePath = pathParts.join(' ');
+
+                if (status === '??') {
+                    // New untracked file
                     try {
-                        const fileContent = await this.executeGitCommand(['show', `:${file}`], repoPath)
-                            .catch(() => '');
-
-                        if (!fileContent) return '';
-
-                        return [
-                            `diff --git a/${file} b/${file}`,
-                            'new file mode 100644',
-                            '--- /dev/null',
-                            `+++ b/${file}`,
-                            ...fileContent.split('\n').map(line => `+${line}`)
-                        ].join('\n') + '\n';
+                        const fileContent = await this.readFileContent(repoPath, filePath);
+                        if (fileContent) {
+                            diffs.push([
+                                `diff --git a/${filePath} b/${filePath}`,
+                                'new file mode 100644',
+                                '--- /dev/null',
+                                `+++ b/${filePath}`,
+                                ...fileContent.split('\n').map(line => `+${line}`)
+                            ].join('\n'));
+                        }
                     } catch (error) {
-                        const errorMessage = error instanceof Error ? error.message : String(error);
-                        void Logger.log(`Error reading content of ${file}: ${errorMessage}`);
-                        return '';
+                        void Logger.error(`Error reading new file ${filePath}:`, error as Error);
                     }
-                })
-            );
+                } else if (status === 'D') {
+                    // Deleted file
+                    try {
+                        const oldContent = await this.executeGitCommand(['show', `HEAD:${filePath}`], repoPath);
+                        if (oldContent) {
+                            diffs.push([
+                                `diff --git a/${filePath} b/${filePath}`,
+                                'deleted file mode 100644',
+                                `--- a/${filePath}`,
+                                '+++ /dev/null',
+                                ...oldContent.split('\n').map(line => `-${line}`)
+                            ].join('\n'));
+                        }
+                    } catch (error) {
+                        void Logger.error(`Error reading deleted file ${filePath}:`, error as Error);
+                    }
+                }
+            }
 
-            const combinedDiff = [
-                unstaged,
-                ...untrackedContents.filter(content => content.length > 0)
-            ].join('\n').trim();
-
+            const combinedDiff = diffs.join('\n\n').trim();
             if (!combinedDiff) {
                 throw new NoChangesDetectedError('No changes detected.');
             }
@@ -151,12 +179,6 @@ export class GitService {
             void Logger.error('Error getting diff:', error as Error);
             throw error;
         }
-    }
-
-    private static async getUntrackedFiles(repoPath: string): Promise<string[]> {
-        const command = ['ls-files', '--others', '--exclude-standard'];
-        const output = await this.executeGitCommand(command, repoPath);
-        return output.split('\n').filter(line => line.trim() !== '');
     }
 
     static async hasChanges(repoPath: string, type: GitChangeType): Promise<boolean> {
@@ -184,6 +206,16 @@ export class GitService {
             .filter(line => line.trim() !== '')
             .filter(line => !onlyStaged || STAGED_STATUS_CODES.includes(line[0] as GitStatusCode))
             .map(line => line.substring(3).trim());
+    }
+
+    private static async readFileContent(repoPath: string, filePath: string): Promise<string> {
+        return new Promise((resolve, reject) => {
+            const fullPath = vscode.Uri.file(path.join(repoPath, filePath));
+            vscode.workspace.fs.readFile(fullPath).then(
+                content => resolve(new TextDecoder().decode(content)),
+                error => reject(error)
+            );
+        });
     }
 
     static async checkGitConfig(repoPath: string): Promise<void> {
