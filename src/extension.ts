@@ -26,9 +26,9 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     void Logger.log('Registering commands and views');
     try {
         const disposables = [
-            vscode.commands.registerCommand('commitsage.generateCommitMessage', async () => {
+            vscode.commands.registerCommand('commitsage.generateCommitMessage', async (sourceControlRepository?: vscode.SourceControl) => {
                 try {
-                    await CommitMessageUI.generateAndSetCommitMessage();
+                    await CommitMessageUI.generateAndSetCommitMessage(sourceControlRepository);
                 } catch (error) {
                     void Logger.error('Error in generateCommitMessage command:', error as Error);
                     void vscode.window.showErrorMessage(`Error: ${(error as Error).message}`);

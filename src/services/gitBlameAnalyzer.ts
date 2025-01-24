@@ -23,14 +23,13 @@ export class GitBlameAnalyzer {
         filePath: string,
         processOutput: (data: Buffer) => T,
         ignoreFileNotFound = false,
-        repoPath?: string
+        repoPath: string
     ): Promise<GitProcessResult<T>> {
         if (!ignoreFileNotFound && !fs.existsSync(filePath)) {
             throw new Error(`${errorMessages.fileNotFound}: ${filePath}`);
         }
 
-        // Use repoPath as cwd if provided, otherwise use dirname of filePath
-        const cwd = repoPath || path.dirname(filePath);
+        const cwd = repoPath;
 
         return new Promise((resolve, reject) => {
             const gitProcess = spawn('git', command, { cwd });

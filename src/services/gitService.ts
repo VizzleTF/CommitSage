@@ -273,12 +273,9 @@ export class GitService {
     }
 
     static async selectRepository(repos: vscode.SourceControl[]): Promise<vscode.SourceControl> {
-        if (repos.length === 1) {
-            return repos[0];
-        }
-
         const repoOptions = repos.map(repo => ({
-            label: repo.rootUri ? repo.rootUri.fsPath : 'Unknown repository path',
+            label: repo.rootUri ? path.basename(repo.rootUri.fsPath) : 'Unknown repository',
+            description: repo.rootUri ? repo.rootUri.fsPath : undefined,
             repository: repo
         }));
 
@@ -292,11 +289,28 @@ export class GitService {
         return selected.repository;
     }
 
-    static async getActiveRepository(): Promise<vscode.SourceControl | undefined> {
+    static async getActiveRepository(sourceControlRepository?: vscode.SourceControl): Promise<vscode.SourceControl> {
+        if (sourceControlRepository?.rootUri) {
+            return sourceControlRepository;
+        }
+
         const repos = await this.getRepositories();
         if (repos.length === 1) {
             return repos[0];
         }
+
+        const activeEditor = vscode.window.activeTextEditor;
+        if (activeEditor) {
+            const activeFile = activeEditor.document.uri;
+            const activeRepo = repos.find(repo => {
+                if (!repo.rootUri) return false;
+                return activeFile.fsPath.startsWith(repo.rootUri.fsPath);
+            });
+            if (activeRepo) {
+                return activeRepo;
+            }
+        }
+
         return this.selectRepository(repos);
     }
 
