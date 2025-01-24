@@ -55,7 +55,10 @@
                 {
                     "when": "scmProvider == git",
                     "command": "commitsage.generateCommitMessage",
-                    "group": "navigation"
+                    "group": "navigation",
+                    "arguments": [
+                        "$scmProvider"
+                    ]
                 }
             ],
             "commandPalette": [
