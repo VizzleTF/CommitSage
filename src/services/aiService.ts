@@ -229,11 +229,23 @@ export class CommitMessageUI {
         let model = 'unknown';
         try {
             await this.initializeAndValidate();
+
+            // Set repository from Source Control view context if available
+            if (sourceControlRepository?.rootUri) {
+                this.selectedRepository = sourceControlRepository;
+                void Logger.log(`Using repository from Source Control view: ${sourceControlRepository.rootUri.fsPath}`);
+            }
+
             await this.executeWithProgress(async progress => {
                 const result = await this.generateAndApplyMessage(progress, sourceControlRepository);
                 model = result.model;
             });
             void vscode.window.showInformationMessage(`Message generated using ${model}`);
+
+            // Handle auto-commit and auto-push after message generation
+            if (this.selectedRepository?.rootUri && ConfigService.getAutoCommitEnabled()) {
+                await this.handleAutoCommit(this.selectedRepository.rootUri.fsPath);
+            }
         } catch (error) {
             await this.handleError(error as Error);
         } finally {
@@ -266,48 +278,46 @@ export class CommitMessageUI {
     }
 
     private static async generateAndApplyMessage(
-        progress: vscode.Progress<{ message?: string; increment?: number }>,
+        progress: ProgressReporter,
         sourceControlRepository?: vscode.SourceControl
-    ): Promise<{ model: string }> {
-        try {
-            progress.report({ message: "Fetching Git changes...", increment: 0 });
+    ): Promise<CommitMessage> {
+        progress.report({ message: "Fetching Git changes...", increment: 0 });
 
-            if (!this.selectedRepository) {
-                this.selectedRepository = await GitService.getActiveRepository(sourceControlRepository);
-            }
-
-            if (!this.selectedRepository?.rootUri) {
-                throw new Error('No active repository found');
-            }
-
-            const repoPath = this.selectedRepository.rootUri.fsPath;
-            const onlyStagedChanges = ConfigService.getOnlyStagedChanges();
-            void Logger.log(`Selected repository: ${repoPath}`);
-            void Logger.log(`Only staged changes mode: ${onlyStagedChanges}`);
-
-            const diff = await GitService.getDiff(repoPath, onlyStagedChanges);
-            void Logger.log(`Git diff fetched successfully. Length: ${diff.length} characters`);
-
-            progress.report({ message: "Analyzing code changes...", increment: 25 });
-            const changedFiles = await GitService.getChangedFiles(repoPath, onlyStagedChanges);
-            void Logger.log(`Analyzing ${changedFiles.length} changed files`);
-
-            const blameAnalysis = await this.analyzeChanges(repoPath, changedFiles);
-            void Logger.log(`Diff length: ${diff.length} characters`);
-
-            const { message, model } = await AIService.generateCommitMessage(diff, blameAnalysis, progress);
-
-            progress.report({ message: "Setting commit message...", increment: 90 });
-            await this.setCommitMessage(message);
-
-            void Logger.log(`Commit message generated using ${model} model`);
-            void TelemetryService.sendEvent('message_generation_completed');
-
-            return { model };
-        } catch (error) {
-            void Logger.error('Error in generateAndApplyMessage:', error as Error);
-            throw error;
+        // Only get active repository if not already set from Source Control view
+        if (!this.selectedRepository) {
+            this.selectedRepository = await GitService.getActiveRepository(sourceControlRepository);
         }
+
+        if (!this.selectedRepository?.rootUri) {
+            throw new Error('No active repository found');
+        }
+
+        const repoPath = this.selectedRepository.rootUri.fsPath;
+        void Logger.log(`Selected repository: ${repoPath}`);
+
+        const onlyStagedChanges = ConfigService.getOnlyStagedChanges();
+        void Logger.log(`Only staged changes mode: ${onlyStagedChanges}`);
+
+        const diff = await GitService.getDiff(repoPath, onlyStagedChanges);
+        void Logger.log(`Git diff fetched successfully. Length: ${diff.length} characters`);
+
+        const changedFiles = await GitService.getChangedFiles(repoPath, onlyStagedChanges);
+        void Logger.log(`Analyzing ${changedFiles.length} changed files`);
+
+        const blameAnalyses: string[] = [];
+        for (const filePath of changedFiles.map(file => vscode.Uri.file(path.join(repoPath, file)))) {
+            const fileBlameAnalysis = await GitBlameAnalyzer.analyzeChanges(repoPath, filePath.fsPath);
+            if (fileBlameAnalysis) {
+                blameAnalyses.push(fileBlameAnalysis);
+            }
+        }
+
+        const message = await AIService.generateCommitMessage(diff, blameAnalyses.join('\n\n'), progress);
+
+        this.selectedRepository.inputBox.value = message.message;
+        void Logger.log('Commit message set in input box');
+
+        return message;
     }
 
     private static async handleError(error: Error): Promise<void> {
@@ -318,42 +328,44 @@ export class CommitMessageUI {
         void vscode.window.showErrorMessage(`Error: ${error.message}`);
     }
 
-    private static async analyzeChanges(repoPath: string, changedFiles: string[]): Promise<string> {
-        let blameAnalysis = '';
-        for (const file of changedFiles) {
-            const filePath = vscode.Uri.file(path.join(repoPath, file));
-            try {
-                const fileBlameAnalysis = await GitBlameAnalyzer.analyzeChanges(repoPath, filePath.fsPath);
-                blameAnalysis += `File: ${file}\n${fileBlameAnalysis}\n\n`;
-                void Logger.log(`Blame analysis completed for: ${file}`);
-            } catch (error) {
-                void Logger.error(`Error analyzing file ${file}:`, error as Error);
-                blameAnalysis += `File: ${file}\nUnable to analyze: ${(error as Error).message}\n\n`;
+    private static async handleAutoCommit(repoPath: string): Promise<void> {
+        let commitSuccessful = false;
+        try {
+            if (!this.selectedRepository?.inputBox.value) {
+                throw new Error('No commit message available');
             }
-        }
-        return blameAnalysis;
-    }
 
-    private static async setCommitMessage(message: string): Promise<void> {
-        if (!this.selectedRepository?.rootUri) {
-            throw new Error('No active repository found');
-        }
-        this.selectedRepository.inputBox.value = message;
-        void Logger.log('Commit message set in input box');
+            void Logger.log('Auto commit enabled, committing changes');
+            await GitService.commitChanges(this.selectedRepository.inputBox.value, this.selectedRepository);
+            void vscode.window.showInformationMessage('Changes committed successfully');
+            commitSuccessful = true;
 
-        if (ConfigService.getAutoCommitEnabled()) {
-            await this.handleAutoCommit(this.selectedRepository.rootUri.fsPath, message);
-        }
-    }
-
-    private static async handleAutoCommit(repoPath: string, message: string): Promise<void> {
-        void Logger.log('Auto commit enabled, committing changes');
-        await GitService.commitChanges(message);
-
-        if (ConfigService.getAutoPushEnabled()) {
-            void Logger.log('Auto push enabled, pushing changes');
-            await GitService.pushChanges();
-            void Logger.log('Changes pushed successfully');
+            if (ConfigService.getAutoPushEnabled()) {
+                void Logger.log('Auto push enabled, pushing changes');
+                try {
+                    await GitService.pushChanges(this.selectedRepository);
+                    void Logger.log('Changes pushed successfully');
+                    void vscode.window.showInformationMessage('Changes pushed successfully');
+                } catch (pushError) {
+                    const errorMessage = (pushError as Error).message;
+                    if (errorMessage.includes('no configured remotes') || errorMessage.includes('Repository has no configured remotes')) {
+                        void Logger.log('Repository has no remotes configured, skipping push');
+                        void vscode.window.showWarningMessage('Auto-push skipped: Repository has no configured remotes. Add a remote repository to enable pushing.');
+                        return;
+                    }
+                    throw pushError;
+                }
+            }
+        } catch (error) {
+            void Logger.error('Error in auto-commit/push:', error as Error);
+            if (!commitSuccessful) {
+                void vscode.window.showErrorMessage(`Auto-commit failed: ${(error as Error).message}`);
+            } else {
+                void vscode.window.showErrorMessage(`Auto-push failed: ${(error as Error).message}`);
+            }
+            if (!commitSuccessful) {
+                throw error;
+            }
         }
     }
 }
