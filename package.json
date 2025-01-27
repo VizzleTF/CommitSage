@@ -127,6 +127,7 @@
                     "type": "string",
                     "default": "",
                     "description": "Custom instructions for commit message generation. Required when useCustomInstructions is enabled",
+                    "editPresentation": "multilineText",
                     "order": 5
                 },
                 "commitSage.commit.onlyStagedChanges": {
