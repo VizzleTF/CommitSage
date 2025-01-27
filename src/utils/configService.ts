@@ -2,6 +2,7 @@ import * as vscode from 'vscode';
 import { Logger } from './logger';
 import { ApiKeyValidator } from './apiKeyValidator';
 import { AiServiceError, ConfigurationError } from '../models/errors';
+import { CustomEndpointService } from '../services/customEndpointService';
 
 type CacheValue = string | boolean | number;
 
@@ -17,10 +18,32 @@ export class ConfigService {
         void Logger.log('Initializing ConfigService');
         this.secretStorage = context.secrets;
 
-        const configListener = vscode.workspace.onDidChangeConfiguration(event => {
+        const configListener = vscode.workspace.onDidChangeConfiguration(async event => {
             if (event.affectsConfiguration('commitSage')) {
                 this.clearCache();
                 void Logger.log('Configuration changed, cache cleared');
+
+                // Validate endpoint if custom endpoint settings changed
+                if (event.affectsConfiguration('commitSage.custom.endpoint') ||
+                    event.affectsConfiguration('commitSage.custom.useCustomEndpoint')) {
+                    const useCustomEndpoint = this.useCustomEndpoint();
+                    const endpoint = this.getCustomEndpoint();
+
+                    if (useCustomEndpoint && endpoint) {
+                        void Logger.log('Custom endpoint changed, validating new endpoint');
+                        await this.validateAndNormalizeEndpoint(endpoint)
+                            .then(async normalizedEndpoint => {
+                                if (normalizedEndpoint && normalizedEndpoint !== endpoint) {
+                                    const config = vscode.workspace.getConfiguration('commitSage');
+                                    await config.update('custom.endpoint', normalizedEndpoint, true);
+                                    void Logger.log('Endpoint normalized and updated');
+                                }
+                            })
+                            .catch(error => {
+                                void Logger.error('Failed to validate new endpoint:', error);
+                            });
+                    }
+                }
             }
         });
 
@@ -319,5 +342,81 @@ export class ConfigService {
 
     public static getCommandId(): string {
         return '@ext:VizzleTF.commitsage commit';
+    }
+
+    private static getEndpointVariants(inputUrl: string): string[] {
+        const url = new URL(inputUrl);
+        const variants: string[] = [];
+
+        const baseUrl = url.origin + url.pathname.replace(/\/+$/, '');
+
+        const withoutCompletions = baseUrl.replace(/\/chat\/completions$/, '');
+
+        const withoutVersion = withoutCompletions.replace(/\/v1$/, '');
+
+        const withoutApi = withoutVersion.replace(/\/api$/, '');
+
+        variants.push(baseUrl);
+        if (baseUrl !== withoutCompletions) variants.push(withoutCompletions);
+        if (withoutCompletions !== withoutVersion) variants.push(withoutVersion);
+        if (withoutVersion !== withoutApi) variants.push(withoutApi);
+
+        if (!withoutApi.endsWith('/api')) {
+            variants.push(`${withoutApi}/api`);
+        }
+
+        return [...new Set(variants)];
+    }
+
+    static async validateAndNormalizeEndpoint(endpoint: string): Promise<string | null> {
+        try {
+            const apiKey = await this.getCustomApiKey();
+            if (!apiKey) {
+                throw new ConfigurationError('Custom API key is not set');
+            }
+
+            const variants = this.getEndpointVariants(endpoint);
+
+            for (const variant of variants) {
+                const models = await CustomEndpointService.fetchAvailableModels(variant, apiKey);
+                if (models.length > 0) {
+                    void vscode.window.showInformationMessage(
+                        `Available models: ${models.join(', ')}`,
+                        { modal: false }
+                    );
+                    return variant;
+                }
+            }
+
+            void vscode.window.showWarningMessage(
+                `Unable to validate endpoint "${endpoint}" and fetch available models. Please verify the endpoint URL and API key.`,
+                { modal: false }
+            );
+            return null;
+        } catch (error) {
+            void vscode.window.showWarningMessage(
+                `Unable to validate endpoint "${endpoint}" and fetch available models. Please verify the endpoint URL and API key.`,
+                { modal: false }
+            );
+            return null;
+        }
+    }
+
+    static async setCustomEndpoint(endpoint: string): Promise<void> {
+        try {
+            const normalizedEndpoint = await this.validateAndNormalizeEndpoint(endpoint);
+            if (!normalizedEndpoint) {
+                throw new ConfigurationError('Failed to validate endpoint');
+            }
+
+            const config = vscode.workspace.getConfiguration('commitSage');
+            await config.update('custom.endpoint', normalizedEndpoint, true);
+            void Logger.log('Custom endpoint has been validated and set');
+            await vscode.window.showInformationMessage('Custom endpoint has been successfully validated and saved');
+        } catch (error) {
+            void Logger.error('Failed to validate and set custom endpoint:', error as Error);
+            await vscode.window.showErrorMessage(`Failed to set custom endpoint: ${(error as Error).message}`);
+            throw error;
+        }
     }
 }
