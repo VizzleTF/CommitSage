@@ -125,21 +125,10 @@ export class ConfigService {
             let key = await this.secretStorage.get('commitsage.customApiKey');
 
             if (!key) {
-                const endpoint = this.getCustomEndpoint();
-                if (!endpoint) {
-                    throw new ConfigurationError('Custom endpoint URL is not set');
-                }
-
                 key = await vscode.window.showInputBox({
                     prompt: 'Enter your Custom API Key',
                     ignoreFocusOut: true,
-                    password: true,
-                    validateInput: (value: string) => {
-                        if (!value) { return 'API key cannot be empty'; }
-                        if (value.length < 32) { return 'API key is too short'; }
-                        if (!/^[A-Za-z0-9_-]+$/.test(value)) { return 'API key contains invalid characters'; }
-                        return null;
-                    }
+                    password: true
                 });
 
                 if (!key) {
@@ -158,17 +147,11 @@ export class ConfigService {
 
     static async setCustomApiKey(key: string): Promise<void> {
         try {
-            const endpoint = this.getCustomEndpoint();
-            if (!endpoint) {
-                throw new ConfigurationError('Custom endpoint URL is not set');
-            }
-
-            await ApiKeyValidator.validateCustomApiKey(key, endpoint);
             await this.secretStorage.store('commitsage.customApiKey', key);
-            void Logger.log('Custom API key has been validated and set');
-            await vscode.window.showInformationMessage('Custom API key has been successfully validated and saved');
+            void Logger.log('Custom API key has been set');
+            await vscode.window.showInformationMessage('Custom API key has been successfully saved');
         } catch (error) {
-            void Logger.error('Failed to validate and set custom API key:', error as Error);
+            void Logger.error('Failed to set custom API key:', error as Error);
             await vscode.window.showErrorMessage(`Failed to set custom API key: ${(error as Error).message}`);
             throw error;
         }
@@ -315,8 +298,7 @@ export class ConfigService {
         const key = await vscode.window.showInputBox({
             prompt: 'Enter your Custom API Key',
             ignoreFocusOut: true,
-            password: true,
-            validateInput: ApiKeyValidator.validateApiKey
+            password: true
         });
 
         if (key) {
