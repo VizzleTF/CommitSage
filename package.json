@@ -24,7 +24,7 @@
         "Programming Languages",
         "AI Assistant",
         "AI",
-        "Autocommit",
+        "AutoCommit",
         "LLM",
         "Git"
     ],
@@ -83,10 +83,15 @@
         "configuration": {
             "title": "Commit Sage",
             "properties": {
-                "commitSage.commit.promptForRefs": {
-                    "type": "boolean",
-                    "default": false,
-                    "description": "Prompt for entering refs (e.g., issue numbers) when generating commit messages. Note: This may interrupt automatic commit flow if Auto Commit is enabled",
+                "commitSage.general.provider": {
+                    "type": "string",
+                    "enum": [
+                        "gemini",
+                        "codestral",
+                        "custom"
+                    ],
+                    "default": "gemini",
+                    "description": "Select the AI provider for commit message generation",
                     "order": 1
                 },
                 "commitSage.commit.commitLanguage": {
@@ -152,6 +157,12 @@
                     "description": "Automatically push changes after committing. Requires Auto Commit to be enabled. Will be ignored if Auto Commit is disabled",
                     "order": 8
                 },
+                "commitSage.commit.promptForRefs": {
+                    "type": "boolean",
+                    "default": false,
+                    "description": "Prompt for entering refs (e.g., issue numbers) when generating commit messages. Note: This may interrupt automatic commit flow if Auto Commit is enabled",
+                    "order": 9
+                },
                 "commitSage.gemini.model": {
                     "type": "string",
                     "enum": [
@@ -162,19 +173,7 @@
                     ],
                     "default": "gemini-1.5-flash",
                     "description": "Select Gemini model for commit message generation. Only used when custom endpoint is not enabled",
-                    "order": 9
-                },
-                "commitSage.custom.endpoint": {
-                    "type": "string",
-                    "default": "",
-                    "description": "Custom endpoint URL (e.g., 'https://api.openai.com/v1' for OpenAI). Required when useCustomEndpoint is enabled",
-                    "order": 11
-                },
-                "commitSage.custom.model": {
-                    "type": "string",
-                    "default": "",
-                    "description": "Model name for custom endpoint (e.g., 'gpt-3.5-turbo' for OpenAI). Required when useCustomEndpoint is enabled",
-                    "order": 12
+                    "order": 10
                 },
                 "commitSage.codestral.model": {
                     "type": "string",
@@ -182,25 +181,27 @@
                         "codestral-2405",
                         "codestral-latest"
                     ],
-                    "default": "codestral-2405",
+                    "default": "codestral-latest",
                     "description": "Select Codestral model for commit message generation. Only used when Codestral provider is selected",
-                    "order": 13
+                    "order": 11
                 },
-                "commitSage.general.provider": {
+                "commitSage.custom.endpoint": {
                     "type": "string",
-                    "enum": [
-                        "gemini",
-                        "codestral",
-                        "custom"
-                    ],
-                    "default": "gemini",
-                    "description": "Select the AI provider for commit message generation",
-                    "order": 14
+                    "default": "",
+                    "description": "Custom endpoint URL (e.g., 'https://api.openai.com/v1' for OpenAI). Required when useCustomEndpoint is enabled",
+                    "order": 12
+                },
+                "commitSage.custom.model": {
+                    "type": "string",
+                    "default": "",
+                    "description": "Model name for custom endpoint (e.g., 'gpt-3.5-turbo' for OpenAI). Required when useCustomEndpoint is enabled",
+                    "order": 13
                 },
                 "commitSage.telemetry.enabled": {
                     "type": "boolean",
                     "default": true,
-                    "description": "Enable telemetry for Commit Sage"
+                    "description": "Enable telemetry for Commit Sage",
+                    "order": 14
                 }
             }
         }

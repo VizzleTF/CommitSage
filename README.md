@@ -2,15 +2,15 @@
 
 <img alt="Visual Studio Marketplace Version" src="https://img.shields.io/visual-studio-marketplace/v/VizzleTF.geminicommit"> <img alt="Visual Studio Marketplace Last Updated" src="https://img.shields.io/visual-studio-marketplace/last-updated/VizzleTF.geminicommit"> <img alt="Visual Studio Marketplace Installs" src="https://img.shields.io/visual-studio-marketplace/i/VizzleTF.geminicommit"> <img alt="Visual Studio Marketplace Rating" src="https://img.shields.io/visual-studio-marketplace/stars/VizzleTF.geminicommit">
 
-Commit Sage is a VSCode extension that automatically generates commit messages using Google's Gemini AI or an OpenAI API endpoint (OpenAI, Ollama, LocalAI and others).
+Commit Sage is a VSCode extension that automatically generates commit messages using Google's Gemini AI, Codestral, or an OpenAI API endpoint (OpenAI, Ollama, LocalAI and others).
 
 ![Commit Sage in action](example.gif)
 
 ## Features
 
 - 🤖 AI-powered commit message generation
-- 🔄 Support for both Google's Gemini and custom OpenAI-compatible endpoints
-- 🌐 Multiple languages support
+- 🔄 Support for Google's Gemini, Codestral , and custom OpenAI-compatible endpoints
+- 🌍 Multiple languages support
 - 🎯 Customizable commit message format
 - ⚡ Fast and efficient
 - 🔒 Secure API key storage
@@ -22,17 +22,18 @@ Commit Sage is a VSCode extension that automatically generates commit messages u
 1. Install from [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=VizzleTF.commitsage)
 2. Get your API key:
    - For Gemini: Get it from [Google AI Studio](https://makersuite.google.com/app/apikey)
+   - For Codestral: [Mistral AI Console](https://console.mistral.ai/codestral)
    - For custom endpoint: Use your OpenAI API key or other compatible service
 3. Set up the API key in VS Code:
    - Open Command Palette (Ctrl+Shift+P / Cmd+Shift+P)
-   - Type "Commit Sage: Set Gemini API Key" or "Commit Sage: Set Custom API Key"
+   - Type "Commit Sage: Set Gemini API Key", "Commit Sage: Set Codestral API Key", or "Commit Sage: Set Custom API Key"
    - Enter your API key
 
 ## Usage
 
 1. Write code
 2. Press button in Source control
-4. Review and confirm generated message
+3. Review and confirm generated message
 
 ## Configuration
 
@@ -84,6 +85,13 @@ Commit Sage is a VSCode extension that automatically generates commit messages u
     - `gemini-2.0-flash-exp`: Experimental model with latest improvements
   - Default: gemini-1.5-flash
 
+- **Codestral Model** (`commitSage.codestral.model`):
+  - Model for Codestral API
+  - Available models:
+    - `codestral-2405`: Base model
+    - `codestral-latest`: Latest model with improvements
+  - Default: codestral-latest
+
 ### Custom Endpoint Settings
 
 - **Use Custom Endpoint** (`commitSage.custom.useCustomEndpoint`):
@@ -123,17 +131,18 @@ MIT
 
 # Commit Sage (на русском)
 
-Commit Sage - расширение VSCode для автоматической генерации сообщений коммитов с использованием Gemini AI от Google или OpenAI API (OpenAI, Ollama, LocalAI и другие).
+Commit Sage - расширение VSCode для автоматической генерации сообщений коммитов с использованием Gemini AI от Google, Codestral API или OpenAI API (OpenAI, Ollama, LocalAI и другие).
 
 ## Установка
 
 1. Установите из [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=VizzleTF.commitsage)
 2. Получите API ключ:
    - Для Gemini: [Google AI Studio](https://makersuite.google.com/app/apikey)
+   - Для Codestral: [Mistral AI Console](https://console.mistral.ai/codestral)
    - Для других: Используйте ключ от OpenAI или другого совместимого сервиса
 3. Настройте ключ в VS Code:
    - Откройте палитру команд (Ctrl+Shift+P / Cmd+Shift+P)
-   - Введите "Commit Sage: Set Gemini API Key" или "Commit Sage: Set Custom API Key"
+   - Введите "Commit Sage: Set Gemini API Key", "Commit Sage: Set Codestral API Key" или "Commit Sage: Set Custom API Key"
    - Введите ваш API ключ
 
 ## Использование
