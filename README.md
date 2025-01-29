@@ -9,7 +9,7 @@ Commit Sage is a VSCode extension that automatically generates commit messages u
 ## Features
 
 - 🤖 AI-powered commit message generation
-- 🔄 Support for Google's Gemini, Codestral , and custom OpenAI-compatible endpoints
+- 🔄 Support for Google's Gemini, Codestral, and custom OpenAI-compatible endpoints
 - 🌍 Multiple languages support
 - 🎯 Customizable commit message format
 - ⚡ Fast and efficient
@@ -76,6 +76,11 @@ Commit Sage is a VSCode extension that automatically generates commit messages u
 
 ### AI Model Settings
 
+- **Provider Selection** (`commitSage.general.provider`):
+  - Select the AI provider for commit message generation
+  - Options: Gemini, Codestral, Custom
+  - Default: Gemini
+
 - **Gemini Model** (`commitSage.gemini.model`):
   - Model for Gemini API
   - Available free models:
@@ -87,16 +92,12 @@ Commit Sage is a VSCode extension that automatically generates commit messages u
 
 - **Codestral Model** (`commitSage.codestral.model`):
   - Model for Codestral API
-  - Available models:
+  - Available free models:
     - `codestral-2405`: Base model
     - `codestral-latest`: Latest model with improvements
   - Default: codestral-latest
 
 ### Custom Endpoint Settings
-
-- **Use Custom Endpoint** (`commitSage.custom.useCustomEndpoint`):
-  - Use alternative AI provider
-  - Default: false
 
 - **Custom Endpoint URL** (`commitSage.custom.endpoint`):
   - API endpoint for custom provider
@@ -161,4 +162,4 @@ Commit Sage - расширение VSCode для автоматической г
 ## Поддержка
 
 - [Telegram Канал](https://t.me/geminicommit) - Анонсы обновлений
-- [Telegram Группа](https://t.me/gemini_commit) - Обсуждения и помощь
+- [Telegram Группа](https://t.me/gemini_commit) - Обсуждения и поддержка сообщества

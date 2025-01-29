@@ -91,12 +91,11 @@ export class AIService {
     ): Promise<CommitMessage> {
         const apiKey = await ConfigService.getApiKey();
         const model = ConfigService.getGeminiModel();
-        const apiUrl = `${GEMINI_API_BASE_URL}/${model}:generateContent`;
+        const apiUrl = `${GEMINI_API_BASE_URL}/${model}:generateContent?key=${apiKey}`;
 
         const requestConfig = {
             headers: {
-                'content-type': 'application/json',
-                'x-goog-api-key': apiKey
+                'content-type': 'application/json'
             },
             timeout: 30000
         };
@@ -115,13 +114,13 @@ export class AIService {
             void Logger.log('Gemini API response received successfully');
             progress.report({ message: "Processing generated message...", increment: 100 });
 
-            const commitMessage = this.extractCommitMessage(response.data);
+            const commitMessage = this.extractCommitMessage(response.data, 'gemini');
             void Logger.log(`Commit message generated using ${model} model`);
             void TelemetryService.sendEvent('message_generation_completed');
 
             return { message: commitMessage, model };
         } catch (error) {
-            return await this.handleGenerationError(error as ErrorWithResponse, prompt, progress, attempt);
+            return await this.handleGenerationError(error as ErrorWithResponse, prompt, progress, attempt, 'gemini');
         }
     }
 
@@ -156,13 +155,13 @@ export class AIService {
             void Logger.log('Codestral API response received successfully');
             progress.report({ message: "Processing generated message...", increment: 100 });
 
-            const commitMessage = this.extractCommitMessage(response.data);
+            const commitMessage = this.extractCommitMessage(response.data, 'codestral');
             void Logger.log(`Commit message generated using ${model} model`);
             void TelemetryService.sendEvent('message_generation_completed');
 
             return { message: commitMessage, model };
         } catch (error) {
-            return await this.handleGenerationError(error as ErrorWithResponse, prompt, progress, attempt);
+            return await this.handleGenerationError(error as ErrorWithResponse, prompt, progress, attempt, 'codestral');
         }
     }
 
@@ -173,23 +172,33 @@ export class AIService {
         progress.report({ message: progressMessage, increment: 10 });
     }
 
-    private static extractCommitMessage(response: any): string {
-        if (response.choices && response.choices[0] && response.choices[0].message && response.choices[0].message.content) {
-            const commitMessage = this.cleanCommitMessage(response.choices[0].message.content);
-            if (!commitMessage.trim()) {
-                throw new Error("Generated commit message is empty.");
+    private static extractCommitMessage(response: any, provider: string): string {
+        if (provider === 'gemini') {
+            if (response.candidates?.[0]?.content?.parts?.[0]?.text) {
+                const commitMessage = this.cleanCommitMessage(response.candidates[0].content.parts[0].text);
+                if (!commitMessage.trim()) {
+                    throw new Error("Generated commit message is empty.");
+                }
+                return commitMessage;
             }
-            return commitMessage;
-        } else {
-            throw new Error("Invalid response format from API");
+        } else if (provider === 'codestral') {
+            if (response.choices?.[0]?.message?.content) {
+                const commitMessage = this.cleanCommitMessage(response.choices[0].message.content);
+                if (!commitMessage.trim()) {
+                    throw new Error("Generated commit message is empty.");
+                }
+                return commitMessage;
+            }
         }
+        throw new Error("Invalid response format from API");
     }
 
     private static async handleGenerationError(
         error: ErrorWithResponse,
         prompt: string,
         progress: ProgressReporter,
-        attempt: number
+        attempt: number,
+        provider: string
     ): Promise<CommitMessage> {
         void Logger.error(`Generation attempt ${attempt} failed:`, error);
         const { errorMessage, shouldRetry } = this.handleApiError(error);
@@ -199,6 +208,10 @@ export class AIService {
             void Logger.log(`Retrying in ${delayMs / 1000} seconds...`);
             progress.report({ message: `Waiting ${delayMs / 1000} seconds before retry...`, increment: 0 });
             await this.delay(delayMs);
+
+            if (provider === 'codestral') {
+                return this.generateWithCodestral(prompt, progress, attempt + 1);
+            }
             return this.generateWithGemini(prompt, progress, attempt + 1);
         }
 
