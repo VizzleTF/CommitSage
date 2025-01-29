@@ -39,7 +39,7 @@
             {
                 "command": "commitsage.generateCommitMessage",
                 "title": "Commit Sage: Generate Commit Message",
-                "icon": "./icon.png"
+                "icon": "./button.png"
             },
             {
                 "command": "commitsage.setApiKey",
