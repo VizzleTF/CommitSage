@@ -1,7 +1,7 @@
 {
     "name": "geminicommit",
     "displayName": "Commit Sage",
-    "description": "Free AI commit messages using Gemini or custom LLM",
+    "description": "Free AI commit messages using Gemini, Codestral, or custom LLM",
     "version": "2.0.12",
     "publisher": "VizzleTF",
     "repository": {
@@ -48,6 +48,10 @@
             {
                 "command": "commitsage.setCustomApiKey",
                 "title": "Commit Sage: Set Custom API Key"
+            },
+            {
+                "command": "commitsage.setCodestralApiKey",
+                "title": "Commit Sage: Set Codestral API Key"
             }
         ],
         "menus": {
@@ -160,12 +164,6 @@
                     "description": "Select Gemini model for commit message generation. Only used when custom endpoint is not enabled",
                     "order": 9
                 },
-                "commitSage.custom.useCustomEndpoint": {
-                    "type": "boolean",
-                    "default": false,
-                    "description": "Use a custom endpoint for AI-generated commit messages. Requires both endpoint URL and model name to be configured",
-                    "order": 10
-                },
                 "commitSage.custom.endpoint": {
                     "type": "string",
                     "default": "",
@@ -177,6 +175,27 @@
                     "default": "",
                     "description": "Model name for custom endpoint (e.g., 'gpt-3.5-turbo' for OpenAI). Required when useCustomEndpoint is enabled",
                     "order": 12
+                },
+                "commitSage.codestral.model": {
+                    "type": "string",
+                    "enum": [
+                        "codestral-2405",
+                        "codestral-latest"
+                    ],
+                    "default": "codestral-2405",
+                    "description": "Select Codestral model for commit message generation. Only used when Codestral provider is selected",
+                    "order": 13
+                },
+                "commitSage.general.provider": {
+                    "type": "string",
+                    "enum": [
+                        "gemini",
+                        "codestral",
+                        "custom"
+                    ],
+                    "default": "gemini",
+                    "description": "Select the AI provider for commit message generation",
+                    "order": 14
                 },
                 "commitSage.telemetry.enabled": {
                     "type": "boolean",

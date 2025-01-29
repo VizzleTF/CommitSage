@@ -157,6 +157,46 @@ export class ConfigService {
         }
     }
 
+    static async getCodestralApiKey(): Promise<string> {
+        try {
+            let key = await this.secretStorage.get('commitsage.codestralApiKey');
+
+            if (!key) {
+                key = await vscode.window.showInputBox({
+                    prompt: 'Enter your Codestral API Key',
+                    ignoreFocusOut: true,
+                    password: true
+                });
+
+                if (!key) {
+                    throw new ConfigurationError('Codestral API key input was cancelled');
+                }
+
+                await this.setCodestralApiKey(key);
+            }
+
+            return key;
+        } catch (error) {
+            void Logger.error('Error getting Codestral API key:', error as Error);
+            throw new AiServiceError('Failed to get Codestral API key: ' + (error as Error).message);
+        }
+    }
+
+    static async setCodestralApiKey(key: string): Promise<void> {
+        try {
+            await ApiKeyValidator.validateCodestralApiKey(key);
+
+            await this.secretStorage.store('commitsage.codestralApiKey', key);
+            void Logger.log('Codestral API key has been validated and set');
+
+            await vscode.window.showInformationMessage('Codestral API key has been successfully validated and saved');
+        } catch (error) {
+            void Logger.error('Failed to validate and set Codestral API key:', error as Error);
+            await vscode.window.showErrorMessage(`Failed to set API key: ${(error as Error).message}`);
+            throw error;
+        }
+    }
+
     static async removeApiKey(): Promise<void> {
         try {
             await this.secretStorage.delete('commitsage.apiKey');
@@ -175,6 +215,17 @@ export class ConfigService {
             await vscode.window.showInformationMessage('Custom API key has been removed');
         } catch (error) {
             void Logger.error('Error removing custom API key:', error as Error);
+            throw error;
+        }
+    }
+
+    static async removeCodestralApiKey(): Promise<void> {
+        try {
+            await this.secretStorage.delete('commitsage.codestralApiKey');
+            void Logger.log('Codestral API key has been removed');
+            await vscode.window.showInformationMessage('Codestral API key has been removed');
+        } catch (error) {
+            void Logger.error('Error removing Codestral API key:', error as Error);
             throw error;
         }
     }
@@ -209,6 +260,14 @@ export class ConfigService {
 
     static getCustomModel(): string {
         return this.getConfig<string>('custom', 'model', '');
+    }
+
+    static getCodestralModel(): string {
+        return this.getConfig<string>('codestral', 'model', 'codestral-2405');
+    }
+
+    static getProvider(): string {
+        return this.getConfig<string>('general', 'provider', 'gemini');
     }
 
     static shouldPromptForRefs(): boolean {
@@ -303,6 +362,18 @@ export class ConfigService {
 
         if (key) {
             await this.setCustomApiKey(key);
+        }
+    }
+
+    static async promptForCodestralApiKey(): Promise<void> {
+        const key = await vscode.window.showInputBox({
+            prompt: 'Enter your Codestral API Key',
+            ignoreFocusOut: true,
+            password: true
+        });
+
+        if (key) {
+            await this.setCodestralApiKey(key);
         }
     }
 

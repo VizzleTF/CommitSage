@@ -10,6 +10,8 @@ Rules:
 3. For complex changes list key points in body:
    - Each line starts with "- "
    - Each line max 50 chars
+   - Limit to 5 bullet points
+   - Summarize changes concisely
 
 Type selection rules:
 - docs: ANY changes to documentation files (*.md, docs/*)
@@ -27,19 +29,19 @@ Examples:
 Documentation change:
 docs: update installation and usage guides
 
-- Add new features description
-- Update configuration section
-- Add usage examples
+- Added new features description
+- Updated configuration section
+- Added usage examples
 
 Feature change:
 feat(auth): add user authentication
 
-- Implement OAuth2 provider integration
-- Create auth service module
-- Add session management`,
+- Implemented OAuth2 provider integration
+- Created auth service module
+- Added session management`,
 
     russian: `Создайте сообщение коммита в формате Conventional Commits:
-<тип>[область]: <описание>
+<тип>[опциональная область]: <описание>
 
 [опциональное тело со списком изменений]
 
@@ -49,6 +51,8 @@ feat(auth): add user authentication
 3. Для сложных изменений список ключевых моментов:
    - Каждая строка начинается с "- "
    - Каждая строка макс 50 символов
+   - Ограничить 5 пунктами
+   - Кратко резюмировать изменения
 
 Правила выбора типа:
 - docs: ЛЮБЫЕ изменения в документации (*.md, docs/*)
@@ -66,16 +70,16 @@ feat(auth): add user authentication
 Изменение документации:
 docs: обновить руководство по установке и использованию
 
-- Добавить описание новых функций
-- Обновить раздел конфигурации
-- Добавить примеры использования
+- Добавлено описание новых функций
+- Обновлен раздел конфигурации
+- Добавлены примеры использования
 
 Новая функциональность:
 feat(auth): добавить аутентификацию пользователей
 
-- Внедрить интеграцию с OAuth2
-- Создать модуль сервиса авторизации
-- Добавить управление сессиями`,
+- Внедрена интеграция с OAuth2
+- Создан модуль сервиса авторизации
+- Добавлено управление сессиями`,
 
     chinese: `生成符合约定式提交（Conventional Commits）格式的提交信息：
 <类型>[可选范围]: <描述>
@@ -83,38 +87,41 @@ feat(auth): добавить аутентификацию пользовател
 [可选正文，包含要点]
 
 规则：
+1. 第一行：类型(范围): 描述（最多50个字符）
+2. 对于小改动，仅使用第一行
+3. 对于复杂改动，在正文中列出关键点：
+   - 每行以"- "开头
+   - 每行最多50个字符
+   - 限制为5个要点
+   - 简明扼要地总结更改
 
-第一行：类型(范围): 描述（最多50个字符）
-对于小改动，仅使用第一行
-对于复杂改动，在正文中列出关键点：
-每行以"- "开头
-每行最多50个字符
 类型选择规则：
+- docs: 对文档文件的任何修改（*.md, docs/*）
+- feat: 新功能或重要的功能变更
+- fix: Bug修复和错误更正
+- style: 格式修改，如分号等（无代码变动）
+- refactor: 不修复bug或添加功能的代码修改
+- perf: 性能提升
+- test: 添加或更新测试
+- build: 构建系统或依赖项
+- ci: CI/CD的变动
+- chore: 其他维护任务
 
-docs: 对文档文件的任何修改（.md, docs/）
-feat: 新功能或重要的功能变更
-fix: Bug修复和错误更正
-style: 格式修改，如分号等（无代码变动）
-refactor: 不修复bug或添加功能的代码修改
-perf: 性能提升
-test: 添加或更新测试
-build: 构建系统或依赖项的变动
-ci: CI/CD的变动
-chore: 其他维护任务
 示例：
 文档修改：
 docs: 更新安装和使用指南
 
-添加新功能描述
-更新配置部分
-增加使用示例
+- 添加新功能描述
+- 更新配置部分
+- 增加使用示例
+
 功能更改：
 feat(auth): 添加用户认证
 
-实现OAuth2提供者集成
-创建身份验证服务模块
-添加会话管理
-`,
+- 实现OAuth2提供者集成
+- 创建身份验证服务模块
+- 添加会话管理`,
+
     japanese: `コミットメッセージを Conventional Commits 形式で生成してください：
 <タイプ>[オプションのスコープ]: <説明>
 
@@ -124,8 +131,10 @@ feat(auth): 添加用户认证
 1. 1行目: タイプ(スコープ): 説明 (最大50文字)
 2. 小さな変更は1行目のみ
 3. 複雑な変更は本文に要点を列挙：
-   - 各行は "- " で始める
+   - 各行は "- " で始まる
    - 各行最大50文字
+   - 5つの箇条書きに制限
+   - 変更を簡潔に要約
 
 タイプの選択ルール：
 - docs: ドキュメントの変更 (*.md, docs/*)
@@ -148,7 +157,7 @@ docs: インストールと使用方法のガイドを更新
 - 使用例を追加
 
 機能の変更：
-feat(認証): ユーザー認証を追加
+feat(auth): ユーザー認証を追加
 
 - OAuth2プロバイダーの統合を実装
 - 認証サービスモジュールを作成
