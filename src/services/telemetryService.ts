@@ -8,7 +8,7 @@ const TELEMETRY_CONFIG = {
     MAX_RETRIES: 3,
     RETRY_DELAY: 1000,
     QUEUE_SIZE_LIMIT: 100,
-    FLUSH_INTERVAL: 30000, // 30 seconds
+    FLUSH_INTERVAL: 30000,
 } as const;
 
 type TelemetryEventName =
@@ -105,7 +105,6 @@ export class TelemetryService {
     }
 
     private static queueEvent(event: QueuedEvent): void {
-        // Remove old events if queue is full
         if (this.eventQueue.length >= TELEMETRY_CONFIG.QUEUE_SIZE_LIMIT) {
             this.eventQueue.shift();
             void Logger.warn('Telemetry event queue full, removing oldest event');
@@ -114,7 +113,6 @@ export class TelemetryService {
         this.eventQueue.push(event);
         void Logger.log(`Event queued: ${event.eventName}`);
 
-        // Try to process immediately if possible
         if (this.initialized) {
             void this.processEventQueue();
         }
@@ -135,7 +133,6 @@ export class TelemetryService {
                 time: currentEvent.timestamp
             });
 
-            // Remove successfully sent event
             this.eventQueue.shift();
             void Logger.log(`Telemetry event sent successfully: ${currentEvent.eventName}`);
         } catch (error) {
@@ -184,7 +181,6 @@ export class TelemetryService {
             clearInterval(this.flushInterval);
         }
 
-        // Try to send any remaining events
         if (this.eventQueue.length > 0) {
             void Logger.log(`Attempting to send ${this.eventQueue.length} remaining telemetry events`);
             void this.processEventQueue();

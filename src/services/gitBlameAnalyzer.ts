@@ -54,7 +54,6 @@ export class GitBlameAnalyzer {
 
             gitProcess.on('close', (code) => {
                 if (code === 0 || (ignoreFileNotFound && code === 128)) {
-                    // For deleted files or when no output is produced, provide a safe default
                     resolve({ data: result ?? processOutput(Buffer.from('')), stderr });
                 } else {
                     reject(new Error(`Git process exited with code ${code}`));

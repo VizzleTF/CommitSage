@@ -31,7 +31,6 @@ const isValidLanguage = (language: string): language is CommitLanguage =>
     SUPPORTED_LANGUAGES.includes(language as CommitLanguage);
 
 export function getTemplate(format: CommitFormat, language: CommitLanguage): string {
-    // Validate format
     if (!isValidFormat(format)) {
         console.warn(`Invalid format "${format}", falling back to conventional`);
         format = 'conventional';
@@ -39,7 +38,6 @@ export function getTemplate(format: CommitFormat, language: CommitLanguage): str
 
     const template = templates[format];
 
-    // Validate language
     if (!isValidLanguage(language)) {
         console.warn(`Invalid language "${language}", falling back to english`);
         language = 'english';
