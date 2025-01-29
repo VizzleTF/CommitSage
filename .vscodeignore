@@ -2,24 +2,36 @@
 .vscode-test/**
 src/**
 .gitignore
-.env
+.yarnrc
+webpack.config.js
 .eslintrc.json
-**/tsconfig.json
-**/.eslintrc.json
-**/*.map
-**/*.ts
+tsconfig.json
+.env
+.env.*
+.git
+.github
+.editorconfig
+.prettierrc
+.prettierignore
+.eslintignore
 node_modules/**
-.github/**
-.git/**
-release.sh
-eslint.config.mjs
-
-# Keep only production dependencies
 !node_modules/@amplitude/analytics-node/**
 !node_modules/axios/**
-
-# Keep dist folder
-!dist/**
+out/**
+!out/dist/**
+**/*.map
+**/*.ts
+*.vsix
+.DS_Store
+coverage
+*.log
+test/**
+**/*.test.js
+**/*.spec.js
+**/*.test.ts
+**/*.spec.ts
+release.sh
+eslint.config.mjs
 
 # Keep necessary documentation
 !README.md

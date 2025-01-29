@@ -37,48 +37,66 @@ Commit Sage is a VSCode extension that automatically generates commit messages u
 
 ## Configuration
 
+The extension provides the following configuration options:
+
+- **OpenAI API Key** (`commitSage.openai.apiKey`):
+  - Your OpenAI API key for generating commit messages
+  - Required for using OpenAI's models
+  - Can be set via command palette or settings
+
+- **OpenAI Base URL** (`commitSage.openai.baseUrl`):
+  - Optional custom base URL for OpenAI API requests
+  - Useful for proxies or enterprise setups
+  - Defaults to OpenAI's standard API endpoint
+
+- **OpenAI Model** (`commitSage.openai.model`):
+  - The OpenAI model to use for generating commit messages
+  - Defaults to "gpt-3.5-turbo"
+
 ### Commit Settings
 
 - **Commit Language** (`commitSage.commit.commitLanguage`):
   - Language for generated commit messages
   - Default: English
 
+- **Auto Commit** (`commitSage.commit.autoCommit`):
+  - Enable/disable automatic commit after staging changes
+  - Default: `false`
+
+- **Auto Push** (`commitSage.commit.autoPush`):
+  - Enable/disable automatic push after commit
+  - Requires Auto Commit to be enabled
+  - Default: `false`
+
+- **Custom Instructions** (`commitSage.commit.customInstructions`):
+  - Custom instructions to include in the commit message generation prompt
+  - Optional
+  - Default: empty
+
 - **Commit Format** (`commitSage.commit.commitFormat`):
-  - Format style for commit messages
-  - Options: Conventional, Angular, Karma, Semantic, Emoji
-  - Default: Conventional
-
-### Custom Instructions
-
-- Enable with `commitSage.commit.useCustomInstructions`
-- Set instructions in `commitSage.commit.customInstructions`
-- Allows full control over the AI prompt
-
-### Git Integration
+  - Format string for generated commit messages
+  - Default: `{type}: {message}`
 
 - **Prompt for Refs** (`commitSage.commit.promptForRefs`):
-  - Ask for issue/PR references
-  - Default: false
+  - Enable/disable prompting for issue/ticket references
+  - Default: `false`
+
+- **Use Custom Instructions** (`commitSage.commit.useCustomInstructions`):
+  - Enable/disable using custom instructions in the prompt
+  - Default: `false`
+
+### Git Integration
 
 - **Only Staged Changes** (`commitSage.commit.onlyStagedChanges`):
   - Use only staged changes for message generation
   - Default: false
   - When disabled: uses staged changes if present, otherwise all changes
 
-- **Auto Commit** (`commitSage.commit.autoCommit`):
-  - Automatically commit after message generation
-  - Default: false
-
-- **Auto Push** (`commitSage.commit.autoPush`):
-  - Push changes after auto commit
-  - Default: false
-  - Requires Auto Commit to be enabled
-
 ### AI Model Settings
 
 - **Provider Selection** (`commitSage.general.provider`):
   - Select the AI provider for commit message generation
-  - Options: Gemini, Codestral, Custom
+  - Options: Gemini, OpenAI, Codestral, Ollama
   - Default: Gemini
 
 - **Gemini Model** (`commitSage.gemini.model`):
@@ -96,16 +114,6 @@ Commit Sage is a VSCode extension that automatically generates commit messages u
     - `codestral-2405`: Base model
     - `codestral-latest`: Latest model with improvements
   - Default: codestral-latest
-
-### Custom Endpoint Settings
-
-- **Custom Endpoint URL** (`commitSage.custom.endpoint`):
-  - API endpoint for custom provider
-  - Example: https://api.openai.com/v1
-
-- **Custom Model** (`commitSage.custom.model`):
-  - Model name for custom endpoint
-  - Example: gpt-3.5-turbo
 
 ### Telemetry
 
