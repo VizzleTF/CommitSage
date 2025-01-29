@@ -55,7 +55,6 @@ export class GitService {
                 throw new NoChangesDetectedError();
             }
 
-            // Stage all changes if needed
             if ((hasUntrackedFiles || hasDeletedFiles) && !hasStagedChanges) {
                 await this.executeGitCommand(['add', '-A'], repoPath);
             }

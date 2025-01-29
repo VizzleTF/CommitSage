@@ -14,7 +14,7 @@ import { errorMessages } from '../utils/constants';
 
 const MAX_DIFF_LENGTH = 100000;
 const GEMINI_API_BASE_URL = 'https://generativelanguage.googleapis.com/v1beta/models';
-const MAX_RETRY_BACKOFF = 10000; // Maximum retry delay in milliseconds
+const MAX_RETRY_BACKOFF = 10000;
 
 interface GeminiResponse {
     candidates: Array<{
@@ -95,7 +95,7 @@ export class AIService {
                 'content-type': 'application/json',
                 'x-goog-api-key': apiKey
             },
-            timeout: 30000 // 30 seconds timeout
+            timeout: 30000
         };
 
         const payload = {
@@ -230,7 +230,6 @@ export class CommitMessageUI {
         try {
             await this.initializeAndValidate();
 
-            // Set repository from Source Control view context if available
             if (sourceControlRepository?.rootUri) {
                 this.selectedRepository = sourceControlRepository;
                 void Logger.log(`Using repository from Source Control view: ${sourceControlRepository.rootUri.fsPath}`);
@@ -242,7 +241,6 @@ export class CommitMessageUI {
             });
             void vscode.window.showInformationMessage(`Message generated using ${model}`);
 
-            // Handle auto-commit and auto-push after message generation
             if (this.selectedRepository?.rootUri && ConfigService.getAutoCommitEnabled()) {
                 await this.handleAutoCommit(this.selectedRepository.rootUri.fsPath);
             }
@@ -271,7 +269,6 @@ export class CommitMessageUI {
                 await action(progress);
                 progress.report({ increment: 100 });
             } finally {
-                // Ensure progress is completed
                 progress.report({ increment: 100 });
             }
         });
@@ -283,7 +280,6 @@ export class CommitMessageUI {
     ): Promise<CommitMessage> {
         progress.report({ message: "Fetching Git changes...", increment: 0 });
 
-        // Only get active repository if not already set from Source Control view
         if (!this.selectedRepository) {
             this.selectedRepository = await GitService.getActiveRepository(sourceControlRepository);
         }

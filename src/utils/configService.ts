@@ -23,7 +23,6 @@ export class ConfigService {
                 this.clearCache();
                 void Logger.log('Configuration changed, cache cleared');
 
-                // Validate endpoint if custom endpoint settings changed
                 if (event.affectsConfiguration('commitSage.custom.endpoint') ||
                     event.affectsConfiguration('commitSage.custom.useCustomEndpoint')) {
                     const useCustomEndpoint = this.useCustomEndpoint();
@@ -337,7 +336,6 @@ export class ConfigService {
 
     private static async loadConfig(): Promise<void> {
         const config = vscode.workspace.getConfiguration('commitSage');
-        // ... existing code ...
     }
 
     public static getCommandId(): string {
