@@ -40,10 +40,10 @@ export class ApiKeyNotSetError extends Error {
     }
 }
 
-export class CustomEndpointError extends Error {
+export class OpenAIError extends Error {
     constructor(message: string) {
-        super(`Error with custom endpoint: ${message}`);
-        this.name = 'CustomEndpointError';
+        super(message);
+        this.name = 'OpenAIError';
     }
 }
 

@@ -4,11 +4,14 @@ import * as path from 'path';
 import * as fs from 'fs';
 import { Logger } from '../utils/logger';
 import { errorMessages } from '../utils/constants';
+import { GitService } from './gitService';
 
 interface BlameInfo {
     commit: string;
     author: string;
+    email: string;
     date: string;
+    timestamp: number;
     line: string;
 }
 
@@ -155,12 +158,13 @@ export class GitBlameAnalyzer {
         try {
             const hasHead = await this.hasHead(repoPath);
             if (!hasHead) {
-                void Logger.log(`Skipping diff for repository without HEAD: ${repoPath}`);
                 return '';
             }
 
+            const relativePath = path.relative(repoPath, filePath);
+
             const { data } = await this.executeGitCommand(
-                ['diff', '--', path.relative(repoPath, filePath)],
+                ['diff', '--', relativePath],
                 filePath,
                 processDiffOutput,
                 true,
@@ -169,7 +173,7 @@ export class GitBlameAnalyzer {
 
             return data;
         } catch (error) {
-            void Logger.log(`Could not get diff for ${filePath}, might be moved/deleted`);
+            void Logger.error(`Error getting diff for ${filePath}:`, error as Error);
             return '';
         }
     }
@@ -182,24 +186,25 @@ export class GitBlameAnalyzer {
                 return '';
             }
 
-            if (!fs.existsSync(filePath)) {
-                void Logger.log(`Skipping blame analysis for deleted file: ${filePath}`);
+            const absoluteFilePath = path.resolve(repoPath, filePath);
+            if (!fs.existsSync(absoluteFilePath)) {
+                void Logger.log(`File does not exist: ${absoluteFilePath}`);
                 return '';
             }
 
-            if (await this.isNewFile(filePath, repoPath)) {
-                void Logger.log(`Skipping blame analysis for new file: ${filePath}`);
+            if (await this.isNewFile(absoluteFilePath, repoPath)) {
+                void Logger.log(`File is new: ${absoluteFilePath}`);
                 return '';
             }
 
-            void Logger.log(`Analyzing changes for file: ${filePath}`);
-            const blame = await this.getGitBlame(filePath, repoPath);
+            void Logger.log(`Analyzing changes for file: ${absoluteFilePath}`);
+            const blame = await this.getGitBlame(absoluteFilePath, repoPath);
 
             if (!blame.length) {
                 return '';
             }
 
-            const diff = await this.getDiff(repoPath, filePath);
+            const diff = await this.getDiff(repoPath, absoluteFilePath);
             const changedLines = this.parseChangedLines(diff);
             const blameAnalysis = this.analyzeBlameInfo(blame, changedLines);
 
@@ -261,5 +266,61 @@ export class GitBlameAnalyzer {
         });
 
         return result;
+    }
+
+    private async executeGitBlame(filePath: string): Promise<string> {
+        const { stdout } = await GitService.execGit(['blame', '--line-porcelain', filePath], path.dirname(filePath));
+        return stdout;
+    }
+
+    private parseBlameOutput(blameOutput: string): BlameInfo[] {
+        const lines = blameOutput.split('\n');
+        const result: BlameInfo[] = [];
+        let currentInfo: Partial<BlameInfo> = {};
+
+        for (const line of lines) {
+            if (line.startsWith('author ')) {
+                currentInfo.author = line.substring(7);
+            } else if (line.startsWith('author-mail ')) {
+                currentInfo.email = line.substring(12).replace(/[<>]/g, '');
+            } else if (line.startsWith('author-time ')) {
+                currentInfo.timestamp = parseInt(line.substring(12), 10);
+                const date = new Date(currentInfo.timestamp * 1000);
+                currentInfo.date = date.toISOString();
+            } else if (line.startsWith('commit ')) {
+                currentInfo.commit = line.substring(7);
+            } else if (line.startsWith('\t')) {
+                currentInfo.line = line.substring(1);
+                if (Object.keys(currentInfo).length > 0) {
+                    result.push(currentInfo as BlameInfo);
+                    currentInfo = {};
+                }
+            }
+        }
+
+        return result;
+    }
+
+    public async getBlameInfo(filePath: string, repoPath: string): Promise<BlameInfo[]> {
+        if (!await GitService.hasHead(repoPath)) {
+            void Logger.log(`Skipping blame analysis for repository without HEAD: ${repoPath}`);
+            return [];
+        }
+
+        if (await GitService.isNewFile(filePath)) {
+            return [];
+        }
+
+        if (await GitService.isFileDeleted(filePath)) {
+            return [];
+        }
+
+        try {
+            const blameOutput = await this.executeGitBlame(filePath);
+            return this.parseBlameOutput(blameOutput);
+        } catch (error) {
+            void Logger.error(`Error during blame analysis for ${filePath}:`, error as Error);
+            return [];
+        }
     }
 }

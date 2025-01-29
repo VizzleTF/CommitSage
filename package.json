@@ -1,7 +1,7 @@
 {
     "name": "geminicommit",
     "displayName": "Commit Sage",
-    "description": "Free AI commit messages using Gemini, Codestral, or custom LLM",
+    "description": "Free AI commit messages using Gemini, Codestral, Ollama, or custom LLM",
     "version": "2.1.0",
     "publisher": "VizzleTF",
     "repository": {
@@ -26,7 +26,8 @@
         "AI",
         "AutoCommit",
         "LLM",
-        "Git"
+        "Git",
+        "Ollama"
     ],
     "activationEvents": [
         "onStartupFinished",
@@ -46,8 +47,8 @@
                 "title": "Commit Sage: Set Gemini API Key"
             },
             {
-                "command": "commitsage.setCustomApiKey",
-                "title": "Commit Sage: Set Custom API Key"
+                "command": "commitsage.setOpenAIApiKey",
+                "title": "Commit Sage: Set OpenAI API Key"
             },
             {
                 "command": "commitsage.setCodestralApiKey",
@@ -83,12 +84,13 @@
         "configuration": {
             "title": "Commit Sage",
             "properties": {
-                "commitSage.general.provider": {
+                "commitSage.provider.type": {
                     "type": "string",
                     "enum": [
                         "gemini",
                         "codestral",
-                        "custom"
+                        "openai",
+                        "ollama"
                     ],
                     "default": "gemini",
                     "description": "Select the AI provider for commit message generation",
@@ -172,7 +174,7 @@
                         "gemini-2.0-flash-exp"
                     ],
                     "default": "gemini-1.5-flash",
-                    "description": "Select Gemini model for commit message generation. Only used when custom endpoint is not enabled",
+                    "description": "Select Gemini model for commit message generation. Only used when Gemini provider is selected",
                     "order": 10
                 },
                 "commitSage.codestral.model": {
@@ -185,23 +187,35 @@
                     "description": "Select Codestral model for commit message generation. Only used when Codestral provider is selected",
                     "order": 11
                 },
-                "commitSage.custom.endpoint": {
+                "commitSage.openai.model": {
                     "type": "string",
-                    "default": "",
-                    "description": "Custom endpoint URL (e.g., 'https://api.openai.com/v1' for OpenAI). Required when useCustomEndpoint is enabled",
+                    "default": "gpt-3.5-turbo",
+                    "description": "Select OpenAI model for commit message generation. Only used when OpenAI provider is selected",
                     "order": 12
                 },
-                "commitSage.custom.model": {
+                "commitSage.openai.baseUrl": {
                     "type": "string",
-                    "default": "",
-                    "description": "Model name for custom endpoint (e.g., 'gpt-3.5-turbo' for OpenAI). Required when useCustomEndpoint is enabled",
+                    "default": "https://api.openai.com/v1",
+                    "description": "Base URL for OpenAI API. Change only if using Azure OpenAI or a custom endpoint",
                     "order": 13
+                },
+                "commitSage.ollama.baseUrl": {
+                    "type": "string",
+                    "default": "http://localhost:11434",
+                    "description": "Base URL for Ollama API. Only used when Ollama provider is selected",
+                    "order": 14
+                },
+                "commitSage.ollama.model": {
+                    "type": "string",
+                    "default": "llama3.2",
+                    "description": "Model name for Ollama. Make sure the model is installed locally. Only used when Ollama provider is selected",
+                    "order": 15
                 },
                 "commitSage.telemetry.enabled": {
                     "type": "boolean",
                     "default": true,
                     "description": "Enable telemetry for Commit Sage",
-                    "order": 14
+                    "order": 16
                 }
             }
         }

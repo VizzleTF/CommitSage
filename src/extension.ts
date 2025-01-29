@@ -35,7 +35,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
                 }
             }),
             vscode.commands.registerCommand('commitsage.setApiKey', () => ConfigService.promptForApiKey()),
-            vscode.commands.registerCommand('commitsage.setCustomApiKey', () => ConfigService.promptForCustomApiKey()),
+            vscode.commands.registerCommand('commitsage.setOpenAIApiKey', () => ConfigService.promptForOpenAIApiKey()),
             vscode.commands.registerCommand('commitsage.setCodestralApiKey', () => ConfigService.promptForCodestralApiKey())
         ];
 

@@ -148,7 +148,6 @@ export class GitService {
                                 const oldContent = await this.executeGitCommand(['show', `HEAD:${file}`], repoPath);
                                 return `diff --git a/${file} b/${file}\ndeleted file mode 100644\n--- a/${file}\n+++ /dev/null\n@@ -1 +0,0 @@\n-${oldContent.trim()}\n`;
                             } catch (error) {
-                                void Logger.error(`Error getting content for deleted file ${file}:`, error as Error);
                                 return '';
                             }
                         })
@@ -181,11 +180,11 @@ export class GitService {
         }
     }
 
-    private static async hasHead(repoPath: string): Promise<boolean> {
+    public static async hasHead(repoPath: string): Promise<boolean> {
         try {
-            await this.executeGitCommand(['rev-parse', 'HEAD'], repoPath);
+            await this.execGit(['rev-parse', 'HEAD'], repoPath);
             return true;
-        } catch {
+        } catch (error) {
             return false;
         }
     }
@@ -353,6 +352,62 @@ export class GitService {
             throw new GitExtensionNotFoundError();
         }
         await extension.activate();
+    }
+
+    public static async execGit(args: string[], cwd: string): Promise<{ stdout: string; stderr: string }> {
+        return new Promise((resolve, reject) => {
+            const process = spawn('git', args, { cwd });
+            let stdout = '';
+            let stderr = '';
+
+            process.stdout.on('data', (data) => {
+                stdout += data.toString();
+            });
+
+            process.stderr.on('data', (data) => {
+                stderr += data.toString();
+            });
+
+            process.on('close', (code) => {
+                if (code === 0) {
+                    resolve({ stdout, stderr });
+                } else {
+                    reject(new Error(`Git command failed with code ${code}: ${stderr}`));
+                }
+            });
+        });
+    }
+
+    private static async getStatus(filePath: string): Promise<string> {
+        const repoPath = path.dirname(filePath);
+        const { stdout } = await this.execGit(['status', '--porcelain', filePath], repoPath);
+        return stdout.trim().slice(0, 2);
+    }
+
+    public static async isNewFile(filePath: string): Promise<boolean> {
+        try {
+            const status = await this.getStatus(filePath);
+            return status === '??' || status === 'A';
+        } catch (error) {
+            // Only log critical errors
+            if (error instanceof Error && !error.message.includes('not found')) {
+                void Logger.error('Error checking if file is new:', error);
+            }
+            return false;
+        }
+    }
+
+    public static async isFileDeleted(filePath: string): Promise<boolean> {
+        try {
+            const status = await this.getStatus(filePath);
+            return status.startsWith('D');
+        } catch (error) {
+            // Only log critical errors
+            if (error instanceof Error && !error.message.includes('not found')) {
+                void Logger.error('Error checking if file is deleted:', error);
+            }
+            return false;
+        }
     }
 }
 
