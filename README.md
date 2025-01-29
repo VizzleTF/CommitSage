@@ -2,139 +2,124 @@
 
 <img alt="Visual Studio Marketplace Version" src="https://img.shields.io/visual-studio-marketplace/v/VizzleTF.geminicommit"> <img alt="Visual Studio Marketplace Last Updated" src="https://img.shields.io/visual-studio-marketplace/last-updated/VizzleTF.geminicommit"> <img alt="Visual Studio Marketplace Installs" src="https://img.shields.io/visual-studio-marketplace/i/VizzleTF.geminicommit"> <img alt="Visual Studio Marketplace Rating" src="https://img.shields.io/visual-studio-marketplace/stars/VizzleTF.geminicommit">
 
-Commit Sage is a VSCode extension that automatically generates commit messages using Google's Gemini AI, Codestral, or an OpenAI API endpoint (OpenAI, Ollama, LocalAI and others).
+Commit Sage is a VSCode extension that automatically generates commit messages using various AI providers:
+- Gemini (default, requires API key, free)
+- OpenAI (requires API key or compatible provider)
+- Codestral (requires API key, free)
+- Ollama (local, free)
 
 ![Commit Sage in action](example.gif)
+
 
 ## Features
 
 - 🤖 AI-powered commit message generation
-- 🔄 Support for Google's Gemini, Codestral, and custom OpenAI-compatible endpoints
-- 🌍 Multiple languages support
-- 🎯 Customizable commit message format
-- ⚡ Fast and efficient
-- 🔒 Secure API key storage
-- 🎨 Custom instructions support
-- 🚀 Auto commit and push support
-
-## Installation
-
-1. Install from [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=VizzleTF.commitsage)
-2. Get your API key:
-   - For Gemini: Get it from [Google AI Studio](https://makersuite.google.com/app/apikey)
-   - For Codestral: [Mistral AI Console](https://console.mistral.ai/codestral)
-   - For custom endpoint: Use your OpenAI API key or other compatible service
-3. Set up the API key in VS Code:
-   - Open Command Palette (Ctrl+Shift+P / Cmd+Shift+P)
-   - Type "Commit Sage: Set Gemini API Key", "Commit Sage: Set Codestral API Key", or "Commit Sage: Set Custom API Key"
-   - Enter your API key
-
-## Usage
-
-1. Write code
-2. Press button in Source control
-3. Review and confirm generated message
+- 🌍 Multiple language support (English, Russian, Chinese, Japanese)
+- 📝 Various commit formats (Conventional, Angular, Karma, Semantic, Emoji)
+- 🔄 Smart handling of staged/unstaged changes
+- 🚀 Auto-commit and auto-push capabilities
+- 🎯 Custom instructions support
+- ⚡ Fast and efficient processing
 
 ## Configuration
 
-The extension provides the following configuration options:
+Get your API key:
+   - For Gemini: Get it from [Google AI Studio](https://makersuite.google.com/app/apikey)
+   - For Codestral: [Mistral AI Console](https://console.mistral.ai/codestral)
+   - For custom endpoint: Use your OpenAI API key or other compatible service
 
-- **OpenAI API Key** (`commitSage.openai.apiKey`):
-  - Your OpenAI API key for generating commit messages
-  - Required for using OpenAI's models
-  - Can be set via command palette or settings
+### AI Provider Settings
 
-- **OpenAI Base URL** (`commitSage.openai.baseUrl`):
-  - Optional custom base URL for OpenAI API requests
-  - Useful for proxies or enterprise setups
-  - Defaults to OpenAI's standard API endpoint
+- **Provider Selection** (`commitSage.provider.type`):
+  - Choose between: `gemini`, `openai`, `codestral`, `ollama`
+  - Default: `gemini`
 
-- **OpenAI Model** (`commitSage.openai.model`):
-  - The OpenAI model to use for generating commit messages
-  - Defaults to "gpt-3.5-turbo"
+- **Gemini Settings**:
+  - Model (`commitSage.gemini.model`): 
+    - Options: `gemini-1.0-pro`, `gemini-1.5-pro`, `gemini-1.5-flash`, `gemini-2.0-flash-exp`
+    - Default: `gemini-1.5-flash`
+
+- **OpenAI Settings**:
+  - Model (`commitSage.openai.model`): Default `gpt-3.5-turbo`
+  - Base URL (`commitSage.openai.baseUrl`): For custom endpoints/Azure
+
+- **Codestral Settings**:
+  - Model (`commitSage.codestral.model`):
+    - Options: `codestral-2405`, `codestral-latest`
+    - Default: `codestral-latest`
+
+- **Ollama Settings**:
+  - Base URL (`commitSage.ollama.baseUrl`): Default `http://localhost:11434`
+  - Model (`commitSage.ollama.model`): Default `llama3.2`
 
 ### Commit Settings
 
-- **Commit Language** (`commitSage.commit.commitLanguage`):
-  - Language for generated commit messages
-  - Default: English
+- **Language** (`commitSage.commit.commitLanguage`):
+  - Options: `english`, `russian`, `chinese`, `japanese`
+  - Default: `english`
+
+- **Format** (`commitSage.commit.commitFormat`):
+  - Options: `conventional`, `angular`, `karma`, `semantic`, `emoji`
+  - Default: `conventional`
+
+- **Staged Changes** (`commitSage.commit.onlyStagedChanges`):
+  - When enabled: Only analyzes staged changes
+  - When disabled: 
+    - Uses staged changes if present
+    - Uses all changes if no staged changes
+  - Default: `false`
 
 - **Auto Commit** (`commitSage.commit.autoCommit`):
-  - Enable/disable automatic commit after staging changes
+  - Automatically commits after message generation
   - Default: `false`
 
 - **Auto Push** (`commitSage.commit.autoPush`):
-  - Enable/disable automatic push after commit
+  - Automatically pushes after auto-commit
   - Requires Auto Commit to be enabled
   - Default: `false`
 
-- **Custom Instructions** (`commitSage.commit.customInstructions`):
-  - Custom instructions to include in the commit message generation prompt
-  - Optional
-  - Default: empty
-
-- **Commit Format** (`commitSage.commit.commitFormat`):
-  - Format string for generated commit messages
-  - Default: `{type}: {message}`
-
-- **Prompt for Refs** (`commitSage.commit.promptForRefs`):
-  - Enable/disable prompting for issue/ticket references
+- **References** (`commitSage.commit.promptForRefs`):
+  - Prompts for issue/PR references
   - Default: `false`
 
-- **Use Custom Instructions** (`commitSage.commit.useCustomInstructions`):
-  - Enable/disable using custom instructions in the prompt
+### Custom Instructions
+
+- **Enable** (`commitSage.commit.useCustomInstructions`):
   - Default: `false`
 
-### Git Integration
-
-- **Only Staged Changes** (`commitSage.commit.onlyStagedChanges`):
-  - Use only staged changes for message generation
-  - Default: false
-  - When disabled: uses staged changes if present, otherwise all changes
-
-### AI Model Settings
-
-- **Provider Selection** (`commitSage.general.provider`):
-  - Select the AI provider for commit message generation
-  - Options: Gemini, OpenAI, Codestral, Ollama
-  - Default: Gemini
-
-- **Gemini Model** (`commitSage.gemini.model`):
-  - Model for Gemini API
-  - Available free models:
-    - `gemini-1.0-pro`: Base model, good for general use
-    - `gemini-1.5-pro`: Enhanced version with better understanding
-    - `gemini-1.5-flash`: Optimized for speed (default)
-    - `gemini-2.0-flash-exp`: Experimental model with latest improvements
-  - Default: gemini-1.5-flash
-
-- **Codestral Model** (`commitSage.codestral.model`):
-  - Model for Codestral API
-  - Available free models:
-    - `codestral-2405`: Base model
-    - `codestral-latest`: Latest model with improvements
-  - Default: codestral-latest
+- **Instructions** (`commitSage.commit.customInstructions`):
+  - Custom prompt instructions
+  - Used when enabled
 
 ### Telemetry
 
-- **Telemetry** (`commitSage.telemetry.enabled`):
-  - Usage data collection (only counts commits without any other information)
-  - Default: true
-  - Helps improve the extension
+- **Enable** (`commitSage.telemetry.enabled`):
+  - Collects anonymous usage data
+  - Default: `true`
 
-## Support
+## Usage
 
-- [Telegram Channel](https://t.me/geminicommit) - Release announcements and updates
-- [Telegram Group](https://t.me/gemini_commit) - Community discussions and support
+1. Stage your changes in Git
+2. Press `Cmd+G` (Mac) / `Ctrl+G` (Windows/Linux)
+3. Or click the Commit Sage icon in the Source Control view
+4. Wait for the AI to analyze changes and generate a message
+5. Review and edit the message if needed
+6. Commit as usual
 
-## Contributing
+## Requirements
 
-- Report issues on [GitHub Issues](https://github.com/VizzleTF/CommitSage/issues)
-- Pull requests are welcome!
+- VSCode 1.93.0 or higher
+- Git installed and configured
+- Internet connection (except for Ollama)
+- API key for OpenAI/Codestral (if using those providers)
 
 ## License
 
 MIT
+
+## Support
+
+If you encounter any issues or have suggestions, please [open an issue](https://github.com/VizzleTF/CommitSage/issues).
 
 ---
 
