@@ -2,7 +2,7 @@
     "name": "geminicommit",
     "displayName": "Commit Sage",
     "description": "Free AI commit messages using Gemini, Codestral, or custom LLM",
-    "version": "2.0.12",
+    "version": "2.1.0",
     "publisher": "VizzleTF",
     "repository": {
         "type": "git",
