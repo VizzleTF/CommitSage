@@ -19,7 +19,6 @@ const GIT_STATUS_CODES = {
 } as const;
 
 type GitStatusCode = typeof GIT_STATUS_CODES[keyof typeof GIT_STATUS_CODES];
-type GitChangeType = 'staged' | 'untracked';
 
 const STAGED_STATUS_CODES: GitStatusCode[] = [
     GIT_STATUS_CODES.MODIFIED,

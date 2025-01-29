@@ -13,7 +13,6 @@ const TELEMETRY_CONFIG = {
 
 type TelemetryEventName =
     | 'extension_activated'
-    | 'extension_deactivated'
     | 'message_generation_started'
     | 'message_generation_completed'
     | 'message_generation_failed'
@@ -171,13 +170,9 @@ export class TelemetryService {
 
     private static handleConfigChange(event: vscode.ConfigurationChangeEvent): void {
         if (event.affectsConfiguration('commitSage.telemetry.enabled')) {
-            void this.loadConfig();
+            this.enabled = ConfigService.isTelemetryEnabled();
+            amplitude.setOptOut(!this.enabled);
         }
-    }
-
-    private static async loadConfig(): Promise<void> {
-        const extensionVersion = vscode.extensions.getExtension('VizzleTF.commitsage')?.packageJSON.version;
-        // ... existing code ...
     }
 
     private static delay(ms: number): Promise<void> {
