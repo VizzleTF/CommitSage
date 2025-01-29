@@ -38,6 +38,39 @@ export class ApiKeyValidator {
         return true;
     }
 
+    static async validateCodestralApiKey(key: string): Promise<boolean> {
+        try {
+            const response = await axios.post(
+                'https://codestral.mistral.ai/v1/chat/completions',
+                {
+                    model: 'codestral-2405',
+                    messages: [{ role: 'user', content: 'Test message' }]
+                },
+                {
+                    headers: {
+                        'Authorization': `Bearer ${key}`,
+                        'Content-Type': 'application/json'
+                    }
+                }
+            );
+
+            if (response.status === 200) {
+                return true;
+            }
+
+            return false;
+        } catch (error) {
+            const axiosError = error as AxiosError;
+            if (axiosError.response) {
+                const status = axiosError.response.status;
+                if (status === 401 || status === 403) {
+                    return false;
+                }
+            }
+            throw error;
+        }
+    }
+
     static validateApiKey(value: string): string | null {
         return null;
     }
