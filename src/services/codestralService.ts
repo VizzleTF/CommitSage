@@ -2,7 +2,6 @@ import axios, { AxiosError } from 'axios';
 import { Logger } from '../utils/logger';
 import { CommitMessage, ProgressReporter } from '../models/types';
 import { ConfigService } from '../utils/configService';
-import { TelemetryService } from './telemetryService';
 
 interface CodestralResponse {
     choices: Array<{
@@ -57,8 +56,6 @@ export class CodestralService {
 
             const commitMessage = this.extractCommitMessage(response.data);
             void Logger.log(`Commit message generated using ${model} model`);
-            void TelemetryService.sendEvent('message_generation_completed');
-
             return { message: commitMessage, model };
         } catch (error) {
             return await this.handleGenerationError(error as ErrorWithResponse, prompt, progress, attempt);
