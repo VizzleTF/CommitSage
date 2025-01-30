@@ -50,6 +50,7 @@ export class GeminiService {
             progress.report({ message: "Processing generated message...", increment: 100 });
 
             const message = this.extractCommitMessage(response.data);
+            void Logger.log(`Commit message generated using ${model} model`);
             return { message, model };
         } catch (error) {
             const axiosError = error as AxiosError;
