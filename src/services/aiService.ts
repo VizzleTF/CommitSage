@@ -52,6 +52,10 @@ export class AIService {
             return result;
         } catch (error) {
             void Logger.error('Failed to generate commit message:', error as Error);
+            void TelemetryService.sendEvent('message_generation_failed', {
+                provider: ConfigService.getProvider(),
+                error: error instanceof Error ? error.message : String(error)
+            });
             throw error;
         }
     }
@@ -90,8 +94,14 @@ export class CommitMessageUI {
                 const commitMessage = await this.generateAndApplyMessage(progress, sourceControlRepository);
                 void Logger.log(`Commit message generated: ${commitMessage.message}`);
             });
-        } catch (error) {
-            await this.handleError(error as Error);
+        } catch (error: unknown) {
+            void Logger.error('Error in CommitMessageUI:', error instanceof Error ? error : new Error(String(error)));
+            void TelemetryService.sendEvent('message_generation_failed', {
+                error: error instanceof Error ? error.message : String(error),
+                error_type: error instanceof Error ? error.constructor.name : 'UnknownError',
+                provider: ConfigService.getProvider()
+            });
+            await this.handleError(error instanceof Error ? error : new Error(String(error)));
         }
     }
 
