@@ -11,24 +11,24 @@ import {
 import { TelemetryService } from './telemetryService';
 
 const GIT_STATUS_CODES = {
-    MODIFIED: 'M',
-    ADDED: 'A',
-    DELETED: 'D',
-    RENAMED: 'R',
-    UNTRACKED: '??'
+    modified: 'M',
+    added: 'A',
+    deleted: 'D',
+    renamed: 'R',
+    untracked: '??'
 } as const;
 
 type GitStatusCode = typeof GIT_STATUS_CODES[keyof typeof GIT_STATUS_CODES];
 
 const STAGED_STATUS_CODES: GitStatusCode[] = [
-    GIT_STATUS_CODES.MODIFIED,
-    GIT_STATUS_CODES.ADDED,
-    GIT_STATUS_CODES.DELETED,
-    GIT_STATUS_CODES.RENAMED
+    GIT_STATUS_CODES.modified,
+    GIT_STATUS_CODES.added,
+    GIT_STATUS_CODES.deleted,
+    GIT_STATUS_CODES.renamed
 ];
 
 export class GitService {
-    static async initialize(context: vscode.ExtensionContext): Promise<void> {
+    static async initialize(): Promise<void> {
         try {
             void Logger.log('Initializing Git service');
             await this.validateGitExtension();
@@ -81,6 +81,7 @@ export class GitService {
         try {
             const result = await this.executeGitCommand(['remote'], repoPath);
             return result.trim().length > 0;
+            // eslint-disable-next-line no-unused-vars, @typescript-eslint/no-unused-vars, unused-imports/no-unused-vars
         } catch (error) {
             return false;
         }
@@ -147,6 +148,7 @@ export class GitService {
                             try {
                                 const oldContent = await this.executeGitCommand(['show', `HEAD:${file}`], repoPath);
                                 return `diff --git a/${file} b/${file}\ndeleted file mode 100644\n--- a/${file}\n+++ /dev/null\n@@ -1 +0,0 @@\n-${oldContent.trim()}\n`;
+                                // eslint-disable-next-line no-unused-vars, @typescript-eslint/no-unused-vars, unused-imports/no-unused-vars
                             } catch (error) {
                                 return '';
                             }
@@ -184,6 +186,7 @@ export class GitService {
         try {
             await this.execGit(['rev-parse', 'HEAD'], repoPath);
             return true;
+            // eslint-disable-next-line no-unused-vars, @typescript-eslint/no-unused-vars, unused-imports/no-unused-vars
         } catch (error) {
             return false;
         }
@@ -335,7 +338,7 @@ export class GitService {
         if (activeEditor) {
             const activeFile = activeEditor.document.uri;
             const activeRepo = repos.find(repo => {
-                if (!repo.rootUri) return false;
+                if (!repo.rootUri) { return false; }
                 return activeFile.fsPath.startsWith(repo.rootUri.fsPath);
             });
             if (activeRepo) {

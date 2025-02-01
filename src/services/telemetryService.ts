@@ -1,14 +1,16 @@
+/// <reference types="node" />
 import * as vscode from 'vscode';
 import * as amplitude from '@amplitude/analytics-node';
 import { Logger } from '../utils/logger';
 import { ConfigService } from '../utils/configService';
 import { AMPLITUDE_API_KEY } from '../constants/apiKeys';
+import { EventOptions } from '@amplitude/analytics-types';
 
 const TELEMETRY_CONFIG = {
-    MAX_RETRIES: 3,
-    RETRY_DELAY: 1000,
-    QUEUE_SIZE_LIMIT: 100,
-    FLUSH_INTERVAL: 30000,
+    maxRetries: 3,
+    retryDelay: 1000,
+    queueSizeLimit: 100,
+    flushInterval: 30000,
 } as const;
 
 type TelemetryEventName =
@@ -26,7 +28,7 @@ interface TelemetryEventProperties {
     vsCodeVersion: string;
     extensionVersion: string | undefined;
     platform: string;
-    [key: string]: any;
+    [key: string]: unknown;
 }
 
 interface QueuedEvent {
@@ -36,12 +38,16 @@ interface QueuedEvent {
     timestamp: number;
 }
 
+declare const setInterval: (callback: () => void, ms: number) => number;
+declare const clearInterval: (intervalId: number) => void;
+declare const process: { platform: string };
+
 export class TelemetryService {
     private static disposables: vscode.Disposable[] = [];
     private static enabled: boolean = true;
     private static initialized: boolean = false;
     private static eventQueue: QueuedEvent[] = [];
-    private static flushInterval: NodeJS.Timeout | null = null;
+    private static flushInterval: number | null = null;
 
     static async initialize(context: vscode.ExtensionContext): Promise<void> {
         void Logger.log('Initializing telemetry service');
@@ -81,7 +87,7 @@ export class TelemetryService {
         }
     }
 
-    static sendEvent(eventName: TelemetryEventName, customProperties: Record<string, any> = {}): void {
+    static sendEvent(eventName: TelemetryEventName, customProperties: Record<string, unknown> = {}): void {
         if (!this.enabled) {
             void Logger.log('Telemetry disabled, skipping event');
             return;
@@ -105,7 +111,7 @@ export class TelemetryService {
     }
 
     private static queueEvent(event: QueuedEvent): void {
-        if (this.eventQueue.length >= TELEMETRY_CONFIG.QUEUE_SIZE_LIMIT) {
+        if (this.eventQueue.length >= TELEMETRY_CONFIG.queueSizeLimit) {
             this.eventQueue.shift();
             void Logger.warn('Telemetry event queue full, removing oldest event');
         }
@@ -128,22 +134,26 @@ export class TelemetryService {
         try {
             void Logger.log(`Processing telemetry event: ${currentEvent.eventName}`);
 
-            await amplitude.track(currentEvent.eventName, currentEvent.properties, {
+            /* eslint-disable @typescript-eslint/naming-convention */
+            const options: EventOptions = {
                 device_id: vscode.env.machineId,
                 time: currentEvent.timestamp
-            });
+            };
+            /* eslint-enable @typescript-eslint/naming-convention */
+
+            await amplitude.track(currentEvent.eventName, currentEvent.properties, options);
 
             this.eventQueue.shift();
             void Logger.log(`Telemetry event sent successfully: ${currentEvent.eventName}`);
         } catch (error) {
             void Logger.error('Failed to send telemetry:', error as Error);
 
-            if (currentEvent.retryCount < TELEMETRY_CONFIG.MAX_RETRIES) {
+            if (currentEvent.retryCount < TELEMETRY_CONFIG.maxRetries) {
                 currentEvent.retryCount++;
-                void Logger.log(`Retrying event ${currentEvent.eventName} (attempt ${currentEvent.retryCount}/${TELEMETRY_CONFIG.MAX_RETRIES})`);
-                await this.delay(TELEMETRY_CONFIG.RETRY_DELAY * currentEvent.retryCount);
+                void Logger.log(`Retrying event ${currentEvent.eventName} (attempt ${currentEvent.retryCount}/${TELEMETRY_CONFIG.maxRetries})`);
+                await this.delay(TELEMETRY_CONFIG.retryDelay * currentEvent.retryCount);
             } else {
-                void Logger.error(`Failed to send event ${currentEvent.eventName} after ${TELEMETRY_CONFIG.MAX_RETRIES} attempts, discarding`);
+                void Logger.error(`Failed to send event ${currentEvent.eventName} after ${TELEMETRY_CONFIG.maxRetries} attempts, discarding`);
                 this.eventQueue.shift();
             }
         }
@@ -156,7 +166,7 @@ export class TelemetryService {
 
         this.flushInterval = setInterval(() => {
             void this.processEventQueue();
-        }, TELEMETRY_CONFIG.FLUSH_INTERVAL);
+        }, TELEMETRY_CONFIG.flushInterval);
     }
 
     private static handleTelemetryStateChange(enabled: boolean): void {

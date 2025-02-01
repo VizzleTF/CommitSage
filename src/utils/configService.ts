@@ -2,12 +2,10 @@ import * as vscode from 'vscode';
 import { Logger } from './logger';
 import { ApiKeyValidator } from './apiKeyValidator';
 import { AiServiceError, ConfigurationError } from '../models/errors';
-import { OpenAIService } from '../services/openaiService';
 
 type CacheValue = string | boolean | number;
 
-export type CommitLanguage = typeof SUPPORTED_LANGUAGES[number];
-const SUPPORTED_LANGUAGES = ['english', 'russian', 'chinese', 'japanese'] as const;
+export type CommitLanguage = 'english' | 'russian' | 'chinese' | 'japanese';
 
 export class ConfigService {
     private static cache = new Map<string, CacheValue>();
@@ -304,11 +302,6 @@ export class ConfigService {
         return this.getConfig<boolean>('telemetry', 'enabled', true);
     }
 
-    private static loadConfig(): void {
-        const config = vscode.workspace.getConfiguration('commitSage');
-        void Logger.log('Configuration loaded');
-    }
-
     public static getCommandId(): string {
         return '@ext:VizzleTF.commitsage commit';
     }
@@ -326,9 +319,9 @@ export class ConfigService {
         const withoutApi = withoutVersion.replace(/\/api$/, '');
 
         variants.push(baseUrl);
-        if (baseUrl !== withoutCompletions) variants.push(withoutCompletions);
-        if (withoutCompletions !== withoutVersion) variants.push(withoutVersion);
-        if (withoutVersion !== withoutApi) variants.push(withoutApi);
+        if (baseUrl !== withoutCompletions) { variants.push(withoutCompletions); }
+        if (withoutCompletions !== withoutVersion) { variants.push(withoutVersion); }
+        if (withoutVersion !== withoutApi) { variants.push(withoutApi); }
 
         if (!withoutApi.endsWith('/api')) {
             variants.push(`${withoutApi}/api`);

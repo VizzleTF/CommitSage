@@ -98,7 +98,7 @@ export class CommitMessageUI {
             void Logger.error('Error in CommitMessageUI:', error instanceof Error ? error : new Error(String(error)));
             void TelemetryService.sendEvent('message_generation_failed', {
                 error: error instanceof Error ? error.message : String(error),
-                error_type: error instanceof Error ? error.constructor.name : 'UnknownError',
+                errorType: error instanceof Error ? error.constructor.name : 'UnknownError',
                 provider: ConfigService.getProvider()
             });
             await this.handleError(error instanceof Error ? error : new Error(String(error)));
@@ -134,20 +134,18 @@ export class CommitMessageUI {
         if (!repo?.rootUri) {
             throw new Error('No Git repository found');
         }
-
-        const repoPath = repo.rootUri.fsPath;
         const onlyStagedSetting = ConfigService.getOnlyStagedChanges();
-        const hasStagedChanges = await GitService.hasChanges(repoPath, 'staged');
+        const hasStagedChanges = await GitService.hasChanges(repo.rootUri!.fsPath, 'staged');
         const useStagedChanges = onlyStagedSetting || hasStagedChanges;
 
-        const diff = await GitService.getDiff(repoPath, useStagedChanges);
+        const diff = await GitService.getDiff(repo.rootUri!.fsPath, useStagedChanges);
         if (!diff) {
             throw new Error('No changes to commit');
         }
 
-        const changedFiles = await GitService.getChangedFiles(repoPath, useStagedChanges);
+        const changedFiles = await GitService.getChangedFiles(repo.rootUri!.fsPath, useStagedChanges);
         const blameAnalyses = await Promise.all(
-            changedFiles.map(file => GitBlameAnalyzer.analyzeChanges(repoPath, file))
+            changedFiles.map(file => GitBlameAnalyzer.analyzeChanges(repo.rootUri!.fsPath, file))
         );
         const blameAnalysis = blameAnalyses.filter(analysis => analysis).join('\n\n');
 
@@ -157,7 +155,7 @@ export class CommitMessageUI {
         this.selectedRepository = sourceControlRepository;
 
         if (ConfigService.getAutoCommitEnabled()) {
-            await this.handleAutoCommit(repoPath);
+            await this.handleAutoCommit();
         }
 
         return commitMessage;
@@ -168,7 +166,7 @@ export class CommitMessageUI {
         await vscode.window.showErrorMessage(`CommitSage: ${error.message}`);
     }
 
-    private static async handleAutoCommit(repoPath: string): Promise<void> {
+    private static async handleAutoCommit(): Promise<void> {
         try {
             if (!this.selectedRepository?.inputBox.value) {
                 throw new Error('No commit message available');

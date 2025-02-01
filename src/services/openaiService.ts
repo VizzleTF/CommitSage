@@ -1,5 +1,4 @@
 import axios, { AxiosError } from 'axios';
-import * as vscode from 'vscode';
 import { Logger } from '../utils/logger';
 import { ConfigService } from '../utils/configService';
 import { ProgressReporter, CommitMessage } from '../models/types';
@@ -17,15 +16,15 @@ interface OpenAIResponse {
 interface ModelsResponse {
     data: Array<{
         id: string;
-        owned_by?: string;
+        ownedBy?: string;
     }>;
 }
 
 type ApiHeaders = Record<string, string>;
 
 export class OpenAIService {
-    private static readonly CHAT_COMPLETIONS_PATH = '/chat/completions';
-    private static readonly MODELS_PATH = '/models';
+    private static readonly chatCompletionsPath = '/chat/completions';
+    private static readonly modelsPath = '/models';
 
     static async generateCommitMessage(
         prompt: string,
@@ -39,12 +38,12 @@ export class OpenAIService {
             model,
             messages: [{ role: "user", content: prompt }],
             temperature: 0.7,
-            max_tokens: 1024
+            maxTokens: 1024
         };
 
         const headers = {
             'Authorization': `Bearer ${apiKey}`,
-            'Content-Type': 'application/json'
+            'content-type': 'application/json'
         };
 
         try {
@@ -65,7 +64,7 @@ export class OpenAIService {
             const axiosError = error as AxiosError;
             if (axiosError.response) {
                 const status = axiosError.response.status;
-                const data = axiosError.response.data as any;
+                const data = axiosError.response.data as { error?: { message?: string } };
 
                 // Handle specific OpenAI error cases
                 switch (status) {
@@ -108,7 +107,7 @@ export class OpenAIService {
             };
 
             const response = await axios.get<ModelsResponse>(
-                `${baseUrl}${this.MODELS_PATH}`,
+                `${baseUrl}${this.modelsPath}`,
                 { headers }
             );
 
@@ -121,6 +120,7 @@ export class OpenAIService {
                 void Logger.log(`Successfully fetched ${models.length} models`);
             }
             return models;
+            // eslint-disable-next-line no-unused-vars, @typescript-eslint/no-unused-vars, unused-imports/no-unused-vars
         } catch (error) {
             return [];
         }
@@ -133,4 +133,4 @@ export class OpenAIService {
 
         return response.choices[0].message.content.trim();
     }
-} 
+}

@@ -15,6 +15,7 @@ export interface CommitTemplate {
 export type CommitFormat = 'conventional' | 'angular' | 'karma' | 'semantic' | 'emoji';
 
 const SUPPORTED_LANGUAGES = ['english', 'russian', 'chinese', 'japanese'] as const;
+type SupportedLanguage = typeof SUPPORTED_LANGUAGES[number];
 
 const templates: Record<CommitFormat, CommitTemplate> = {
     conventional: conventionalTemplate,
@@ -27,8 +28,8 @@ const templates: Record<CommitFormat, CommitTemplate> = {
 const isValidFormat = (format: string): format is CommitFormat =>
     Object.keys(templates).includes(format);
 
-const isValidLanguage = (language: string): language is CommitLanguage =>
-    SUPPORTED_LANGUAGES.includes(language as CommitLanguage);
+const isValidLanguage = (language: string): language is SupportedLanguage =>
+    SUPPORTED_LANGUAGES.includes(language as SupportedLanguage);
 
 export function getTemplate(format: CommitFormat, language: CommitLanguage): string {
     if (!isValidFormat(format)) {
@@ -40,7 +41,7 @@ export function getTemplate(format: CommitFormat, language: CommitLanguage): str
 
     if (!isValidLanguage(language)) {
         console.warn(`Invalid language "${language}", falling back to english`);
-        language = 'english';
+        return template.english;
     }
 
     return template[language];

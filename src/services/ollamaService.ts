@@ -19,8 +19,8 @@ type ErrorWithResponse = AxiosError & {
 };
 
 export class OllamaService {
-    private static readonly DEFAULT_MODEL = 'llama3.2';
-    private static readonly MAX_RETRY_BACKOFF = 10000;
+    private static readonly defaultModel = 'llama3.2';
+    private static readonly maxRetryBackoff = 10000;
 
     static async generateCommitMessage(
         prompt: string,
@@ -28,7 +28,7 @@ export class OllamaService {
         attempt: number = 1
     ): Promise<CommitMessage> {
         const baseUrl = ConfigService.getOllamaBaseUrl() || 'http://localhost:11434';
-        const model = ConfigService.getOllamaModel() || this.DEFAULT_MODEL;
+        const model = ConfigService.getOllamaModel() || this.defaultModel;
         const apiUrl = `${baseUrl}/api/chat`;
 
         const requestConfig = {
@@ -144,10 +144,10 @@ export class OllamaService {
     }
 
     private static calculateRetryDelay(attempt: number): number {
-        return Math.min(1000 * Math.pow(2, attempt - 1), this.MAX_RETRY_BACKOFF);
+        return Math.min(1000 * Math.pow(2, attempt - 1), this.maxRetryBackoff);
     }
 
     private static delay(ms: number): Promise<void> {
         return new Promise(resolve => setTimeout(resolve, ms));
     }
-} 
+}
