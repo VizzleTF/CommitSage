@@ -1,4 +1,3 @@
-import { spawn } from 'child_process';
 import * as path from 'path';
 import * as fs from 'fs';
 import { Logger } from '../utils/logger';
@@ -14,71 +13,15 @@ interface BlameInfo {
     line: string;
 }
 
-interface GitProcessResult<T> {
-    data: T;
-    stderr: string[];
-}
-
 export class GitBlameAnalyzer {
-    private static async executeGitCommand<T>(
-        command: string[],
-        filePath: string,
-        processOutput: (data: Buffer) => T,
-        ignoreFileNotFound = false,
-        repoPath: string
-    ): Promise<GitProcessResult<T>> {
-        if (!ignoreFileNotFound && !fs.existsSync(filePath)) {
-            throw new Error(`${errorMessages.fileNotFound}: ${filePath}`);
-        }
-
-        const cwd = repoPath;
-
-        return new Promise((resolve, reject) => {
-            const gitProcess = spawn('git', command, { cwd });
-
-            let result: T | undefined;
-            const stderr: string[] = [];
-
-            gitProcess.stdout.on('data', (data: Buffer) => {
-                result = processOutput(data);
-            });
-
-            gitProcess.stderr.on('data', (data: Buffer) => {
-                const errorMessage = data.toString();
-                stderr.push(errorMessage);
-                void Logger.error(`Git command stderr: ${errorMessage}`);
-            });
-
-            gitProcess.on('error', (error) => {
-                void Logger.error(`Git command error: ${error.message}`);
-                reject(new Error(`Git command failed: ${error.message}`));
-            });
-
-            gitProcess.on('close', (code) => {
-                if (code === 0 || (ignoreFileNotFound && code === 128)) {
-                    resolve({ data: result ?? processOutput(Buffer.from('')), stderr });
-                } else {
-                    reject(new Error(`Git process exited with code ${code}`));
-                }
-            });
-        });
-    }
-
     private static async isNewFile(filePath: string, repoPath: string): Promise<boolean> {
         try {
             if (!fs.existsSync(filePath)) {
                 return false;
             }
 
-            const processOutput = (data: Buffer): string => data.toString();
-            const { data } = await this.executeGitCommand(
-                ['ls-files', path.relative(repoPath, filePath)],
-                filePath,
-                processOutput,
-                true,
-                repoPath
-            );
-            return !data.trim();
+            const { stdout } = await GitService.execGit(['ls-files', path.relative(repoPath, filePath)], repoPath);
+            return !stdout.trim();
         } catch (error) {
             void Logger.error('Error checking if file is new:', error as Error);
             return true;
@@ -87,15 +30,8 @@ export class GitBlameAnalyzer {
 
     private static async hasHead(repoPath: string): Promise<boolean> {
         try {
-            const processOutput = (data: Buffer): string => data.toString();
-            await this.executeGitCommand(
-                ['rev-parse', 'HEAD'],
-                repoPath,
-                processOutput,
-                true,
-                repoPath
-            );
-            return true;
+            const { stdout } = await GitService.execGit(['rev-parse', 'HEAD'], repoPath);
+            return !!stdout.trim();
         } catch {
             return false;
         }
@@ -103,114 +39,89 @@ export class GitBlameAnalyzer {
 
     private static async getGitBlame(filePath: string, repoPath: string): Promise<BlameInfo[]> {
         try {
-            const hasHead = await this.hasHead(repoPath);
-            if (!hasHead) {
-                void Logger.log(`Skipping blame for repository without HEAD: ${repoPath}`);
-                return [];
+            const absoluteFilePath = path.resolve(repoPath, filePath);
+            if (!fs.existsSync(absoluteFilePath)) {
+                throw new Error(`${errorMessages.fileNotFound}: ${absoluteFilePath}`);
             }
 
-            if (!fs.existsSync(filePath)) {
-                void Logger.log(`Skipping blame for non-existent file: ${filePath}`);
-                return [];
+            if (!await GitService.hasHead(repoPath)) {
+                throw new Error(errorMessages.noCommitsYet);
             }
 
-            const processBlameOutput = (data: Buffer): BlameInfo[] => {
-                const blame: BlameInfo[] = [];
-                let currentBlame: Partial<BlameInfo> = {};
+            if (await GitService.isNewFile(filePath, repoPath)) {
+                throw new Error(errorMessages.fileNotCommitted);
+            }
 
-                const lines = data.toString().split('\n');
-                lines.forEach((line: string) => {
-                    if (line.startsWith('author ')) {
-                        currentBlame.author = line.substring(7);
-                    } else if (line.startsWith('committer-time ')) {
-                        currentBlame.date = new Date(parseInt(line.substring(15)) * 1000).toISOString();
-                    } else if (line.startsWith('\t')) {
-                        currentBlame.line = line.substring(1);
-                        blame.push(currentBlame as BlameInfo);
-                        currentBlame = {};
-                    } else if (line.match(/^[0-9a-f]{40}/)) {
-                        currentBlame.commit = line.split(' ')[0];
-                    }
-                });
-
-                return blame;
-            };
-
-            const { data } = await this.executeGitCommand(
-                ['blame', '--line-porcelain', path.relative(repoPath, filePath)],
-                filePath,
-                processBlameOutput,
-                true,
-                repoPath
-            );
-
-            return data;
+            const blameOutput = await this.executeGitBlame(filePath, repoPath);
+            return this.parseBlameOutput(blameOutput);
         } catch (error) {
-            void Logger.error(`Error getting blame for ${filePath}:`, error as Error);
-            return [];
+            void Logger.error('Error getting blame info:', error as Error);
+            throw error;
         }
     }
 
-    private static async getDiff(repoPath: string, filePath: string): Promise<string> {
-        const processDiffOutput = (data: Buffer): string => data.toString();
+    private static async executeGitBlame(filePath: string, repoPath: string): Promise<string> {
+        const { stdout } = await GitService.execGit(['blame', '--line-porcelain', filePath], repoPath);
+        return stdout;
+    }
 
-        try {
-            const hasHead = await this.hasHead(repoPath);
-            if (!hasHead) {
-                return '';
+    private static parseBlameOutput(blameOutput: string): BlameInfo[] {
+        const lines = blameOutput.split('\n');
+        const blameInfos: BlameInfo[] = [];
+        let currentBlame: Partial<BlameInfo> = {};
+
+        for (const line of lines) {
+            if (line.startsWith('author ')) {
+                currentBlame.author = line.substring(7);
+            } else if (line.startsWith('author-mail ')) {
+                currentBlame.email = line.substring(12).replace(/[<>]/g, '');
+            } else if (line.startsWith('author-time ')) {
+                currentBlame.timestamp = parseInt(line.substring(11), 10);
+                currentBlame.date = new Date(currentBlame.timestamp * 1000).toISOString();
+            } else if (line.startsWith('\t')) {
+                currentBlame.line = line.substring(1);
+                if (currentBlame.author && currentBlame.email && currentBlame.date && currentBlame.timestamp && currentBlame.line) {
+                    blameInfos.push(currentBlame as BlameInfo);
+                }
+                currentBlame = {};
+            } else if (line.match(/^[0-9a-f]{40}/)) {
+                currentBlame.commit = line.split(' ')[0];
             }
-
-            const relativePath = path.relative(repoPath, filePath);
-
-            const { data } = await this.executeGitCommand(
-                ['diff', '--', relativePath],
-                filePath,
-                processDiffOutput,
-                true,
-                repoPath
-            );
-
-            return data;
-        } catch (error) {
-            void Logger.error(`Error getting diff for ${filePath}:`, error as Error);
-            return '';
         }
+
+        return blameInfos;
+    }
+
+    private static async getDiff(repoPath: string, filePath: string): Promise<string> {
+        const { stdout } = await GitService.execGit(['diff', '--unified=0', filePath], repoPath);
+        return stdout;
     }
 
     static async analyzeChanges(repoPath: string, filePath: string): Promise<string> {
         try {
-            const hasHead = await this.hasHead(repoPath);
-            if (!hasHead) {
-                void Logger.log(`Skipping blame analysis for repository without HEAD: ${repoPath}`);
-                return '';
+            // First check if file is deleted or new, as these don't need blame analysis
+            // Use git status to check file state
+            const normalizedPath = path.normalize(filePath.replace(/^\/+/, ''));
+
+            if (await GitService.isFileDeleted(normalizedPath, repoPath)) {
+                void Logger.log(`Skipping blame analysis for deleted file: ${normalizedPath}`);
+                return `Deleted file: ${normalizedPath}`;
             }
 
-            const absoluteFilePath = path.resolve(repoPath, filePath);
-            if (!fs.existsSync(absoluteFilePath)) {
-                void Logger.log(`File does not exist: ${absoluteFilePath}`);
-                return '';
+            if (await GitService.isNewFile(normalizedPath, repoPath)) {
+                void Logger.log(`Skipping blame analysis for new file: ${normalizedPath}`);
+                return `New file: ${normalizedPath}`;
             }
 
-            if (await this.isNewFile(absoluteFilePath, repoPath)) {
-                void Logger.log(`File is new: ${absoluteFilePath}`);
-                return '';
-            }
-
-            void Logger.log(`Analyzing changes for file: ${absoluteFilePath}`);
-            const blame = await this.getGitBlame(absoluteFilePath, repoPath);
-
-            if (!blame.length) {
-                return '';
-            }
-
-            const diff = await this.getDiff(repoPath, absoluteFilePath);
+            // For existing files, we need to get blame info
+            const blame = await this.getGitBlame(normalizedPath, repoPath);
+            const diff = await this.getDiff(repoPath, normalizedPath);
             const changedLines = this.parseChangedLines(diff);
-            const blameAnalysis = this.analyzeBlameInfo(blame, changedLines);
-
-            return this.formatAnalysis(blameAnalysis);
+            const authorChanges = this.analyzeBlameInfo(blame, changedLines);
+            return this.formatAnalysis(authorChanges);
         } catch (error) {
-            void Logger.error('Error in GitBlameAnalyzer:', error as Error);
-            return '';
+            void Logger.error('Error analyzing changes:', error as Error);
+            throw error;
         }
     }
 
@@ -220,15 +131,13 @@ export class GitBlameAnalyzer {
         let currentLine = 0;
 
         for (const line of lines) {
-            if (line.startsWith('@@')) {
-                const match = line.match(/@@ -\d+,\d+ \+(\d+),\d+ @@/);
-                if (match) {
-                    currentLine = parseInt(match[1]) - 1;
-                }
+            const match = line.match(/^@@ -\d+(?:,\d+)? \+(\d+)(?:,\d+)? @@/);
+            if (match) {
+                currentLine = parseInt(match[1], 10);
             } else if (line.startsWith('+') && !line.startsWith('+++')) {
                 changedLines.add(currentLine);
                 currentLine++;
-            } else if (!line.startsWith('-')) {
+            } else if (!line.startsWith('-') && !line.startsWith('---')) {
                 currentLine++;
             }
         }
@@ -239,13 +148,13 @@ export class GitBlameAnalyzer {
     private static analyzeBlameInfo(blame: BlameInfo[], changedLines: Set<number>): Map<string, { count: number, lines: number[] }> {
         const authorChanges = new Map<string, { count: number, lines: number[] }>();
 
-        changedLines.forEach(lineNumber => {
-            const blameInfo = blame[lineNumber - 1];
-            if (blameInfo) {
-                const authorData = authorChanges.get(blameInfo.author) || { count: 0, lines: [] };
-                authorData.count++;
-                authorData.lines.push(lineNumber);
-                authorChanges.set(blameInfo.author, authorData);
+        blame.forEach((info, index) => {
+            if (changedLines.has(index + 1)) {
+                const key = `${info.author} <${info.email}>`;
+                const current = authorChanges.get(key) || { count: 0, lines: [] };
+                current.count++;
+                current.lines.push(index + 1);
+                authorChanges.set(key, current);
             }
         });
 
@@ -253,73 +162,37 @@ export class GitBlameAnalyzer {
     }
 
     private static formatAnalysis(authorChanges: Map<string, { count: number, lines: number[] }>): string {
-        let result = "Change Analysis based on Git Blame:\n\n";
-
         if (authorChanges.size === 0) {
-            return result;
+            return 'No changes detected.';
         }
 
-        authorChanges.forEach((data, author) => {
-            result += `${author}: modified ${data.count} lines\n`;
-            result += `Lines: ${data.lines.join(', ')}\n\n`;
-        });
+        const sortedAuthors = Array.from(authorChanges.entries())
+            .sort((a, b) => b[1].count - a[1].count);
 
-        return result;
-    }
-
-    private async executeGitBlame(filePath: string): Promise<string> {
-        const { stdout } = await GitService.execGit(['blame', '--line-porcelain', filePath], path.dirname(filePath));
-        return stdout;
-    }
-
-    private parseBlameOutput(blameOutput: string): BlameInfo[] {
-        const lines = blameOutput.split('\n');
-        const result: BlameInfo[] = [];
-        let currentInfo: Partial<BlameInfo> = {};
-
-        for (const line of lines) {
-            if (line.startsWith('author ')) {
-                currentInfo.author = line.substring(7);
-            } else if (line.startsWith('author-mail ')) {
-                currentInfo.email = line.substring(12).replace(/[<>]/g, '');
-            } else if (line.startsWith('author-time ')) {
-                currentInfo.timestamp = parseInt(line.substring(12), 10);
-                const date = new Date(currentInfo.timestamp * 1000);
-                currentInfo.date = date.toISOString();
-            } else if (line.startsWith('commit ')) {
-                currentInfo.commit = line.substring(7);
-            } else if (line.startsWith('\t')) {
-                currentInfo.line = line.substring(1);
-                if (Object.keys(currentInfo).length > 0) {
-                    result.push(currentInfo as BlameInfo);
-                    currentInfo = {};
-                }
-            }
-        }
-
-        return result;
+        return sortedAuthors.map(([author, { count, lines }]) =>
+            `${author} modified ${count} line${count === 1 ? '' : 's'} (${lines.join(', ')})`
+        ).join('\n');
     }
 
     public async getBlameInfo(filePath: string, repoPath: string): Promise<BlameInfo[]> {
-        if (!await GitService.hasHead(repoPath)) {
-            void Logger.log(`Skipping blame analysis for repository without HEAD: ${repoPath}`);
-            return [];
-        }
-
-        if (await GitService.isNewFile(filePath)) {
-            return [];
-        }
-
-        if (await GitService.isFileDeleted(filePath)) {
-            return [];
-        }
-
         try {
-            const blameOutput = await this.executeGitBlame(filePath);
-            return this.parseBlameOutput(blameOutput);
+            if (!await GitService.hasHead(repoPath)) {
+                throw new Error(errorMessages.noCommitsYet);
+            }
+
+            if (await GitService.isNewFile(filePath, repoPath)) {
+                throw new Error(errorMessages.fileNotCommitted);
+            }
+
+            if (await GitService.isFileDeleted(filePath, repoPath)) {
+                throw new Error(errorMessages.fileDeleted);
+            }
+
+            const blameOutput = await GitBlameAnalyzer.executeGitBlame(filePath, repoPath);
+            return GitBlameAnalyzer.parseBlameOutput(blameOutput);
         } catch (error) {
-            void Logger.error(`Error during blame analysis for ${filePath}:`, error as Error);
-            return [];
+            void Logger.error('Error getting blame info:', error as Error);
+            throw error;
         }
     }
 }

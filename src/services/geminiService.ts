@@ -44,7 +44,7 @@ export class GeminiService {
             progress.report({ message: "Generating commit message...", increment: 50 });
 
             const response = await axios.post<GeminiResponse>(apiUrl, payload, requestConfig);
-            progress.report({ message: "Processing generated message...", increment: 100 });
+            progress.report({ message: "Processing generated message...", increment: 90 });
 
             const message = this.extractCommitMessage(response.data);
             void Logger.log(`Commit message generated using ${model} model`);
