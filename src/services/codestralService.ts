@@ -52,7 +52,7 @@ export class CodestralService {
             const response = await axios.post<CodestralResponse>(this.apiUrl, payload, requestConfig);
 
             void Logger.log('Codestral API response received successfully');
-            progress.report({ message: "Processing generated message...", increment: 100 });
+            progress.report({ message: "Processing generated message...", increment: 90 });
 
             const commitMessage = this.extractCommitMessage(response.data);
             void Logger.log(`Commit message generated using ${model} model`);

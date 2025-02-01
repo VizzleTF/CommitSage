@@ -13,7 +13,6 @@ import { CodestralService } from './codestralService';
 import { OllamaService } from './ollamaService';
 
 const MAX_DIFF_LENGTH = 100000;
-const MAX_RETRY_BACKOFF = 10000;
 
 export class AIService {
     static async generateCommitMessage(
@@ -65,23 +64,6 @@ export class AIService {
             ? `${diff.substring(0, MAX_DIFF_LENGTH)}\n...(truncated)`
             : diff;
     }
-
-    private static cleanCommitMessage(message: string): string {
-        return message
-            .replace(/^["']|["']$/g, '')
-            .replace(/^(Here'?s? (is )?(a )?)?commit message:?\s*/i, '')
-            .replace(/\n{3,}/g, '\n\n')
-            .trim();
-    }
-
-    private static calculateRetryDelay(attempt: number): number {
-        const initialDelay = ConfigService.getInitialRetryDelay();
-        return Math.min(initialDelay * Math.pow(2, attempt - 1), MAX_RETRY_BACKOFF);
-    }
-
-    private static delay(ms: number): Promise<void> {
-        return new Promise(resolve => setTimeout(resolve, ms));
-    }
 }
 
 export class CommitMessageUI {
@@ -90,8 +72,18 @@ export class CommitMessageUI {
     static async generateAndSetCommitMessage(sourceControlRepository?: vscode.SourceControl): Promise<void> {
         try {
             await this.initializeAndValidate();
+
+            if (!sourceControlRepository) {
+                const repos = await GitService.getRepositories();
+                if (repos.length === 1) {
+                    sourceControlRepository = repos[0];
+                } else {
+                    sourceControlRepository = await GitService.selectRepository(repos);
+                }
+            }
+
             await this.executeWithProgress(async progress => {
-                const commitMessage = await this.generateAndApplyMessage(progress, sourceControlRepository);
+                const commitMessage = await this.generateAndApplyMessage(progress, sourceControlRepository!);
                 void Logger.log(`Commit message generated: ${commitMessage.message}`);
             });
         } catch (error: unknown) {
@@ -126,32 +118,33 @@ export class CommitMessageUI {
 
     private static async generateAndApplyMessage(
         progress: ProgressReporter,
-        sourceControlRepository?: vscode.SourceControl
+        sourceControlRepository: vscode.SourceControl
     ): Promise<CommitMessage> {
         progress.report({ message: "Analyzing changes...", increment: 10 });
 
-        const repo = sourceControlRepository || await GitService.getActiveRepository();
-        if (!repo?.rootUri) {
+        if (!sourceControlRepository?.rootUri) {
             throw new Error('No Git repository found');
         }
+
+        const repoPath = sourceControlRepository.rootUri.fsPath;
         const onlyStagedSetting = ConfigService.getOnlyStagedChanges();
-        const hasStagedChanges = await GitService.hasChanges(repo.rootUri!.fsPath, 'staged');
+        const hasStagedChanges = await GitService.hasChanges(repoPath, 'staged');
         const useStagedChanges = onlyStagedSetting || hasStagedChanges;
 
-        const diff = await GitService.getDiff(repo.rootUri!.fsPath, useStagedChanges);
+        const diff = await GitService.getDiff(repoPath, useStagedChanges);
         if (!diff) {
             throw new Error('No changes to commit');
         }
 
-        const changedFiles = await GitService.getChangedFiles(repo.rootUri!.fsPath, useStagedChanges);
+        const changedFiles = await GitService.getChangedFiles(repoPath, useStagedChanges);
         const blameAnalyses = await Promise.all(
-            changedFiles.map(file => GitBlameAnalyzer.analyzeChanges(repo.rootUri!.fsPath, file))
+            changedFiles.map(file => GitBlameAnalyzer.analyzeChanges(repoPath, file))
         );
         const blameAnalysis = blameAnalyses.filter(analysis => analysis).join('\n\n');
 
         const commitMessage = await AIService.generateCommitMessage(diff, blameAnalysis, progress);
 
-        repo.inputBox.value = commitMessage.message;
+        sourceControlRepository.inputBox.value = commitMessage.message;
         this.selectedRepository = sourceControlRepository;
 
         if (ConfigService.getAutoCommitEnabled()) {

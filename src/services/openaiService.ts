@@ -55,7 +55,7 @@ export class OpenAIService {
                 { headers }
             );
 
-            progress.report({ message: "Processing generated message...", increment: 100 });
+            progress.report({ message: "Processing generated message...", increment: 90 });
 
             const message = this.extractCommitMessage(response.data);
             void Logger.log(`Commit message generated using ${model} model`);
@@ -120,8 +120,7 @@ export class OpenAIService {
                 void Logger.log(`Successfully fetched ${models.length} models`);
             }
             return models;
-            // eslint-disable-next-line no-unused-vars, @typescript-eslint/no-unused-vars, unused-imports/no-unused-vars
-        } catch (error) {
+        } catch {
             return [];
         }
     }

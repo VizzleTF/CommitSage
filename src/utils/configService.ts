@@ -306,30 +306,6 @@ export class ConfigService {
         return '@ext:VizzleTF.commitsage commit';
     }
 
-    private static getEndpointVariants(inputUrl: string): string[] {
-        const url = new URL(inputUrl);
-        const variants: string[] = [];
-
-        const baseUrl = url.origin + url.pathname.replace(/\/+$/, '');
-
-        const withoutCompletions = baseUrl.replace(/\/chat\/completions$/, '');
-
-        const withoutVersion = withoutCompletions.replace(/\/v1$/, '');
-
-        const withoutApi = withoutVersion.replace(/\/api$/, '');
-
-        variants.push(baseUrl);
-        if (baseUrl !== withoutCompletions) { variants.push(withoutCompletions); }
-        if (withoutCompletions !== withoutVersion) { variants.push(withoutVersion); }
-        if (withoutVersion !== withoutApi) { variants.push(withoutApi); }
-
-        if (!withoutApi.endsWith('/api')) {
-            variants.push(`${withoutApi}/api`);
-        }
-
-        return [...new Set(variants)];
-    }
-
     private static validateAndNormalizeEndpoint(endpoint: string): string {
         if (!endpoint) {
             return '';

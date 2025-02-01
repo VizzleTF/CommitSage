@@ -28,5 +28,8 @@ export const errorMessages = {
     authenticationError: 'Authentication Error: The API key is invalid or has been revoked. Please check your API key.',
     noChanges: 'No changes to commit',
     noRepository: 'No Git repository found',
-    noWorkspace: 'No workspace folder is open'
+    noWorkspace: 'No workspace folder is open',
+    noCommitsYet: 'Repository has no commits yet',
+    fileNotCommitted: 'File has not been committed yet',
+    fileDeleted: 'File has been deleted'
 };
