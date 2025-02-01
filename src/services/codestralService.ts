@@ -21,8 +21,8 @@ type ErrorWithResponse = AxiosError & {
 };
 
 export class CodestralService {
-    private static readonly API_URL = 'https://codestral.mistral.ai/v1/chat/completions';
-    private static readonly MAX_RETRY_BACKOFF = 10000;
+    private static readonly apiUrl = 'https://codestral.mistral.ai/v1/chat/completions';
+    private static readonly maxRetryBackoff = 10000;
 
     static async generateCommitMessage(
         prompt: string,
@@ -49,7 +49,7 @@ export class CodestralService {
             void Logger.log(`Attempt ${attempt}: Sending request to Codestral API`);
             await this.updateProgressForAttempt(progress, attempt);
 
-            const response = await axios.post<CodestralResponse>(this.API_URL, payload, requestConfig);
+            const response = await axios.post<CodestralResponse>(this.apiUrl, payload, requestConfig);
 
             void Logger.log('Codestral API response received successfully');
             progress.report({ message: "Processing generated message...", increment: 100 });
@@ -148,10 +148,10 @@ export class CodestralService {
     }
 
     private static calculateRetryDelay(attempt: number): number {
-        return Math.min(1000 * Math.pow(2, attempt - 1), this.MAX_RETRY_BACKOFF);
+        return Math.min(1000 * Math.pow(2, attempt - 1), this.maxRetryBackoff);
     }
 
     private static delay(ms: number): Promise<void> {
         return new Promise(resolve => setTimeout(resolve, ms));
     }
-} 
+}

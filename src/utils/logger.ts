@@ -3,7 +3,7 @@ import * as vscode from 'vscode';
 export class Logger {
     private static readonly outputChannel: vscode.OutputChannel = vscode.window.createOutputChannel('Commit Sage');
 
-    static async initialize(_context: vscode.ExtensionContext): Promise<void> {
+    static async initialize(): Promise<void> {
         this.log('Logger initialized');
     }
 
@@ -42,9 +42,9 @@ export class Logger {
         this.outputChannel.dispose();
     }
 
-    public static showError(message: string, error?: Error): void {
-        this.error(message, error);
-        void vscode.window.showErrorMessage(
+    public static async showError(message: string, error?: Error): Promise<void> {
+        await this.error(message, error);
+        await vscode.window.showErrorMessage(
             `Commit Sage: ${message}`,
             { modal: false }
         );

@@ -14,7 +14,13 @@
         "types": [
             "node",
             "vscode"
-        ]
+        ],
+        "baseUrl": ".",
+        "paths": {
+            "*": [
+                "src/*"
+            ]
+        }
     },
     "exclude": [
         "node_modules",

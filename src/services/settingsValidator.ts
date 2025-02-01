@@ -107,6 +107,7 @@ export class SettingsValidator {
     }
 
     public static validateTelemetrySettings(): void {
+        // eslint-disable-next-line no-unused-vars, @typescript-eslint/no-unused-vars, unused-imports/no-unused-vars
         const config = vscode.workspace.getConfiguration('commitSage');
     }
 

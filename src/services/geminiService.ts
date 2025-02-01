@@ -4,8 +4,6 @@ import { ConfigService } from '../utils/configService';
 import { ProgressReporter, CommitMessage } from '../models/types';
 import { errorMessages } from '../utils/constants';
 
-const GEMINI_API_BASE_URL = 'https://generativelanguage.googleapis.com/v1beta/models';
-
 interface GeminiResponse {
     candidates: Array<{
         content: {
@@ -20,15 +18,14 @@ export class GeminiService {
     static async generateCommitMessage(
         prompt: string,
         progress: ProgressReporter,
-        attempt: number = 1
     ): Promise<CommitMessage> {
         const apiKey = await ConfigService.getApiKey();
         const model = ConfigService.getGeminiModel();
-        const apiUrl = `${GEMINI_API_BASE_URL}/${model}:generateContent?key=${apiKey}`;
+        const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
 
         const requestConfig = {
             headers: {
-                'Content-Type': 'application/json'
+                'content-type': 'application/json'
             },
             timeout: 30000
         };
@@ -56,7 +53,7 @@ export class GeminiService {
             const axiosError = error as AxiosError;
             if (axiosError.response) {
                 const status = axiosError.response.status;
-                const data = axiosError.response.data as any;
+                const data = axiosError.response.data as { error?: { message?: string } };
 
                 switch (status) {
                     case 401:
@@ -97,4 +94,4 @@ export class GeminiService {
 
         return response.candidates[0].content.parts[0].text.trim();
     }
-} 
+}

@@ -1,6 +1,8 @@
 import eslint from '@eslint/js';
 import * as tseslint from '@typescript-eslint/eslint-plugin';
 import tsparser from '@typescript-eslint/parser';
+import importPlugin from 'eslint-plugin-import';
+import unusedImportsPlugin from 'eslint-plugin-unused-imports';
 
 export default [
     eslint.configs.recommended,
@@ -21,8 +23,22 @@ export default [
                 Thenable: 'readonly'
             }
         },
+        settings: {
+            'import/resolver': {
+                typescript: {
+                    project: './tsconfig.json',
+                    alwaysTryTypes: true
+                },
+                node: {
+                    extensions: ['.ts', '.js'],
+                    paths: ['node_modules', 'node_modules/@types']
+                }
+            }
+        },
         plugins: {
-            '@typescript-eslint': tseslint
+            '@typescript-eslint': tseslint,
+            'import': importPlugin,
+            'unused-imports': unusedImportsPlugin
         },
         rules: {
             '@typescript-eslint/naming-convention': [
@@ -71,14 +87,27 @@ export default [
             '@typescript-eslint/no-unused-vars': [
                 'error',
                 {
-                    argsIgnorePattern: '^_',
-                    varsIgnorePattern: '^_'
+                    argsIgnorePattern: '^_', // Ignore parameters starting with underscore
+                    varsIgnorePattern: '^_',  // Ignore variables starting with underscore
+                    ignoreRestSiblings: true
                 }
             ],
             '@typescript-eslint/no-explicit-any': 'warn',
             '@typescript-eslint/no-floating-promises': 'error',
             'no-trailing-spaces': 'error',
-            'no-multiple-empty-lines': ['error', { max: 1 }]
+            'no-multiple-empty-lines': ['error', { max: 1 }],
+            'import/no-unresolved': 'error',
+            'unused-imports/no-unused-imports': 'error',
+            'unused-imports/no-unused-vars': [
+                'warn',
+                {
+                    vars: 'all',
+                    varsIgnorePattern: '^_', // Ignore variables starting with underscore
+                    args: 'after-used',
+                    argsIgnorePattern: '^_', // Ignore parameters starting with underscore
+                    ignoreRestSiblings: true
+                }
+            ]
         }
     }
 ];

@@ -1,61 +1,49 @@
 import axios, { AxiosError } from 'axios';
-import { Logger } from './logger';
 import { AiServiceError } from '../models/errors';
 
-const API_VALIDATION = {
-    KEY_FORMAT: /^[A-Za-z0-9_-]+$/,
-    GEMINI_TEST_ENDPOINT: 'https://generativelanguage.googleapis.com/v1beta/models',
-    OPENAI_TEST_ENDPOINT: 'https://api.openai.com/v1/models',
-    ERROR_MESSAGES: {
-        EMPTY_KEY: 'API key cannot be empty',
-        INVALID_CHARS: 'API key contains invalid characters',
-        INVALID_FORMAT: 'Invalid API key format',
-        INVALID_KEY: 'Invalid API key',
-        RATE_LIMIT: 'Rate limit exceeded',
-        INVALID_ENDPOINT: 'Invalid endpoint URL',
-        VALIDATION_FAILED: (status: number) => `API validation failed: ${status}`,
-        CUSTOM_VALIDATION_FAILED: (status: number) => `Custom API validation failed: ${status}`,
-        INVALID_OPENAI_KEY: 'Invalid OpenAI API key format. Key should start with "sk-"'
+const apiValidation = {
+    keyFormat: /^[A-Za-z0-9_-]+$/,
+    openaiTestEndpoint: 'https://api.openai.com/v1/models',
+    errorMessages: {
+        emptyKey: 'API key cannot be empty',
+        invalidChars: 'API key contains invalid characters',
+        invalidFormat: 'Invalid API key format',
+        invalidKey: 'Invalid API key',
+        rateLimit: 'Rate limit exceeded',
+        invalidEndpoint: 'Invalid endpoint URL',
+        validationFailed: (status: number) => `API validation failed: ${status}`,
+        customValidationFailed: (status: number) => `Custom API validation failed: ${status}`,
+        invalidOpenaiKey: 'Invalid OpenAI API key format. Key should start with "sk-"'
     }
 } as const;
-
-interface ApiResponse {
-    status: number;
-    data: unknown;
-}
-
-type ValidationResult = {
-    isValid: boolean;
-    error?: string;
-};
 
 export class ApiKeyValidator {
     static validateOpenAIApiKey(key: string): string | null {
         if (!key) {
-            return API_VALIDATION.ERROR_MESSAGES.EMPTY_KEY;
+            return apiValidation.errorMessages.emptyKey;
         }
         if (!key.startsWith('sk-')) {
-            return API_VALIDATION.ERROR_MESSAGES.INVALID_OPENAI_KEY;
+            return apiValidation.errorMessages.invalidOpenaiKey;
         }
         return null;
     }
 
     static validateGeminiApiKey(key: string): string | null {
         if (!key) {
-            return API_VALIDATION.ERROR_MESSAGES.EMPTY_KEY;
+            return apiValidation.errorMessages.emptyKey;
         }
-        if (!API_VALIDATION.KEY_FORMAT.test(key)) {
-            return API_VALIDATION.ERROR_MESSAGES.INVALID_CHARS;
+        if (!apiValidation.keyFormat.test(key)) {
+            return apiValidation.errorMessages.invalidChars;
         }
         return null;
     }
 
     static validateCodestralApiKey(key: string): string | null {
         if (!key) {
-            return API_VALIDATION.ERROR_MESSAGES.EMPTY_KEY;
+            return apiValidation.errorMessages.emptyKey;
         }
-        if (!API_VALIDATION.KEY_FORMAT.test(key)) {
-            return API_VALIDATION.ERROR_MESSAGES.INVALID_CHARS;
+        if (!apiValidation.keyFormat.test(key)) {
+            return apiValidation.errorMessages.invalidChars;
         }
         return null;
     }
@@ -63,15 +51,15 @@ export class ApiKeyValidator {
     static async validateOpenAIApiKeyOnline(key: string): Promise<boolean> {
         try {
             if (!key.startsWith('sk-')) {
-                throw new AiServiceError(API_VALIDATION.ERROR_MESSAGES.INVALID_OPENAI_KEY);
+                throw new AiServiceError(apiValidation.errorMessages.invalidOpenaiKey);
             }
 
             const response = await axios.get(
-                API_VALIDATION.OPENAI_TEST_ENDPOINT,
+                apiValidation.openaiTestEndpoint,
                 {
                     headers: {
                         'Authorization': `Bearer ${key}`,
-                        'Content-Type': 'application/json'
+                        contentType: 'application/json'
                     }
                 }
             );
@@ -82,17 +70,17 @@ export class ApiKeyValidator {
             if (axiosError.response) {
                 const status = axiosError.response.status;
                 if (status === 401 || status === 403) {
-                    throw new AiServiceError(API_VALIDATION.ERROR_MESSAGES.INVALID_KEY);
+                    throw new AiServiceError(apiValidation.errorMessages.invalidKey);
                 }
                 if (status === 429) {
-                    throw new AiServiceError(API_VALIDATION.ERROR_MESSAGES.RATE_LIMIT);
+                    throw new AiServiceError(apiValidation.errorMessages.rateLimit);
                 }
             }
             throw error;
         }
     }
-
-    static async validateGeminiApiKeyOnline(key: string): Promise<boolean> {
+    // eslint-disable-next-line no-unused-vars
+    static async validateGeminiApiKeyOnline(_key: string): Promise<boolean> {
         return true; // TODO: Implement online validation for Gemini API
     }
 
@@ -107,7 +95,7 @@ export class ApiKeyValidator {
                 {
                     headers: {
                         'Authorization': `Bearer ${key}`,
-                        'Content-Type': 'application/json'
+                        contentType: 'application/json'
                     }
                 }
             );
@@ -125,15 +113,4 @@ export class ApiKeyValidator {
         }
     }
 
-    private static handleApiError(error: AxiosError): never {
-        if (error.response) {
-            const status = error.response.status;
-            if (status === 401 || status === 403) {
-                throw new AiServiceError(API_VALIDATION.ERROR_MESSAGES.INVALID_KEY);
-            } else {
-                throw new AiServiceError(API_VALIDATION.ERROR_MESSAGES.VALIDATION_FAILED(status));
-            }
-        }
-        throw error;
-    }
 }
