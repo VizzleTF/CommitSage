@@ -16,7 +16,8 @@ const GIT_STATUS_CODES = {
     added: 'A',
     deleted: 'D',
     renamed: 'R',
-    untracked: '??'
+    untracked: '??',
+    submodule: 'S'
 } as const;
 
 type GitStatusCode = typeof GIT_STATUS_CODES[keyof typeof GIT_STATUS_CODES];
@@ -120,27 +121,61 @@ export class GitService {
 
             const diffs: string[] = [];
 
+            // Skip submodule changes
+            const isSubmodule = async (file: string): Promise<boolean> => {
+                try {
+                    const { stdout } = await this.execGit(['ls-files', '--stage', file], repoPath);
+                    return stdout.includes('160000');
+                } catch {
+                    return false;
+                }
+            };
+
             // If we only want staged changes and there are some, return only those
             if (onlyStagedChanges && hasStagedChanges) {
-                const stagedDiff = await this.executeGitCommand(['diff', '--cached'], repoPath);
-                if (stagedDiff.trim()) {
-                    diffs.push(stagedDiff);
+                const stagedFiles = (await this.executeGitCommand(['diff', '--cached', '--name-only'], repoPath))
+                    .split('\n')
+                    .filter(file => file.trim());
+
+                for (const file of stagedFiles) {
+                    if (!(await isSubmodule(file))) {
+                        const fileDiff = await this.executeGitCommand(['diff', '--cached', file], repoPath);
+                        if (fileDiff.trim()) {
+                            diffs.push(fileDiff);
+                        }
+                    }
                 }
                 return diffs.join('\n\n').trim();
             }
 
             // Otherwise, get all changes
             if (hasStagedChanges) {
-                const stagedDiff = await this.executeGitCommand(['diff', '--cached'], repoPath);
-                if (stagedDiff.trim()) {
-                    diffs.push('# Staged changes:\n' + stagedDiff);
+                const stagedFiles = (await this.executeGitCommand(['diff', '--cached', '--name-only'], repoPath))
+                    .split('\n')
+                    .filter(file => file.trim());
+
+                for (const file of stagedFiles) {
+                    if (!(await isSubmodule(file))) {
+                        const fileDiff = await this.executeGitCommand(['diff', '--cached', file], repoPath);
+                        if (fileDiff.trim()) {
+                            diffs.push('# Staged changes:\n' + fileDiff);
+                        }
+                    }
                 }
             }
 
             if (hasUnstagedChanges) {
-                const unstagedDiff = await this.executeGitCommand(['diff'], repoPath);
-                if (unstagedDiff.trim()) {
-                    diffs.push('# Unstaged changes:\n' + unstagedDiff);
+                const unstagedFiles = (await this.executeGitCommand(['diff', '--name-only'], repoPath))
+                    .split('\n')
+                    .filter(file => file.trim());
+
+                for (const file of unstagedFiles) {
+                    if (!(await isSubmodule(file))) {
+                        const fileDiff = await this.executeGitCommand(['diff', file], repoPath);
+                        if (fileDiff.trim()) {
+                            diffs.push('# Unstaged changes:\n' + fileDiff);
+                        }
+                    }
                 }
             }
 
@@ -248,6 +283,10 @@ export class GitService {
             return output.split('\n')
                 .filter(line => line.trim() !== '')
                 .filter(line => {
+                    if (line.includes('Subproject commit') || line.includes('Entering')) {
+                        return false;
+                    }
+
                     if (onlyStaged) {
                         // For staged changes, check first character
                         return STAGED_STATUS_CODES.includes(line[0] as GitStatusCode);
