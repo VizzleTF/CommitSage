@@ -2,6 +2,7 @@ import axios, { AxiosError } from 'axios';
 import { Logger } from '../utils/logger';
 import { CommitMessage, ProgressReporter } from '../models/types';
 import { ConfigService } from '../utils/configService';
+import { ConfigurationError } from '../models/errors';
 
 interface CodestralResponse {
     choices: Array<{
@@ -29,23 +30,23 @@ export class CodestralService {
         progress: ProgressReporter,
         attempt: number = 1
     ): Promise<CommitMessage> {
-        const apiKey = await ConfigService.getCodestralApiKey();
-        const model = ConfigService.getCodestralModel();
-
-        const requestConfig = {
-            headers: {
-                'content-type': 'application/json',
-                'Authorization': `Bearer ${apiKey}`
-            },
-            timeout: 30000
-        };
-
-        const payload = {
-            model: model,
-            messages: [{ role: "user", content: prompt }]
-        };
-
         try {
+            const apiKey = await ConfigService.getCodestralApiKey();
+            const model = ConfigService.getCodestralModel();
+
+            const requestConfig = {
+                headers: {
+                    'content-type': 'application/json',
+                    'Authorization': `Bearer ${apiKey}`
+                },
+                timeout: 30000
+            };
+
+            const payload = {
+                model: model,
+                messages: [{ role: "user", content: prompt }]
+            };
+
             void Logger.log(`Attempt ${attempt}: Sending request to Codestral API`);
             await this.updateProgressForAttempt(progress, attempt);
 
@@ -58,7 +59,39 @@ export class CodestralService {
             void Logger.log(`Commit message generated using ${model} model`);
             return { message: commitMessage, model };
         } catch (error) {
-            return await this.handleGenerationError(error as ErrorWithResponse, prompt, progress, attempt);
+            const axiosError = error as ErrorWithResponse;
+            if (axiosError.response) {
+                const { status } = axiosError.response;
+                const responseData = JSON.stringify(axiosError.response.data);
+
+                switch (status) {
+                    case 401:
+                        if (attempt === 1) {
+                            await ConfigService.removeCodestralApiKey();
+                            await ConfigService.promptForCodestralApiKey();
+                            return this.generateCommitMessage(prompt, progress, attempt + 1);
+                        }
+                        throw new Error('Invalid API key. Please check your Codestral API key.');
+                    case 429:
+                        throw new Error('Rate limit exceeded. Please try again later.');
+                    case 500:
+                        throw new Error('Server error. Please try again later.');
+                    default:
+                        throw new Error(`API returned status ${status}. ${responseData}`);
+                }
+            }
+
+            if (axiosError.message.includes('ECONNREFUSED') || axiosError.message.includes('ETIMEDOUT')) {
+                throw new Error('Could not connect to Codestral API. Please check your internet connection.');
+            }
+
+            // Если ключ не установлен и это первая попытка
+            if (error instanceof ConfigurationError && attempt === 1) {
+                await ConfigService.promptForCodestralApiKey();
+                return this.generateCommitMessage(prompt, progress, attempt + 1);
+            }
+
+            throw error;
         }
     }
 

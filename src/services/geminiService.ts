@@ -3,6 +3,7 @@ import { Logger } from '../utils/logger';
 import { ConfigService } from '../utils/configService';
 import { ProgressReporter, CommitMessage } from '../models/types';
 import { errorMessages } from '../utils/constants';
+import { ConfigurationError } from '../models/errors';
 
 interface GeminiResponse {
     candidates: Array<{
@@ -18,29 +19,30 @@ export class GeminiService {
     static async generateCommitMessage(
         prompt: string,
         progress: ProgressReporter,
+        attempt: number = 1
     ): Promise<CommitMessage> {
-        const apiKey = await ConfigService.getApiKey();
-        const model = ConfigService.getGeminiModel();
-        const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
-
-        const requestConfig = {
-            headers: {
-                'content-type': 'application/json'
-            },
-            timeout: 30000
-        };
-
-        const payload = {
-            contents: [{ parts: [{ text: prompt }] }],
-            generationConfig: {
-                temperature: 0.7,
-                topK: 40,
-                topP: 0.95,
-                maxOutputTokens: 1024
-            }
-        };
-
         try {
+            const apiKey = await ConfigService.getApiKey();
+            const model = ConfigService.getGeminiModel();
+            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+
+            const requestConfig = {
+                headers: {
+                    'content-type': 'application/json'
+                },
+                timeout: 30000
+            };
+
+            const payload = {
+                contents: [{ parts: [{ text: prompt }] }],
+                generationConfig: {
+                    temperature: 0.7,
+                    topK: 40,
+                    topP: 0.95,
+                    maxOutputTokens: 1024
+                }
+            };
+
             progress.report({ message: "Generating commit message...", increment: 50 });
 
             const response = await axios.post<GeminiResponse>(apiUrl, payload, requestConfig);
@@ -57,6 +59,12 @@ export class GeminiService {
 
                 switch (status) {
                     case 401:
+                        if (attempt === 1) {
+                            // Если это первая попытка и ключ неверный, запросим новый ключ и попробуем снова
+                            await ConfigService.removeApiKey();
+                            await ConfigService.promptForApiKey();
+                            return this.generateCommitMessage(prompt, progress, attempt + 1);
+                        }
                         throw new Error(errorMessages.authenticationError);
                     case 402:
                         throw new Error(errorMessages.paymentRequired);
@@ -79,6 +87,12 @@ export class GeminiService {
                 throw new Error(
                     errorMessages.networkError.replace('{0}', 'Connection failed. Please check your internet connection.')
                 );
+            }
+
+            // Если ключ не установлен и это первая попытка
+            if (error instanceof ConfigurationError && attempt === 1) {
+                await ConfigService.promptForApiKey();
+                return this.generateCommitMessage(prompt, progress, attempt + 1);
             }
 
             throw new Error(
