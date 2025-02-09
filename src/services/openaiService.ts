@@ -3,7 +3,7 @@ import { Logger } from '../utils/logger';
 import { ConfigService } from '../utils/configService';
 import { ProgressReporter, CommitMessage } from '../models/types';
 import { errorMessages } from '../utils/constants';
-import { OpenAIError } from '../models/errors';
+import { OpenAIError, ConfigurationError } from '../models/errors';
 
 interface OpenAIResponse {
     choices: Array<{
@@ -28,25 +28,26 @@ export class OpenAIService {
 
     static async generateCommitMessage(
         prompt: string,
-        progress: ProgressReporter
+        progress: ProgressReporter,
+        attempt: number = 1
     ): Promise<CommitMessage> {
-        const apiKey = await ConfigService.getOpenAIApiKey();
-        const model = ConfigService.getOpenAIModel();
-        const baseUrl = ConfigService.getOpenAIBaseUrl();
-
-        const payload = {
-            model,
-            messages: [{ role: "user", content: prompt }],
-            temperature: 0.7,
-            maxTokens: 1024
-        };
-
-        const headers = {
-            'Authorization': `Bearer ${apiKey}`,
-            'content-type': 'application/json'
-        };
-
         try {
+            const apiKey = await ConfigService.getOpenAIApiKey();
+            const model = ConfigService.getOpenAIModel();
+            const baseUrl = ConfigService.getOpenAIBaseUrl();
+
+            const payload = {
+                model,
+                messages: [{ role: "user", content: prompt }],
+                temperature: 0.7,
+                maxTokens: 1024
+            };
+
+            const headers = {
+                'Authorization': `Bearer ${apiKey}`,
+                'content-type': 'application/json'
+            };
+
             progress.report({ message: "Generating commit message...", increment: 50 });
 
             const response = await axios.post<OpenAIResponse>(
@@ -66,9 +67,13 @@ export class OpenAIService {
                 const status = axiosError.response.status;
                 const data = axiosError.response.data as { error?: { message?: string } };
 
-                // Handle specific OpenAI error cases
                 switch (status) {
                     case 401:
+                        if (attempt === 1) {
+                            await ConfigService.removeOpenAIApiKey();
+                            await ConfigService.promptForOpenAIApiKey();
+                            return this.generateCommitMessage(prompt, progress, attempt + 1);
+                        }
                         throw new OpenAIError(errorMessages.authenticationError);
                     case 402:
                         throw new OpenAIError(errorMessages.paymentRequired);
@@ -91,6 +96,12 @@ export class OpenAIService {
                 throw new OpenAIError(
                     errorMessages.networkError.replace('{0}', 'Connection failed. Please check your internet connection.')
                 );
+            }
+
+            // Если ключ не установлен и это первая попытка
+            if (error instanceof ConfigurationError && attempt === 1) {
+                await ConfigService.promptForOpenAIApiKey();
+                return this.generateCommitMessage(prompt, progress, attempt + 1);
             }
 
             throw new OpenAIError(
