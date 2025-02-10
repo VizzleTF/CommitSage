@@ -93,7 +93,7 @@ export class GitBlameAnalyzer {
     }
 
     private static async getDiff(repoPath: string, filePath: string): Promise<string> {
-        const { stdout } = await GitService.execGit(['diff', '--unified=0', filePath], repoPath);
+        const { stdout } = await GitService.execGit(['diff', '--unified=0', '--', filePath], repoPath);
         return stdout;
     }
 
