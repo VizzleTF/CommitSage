@@ -124,7 +124,7 @@ export class GitService {
             // Skip submodule changes
             const isSubmodule = async (file: string): Promise<boolean> => {
                 try {
-                    const { stdout } = await this.execGit(['ls-files', '--stage', file], repoPath);
+                    const { stdout } = await this.execGit(['ls-files', '--stage', '--', file], repoPath);
                     return stdout.includes('160000');
                 } catch {
                     return false;
@@ -139,7 +139,7 @@ export class GitService {
 
                 for (const file of stagedFiles) {
                     if (!(await isSubmodule(file))) {
-                        const fileDiff = await this.executeGitCommand(['diff', '--cached', file], repoPath);
+                        const fileDiff = await this.executeGitCommand(['diff', '--cached', '--', file], repoPath);
                         if (fileDiff.trim()) {
                             diffs.push(fileDiff);
                         }
@@ -156,7 +156,7 @@ export class GitService {
 
                 for (const file of stagedFiles) {
                     if (!(await isSubmodule(file))) {
-                        const fileDiff = await this.executeGitCommand(['diff', '--cached', file], repoPath);
+                        const fileDiff = await this.executeGitCommand(['diff', '--cached', '--', file], repoPath);
                         if (fileDiff.trim()) {
                             diffs.push('# Staged changes:\n' + fileDiff);
                         }
@@ -171,7 +171,7 @@ export class GitService {
 
                 for (const file of unstagedFiles) {
                     if (!(await isSubmodule(file))) {
-                        const fileDiff = await this.executeGitCommand(['diff', file], repoPath);
+                        const fileDiff = await this.executeGitCommand(['diff', '--', file], repoPath);
                         if (fileDiff.trim()) {
                             diffs.push('# Unstaged changes:\n' + fileDiff);
                         }
