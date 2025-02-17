@@ -236,7 +236,7 @@
         "@vscode/test-electron": "^2.3.9",
         "@vscode/vsce": "^3.2.2",
         "dotenv-webpack": "^8.0.1",
-        "eslint": "^9.20.0",
+        "eslint": "^9.20.1",
         "eslint-import-resolver-typescript": "^3.8.0",
         "eslint-plugin-import": "^2.31.0",
         "eslint-plugin-unused-imports": "^4.1.4",
