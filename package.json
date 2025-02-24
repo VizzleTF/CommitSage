@@ -237,7 +237,7 @@
         "@vscode/vsce": "^3.2.2",
         "dotenv-webpack": "^8.0.1",
         "eslint": "^9.21.0",
-        "eslint-import-resolver-typescript": "^3.8.0",
+        "eslint-import-resolver-typescript": "^3.8.3",
         "eslint-plugin-import": "^2.31.0",
         "eslint-plugin-unused-imports": "^4.1.4",
         "glob": "^11.0.1",
