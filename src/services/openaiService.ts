@@ -141,6 +141,11 @@ export class OpenAIService {
             throw new OpenAIError('Unexpected response format from OpenAI API');
         }
 
-        return response.choices[0].message.content.trim();
+        let content = response.choices[0].message.content.trim();
+
+        // Remove <think> tags for DeepSeek R1 model support
+        content = content.replace(/<think>[\s\S]*?<\/think>/g, '').trim();
+
+        return content;
     }
 }
