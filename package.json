@@ -115,14 +115,16 @@
                         "angular",
                         "karma",
                         "semantic",
-                        "emoji"
+                        "emoji",
+                        "emoji-karma"
                     ],
                     "enumDescriptions": [
                         "type(scope): description\n\nbody\n\nfooter",
                         "type(scope): short summary\n\nbody\n\nfooter",
                         "type(scope): message",
                         "type: message",
-                        ":emoji: message"
+                        ":emoji: message",
+                        ":emoji: type(scope): message"
                     ],
                     "default": "conventional",
                     "description": "Format style for commit messages. All formats support English, some may have limited support for other languages",
