@@ -119,7 +119,7 @@
                         "karma",
                         "semantic",
                         "emoji",
-                        "emoji-karma"
+                        "emojiKarma"
                     ],
                     "enumDescriptions": [
                         "type(scope): description\n\nbody\n\nfooter",
