@@ -1,0 +1,32 @@
+{
+  // Use IntelliSense to learn about possible attributes.
+  // Hover to view descriptions of existing attributes.
+  // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Run Extension",
+      "type": "extensionHost",
+      "request": "launch",
+      "args": ["--extensionDevelopmentPath=${workspaceFolder}"],
+      "outFiles": [
+        "${workspaceFolder}/dist/**/*.js" // Adjust if your compiled output is elsewhere
+      ],
+      "preLaunchTask": "${defaultBuildTask}" // Assumes you have a default build task configured
+    },
+    {
+      "name": "Extension Tests",
+      "type": "extensionHost",
+      "request": "launch",
+      "args": [
+        "--extensionDevelopmentPath=${workspaceFolder}",
+        "--extensionTestsPath=${workspaceFolder}/out/test/suite/index" // Adjust if your test entry point is different
+      ],
+      "outFiles": [
+        "${workspaceFolder}/out/test/**/*.js", // Adjust if your compiled test output is elsewhere
+        "${workspaceFolder}/dist/**/*.js" // Include main compiled output as well
+      ],
+      "preLaunchTask": "${defaultBuildTask}" // Assumes tests also need the build task
+    }
+  ]
+}
