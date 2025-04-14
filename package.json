@@ -238,7 +238,7 @@
         "@types/vscode": "^1.93.0",
         "@typescript-eslint/eslint-plugin": "^8.29.0",
         "@typescript-eslint/parser": "^8.29.0",
-        "@vscode/test-electron": "^2.3.9",
+        "@vscode/test-electron": "^2.5.2",
         "@vscode/vsce": "^3.3.2",
         "dotenv-webpack": "^8.0.1",
         "eslint": "^9.24.0",
