@@ -161,5 +161,46 @@ feat(auth): ユーザー認証を追加
 
 - OAuth2プロバイダーの統合を実装
 - 認証サービスモジュールを作成
-- セッション管理を追加`
+- セッション管理を追加`,
+
+    spanish: `Genera un mensaje de commit siguiendo el formato de Conventional Commits:
+<tipo>[ámbito opcional]: <descripción>
+
+[cuerpo opcional con puntos]
+
+Reglas:
+1. Primera línea: tipo(ámbito): descripción (máx 50 caracteres)
+2. Para cambios pequeños usar solo la primera línea
+3. Para cambios complejos listar puntos clave en el cuerpo:
+   - Cada línea empieza con "- "
+   - Cada línea máx 50 caracteres
+   - Limitar a 5 puntos
+   - Resumir cambios de forma concisa
+
+Reglas de selección de tipo:
+- docs: CUALQUIER cambio en documentación (*.md, docs/*)
+- feat: Nuevas características o cambios funcionales significativos
+- fix: Correcciones de errores y bugs
+- style: Formato, punto y coma, etc (sin cambios de código)
+- refactor: Cambios de código que no arreglan bugs ni añaden funciones
+- perf: Mejoras de rendimiento
+- test: Añadir o actualizar pruebas
+- build: Sistema de build o dependencias
+- ci: Cambios en CI/CD
+- chore: Otras tareas de mantenimiento
+
+Ejemplos:
+Cambio en documentación:
+docs: actualizar guías de instalación y uso
+
+- Añadida descripción de nuevas características
+- Actualizada sección de configuración
+- Añadidos ejemplos de uso
+
+Cambio de característica:
+feat(auth): añadir autenticación de usuario
+
+- Implementada integración con proveedor OAuth2
+- Creado módulo de servicio de autenticación
+- Añadida gestión de sesiones`
 };

@@ -57,5 +57,20 @@ chore(ci): 更新部署脚本至 Node 16`,
 - chore: メンテナンス
 
 例：
-chore(ci): デプロイスクリプトをNode 16に更新`
+chore(ci): デプロイスクリプトをNode 16に更新`,
+
+    spanish: `Genera un mensaje de commit siguiendo el formato Karma:
+<tipo>(<ámbito>): <mensaje>
+
+Tipos:
+- feat: Nueva característica
+- fix: Corrección de bug
+- docs: Cambio en documentación
+- style: Formato, punto y coma faltantes, etc
+- refactor: Refactorización de código
+- test: Añadir pruebas
+- chore: Mantenimiento
+
+Ejemplo:
+chore(ci): actualizar script de despliegue a Node 16`
 };

@@ -57,5 +57,20 @@ feat: 添加用户头像上传功能`,
 - chore: ビルドプロセスまたは補助ツールの変更
 
 例：
-feat: ユーザーアバターのアップロード機能を追加`
+feat: ユーザーアバターのアップロード機能を追加`,
+
+    spanish: `Genera un mensaje de commit siguiendo el formato Semántico:
+tipo: mensaje
+
+Tipos:
+- feat: Nueva característica
+- fix: Corrección de bug
+- docs: Cambios en documentación
+- style: Cambios de estilo de código
+- refactor: Refactorización de código
+- test: Actualizaciones de pruebas
+- chore: Cambios en proceso de build o herramientas auxiliares
+
+Ejemplo:
+feat: añadir funcionalidad de subida de avatar de usuario`
 };

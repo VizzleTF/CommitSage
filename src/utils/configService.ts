@@ -5,7 +5,7 @@ import { AiServiceError, ConfigurationError } from '../models/errors';
 
 type CacheValue = string | boolean | number;
 
-export type CommitLanguage = 'english' | 'russian' | 'chinese' | 'japanese';
+export type CommitLanguage = 'english' | 'russian' | 'chinese' | 'japanese' | 'spanish';
 
 export class ConfigService {
     private static cache = new Map<string, CacheValue>();

@@ -129,5 +129,38 @@ refactor(core): データベースクエリを最適化
 
 - クエリキャッシュを実装
 - コネクションプーリングを追加
-- エラー処理を更新`
+- エラー処理を更新`,
+
+    spanish: `Genera un mensaje de commit siguiendo el formato Angular:
+<tipo>(<ámbito>): <resumen corto>
+
+[cuerpo opcional con puntos]
+
+Reglas:
+1. Primera línea: tipo(ámbito): resumen (máx 50 caracteres)
+2. Para cambios pequeños usar solo la primera línea
+3. Para cambios complejos listar puntos clave en el cuerpo:
+   - Cada línea empieza con "- "
+   - Cada línea máx 50 caracteres
+
+Tipos:
+build: Build/dependencias
+ci: Configuración CI
+docs: Documentación
+feat: Nueva característica
+fix: Corrección de bug
+perf: Rendimiento
+refactor: Cambio de código
+test: Pruebas
+
+Ejemplos:
+Cambio pequeño:
+feat(api): añadir método de validación de datos
+
+Cambio complejo:
+refactor(core): optimizar consultas de base de datos
+
+- Implementar caché de consultas
+- Añadir pool de conexiones
+- Actualizar manejo de errores`
 };

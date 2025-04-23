@@ -166,4 +166,88 @@ export const russianLongInstructions = `Создайте подробное со
    Переписал неэффективные запросы с использованием индексов
    Добавил уровень кэширования для часто запрашиваемых данных`;
 
+export const spanishShortInstructions = `Genera un mensaje de commit Git conciso basado en el diff proporcionado. Sigue estas reglas:
+1. Usa el formato: <tipo>: <descripción>
+2. Tipos:
+- feat: para nuevas características o actualizaciones significativas
+- fix: para correcciones de errores
+- docs: para cambios en la documentación
+- style: para formato, punto y coma faltantes, etc.
+- refactor: para reestructuración de código sin cambiar su comportamiento
+- test: para agregar o cambiar pruebas
+- chore: para tareas pequeñas, mantenimiento o cambios triviales
+- perf: para mejoras de rendimiento
+- ci: para actualizaciones de pipeline CI/CD
+- build: para cambios que afectan el sistema de compilación o dependencias
+3. Mantén todo el mensaje en menos de 50 caracteres
+4. Usa modo imperativo (ej., "Agrega" no "Agregado")
+5. Enfócate en el cambio general, no en detalles específicos
+6. No menciones nombres de archivos o números de línea
+
+Ejemplos:
+1. Diff: Agregada nueva función de autenticación de usuario
+   Mensaje: feat: Agrega autenticación de usuario
+
+2. Diff: Corregido error en procesamiento de pagos
+   Mensaje: fix: Corrige procesamiento de pagos
+
+3. Diff: Actualizado README con nuevos pasos de instalación
+   Mensaje: docs: Actualiza instrucciones de instalación
+
+4. Diff: Reformateado código según guía de estilo
+   Mensaje: style: Aplica formato consistente de código
+
+5. Diff: Reestructuradas consultas de base de datos para eficiencia
+   Mensaje: refactor: Optimiza consultas de base de datos`;
+
+export const spanishLongInstructions = `Crea un mensaje de commit Git detallado basado en el diff proporcionado. Sigue estas pautas:
+1. Primera línea: <tipo>: <resumen breve> (50 caracteres o menos)
+2. Tipos:
+- feat: para nuevas características o actualizaciones significativas
+- fix: para correcciones de errores
+- docs: para cambios en la documentación
+- style: para formato, punto y coma faltantes, etc.
+- refactor: para reestructuración de código sin cambiar su comportamiento
+- test: para agregar o cambiar pruebas
+- chore: para tareas pequeñas, mantenimiento o cambios triviales
+- perf: para mejoras de rendimiento
+- ci: para actualizaciones de pipeline CI/CD
+- build: para cambios que afectan el sistema de compilación o dependencias
+3. Deja una línea en blanco después de la primera línea
+4. Líneas siguientes: descripción detallada (ajustar a 72 caracteres)
+5. Usa modo imperativo en todas las líneas
+6. Explica qué y por qué, no cómo
+7. Menciona cambios significativos y su impacto
+8. No menciones nombres específicos de archivos o números de línea
+9. Máximo 5 líneas en total (incluyendo línea en blanco)
+
+Ejemplos:
+1. Diff: Implementada funcionalidad de registro y login de usuario
+   Mensaje: feat: Agrega sistema de autenticación de usuario
+
+   Implementa procesos seguros de registro y login
+   Integra verificación de correo para nuevas cuentas
+   Mejora la seguridad general de la aplicación
+
+2. Diff: Corregido error crítico causando pérdida de datos en respaldo
+   Mensaje: fix: Resuelve problema de pérdida de datos en respaldo
+
+   Identifica y corrige vulnerabilidad en rutina de respaldo
+   Implementa verificaciones adicionales de integridad de datos
+   Mejora manejo de errores y registro para respaldos
+
+3. Diff: Actualizada documentación API con nuevos endpoints
+   Mensaje: docs: Mejora documentación de API
+
+   Agrega descripciones para endpoints API recién implementados
+   Incluye ejemplos de uso y formatos de respuesta
+   Actualiza sección de requisitos de autenticación
+
+4. Diff: Refactorizado capa de acceso a base de datos para mejor rendimiento
+   Mensaje: refactor: Optimiza operaciones de base de datos
+
+   Implementa pool de conexiones para mejor eficiencia
+   Reescribe consultas ineficientes usando indexación adecuada
+   Agrega capa de caché para datos frecuentemente accedidos`;
+
 export const customInstructions = "{customInstructions}";

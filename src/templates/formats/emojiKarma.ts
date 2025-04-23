@@ -105,5 +105,32 @@ Example:
 
 例：
 ✨ feat(auth): ユーザー認証システムを追加
-🐛 fix(api): トークン期限切れの問題を解決`
+🐛 fix(api): トークン期限切れの問題を解決`,
+
+    spanish: `Genera un mensaje de commit siguiendo el formato Emoji-Karma:
+:emoji: tipo(ámbito): mensaje
+
+Tipos:
+- feat: Nueva característica
+- fix: Corrección de bug
+- docs: Cambio en documentación
+- style: Formato, punto y coma faltantes, etc
+- refactor: Refactorización de código
+- test: Añadir pruebas
+- chore: Mantenimiento
+
+Emojis comunes:
+✨ :sparkles: - Nueva característica
+🐛 :bug: - Corrección de bug
+📚 :books: - Documentación
+💄 :lipstick: - Cambios de UI/estilo
+♻️ :recycle: - Refactorización
+✅ :white_check_mark: - Pruebas
+🔧 :wrench: - Configuración
+⚡️ :zap: - Rendimiento
+🔒 :lock: - Seguridad
+
+Ejemplo:
+✨ feat(auth): añadir sistema de autenticación de usuario
+🐛 fix(api): resolver problema de expiración del token`
 }; 
