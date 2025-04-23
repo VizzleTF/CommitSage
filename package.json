@@ -105,7 +105,8 @@
                         "english",
                         "russian",
                         "chinese",
-                        "japanese"
+                        "japanese",
+                        "spanish"
                     ],
                     "default": "english",
                     "description": "Language for generated commit messages. Some commit formats may have limited support for non-English languages",

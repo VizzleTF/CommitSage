@@ -11,11 +11,12 @@ export interface CommitTemplate {
     russian: string;
     chinese: string;
     japanese: string;
+    spanish: string;
 }
 
 export type CommitFormat = 'conventional' | 'angular' | 'karma' | 'semantic' | 'emoji' | 'emojiKarma';
 
-const SUPPORTED_LANGUAGES = ['english', 'russian', 'chinese', 'japanese'] as const;
+const SUPPORTED_LANGUAGES = ['english', 'russian', 'chinese', 'japanese', 'spanish'] as const;
 type SupportedLanguage = typeof SUPPORTED_LANGUAGES[number];
 
 const templates: Record<CommitFormat, CommitTemplate> = {
