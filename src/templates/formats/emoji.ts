@@ -69,5 +69,23 @@ Example:
 
 例：
 ✨ リアルタイムコラボレーション機能を追加
-🐛 認証トークンの有効期限の問題を修正`
+🐛 認証トークンの有効期限の問題を修正`,
+
+    spanish: `Genera un mensaje de commit siguiendo el formato Emoji:
+:emoji: mensaje de commit
+
+Emojis comunes:
+✨ :sparkles: - Nueva característica
+🐛 :bug: - Corrección de bug
+📚 :books: - Documentación
+💄 :lipstick: - Cambios de UI/estilo
+♻️ :recycle: - Refactorización
+✅ :white_check_mark: - Pruebas
+🔧 :wrench: - Configuración
+⚡️ :zap: - Rendimiento
+🔒 :lock: - Seguridad
+
+Ejemplo:
+✨ añadir característica de colaboración en tiempo real
+🐛 corregir expiración del token de autenticación`
 };

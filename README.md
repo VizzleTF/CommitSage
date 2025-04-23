@@ -14,7 +14,7 @@ Commit Sage is a VSCode extension that automatically generates commit messages u
 ## Features
 
 - 🤖 AI-powered commit message generation
-- 🌍 Multiple language support (English, Russian, Chinese, Japanese)
+- 🌍 Multiple language support (English, Russian, Chinese, Japanese, Spanish)
 - 📝 Various commit formats (Conventional, Angular, Karma, Semantic, Emoji, EmojiKarma)
 - 🔄 Smart handling of staged/unstaged changes
 - 🚀 Auto-commit and auto-push capabilities
@@ -55,7 +55,7 @@ Get your API key:
 ### Commit Settings
 
 - **Language** (`commitSage.commit.commitLanguage`):
-  - Options: `english`, `russian`, `chinese`, `japanese`
+  - Options: `english`, `russian`, `chinese`, `japanese`, `spanish`
   - Default: `english`
 
 - **Format** (`commitSage.commit.commitFormat`):
