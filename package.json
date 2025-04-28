@@ -246,7 +246,7 @@
         "eslint-import-resolver-typescript": "^4.3.4",
         "eslint-plugin-import": "^2.31.0",
         "eslint-plugin-unused-imports": "^4.1.4",
-        "glob": "^11.0.1",
+        "glob": "^11.0.2",
         "mocha": "^11.1.0",
         "ts-loader": "^9.5.1",
         "typescript": "^5.8.3",
