@@ -11,6 +11,7 @@ import { errorMessages } from '../utils/constants';
 import { GeminiService } from './geminiService';
 import { CodestralService } from './codestralService';
 import { OllamaService } from './ollamaService';
+import { removeThinkTags } from '../utils/textProcessing';
 
 const MAX_DIFF_LENGTH = 100000;
 
@@ -47,6 +48,8 @@ export class AIService {
                     result = await GeminiService.generateCommitMessage(prompt, progress);
                     break;
             }
+            // Post-process the commit message to remove think tags
+            result.message = removeThinkTags(result.message);
             void TelemetryService.sendEvent('message_generation_completed', { provider, model: result.model });
             return result;
         } catch (error) {
