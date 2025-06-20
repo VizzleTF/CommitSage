@@ -75,7 +75,7 @@ jobs:
               {
                 "parts": [
                   {
-                    "text": "Суммаризируй следующий changelog для релиза VS Code расширения. Выдели только самые важные изменения на русском языке. Используй эмодзи. Максимум 5 пунктов. Формат: • описание\n\nChangelog:\nCHANGELOG_PLACEHOLDER"
+                    "text": "Extract only the most important changes from this VS Code extension changelog. Return ONLY bullet points, NO introductory text, NO explanations. Format: • description with emoji. Maximum 5 points. Use English. Start immediately with the first bullet point.\n\nChangelog:\nCHANGELOG_PLACEHOLDER"
                   }
                 ]
               }
