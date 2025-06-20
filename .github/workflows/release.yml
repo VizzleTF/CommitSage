@@ -24,7 +24,9 @@ jobs:
         node-version: '20'
 
     - name: Install dependencies
-      run: npm ci
+      run: |
+        npm ci
+        sudo apt-get update && sudo apt-get install -y jq
 
     - name: Set API Key
       run: |
@@ -64,22 +66,75 @@ jobs:
           RELEASE_NOTE=""
         fi
         
-        # Формируем финальное сообщение для Telegram
+        # AI суммаризация changelog с помощью Gemini
+        if [ -n "${{ secrets.GEMINI_API_KEY }}" ] && [ $(echo "$CLEAN_CHANGES" | wc -l) -gt 3 ]; then
+          echo "🤖 Генерируем AI-суммаризацию changelog..."
+          
+          # Создаем промпт для Gemini
+          cat << 'PROMPT_EOF' > ai_prompt.json
+          {
+            "contents": [{
+              "parts": [{
+                "text": "Суммаризируй следующий changelog для релиза VS Code расширения. Выдели только самые важные изменения на русском языке. Используй эмодзи. Максимум 5 пунктов. Формат: • описание\n\nChangelog:\nCHANGELOG_PLACEHOLDER"
+              }]
+            }],
+            "generationConfig": {
+              "temperature": 0.3,
+              "maxOutputTokens": 200
+            }
+          }
+          PROMPT_EOF
+          
+          # Заменяем placeholder на реальный changelog
+          sed -i "s/CHANGELOG_PLACEHOLDER/$(echo "$CLEAN_CHANGES" | sed 's/"/\\"/g' | tr '\n' ' ')/" ai_prompt.json
+          
+          # Вызываем Gemini API
+          AI_SUMMARY=$(curl -s -X POST \
+            "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${{ secrets.GEMINI_API_KEY }}" \
+            -H "Content-Type: application/json" \
+            -d @ai_prompt.json | \
+            jq -r '.candidates[0].content.parts[0].text // empty' 2>/dev/null)
+          
+          # Проверяем успешность AI обработки
+          if [ -n "$AI_SUMMARY" ] && [ "$AI_SUMMARY" != "null" ]; then
+            echo "✅ AI суммаризация успешна"
+            SUMMARIZED_CHANGES="$AI_SUMMARY"
+          else
+            echo "⚠️ AI суммаризация не удалась, используем сокращенную версию"
+            SUMMARIZED_CHANGES=$(echo "$CLEAN_CHANGES" | head -5 | sed 's/^- /• /')
+          fi
+          
+          # Очистка временных файлов
+          rm -f ai_prompt.json
+        else
+          echo "📝 Используем сокращенную версию changelog"
+          SUMMARIZED_CHANGES=$(echo "$CLEAN_CHANGES" | head -5 | sed 's/^- /• /')
+        fi
+        
         cat << EOF > telegram_message.txt
         $PREFIX
 
-        CommitSage _${LATEST_TAG}_
+        🚀 **CommitSage ${LATEST_TAG}**
 
-        Changes:
-        $CLEAN_CHANGES
+        📋 **What's New:**
+        $SUMMARIZED_CHANGES
 
         📦 **Download:**
         • [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=VizzleTF.geminicommit)
         • [Open VSX Registry](https://open-vsx.org/extension/VizzleTF/geminicommit)
 
-        Join our [community chat](https://t.me/gemini_commit) for discussions and support!
-        #vscode #CommitSage #update #git #ai #gemini #developer #tools #llm
+        💬 [Join community chat](https://t.me/gemini_commit)
+        #CommitSage #vscode #ai
         EOF
+        
+        # Проверяем длину сообщения (лимит Telegram 4096 символов)
+        MSG_LENGTH=$(wc -c < telegram_message.txt)
+        if [ $MSG_LENGTH -gt 4000 ]; then
+          echo "⚠️ Сообщение слишком длинное ($MSG_LENGTH символов), обрезаем..."
+          head -c 3900 telegram_message.txt > telegram_message_short.txt
+          echo "..." >> telegram_message_short.txt
+          mv telegram_message_short.txt telegram_message.txt
+        fi
         
         echo "TELEGRAM_MSG<<EOF" >> $GITHUB_OUTPUT
         cat telegram_message.txt >> $GITHUB_OUTPUT
