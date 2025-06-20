@@ -126,20 +126,29 @@ jobs:
           SUMMARIZED_CHANGES=$(echo "$CLEAN_CHANGES" | head -5 | sed 's/^- /• /')
         fi
         
-        # Создаем Telegram сообщение
+        # Экранируем специальные символы HTML для Telegram
+        escape_html() {
+          echo "$1" | sed -e 's/&/\&amp;/g' -e 's/</\&lt;/g' -e 's/>/\&gt;/g'
+        }
+        
+        # Экранируем содержимое изменений
+        ESCAPED_SUMMARIZED_CHANGES=$(escape_html "$SUMMARIZED_CHANGES")
+        ESCAPED_TAG=$(escape_html "$LATEST_TAG")
+        
+        # Создаем Telegram сообщение в HTML формате
         printf '%s\n' \
-          "$PREFIX" \
+          "<b>🚀 New Release!</b>" \
           "" \
-          "🚀 **CommitSage ${LATEST_TAG}**" \
+          "🚀 <b>CommitSage ${ESCAPED_TAG}</b>" \
           "" \
-          "📋 **What's New:**" \
-          "$SUMMARIZED_CHANGES" \
+          "📋 <b>What's New:</b>" \
+          "$ESCAPED_SUMMARIZED_CHANGES" \
           "" \
-          "📦 **Download:**" \
-          "• [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=VizzleTF.geminicommit)" \
-          "• [Open VSX Registry](https://open-vsx.org/extension/VizzleTF/geminicommit)" \
+          "📦 <b>Download:</b>" \
+          "• <a href=\"https://marketplace.visualstudio.com/items?itemName=VizzleTF.geminicommit\">VS Code Marketplace</a>" \
+          "• <a href=\"https://open-vsx.org/extension/VizzleTF/geminicommit\">Open VSX Registry</a>" \
           "" \
-          "💬 [Join community chat](https://t.me/gemini_commit)" \
+          "💬 <a href=\"https://t.me/gemini_commit\">Join community chat</a>" \
           "#CommitSage #vscode #ai" > telegram_message.txt
         
         # Проверяем длину сообщения (лимит Telegram 4096 символов)
@@ -230,7 +239,7 @@ jobs:
       with:
         to: ${{ secrets.TELEGRAM_CHAT_ID }}
         token: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-        format: markdown
+        format: html
         message_file: telegram_message.txt
 
     - name: Notify on Security Release
