@@ -133,4 +133,4 @@ Emojis comunes:
 Ejemplo:
 ✨ feat(auth): añadir sistema de autenticación de usuario
 🐛 fix(api): resolver problema de expiración del token`
-}; 
+};
