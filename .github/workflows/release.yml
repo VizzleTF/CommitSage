@@ -71,11 +71,15 @@ jobs:
           echo "🤖 Генерируем AI-суммаризацию changelog..."
           
           echo '{
-            "contents": [{
-              "parts": [{
-                "text": "Суммаризируй следующий changelog для релиза VS Code расширения. Выдели только самые важные изменения на русском языке. Используй эмодзи. Максимум 5 пунктов. Формат: • описание\n\nChangelog:\nCHANGELOG_PLACEHOLDER"
-              }]
-            }],
+            "contents": [
+              {
+                "parts": [
+                  {
+                    "text": "Суммаризируй следующий changelog для релиза VS Code расширения. Выдели только самые важные изменения на русском языке. Используй эмодзи. Максимум 5 пунктов. Формат: • описание\n\nChangelog:\nCHANGELOG_PLACEHOLDER"
+                  }
+                ]
+              }
+            ],
             "generationConfig": {
               "temperature": 0.3,
               "maxOutputTokens": 200
@@ -86,19 +90,32 @@ jobs:
           ESCAPED_CHANGELOG=$(echo "$CLEAN_CHANGES" | sed 's/"/\\"/g' | sed 's/$/\\n/g' | tr -d '\n' | sed 's/\\n$//')
           sed -i "s|CHANGELOG_PLACEHOLDER|$ESCAPED_CHANGELOG|g" ai_prompt.json
           
-          # Вызываем Gemini API
-          AI_SUMMARY=$(curl -s -X POST \
-            "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${{ secrets.GEMINI_API_KEY }}" \
+          # Вызываем Gemini API с улучшенной обработкой ошибок
+          RESPONSE=$(curl -s -w "HTTPSTATUS:%{http_code}" -X POST \
+            "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${{ secrets.GEMINI_API_KEY }}" \
             -H "Content-Type: application/json" \
-            -d @ai_prompt.json | \
-            jq -r '.candidates[0].content.parts[0].text // empty' 2>/dev/null)
+            -d @ai_prompt.json)
           
-          # Проверяем успешность AI обработки
-          if [ -n "$AI_SUMMARY" ] && [ "$AI_SUMMARY" != "null" ]; then
-            echo "✅ AI суммаризация успешна"
-            SUMMARIZED_CHANGES="$AI_SUMMARY"
+          # Извлекаем HTTP статус и тело ответа
+          HTTP_STATUS=$(echo "$RESPONSE" | grep -o "HTTPSTATUS:[0-9]*" | cut -d: -f2)
+          RESPONSE_BODY=$(echo "$RESPONSE" | sed -E 's/HTTPSTATUS:[0-9]*$//')
+          
+          echo "📊 Gemini API HTTP статус: $HTTP_STATUS"
+          
+          if [ "$HTTP_STATUS" -eq 200 ]; then
+            AI_SUMMARY=$(echo "$RESPONSE_BODY" | jq -r '.candidates[0].content.parts[0].text // empty' 2>/dev/null)
+            
+            # Проверяем успешность AI обработки
+            if [ -n "$AI_SUMMARY" ] && [ "$AI_SUMMARY" != "null" ] && [ "$AI_SUMMARY" != "empty" ]; then
+              echo "✅ AI суммаризация успешна"
+              SUMMARIZED_CHANGES="$AI_SUMMARY"
+            else
+              echo "⚠️ AI вернула пустой ответ, используем сокращенную версию"
+              SUMMARIZED_CHANGES=$(echo "$CLEAN_CHANGES" | head -5 | sed 's/^- /• /')
+            fi
           else
-            echo "⚠️ AI суммаризация не удалась, используем сокращенную версию"
+            echo "⚠️ Ошибка Gemini API (HTTP: $HTTP_STATUS), используем сокращенную версию"
+            echo "Ответ API: $(echo "$RESPONSE_BODY" | head -c 200)..."
             SUMMARIZED_CHANGES=$(echo "$CLEAN_CHANGES" | head -5 | sed 's/^- /• /')
           fi
           

@@ -11,3 +11,4 @@ coverage
 .env.*
 !.env.example
 src/constants/apiKeys.ts
+test-gemini-api.sh
