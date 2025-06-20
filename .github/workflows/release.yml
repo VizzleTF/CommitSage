@@ -1,4 +1,4 @@
-name: Create Release and Publish to Marketplace
+name: Create Release and Publish to Marketplaces
 
 on:
   push:
@@ -73,7 +73,9 @@ jobs:
         Changes:
         $CLEAN_CHANGES
 
-        [Download from Marketplace](https://marketplace.visualstudio.com/items?itemName=VizzleTF.geminicommit)
+        📦 **Download:**
+        • [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=VizzleTF.geminicommit)
+        • [Open VSX Registry](https://open-vsx.org/extension/VizzleTF/geminicommit)
 
         Join our [community chat](https://t.me/gemini_commit) for discussions and support!
         #vscode #CommitSage #update #git #ai #gemini #developer #tools #llm
@@ -143,6 +145,14 @@ jobs:
       env:
         VSCE_PAT: ${{ secrets.VS_MARKETPLACE_TOKEN }}
       run: npx vsce publish -p $VSCE_PAT
+
+    - name: Install ovsx CLI
+      run: npm install -g ovsx
+
+    - name: Publish to Open VSX Registry
+      env:
+        OVSX_PAT: ${{ secrets.OPEN_VSX_TOKEN }}
+      run: ovsx publish -p $OVSX_PAT
 
     - name: Send Telegram Notification
       if: success()
