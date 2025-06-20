@@ -67,7 +67,7 @@ jobs:
         fi
         
         # AI суммаризация changelog с помощью Gemini
-        if [ -n "${{ secrets.GEMINI_API_KEY }}" ] && [ $(echo "$CLEAN_CHANGES" | wc -l) -gt 3 ]; then
+        if [ -n "${{ secrets.GEMINI_API_KEY }}" ]; then
           echo "🤖 Генерируем AI-суммаризацию changelog..."
           
           echo '{
