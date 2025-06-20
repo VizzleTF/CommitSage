@@ -10,4 +10,4 @@
 export function removeThinkTags(text: string): string {
     // Remove all content between <think> tags, including the tags themselves
     return text.replace(/<think>[\s\S]*?<\/think>/g, '').trim();
-} 
+}

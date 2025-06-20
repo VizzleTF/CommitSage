@@ -1,15 +1,14 @@
 import eslint from '@eslint/js';
-import * as tseslint from '@typescript-eslint/eslint-plugin';
-import tsparser from '@typescript-eslint/parser';
+import tseslint from 'typescript-eslint';
 import importPlugin from 'eslint-plugin-import';
 import unusedImportsPlugin from 'eslint-plugin-unused-imports';
 
-export default [
+export default tseslint.config(
     eslint.configs.recommended,
+    ...tseslint.configs.recommended,
     {
         files: ['src/**/*.ts'],
         languageOptions: {
-            parser: tsparser,
             parserOptions: {
                 project: './tsconfig.json',
                 ecmaVersion: 2020,
@@ -36,7 +35,6 @@ export default [
             }
         },
         plugins: {
-            '@typescript-eslint': tseslint,
             'import': importPlugin,
             'unused-imports': unusedImportsPlugin
         },
@@ -87,8 +85,8 @@ export default [
             '@typescript-eslint/no-unused-vars': [
                 'error',
                 {
-                    argsIgnorePattern: '^_', // Ignore parameters starting with underscore
-                    varsIgnorePattern: '^_',  // Ignore variables starting with underscore
+                    argsIgnorePattern: '^_',
+                    varsIgnorePattern: '^_',
                     ignoreRestSiblings: true
                 }
             ],
@@ -102,12 +100,12 @@ export default [
                 'warn',
                 {
                     vars: 'all',
-                    varsIgnorePattern: '^_', // Ignore variables starting with underscore
+                    varsIgnorePattern: '^_',
                     args: 'after-used',
-                    argsIgnorePattern: '^_', // Ignore parameters starting with underscore
+                    argsIgnorePattern: '^_',
                     ignoreRestSiblings: true
                 }
             ]
         }
     }
-];
+);
