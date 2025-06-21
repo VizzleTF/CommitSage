@@ -2,7 +2,7 @@
     "name": "geminicommit",
     "displayName": "Commit Sage",
     "description": "Free AI commit messages using Gemini, Codestral, Ollama, or custom LLM",
-    "version": "2.2.20",
+    "version": "2.2.21",
     "publisher": "VizzleTF",
     "repository": {
         "type": "git",
@@ -30,8 +30,11 @@
         "Ollama"
     ],
     "activationEvents": [
-        "onStartupFinished",
-        "onView:commitSageView"
+        "onCommand:commitsage.generateCommitMessage",
+        "onCommand:commitsage.setApiKey",
+        "onCommand:commitsage.setOpenAIApiKey",
+        "onCommand:commitsage.setCodestralApiKey",
+        "workspaceContains:.git"
     ],
     "icon": "icon.png",
     "main": "./dist/extension.js",
