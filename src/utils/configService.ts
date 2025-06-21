@@ -1,7 +1,10 @@
 import * as vscode from 'vscode';
+import * as fs from 'fs';
+import * as path from 'path';
 import { Logger } from './logger';
 import { ApiKeyValidator } from './apiKeyValidator';
 import { AiServiceError, ConfigurationError } from '../models/errors';
+import { ProjectConfig } from '../models/types';
 
 type CacheValue = string | boolean | number;
 
@@ -9,6 +12,8 @@ export type CommitLanguage = 'english' | 'russian' | 'chinese' | 'japanese' | 's
 
 export class ConfigService {
     private static cache = new Map<string, CacheValue>();
+    private static projectConfigCache: ProjectConfig | null = null;
+    private static projectConfigFileWatcher: vscode.FileSystemWatcher | null = null;
     private static secretStorage: vscode.SecretStorage;
     private static disposables: vscode.Disposable[] = [];
 
@@ -33,14 +38,105 @@ export class ConfigService {
             }
         });
 
+        // Инициализируем наблюдение за файлом .commitsage
+        this.initializeProjectConfigWatcher(context);
+
         this.disposables.push(configListener);
         context.subscriptions.push(...this.disposables);
+    }
+
+    private static initializeProjectConfigWatcher(context: vscode.ExtensionContext): void {
+        const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
+        if (!workspaceFolder) {
+            return;
+        }
+
+        const pattern = new vscode.RelativePattern(workspaceFolder, '.commitsage');
+        this.projectConfigFileWatcher = vscode.workspace.createFileSystemWatcher(pattern);
+
+        this.projectConfigFileWatcher.onDidCreate(() => {
+            this.invalidateProjectConfig();
+        });
+
+        this.projectConfigFileWatcher.onDidChange(() => {
+            this.invalidateProjectConfig();
+        });
+
+        this.projectConfigFileWatcher.onDidDelete(() => {
+            this.invalidateProjectConfig();
+        });
+
+        this.disposables.push(this.projectConfigFileWatcher);
+        context.subscriptions.push(this.projectConfigFileWatcher);
+    }
+
+    private static invalidateProjectConfig(): void {
+        this.projectConfigCache = null;
+        this.clearCache();
+        void Logger.log('Project configuration cache invalidated');
+    }
+
+    private static getProjectConfig(): ProjectConfig | null {
+        if (this.projectConfigCache !== null) {
+            return this.projectConfigCache;
+        }
+
+        const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
+        if (!workspaceFolder) {
+            this.projectConfigCache = {};
+            return this.projectConfigCache;
+        }
+
+        const configPath = path.join(workspaceFolder.uri.fsPath, '.commitsage');
+
+        try {
+            if (fs.existsSync(configPath)) {
+                const configContent = fs.readFileSync(configPath, 'utf8');
+                const config = JSON.parse(configContent) as ProjectConfig;
+                this.projectConfigCache = config;
+                void Logger.log('Loaded project configuration from .commitsage file');
+            } else {
+                this.projectConfigCache = {};
+            }
+        } catch (error) {
+            void Logger.error('Error reading .commitsage file:', error as Error);
+            this.projectConfigCache = {};
+        }
+
+        return this.projectConfigCache;
+    }
+
+    private static getNestedProjectValue<T>(sections: string[], defaultValue: T): T | undefined {
+        const projectConfig = this.getProjectConfig();
+        if (!projectConfig) {
+            return undefined;
+        }
+
+        let current: any = projectConfig;
+        for (const section of sections) {
+            if (current && typeof current === 'object' && section in current) {
+                current = current[section];
+            } else {
+                return undefined;
+            }
+        }
+
+        return current as T;
     }
 
     static getConfig<T extends CacheValue>(section: string, key: string, defaultValue: T): T {
         try {
             const cacheKey = `${section}.${key}`;
             if (!this.cache.has(cacheKey)) {
+                // Сначала проверяем настройки проекта
+                const projectValue = this.getNestedProjectValue<T>([section, key], defaultValue);
+
+                if (projectValue !== undefined) {
+                    this.cache.set(cacheKey, projectValue);
+                    return projectValue;
+                }
+
+                // Если в проекте нет настройки, используем настройки расширения
                 const config = vscode.workspace.getConfiguration('commitSage');
                 const value = config.inspect<T>(`${section}.${key}`);
 
@@ -270,6 +366,11 @@ export class ConfigService {
         this.disposables.forEach(d => void d.dispose());
         this.disposables = [];
         this.clearCache();
+        this.projectConfigCache = null;
+        if (this.projectConfigFileWatcher) {
+            this.projectConfigFileWatcher.dispose();
+            this.projectConfigFileWatcher = null;
+        }
     }
 
     static async promptForApiKey(): Promise<void> {
