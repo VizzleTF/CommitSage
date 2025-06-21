@@ -4,29 +4,9 @@
   },
   "commit": {
     "commitLanguage": "english",
-    "commitFormat": "conventional",
-    "useCustomInstructions": false,
-    "customInstructions": "",
-    "onlyStagedChanges": false,
-    "autoCommit": false,
-    "autoPush": false,
-    "promptForRefs": false
+    "commitFormat": "conventional"
   },
   "gemini": {
     "model": "gemini-2.0-flash"
-  },
-  "codestral": {
-    "model": "codestral-latest"
-  },
-  "openai": {
-    "model": "gpt-3.5-turbo",
-    "baseUrl": "https://api.openai.com/v1"
-  },
-  "ollama": {
-    "baseUrl": "http://localhost:11434",
-    "model": "llama3.2"
-  },
-  "telemetry": {
-    "enabled": true
   }
 }
