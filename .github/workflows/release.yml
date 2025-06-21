@@ -137,12 +137,11 @@ jobs:
         
         # Создаем Telegram сообщение в HTML формате
         printf '%s\n' \
-          "<b>🚀 New Release!</b>" \
+          "🎉 <b>CommitSage ${ESCAPED_TAG}</b>" \
           "" \
-          "🚀 <b>CommitSage ${ESCAPED_TAG}</b>" \
-          "" \
-          "📋 <b>What's New:</b>" \
+          "✨ <b>What's New:</b>" \
           "$ESCAPED_SUMMARIZED_CHANGES" \
+
           "" \
           "📦 <b>Download:</b>" \
           "• <a href=\"https://marketplace.visualstudio.com/items?itemName=VizzleTF.geminicommit\">VS Code Marketplace</a>" \
@@ -260,5 +259,5 @@ jobs:
                   ${releaseNotes}
                   
                   The extension has been automatically updated in the Visual Studio Marketplace.`,
-            labels: ['security']
+                        labels: ['security']
           });
