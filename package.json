@@ -38,6 +38,7 @@
     ],
     "icon": "icon.png",
     "main": "./dist/extension.js",
+    "sideEffects": false,
     "contributes": {
         "commands": [
             {
@@ -231,9 +232,14 @@
     },
     "scripts": {
         "vscode:prepublish": "webpack --mode production",
+        "vscode:prepublish:tsc": "tsc -p ./",
         "compile": "webpack --mode development",
         "watch": "webpack --mode development --watch",
-        "package": "vsce package"
+        "build:prod": "webpack --mode production",
+        "build:analyze": "ANALYZE=true webpack --mode production",
+        "package": "vsce package",
+        "package:nowebpack": "npm run vscode:prepublish:tsc && vsce package",
+        "package:analyze": "npm run build:analyze && vsce package"
     },
     "devDependencies": {
         "@types/node": "^24.0.3",
@@ -246,10 +252,12 @@
         "eslint-import-resolver-typescript": "^4.4.3",
         "eslint-plugin-import": "^2.31.0",
         "eslint-plugin-unused-imports": "^4.1.4",
+        "terser-webpack-plugin": "^5.3.14",
         "ts-loader": "^9.5.2",
         "typescript": "^5.8.3",
         "typescript-eslint": "^8.34.1",
         "webpack": "^5.99.9",
+        "webpack-bundle-analyzer": "^4.10.2",
         "webpack-cli": "^6.0.1"
     },
     "dependencies": {
