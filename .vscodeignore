@@ -35,6 +35,6 @@ eslint.config.mjs
 
 # Keep necessary documentation
 !README.md
-!LICENSE.txt
+!LICENSE
 !icon.png
 !example.gif 

@@ -2,9 +2,9 @@ import * as vscode from 'vscode';
 import { GitService } from './services/gitService';
 import { Logger } from './utils/logger';
 import { ConfigService } from './utils/configService';
-import { CommitMessageUI } from './services/aiService';
 import { SettingsValidator } from './services/settingsValidator';
 import { TelemetryService } from './services/telemetryService';
+import { registerCommands } from './commands';
 
 export async function activate(context: vscode.ExtensionContext): Promise<void> {
     void Logger.log('Starting extension activation');
@@ -23,38 +23,31 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         return;
     }
 
-    void Logger.log('Registering commands and views');
-    try {
-        const disposables = [
-            vscode.commands.registerCommand('commitsage.generateCommitMessage', async (sourceControlRepository?: vscode.SourceControl) => {
-                try {
-                    await CommitMessageUI.generateAndSetCommitMessage(sourceControlRepository);
-                } catch (error) {
-                    void Logger.error('Error in generateCommitMessage command:', error as Error);
-                    void vscode.window.showErrorMessage(`Error: ${(error as Error).message}`);
-                }
-            }),
-            vscode.commands.registerCommand('commitsage.setApiKey', () => ConfigService.promptForApiKey()),
-            vscode.commands.registerCommand('commitsage.setOpenAIApiKey', () => ConfigService.promptForOpenAIApiKey()),
-            vscode.commands.registerCommand('commitsage.setCodestralApiKey', () => ConfigService.promptForCodestralApiKey())
-        ];
-
-        context.subscriptions.push(...disposables);
-    } catch (error) {
-        void Logger.error('Failed to register commands:', error as Error);
-        void vscode.window.showErrorMessage('Failed to register Commit Sage commands');
-        return;
-    }
+    registerCommands(context);
 
     void SettingsValidator.validateAllSettings();
     void TelemetryService.sendEvent('extension_activated');
     void Logger.log('Extension activated successfully');
 }
 
-export function deactivate(): void {
+export async function deactivate(): Promise<void> {
     void Logger.log('Deactivating extension');
-    ConfigService.dispose();
-    Logger.dispose();
-    TelemetryService.dispose();
-    void Logger.log('Extension deactivated successfully');
+
+    try {
+        // Send deactivation event before shutting down telemetry
+        TelemetryService.sendEvent('extension_deactivated');
+
+        // Wait for telemetry to flush remaining events
+        await TelemetryService.flush();
+
+        // Dispose services in reverse order of initialization
+        TelemetryService.dispose();
+        ConfigService.dispose();
+        Logger.dispose();
+
+        void Logger.log('Extension deactivated successfully');
+    } catch (error) {
+        // Fallback logging if Logger is already disposed
+        console.error('Error during extension deactivation:', error);
+    }
 }

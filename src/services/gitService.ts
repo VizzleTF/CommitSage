@@ -1,5 +1,4 @@
 import * as vscode from 'vscode';
-import { spawn } from 'child_process';
 import * as path from 'path';
 import { Logger } from '../utils/logger';
 import {
@@ -9,7 +8,7 @@ import {
     NoRepositorySelectedError
 } from '../models/errors';
 import { TelemetryService } from './telemetryService';
-import * as fs from 'fs';
+import { EnvironmentUtils } from '../utils/environmentUtils';
 
 const GIT_STATUS_CODES = {
     modified: 'M',
@@ -30,6 +29,11 @@ const STAGED_STATUS_CODES: GitStatusCode[] = [
 ];
 
 export class GitService {
+    private static checkWebCompatibility(): void {
+        if (EnvironmentUtils.isWebExtension()) {
+            throw new Error('Git operations are not supported in VS Code Web. Please use VS Code Desktop for Git functionality.');
+        }
+    }
     static async initialize(): Promise<void> {
         try {
             void Logger.log('Initializing Git service');
@@ -187,9 +191,10 @@ export class GitService {
                         .map(async file => {
                             try {
                                 // Read the content of the new file
+                                const fs = require('fs');
                                 const content = await fs.promises.readFile(path.join(repoPath, file), 'utf-8');
                                 const lines = content.split('\n');
-                                const contentDiff = lines.map(line => `+${line}`).join('\n');
+                                const contentDiff = lines.map((line: string) => `+${line}`).join('\n');
                                 return `diff --git a/${file} b/${file}\nnew file mode 100644\nindex 0000000..${this.calculateFileHash(content)}\n--- /dev/null\n+++ b/${file}\n@@ -0,0 +1,${lines.length} @@\n${contentDiff}`;
                             } catch (error) {
                                 void Logger.error(`Error reading new file ${file}:`, error as Error);
@@ -395,20 +400,23 @@ export class GitService {
     }
 
     public static async execGit(args: string[], cwd: string): Promise<{ stdout: string; stderr: string }> {
+        this.checkWebCompatibility();
+
         return new Promise((resolve, reject) => {
+            const { spawn } = require('child_process');
             const process = spawn('git', args, { cwd });
             let stdout = '';
             let stderr = '';
 
-            process.stdout.on('data', (data) => {
+            process.stdout.on('data', (data: Buffer) => {
                 stdout += data.toString();
             });
 
-            process.stderr.on('data', (data) => {
+            process.stderr.on('data', (data: Buffer) => {
                 stderr += data.toString();
             });
 
-            process.on('close', (code) => {
+            process.on('close', (code: number) => {
                 if (code === 0) {
                     resolve({ stdout, stderr });
                 } else {
