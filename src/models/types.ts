@@ -97,3 +97,40 @@ export interface ApiError {
     retryable: boolean;
     response?: unknown;
 }
+
+/**
+ * Интерфейс для настроек проекта из файла .commitsage
+ * Позволяет переопределить настройки расширения на уровне проекта
+ */
+export interface ProjectConfig {
+    provider?: {
+        type?: 'gemini' | 'codestral' | 'openai' | 'ollama';
+    };
+    commit?: {
+        commitLanguage?: 'english' | 'russian' | 'chinese' | 'japanese' | 'spanish';
+        commitFormat?: 'conventional' | 'angular' | 'karma' | 'semantic' | 'emoji' | 'emojiKarma';
+        useCustomInstructions?: boolean;
+        customInstructions?: string;
+        onlyStagedChanges?: boolean;
+        autoCommit?: boolean;
+        autoPush?: boolean;
+        promptForRefs?: boolean;
+    };
+    gemini?: {
+        model?: 'gemini-1.0-pro' | 'gemini-1.5-pro' | 'gemini-1.5-flash' | 'gemini-2.0-flash-exp';
+    };
+    codestral?: {
+        model?: 'codestral-2405' | 'codestral-latest';
+    };
+    openai?: {
+        model?: string;
+        baseUrl?: string;
+    };
+    ollama?: {
+        baseUrl?: string;
+        model?: string;
+    };
+    telemetry?: {
+        enabled?: boolean;
+    };
+}
