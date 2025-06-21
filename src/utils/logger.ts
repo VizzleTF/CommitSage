@@ -43,10 +43,19 @@ export class Logger {
     }
 
     public static async showError(message: string, error?: Error): Promise<void> {
-        await this.error(message, error);
+        const timestamp = new Date().toISOString();
+        const errorMessage = error ? `: ${error.message}\n${error.stack}` : '';
+        this.outputChannel.appendLine(`[${timestamp}] [ERROR] ${message}${errorMessage}`);
+
         await vscode.window.showErrorMessage(
             `Commit Sage: ${message}`,
-            { modal: false }
-        );
+            { modal: false },
+            'Show Details',
+            'OK'
+        ).then(selection => {
+            if (selection === 'Show Details') {
+                this.show();
+            }
+        });
     }
 }

@@ -1,8 +1,8 @@
 import * as path from 'path';
-import * as fs from 'fs';
 import { Logger } from '../utils/logger';
 import { errorMessages } from '../utils/constants';
 import { GitService } from './gitService';
+import { EnvironmentUtils } from '../utils/environmentUtils';
 
 interface BlameInfo {
     commit: string;
@@ -16,6 +16,12 @@ interface BlameInfo {
 export class GitBlameAnalyzer {
     private static async isNewFile(filePath: string, repoPath: string): Promise<boolean> {
         try {
+            if (EnvironmentUtils.isWebExtension()) {
+                // In web version, rely on git commands only
+                return await GitService.isNewFile(filePath, repoPath);
+            }
+
+            const fs = require('fs');
             if (!fs.existsSync(filePath)) {
                 return false;
             }
@@ -40,8 +46,14 @@ export class GitBlameAnalyzer {
     private static async getGitBlame(filePath: string, repoPath: string): Promise<BlameInfo[]> {
         try {
             const absoluteFilePath = path.resolve(repoPath, filePath);
-            if (!fs.existsSync(absoluteFilePath)) {
-                throw new Error(`${errorMessages.fileNotFound}: ${absoluteFilePath}`);
+
+            if (EnvironmentUtils.isWebExtension()) {
+                // In web version, skip file existence check, let git handle it
+            } else {
+                const fs = require('fs');
+                if (!fs.existsSync(absoluteFilePath)) {
+                    throw new Error(`${errorMessages.fileNotFound}: ${absoluteFilePath}`);
+                }
             }
 
             if (!await GitService.hasHead(repoPath)) {

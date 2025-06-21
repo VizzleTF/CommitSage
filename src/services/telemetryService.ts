@@ -5,6 +5,7 @@ import { Logger } from '../utils/logger';
 import { ConfigService } from '../utils/configService';
 import { AMPLITUDE_API_KEY } from '../constants/apiKeys';
 import { EventOptions } from '@amplitude/analytics-types';
+import { EnvironmentUtils } from '../utils/environmentUtils';
 
 const TELEMETRY_CONFIG = {
     maxRetries: 3,
@@ -15,6 +16,7 @@ const TELEMETRY_CONFIG = {
 
 type TelemetryEventName =
     | 'extension_activated'
+    | 'extension_deactivated'
     | 'message_generation_started'
     | 'message_generation_completed'
     | 'message_generation_failed'
@@ -96,7 +98,8 @@ export class TelemetryService {
         const properties: TelemetryEventProperties = {
             vsCodeVersion: vscode.version,
             extensionVersion: vscode.extensions.getExtension('VizzleTF.commitsage')?.packageJSON.version,
-            platform: process.platform,
+            platform: EnvironmentUtils.getPlatform(),
+            environment: EnvironmentUtils.getEnvironmentType(),
             ...customProperties
         };
 
@@ -184,6 +187,27 @@ export class TelemetryService {
 
     private static delay(ms: number): Promise<void> {
         return new Promise(resolve => setTimeout(resolve, ms));
+    }
+
+    /**
+     * Flush remaining events in the queue
+     */
+    static async flush(): Promise<void> {
+        if (!this.initialized || this.eventQueue.length === 0) {
+            return;
+        }
+
+        void Logger.log(`Flushing ${this.eventQueue.length} remaining telemetry events`);
+
+        // Process all remaining events
+        while (this.eventQueue.length > 0) {
+            await this.processEventQueue();
+
+            // Prevent infinite loops
+            if (this.eventQueue.length > 0) {
+                await this.delay(100);
+            }
+        }
     }
 
     static dispose(): void {
