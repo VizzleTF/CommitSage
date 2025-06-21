@@ -1,9 +1,11 @@
 import axios, { AxiosError } from 'axios';
 import { Logger } from '../utils/logger';
 import { ConfigService } from '../utils/configService';
-import { ProgressReporter, CommitMessage } from '../models/types';
-import { errorMessages } from '../utils/constants';
+import { ProgressReporter, CommitMessage, IModelService } from '../models/types';
 import { OpenAIError, ConfigurationError } from '../models/errors';
+import { BaseAIService } from './baseAIService';
+import { HttpUtils } from '../utils/httpUtils';
+import { RetryUtils } from '../utils/retryUtils';
 
 interface OpenAIResponse {
     choices: Array<{
@@ -22,6 +24,8 @@ interface ModelsResponse {
 
 type ApiHeaders = Record<string, string>;
 
+// AI сервис для работы с OpenAI/совместимыми API  
+// Реализует интерфейс IModelService со статическими методами (включая fetchAvailableModels)
 export class OpenAIService {
     private static readonly chatCompletionsPath = '/chat/completions';
     private static readonly modelsPath = '/models';
@@ -43,17 +47,15 @@ export class OpenAIService {
                 maxTokens: 1024
             };
 
-            const headers = {
-                'Authorization': `Bearer ${apiKey}`,
-                'content-type': 'application/json'
-            };
+            await RetryUtils.updateProgressForAttempt(progress, attempt);
 
-            progress.report({ message: "Generating commit message...", increment: 50 });
+            const headers = HttpUtils.createRequestHeaders(apiKey);
+            const requestConfig = HttpUtils.createRequestConfig(headers);
 
             const response = await axios.post<OpenAIResponse>(
                 `${baseUrl}/chat/completions`,
                 payload,
-                { headers }
+                requestConfig
             );
 
             progress.report({ message: "Processing generated message...", increment: 90 });
@@ -62,64 +64,39 @@ export class OpenAIService {
             void Logger.log(`Commit message generated using ${model} model`);
             return { message, model };
         } catch (error) {
+            // Обработка специальных случаев для OpenAI
             const axiosError = error as AxiosError;
-            if (axiosError.response) {
-                const status = axiosError.response.status;
-                const data = axiosError.response.data as { error?: { message?: string } };
-
-                switch (status) {
-                    case 401:
-                        if (attempt === 1) {
-                            await ConfigService.removeOpenAIApiKey();
-                            await ConfigService.promptForOpenAIApiKey();
-                            return this.generateCommitMessage(prompt, progress, attempt + 1);
-                        }
-                        throw new OpenAIError(errorMessages.authenticationError);
-                    case 402:
-                        throw new OpenAIError(errorMessages.paymentRequired);
-                    case 429:
-                        throw new OpenAIError(errorMessages.rateLimitExceeded);
-                    case 422:
-                        throw new OpenAIError(
-                            data.error?.message || errorMessages.invalidRequest
-                        );
-                    case 500:
-                        throw new OpenAIError(errorMessages.serverError);
-                    default:
-                        throw new OpenAIError(
-                            `${errorMessages.apiError.replace('{0}', String(status))}: ${data.error?.message || 'Unknown error'}`
-                        );
-                }
+            if (axiosError.response?.status === 401 && attempt === 1) {
+                await ConfigService.removeOpenAIApiKey();
+                await ConfigService.promptForOpenAIApiKey();
+                return this.generateCommitMessage(prompt, progress, attempt + 1);
             }
 
-            if (axiosError.code === 'ECONNREFUSED' || axiosError.code === 'ETIMEDOUT') {
-                throw new OpenAIError(
-                    errorMessages.networkError.replace('{0}', 'Connection failed. Please check your internet connection.')
-                );
-            }
-
-            // Если ключ не установлен и это первая попытка
             if (error instanceof ConfigurationError && attempt === 1) {
                 await ConfigService.promptForOpenAIApiKey();
                 return this.generateCommitMessage(prompt, progress, attempt + 1);
             }
 
-            throw new OpenAIError(
-                errorMessages.networkError.replace('{0}', axiosError.message)
+            // Используем retry utils для retry логики
+            return RetryUtils.handleGenerationError(
+                error as Error,
+                prompt,
+                progress,
+                attempt,
+                this.generateCommitMessage.bind(this),
+                BaseAIService.handleOpenAIError.bind(BaseAIService)
             );
         }
     }
 
     static async fetchAvailableModels(baseUrl: string, apiKey: string): Promise<string[]> {
         try {
-            const headers: ApiHeaders = {
-                'content-type': 'application/json',
-                'authorization': `Bearer ${apiKey}`
-            };
+            const headers = HttpUtils.createRequestHeaders(apiKey);
+            const requestConfig = HttpUtils.createRequestConfig(headers);
 
             const response = await axios.get<ModelsResponse>(
                 `${baseUrl}${this.modelsPath}`,
-                { headers }
+                requestConfig
             );
 
             if (!response.data?.data) {
@@ -137,10 +114,12 @@ export class OpenAIService {
     }
 
     private static extractCommitMessage(response: OpenAIResponse): string {
-        if (!response.choices?.[0]?.message?.content) {
+        const content = response.choices?.[0]?.message?.content;
+        if (!content) {
             throw new OpenAIError('Unexpected response format from OpenAI API');
         }
-
-        return response.choices[0].message.content.trim();
+        return BaseAIService.validateCommitMessage(content);
     }
+
+
 }
