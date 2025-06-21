@@ -15,10 +15,7 @@ tsconfig.json
 .prettierignore
 .eslintignore
 node_modules/**
-!node_modules/@amplitude/analytics-node/**
-!node_modules/axios/**
 out/**
-!out/dist/**
 **/*.map
 **/*.ts
 *.vsix
@@ -32,6 +29,11 @@ test/**
 **/*.spec.ts
 release.sh
 eslint.config.mjs
+webpack-optimizations.md
+CONTRIBUTING.md
+.github/**
+docs/**
+package-lock.json
 
 # Keep necessary documentation
 !README.md
