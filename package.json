@@ -34,7 +34,7 @@
         "onCommand:commitsage.setApiKey",
         "onCommand:commitsage.setOpenAIApiKey",
         "onCommand:commitsage.setCodestralApiKey",
-        "workspaceContains:.git"
+        "onView:scm"
     ],
     "icon": "icon.png",
     "main": "./dist/extension.js",
