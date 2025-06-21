@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [2.2.25] - 2025-01-25
+## [2.2.25] - 2025-06-21
 
 ### Added
 - ✨ **PROJECT CONFIGURATION**: Added support for `.commitsage` file in project root
@@ -22,7 +22,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - ♻️ Refactored `ConfigService` to support hierarchical configuration loading
 - 🔧 Enhanced settings validation for project-specific configurations
 
-## [2.2.24] - 2025-01-25
+## [2.2.24] - 2025-06-21
 
 ### Fixed
 - 🐛 Fixed release workflow notification message generation
@@ -32,7 +32,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - ♻️ Refactored AI service architecture for better modularity
 - 🔧 Improved release notification system
 
-## [2.2.22] - 2025-01-25
+## [2.2.22] - 2025-06-21
 
 ### Changed
 - 🔧 Improved AI prompt for cleaner changelog output
@@ -46,7 +46,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added AI-powered changelog summarization
 - Improved Telegram notifications for releases
 
-## [2.2.13] - 2024-12-20
+## [2.2.13] - 2025-05-01
 
 ### Added
 - ✨ Added Spanish language support for commit messages
@@ -65,7 +65,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - ♻️ Centralized think tag removal logic
 - 🎨 Updated extension icon for better theme compatibility
 
-## [2.2.0] - 2024-11-15
+## [2.2.0] - 2025-01-30
 
 ### Added
 - ✨ **NEW AI PROVIDERS**: Added support for Codestral AI
@@ -85,7 +85,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - 🎨 Updated extension icon design
 - 📝 Updated settings documentation and grouping
 
-## [2.0.0] - 2024-10-01
+## [2.0.0] - 2025-01-21
 
 ### Added
 - 🎉 **MAJOR REBRAND**: Extension renamed to "Commit Sage"
@@ -113,7 +113,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Removed
 - 🗑️ Removed deprecated commands and view components
 
-## [1.9.0] - 2024-09-15
+## [1.9.0] - 2025-01-20
 
 ### Added
 - ✨ Added Chinese language support (community contribution)
@@ -126,7 +126,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - 📦 Added .vscodeignore for better package optimization
 - 🔧 Improved build process and dependencies
 
-## [1.8.0] - 2024-08-01
+## [1.8.0] - 2024-12-28
 
 ### Added
 - ✨ **COMMIT FORMATS**: Added multiple commit message formats:
@@ -143,7 +143,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - 🔧 Improved settings organization and descriptions
 - 📝 Updated README with detailed setup instructions
 
-## [1.7.0] - 2024-07-15
+## [1.7.0] - 2024-12-24
 
 ### Added
 - ✨ Added Gemini 2.0 Flash experimental model support
@@ -157,7 +157,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - 🔧 Enhanced release workflow automation
 - 📊 Added telemetry and usage analytics
 
-## [1.6.0] - 2024-06-01
+## [1.6.0] - 2024-11-28
 
 ### Added
 - ✨ **GIT INTEGRATION**: Enhanced Git operations
@@ -171,7 +171,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - 🏗️ Simplified and modularized Git service
 - 📝 Improved README with badges and better documentation
 
-## [1.5.0] - 2024-05-01
+## [1.5.0] - 2024-09-30
 
 ### Added
 - ✨ **AI INTEGRATION**: Git blame analysis for better context
@@ -182,7 +182,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - 🏗️ Extracted logger and configuration services
 - 📝 Simplified README and setup instructions
 
-## [1.0.0] - 2024-03-01
+## [1.0.0] - 2024-08-26
 
 ### Added
 - 🎉 **INITIAL STABLE RELEASE**
