@@ -2,16 +2,13 @@ import * as vscode from 'vscode';
 import { ConfigService } from '../utils/configService';
 import { Logger } from '../utils/logger';
 import { CommitMessage, ProgressReporter } from '../models/types';
-import { OpenAIService } from './openaiService';
 import { PromptService } from './promptService';
 import { GitService } from './gitService';
 import { GitBlameAnalyzer } from './gitBlameAnalyzer';
 import { TelemetryService } from './telemetryService';
 import { errorMessages } from '../utils/constants';
-import { GeminiService } from './geminiService';
-import { CodestralService } from './codestralService';
-import { OllamaService } from './ollamaService';
 import { removeThinkTags } from '../utils/textProcessing';
+import { AIServiceFactory, AIServiceType } from './aiServiceFactory';
 
 const MAX_DIFF_LENGTH = 100000;
 
@@ -32,22 +29,13 @@ export class AIService {
 
         try {
             const provider = ConfigService.getProvider();
-            let result: CommitMessage;
-            switch (provider) {
-                case 'openai':
-                    result = await OpenAIService.generateCommitMessage(prompt, progress);
-                    break;
-                case 'codestral':
-                    result = await CodestralService.generateCommitMessage(prompt, progress);
-                    break;
-                case 'ollama':
-                    result = await OllamaService.generateCommitMessage(prompt, progress);
-                    break;
-                case 'gemini':
-                default:
-                    result = await GeminiService.generateCommitMessage(prompt, progress);
-                    break;
-            }
+
+            // Преобразуем string provider в AIServiceType enum
+            const serviceType = this.getServiceTypeFromProvider(provider);
+
+            // Используем фабрику для генерации
+            let result = await AIServiceFactory.generateCommitMessage(serviceType, prompt, progress);
+
             // Post-process the commit message to remove think tags
             result.message = removeThinkTags(result.message);
             void TelemetryService.sendEvent('message_generation_completed', { provider, model: result.model });
@@ -66,6 +54,23 @@ export class AIService {
         return diff.length > MAX_DIFF_LENGTH
             ? `${diff.substring(0, MAX_DIFF_LENGTH)}\n...(truncated)`
             : diff;
+    }
+
+    /**
+     * Преобразует строковый provider в enum AIServiceType
+     */
+    private static getServiceTypeFromProvider(provider: string): AIServiceType {
+        switch (provider) {
+            case 'openai':
+                return AIServiceType.OPENAI;
+            case 'codestral':
+                return AIServiceType.CODESTRAL;
+            case 'ollama':
+                return AIServiceType.OLLAMA;
+            case 'gemini':
+            default:
+                return AIServiceType.GEMINI;
+        }
     }
 }
 

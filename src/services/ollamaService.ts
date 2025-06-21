@@ -1,7 +1,10 @@
 import axios, { AxiosError } from 'axios';
 import { Logger } from '../utils/logger';
-import { CommitMessage, ProgressReporter } from '../models/types';
+import { CommitMessage, ProgressReporter, IAIService } from '../models/types';
 import { ConfigService } from '../utils/configService';
+import { BaseAIService } from './baseAIService';
+import { HttpUtils } from '../utils/httpUtils';
+import { RetryUtils } from '../utils/retryUtils';
 
 interface OllamaResponse {
     message: {
@@ -18,9 +21,10 @@ type ErrorWithResponse = AxiosError & {
     response?: ApiErrorResponse;
 };
 
+// AI сервис для работы с локальным Ollama API  
+// Реализует интерфейс IAIService со статическими методами
 export class OllamaService {
     private static readonly defaultModel = 'llama3.2';
-    private static readonly maxRetryBackoff = 10000;
 
     static async generateCommitMessage(
         prompt: string,
@@ -30,13 +34,6 @@ export class OllamaService {
         const baseUrl = ConfigService.getOllamaBaseUrl() || 'http://localhost:11434';
         const model = ConfigService.getOllamaModel() || this.defaultModel;
         const apiUrl = `${baseUrl}/api/chat`;
-
-        const requestConfig = {
-            headers: {
-                'content-type': 'application/json'
-            },
-            timeout: 30000
-        };
 
         const payload = {
             model: model,
@@ -48,7 +45,11 @@ export class OllamaService {
 
         try {
             void Logger.log(`Attempt ${attempt}: Sending request to Ollama API`);
-            await this.updateProgressForAttempt(progress, attempt);
+            await RetryUtils.updateProgressForAttempt(progress, attempt);
+
+            const requestConfig = HttpUtils.createRequestConfig(
+                { 'content-type': 'application/json' }
+            );
 
             const response = await axios.post<OllamaResponse>(apiUrl, payload, requestConfig);
 
@@ -59,95 +60,22 @@ export class OllamaService {
             void Logger.log(`Commit message generated using ${model} model`);
             return { message: commitMessage, model };
         } catch (error) {
-            return await this.handleGenerationError(error as ErrorWithResponse, prompt, progress, attempt);
+            // Используем retry utils для retry логики
+            return RetryUtils.handleGenerationError(
+                error as Error,
+                prompt,
+                progress,
+                attempt,
+                this.generateCommitMessage.bind(this),
+                BaseAIService.handleOllamaError.bind(BaseAIService)
+            );
         }
-    }
-
-    private static async updateProgressForAttempt(progress: ProgressReporter, attempt: number): Promise<void> {
-        const progressMessage = attempt === 1
-            ? "Generating commit message..."
-            : `Retry attempt ${attempt}/${ConfigService.getMaxRetries()}...`;
-        progress.report({ message: progressMessage, increment: 10 });
     }
 
     private static extractCommitMessage(response: OllamaResponse): string {
-        if (response.message?.content) {
-            const commitMessage = this.cleanCommitMessage(response.message.content);
-            if (!commitMessage.trim()) {
-                throw new Error("Generated commit message is empty.");
-            }
-            return commitMessage;
-        }
-        throw new Error("Invalid response format from Ollama API");
+        const content = response.message?.content;
+        return BaseAIService.extractAndValidateMessage(content, 'Ollama');
     }
 
-    private static async handleGenerationError(
-        error: ErrorWithResponse,
-        prompt: string,
-        progress: ProgressReporter,
-        attempt: number
-    ): Promise<CommitMessage> {
-        void Logger.error(`Generation attempt ${attempt} failed:`, error);
-        const { errorMessage, shouldRetry } = this.handleApiError(error);
 
-        if (shouldRetry && attempt < ConfigService.getMaxRetries()) {
-            const delayMs = this.calculateRetryDelay(attempt);
-            void Logger.log(`Retrying in ${delayMs / 1000} seconds...`);
-            progress.report({ message: `Waiting ${delayMs / 1000} seconds before retry...`, increment: 0 });
-            await this.delay(delayMs);
-
-            return this.generateCommitMessage(prompt, progress, attempt + 1);
-        }
-
-        throw new Error(`Failed to generate commit message: ${errorMessage}`);
-    }
-
-    private static handleApiError(error: ErrorWithResponse): { errorMessage: string; shouldRetry: boolean } {
-        if (error.response) {
-            const { status } = error.response;
-            const responseData = JSON.stringify(error.response.data);
-
-            switch (status) {
-                case 404:
-                    return {
-                        errorMessage: `Model not found. Please check if Ollama is running and the model is installed.`,
-                        shouldRetry: false
-                    };
-                case 500:
-                    return {
-                        errorMessage: `Server error. Please check if Ollama is running properly.`,
-                        shouldRetry: true
-                    };
-                default:
-                    return {
-                        errorMessage: `API returned status ${status}. ${responseData}`,
-                        shouldRetry: status >= 500
-                    };
-            }
-        }
-
-        if (error.message.includes('ECONNREFUSED') || error.message.includes('ETIMEDOUT')) {
-            return {
-                errorMessage: 'Could not connect to Ollama. Please make sure Ollama is running.',
-                shouldRetry: true
-            };
-        }
-
-        return {
-            errorMessage: error.message,
-            shouldRetry: false
-        };
-    }
-
-    private static cleanCommitMessage(message: string): string {
-        return message.trim();
-    }
-
-    private static calculateRetryDelay(attempt: number): number {
-        return Math.min(1000 * Math.pow(2, attempt - 1), this.maxRetryBackoff);
-    }
-
-    private static delay(ms: number): Promise<void> {
-        return new Promise(resolve => setTimeout(resolve, ms));
-    }
 }

@@ -1,9 +1,11 @@
 import axios, { AxiosError } from 'axios';
 import { Logger } from '../utils/logger';
 import { ConfigService } from '../utils/configService';
-import { ProgressReporter, CommitMessage } from '../models/types';
-import { errorMessages } from '../utils/constants';
+import { ProgressReporter, CommitMessage, IAIService } from '../models/types';
 import { ConfigurationError } from '../models/errors';
+import { BaseAIService } from './baseAIService';
+import { HttpUtils } from '../utils/httpUtils';
+import { RetryUtils } from '../utils/retryUtils';
 
 interface GeminiResponse {
     candidates: Array<{
@@ -15,6 +17,8 @@ interface GeminiResponse {
     }>;
 }
 
+// AI сервис для работы с Google Gemini API  
+// Реализует интерфейс IAIService со статическими методами
 export class GeminiService {
     static async generateCommitMessage(
         prompt: string,
@@ -26,13 +30,6 @@ export class GeminiService {
             const model = ConfigService.getGeminiModel();
             const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
 
-            const requestConfig = {
-                headers: {
-                    'content-type': 'application/json'
-                },
-                timeout: 30000
-            };
-
             const payload = {
                 contents: [{ parts: [{ text: prompt }] }],
                 generationConfig: {
@@ -43,7 +40,12 @@ export class GeminiService {
                 }
             };
 
-            progress.report({ message: "Generating commit message...", increment: 50 });
+            // Используем retry utils для прогресса
+            await RetryUtils.updateProgressForAttempt(progress, attempt);
+
+            const requestConfig = HttpUtils.createRequestConfig(
+                { 'content-type': 'application/json' }
+            );
 
             const response = await axios.post<GeminiResponse>(apiUrl, payload, requestConfig);
             progress.report({ message: "Processing generated message...", increment: 90 });
@@ -52,60 +54,35 @@ export class GeminiService {
             void Logger.log(`Commit message generated using ${model} model`);
             return { message, model };
         } catch (error) {
+            // Обработка специальных случаев для Gemini
             const axiosError = error as AxiosError;
-            if (axiosError.response) {
-                const status = axiosError.response.status;
-                const data = axiosError.response.data as { error?: { message?: string } };
-
-                switch (status) {
-                    case 401:
-                        if (attempt === 1) {
-                            // Если это первая попытка и ключ неверный, запросим новый ключ и попробуем снова
-                            await ConfigService.removeApiKey();
-                            await ConfigService.promptForApiKey();
-                            return this.generateCommitMessage(prompt, progress, attempt + 1);
-                        }
-                        throw new Error(errorMessages.authenticationError);
-                    case 402:
-                        throw new Error(errorMessages.paymentRequired);
-                    case 429:
-                        throw new Error(errorMessages.rateLimitExceeded);
-                    case 422:
-                        throw new Error(
-                            data.error?.message || errorMessages.invalidRequest
-                        );
-                    case 500:
-                        throw new Error(errorMessages.serverError);
-                    default:
-                        throw new Error(
-                            `${errorMessages.apiError.replace('{0}', String(status))}: ${data.error?.message || 'Unknown error'}`
-                        );
-                }
+            if (axiosError.response?.status === 401 && attempt === 1) {
+                await ConfigService.removeApiKey();
+                await ConfigService.promptForApiKey();
+                return this.generateCommitMessage(prompt, progress, attempt + 1);
             }
 
-            if (axiosError.code === 'ECONNREFUSED' || axiosError.code === 'ETIMEDOUT') {
-                throw new Error(
-                    errorMessages.networkError.replace('{0}', 'Connection failed. Please check your internet connection.')
-                );
-            }
-
-            // Если ключ не установлен и это первая попытка
             if (error instanceof ConfigurationError && attempt === 1) {
                 await ConfigService.promptForApiKey();
                 return this.generateCommitMessage(prompt, progress, attempt + 1);
             }
 
-            throw new Error(
-                errorMessages.networkError.replace('{0}', axiosError.message)
+            // Используем retry utils для retry логики
+            return RetryUtils.handleGenerationError(
+                error as Error,
+                prompt,
+                progress,
+                attempt,
+                this.generateCommitMessage.bind(this),
+                BaseAIService.handleGeminiError.bind(BaseAIService)
             );
         }
     }
 
     private static extractCommitMessage(response: GeminiResponse): string {
-        if (!response.candidates?.[0]?.content?.parts?.[0]?.text) {
-            throw new Error('Unexpected response format from Gemini API');
-        }
-
-        return response.candidates[0].content.parts[0].text.trim();
+        const content = response.candidates?.[0]?.content?.parts?.[0]?.text;
+        return BaseAIService.extractAndValidateMessage(content, 'Gemini');
     }
+
+
 }
