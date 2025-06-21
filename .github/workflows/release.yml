@@ -141,7 +141,6 @@ jobs:
           "" \
           "✨ <b>What's New:</b>" \
           "$ESCAPED_SUMMARIZED_CHANGES" \
-
           "" \
           "📦 <b>Download:</b>" \
           "• <a href=\"https://marketplace.visualstudio.com/items?itemName=VizzleTF.geminicommit\">VS Code Marketplace</a>" \

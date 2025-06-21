@@ -97,6 +97,52 @@ Get your API key:
   - Collects anonymous usage data
   - Default: `true`
 
+## Project Configuration (.commitsage)
+
+You can override extension settings for individual projects by creating a `.commitsage` file in your project root. This allows different projects to have different AI providers, commit formats, or other settings.
+
+### Creating Project Configuration
+
+1. Open Command Palette (`Ctrl+Shift+P` / `Cmd+Shift+P`)
+2. Run "Commit Sage: Create Project Configuration (.commitsage)"
+3. Edit the generated file with your project-specific settings
+
+### Example .commitsage file:
+
+```json
+{
+  "provider": {
+    "type": "gemini"
+  },
+  "commit": {
+    "commitLanguage": "russian",
+    "commitFormat": "conventional",
+    "autoCommit": false,
+    "autoPush": false
+  },
+  "gemini": {
+    "model": "gemini-1.5-flash"
+  },
+  "telemetry": {
+    "enabled": false
+  }
+}
+```
+
+### Settings Priority
+
+Settings are loaded in the following order (higher priority overrides lower):
+1. **Project settings** (`.commitsage` file) - Highest priority
+2. **VS Code workspace settings** - Medium priority  
+3. **VS Code global settings** - Lowest priority
+
+### Notes
+
+- The `.commitsage` file is automatically watched for changes
+- Invalid JSON syntax will show an error notification
+- API keys are still managed through VS Code's secure storage (not stored in project files)
+- You can override any setting available in the extension configuration
+
 ## Usage
 
 1. Stage your changes in Git
@@ -151,6 +197,52 @@ Commit Sage - расширение VSCode для автоматической г
 Все настройки доступны через:
 - Палитра команд → "Preferences: Open Settings (UI)"
 - Поиск "Commit Sage"
+
+## Конфигурация проекта (.commitsage)
+
+Вы можете переопределить настройки расширения для отдельных проектов, создав файл `.commitsage` в корне проекта. Это позволяет разным проектам иметь разные провайдеры ИИ, форматы коммитов или другие настройки.
+
+### Создание конфигурации проекта
+
+1. Откройте палитру команд (`Ctrl+Shift+P` / `Cmd+Shift+P`)
+2. Выполните "Commit Sage: Create Project Configuration (.commitsage)"
+3. Отредактируйте созданный файл с настройками для вашего проекта
+
+### Пример файла .commitsage:
+
+```json
+{
+  "provider": {
+    "type": "gemini"
+  },
+  "commit": {
+    "commitLanguage": "russian",
+    "commitFormat": "conventional",
+    "autoCommit": false,
+    "autoPush": false
+  },
+  "gemini": {
+    "model": "gemini-1.5-flash"
+  },
+  "telemetry": {
+    "enabled": false
+  }
+}
+```
+
+### Приоритет настроек
+
+Настройки загружаются в следующем порядке (более высокий приоритет переопределяет низкий):
+1. **Настройки проекта** (файл `.commitsage`) - Наивысший приоритет
+2. **Настройки рабочей области VS Code** - Средний приоритет
+3. **Глобальные настройки VS Code** - Низший приоритет
+
+### Примечания
+
+- Файл `.commitsage` автоматически отслеживается на изменения
+- Неверный JSON синтаксис покажет уведомление об ошибке
+- API ключи по-прежнему управляются через защищенное хранилище VS Code (не хранятся в файлах проекта)
+- Вы можете переопределить любую настройку, доступную в конфигурации расширения
 
 ## Поддержка
 

@@ -7,6 +7,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.2.25] - 2025-01-25
+
+### Added
+- ✨ **PROJECT CONFIGURATION**: Added support for `.commitsage` file in project root
+  - Override extension settings per project (AI provider, commit format, language, etc.)
+  - Command to create project configuration file with template
+  - Automatic file watching and cache invalidation on changes
+  - Settings priority: project file > workspace settings > global settings
+- ✨ Added project configuration validation with error notifications
+- 📚 Updated documentation with project configuration examples and usage
+
+### Changed
+- ♻️ Refactored `ConfigService` to support hierarchical configuration loading
+- 🔧 Enhanced settings validation for project-specific configurations
+
+## [2.2.24] - 2025-01-25
+
+### Fixed
+- 🐛 Fixed release workflow notification message generation
+- 🐛 Resolved Telegram message parsing errors in CI pipeline
+
+### Changed
+- ♻️ Refactored AI service architecture for better modularity
+- 🔧 Improved release notification system
+
 ## [2.2.22] - 2025-01-25
 
 ### Changed

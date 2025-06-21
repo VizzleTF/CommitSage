@@ -1,12 +1,52 @@
 import * as vscode from 'vscode';
+import * as fs from 'fs';
+import * as path from 'path';
 import { Logger } from '../utils/logger';
 import { ConfigService } from '../utils/configService';
+import { ProjectConfig } from '../models/types';
 
 export class SettingsValidator {
     static async validateAllSettings(): Promise<void> {
+        await this.validateProjectConfig();
         await this.validateAutoPushState();
         await this.validateCustomInstructions();
         await this.validateRefsWithAutoCommit();
+    }
+
+    static async validateProjectConfig(): Promise<void> {
+        const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
+        if (!workspaceFolder) {
+            return;
+        }
+
+        const configPath = path.join(workspaceFolder.uri.fsPath, '.commitsage');
+
+        if (!fs.existsSync(configPath)) {
+            return;
+        }
+
+        try {
+            const configContent = fs.readFileSync(configPath, 'utf8');
+            JSON.parse(configContent) as ProjectConfig;
+            void Logger.log('Project configuration (.commitsage) validated successfully');
+        } catch (error) {
+            const selection = await vscode.window.showErrorMessage(
+                'Invalid .commitsage configuration file. The file contains syntax errors.',
+                {
+                    modal: true,
+                    detail: 'The project configuration file has JSON syntax errors that prevent it from being loaded.'
+                },
+                { title: 'Open File', isCloseAffordance: false },
+                { title: 'Ignore', isCloseAffordance: true }
+            );
+
+            if (selection?.title === 'Open File') {
+                const uri = vscode.Uri.file(configPath);
+                void vscode.window.showTextDocument(uri);
+            }
+
+            void Logger.error('Error validating .commitsage file:', error as Error);
+        }
     }
 
     static async validateAutoPushState(): Promise<void> {
