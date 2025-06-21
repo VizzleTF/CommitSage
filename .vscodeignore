@@ -1,42 +1,61 @@
+# Development files
 .vscode/**
 .vscode-test/**
 src/**
+out/**
+test/**
+docs/**
+.github/**
+
+# Configuration files
 .gitignore
 .yarnrc
 webpack.config.js
 .eslintrc.json
 tsconfig.json
-.env
-.env.*
-.git
-.github
+eslint.config.mjs
 .editorconfig
 .prettierrc
 .prettierignore
 .eslintignore
-node_modules/**
-out/**
+
+# Environment and secrets
+.env
+.env.*
+
+# Build artifacts
 **/*.map
 **/*.ts
 *.vsix
 .DS_Store
 coverage
 *.log
-test/**
+node_modules/**
+
+# Test files
 **/*.test.js
 **/*.spec.js
 **/*.test.ts
 **/*.spec.ts
-release.sh
-eslint.config.mjs
-webpack-optimizations.md
+
+# Documentation (except essential)
 CONTRIBUTING.md
-.github/**
-docs/**
+webpack-optimizations.md
+CHANGELOG.md
+release.sh
+test-gemini-api.sh
 package-lock.json
 
-# Keep necessary documentation
+# Cache and temp files
+.nyc_output/
+*.tmp
+*.swp
+*.swo
+*~
+
+# Only keep essential files
 !README.md
 !LICENSE
 !icon.png
-!example.gif 
+!example.gif
+!dist/** 
