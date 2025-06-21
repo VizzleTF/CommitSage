@@ -6,7 +6,7 @@ module.exports = (env, argv) => {
     const isProduction = argv.mode === 'production';
 
     return {
-        target: 'node',
+        target: 'node', // Node.js для Git/FS операций, но с Web совместимостью
         entry: './src/extension.ts',
         output: {
             path: path.resolve(__dirname, 'dist'),
@@ -16,12 +16,35 @@ module.exports = (env, argv) => {
             clean: true // Очистка dist папки при каждой сборке
         },
         // Настройка source maps в зависимости от режима
-        devtool: isProduction ? false : 'source-map',
+        devtool: isProduction ? 'hidden-source-map' : 'source-map',
 
         resolve: {
             extensions: ['.ts', '.js'],
-            // Приоритет для ES modules (лучше для tree-shaking)
-            mainFields: ['module', 'main']
+            // VS Code Web compatibility - приоритет browser entry points
+            mainFields: ['browser', 'module', 'main'],
+            // Webpack 5 fallbacks for Node.js modules
+            fallback: {
+                // Add polyfills for Node.js core modules if needed
+                "fs": false,
+                "os": false,
+                "path": false,
+                "crypto": false,
+                "stream": false,
+                "buffer": false,
+                "child_process": false,
+                "http": false,
+                "https": false,
+                "url": false,
+                "util": false,
+                "events": false
+            },
+            alias: {
+                // Optimize imports with aliases
+                '@': path.resolve(__dirname, 'src'),
+                '@services': path.resolve(__dirname, 'src/services'),
+                '@utils': path.resolve(__dirname, 'src/utils'),
+                '@models': path.resolve(__dirname, 'src/models')
+            }
         },
 
         module: {
@@ -43,7 +66,8 @@ module.exports = (env, argv) => {
         },
 
         externals: {
-            vscode: 'commonjs vscode'
+            vscode: 'commonjs vscode' // Only vscode module is external
+            // Bundle runtime dependencies: @amplitude/analytics-node, axios
         },
 
         // Основные оптимизации
@@ -77,6 +101,10 @@ module.exports = (env, argv) => {
 
             // Модульная конкатенация для лучшего tree-shaking
             concatenateModules: isProduction,
+
+            // Детерминистические IDs для лучшего кэширования
+            moduleIds: 'deterministic',
+            chunkIds: 'deterministic',
 
             // Для VS Code расширений используем один файл
             splitChunks: false
