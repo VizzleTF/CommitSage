@@ -251,7 +251,7 @@
         "package:analyze": "npm run build:analyze && vsce package"
     },
     "devDependencies": {
-        "@types/node": "^24.0.3",
+        "@types/node": "^24.0.7",
         "@types/vscode": "^1.93.0",
         "@typescript-eslint/eslint-plugin": "^8.34.1",
         "@typescript-eslint/parser": "^8.34.1",
