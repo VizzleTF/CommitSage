@@ -253,7 +253,7 @@
     "devDependencies": {
         "@types/node": "^24.0.10",
         "@types/vscode": "^1.93.0",
-        "@typescript-eslint/eslint-plugin": "^8.35.1",
+        "@typescript-eslint/eslint-plugin": "^8.36.0",
         "@typescript-eslint/parser": "^8.35.1",
         "@vscode/vsce": "^3.6.0",
         "dotenv-webpack": "^8.1.1",
