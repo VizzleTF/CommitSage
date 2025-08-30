@@ -4,6 +4,8 @@ import { karmaTemplate } from './formats/karma';
 import { semanticTemplate } from './formats/semantic';
 import { emojiTemplate } from './formats/emoji';
 import { emojiKarmaTemplate } from './formats/emojiKarma';
+import { googleTemplate } from './formats/google';
+import { atomTemplate } from './formats/atom';
 import type { CommitLanguage } from '../utils/configService';
 
 export interface CommitTemplate {
@@ -14,7 +16,7 @@ export interface CommitTemplate {
     spanish: string;
 }
 
-export type CommitFormat = 'conventional' | 'angular' | 'karma' | 'semantic' | 'emoji' | 'emojiKarma';
+export type CommitFormat = 'conventional' | 'angular' | 'karma' | 'semantic' | 'emoji' | 'emojiKarma' | 'google' | 'atom';
 
 const SUPPORTED_LANGUAGES = ['english', 'russian', 'chinese', 'japanese', 'spanish'] as const;
 type SupportedLanguage = typeof SUPPORTED_LANGUAGES[number];
@@ -25,7 +27,9 @@ const templates: Record<CommitFormat, CommitTemplate> = {
     karma: karmaTemplate,
     semantic: semanticTemplate,
     emoji: emojiTemplate,
-    emojiKarma: emojiKarmaTemplate
+    emojiKarma: emojiKarmaTemplate,
+    google: googleTemplate,
+    atom: atomTemplate
 } as const;
 
 const isValidFormat = (format: string): format is CommitFormat =>

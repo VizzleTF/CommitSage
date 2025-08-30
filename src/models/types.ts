@@ -108,7 +108,7 @@ export interface ProjectConfig {
     };
     commit?: {
         commitLanguage?: 'english' | 'russian' | 'chinese' | 'japanese' | 'spanish';
-        commitFormat?: 'conventional' | 'angular' | 'karma' | 'semantic' | 'emoji' | 'emojiKarma';
+        commitFormat?: 'conventional' | 'angular' | 'karma' | 'semantic' | 'emoji' | 'emojiKarma' | 'google' | 'atom';
         useCustomInstructions?: boolean;
         customInstructions?: string;
         onlyStagedChanges?: boolean;
