@@ -128,7 +128,9 @@
                         "karma",
                         "semantic",
                         "emoji",
-                        "emojiKarma"
+                        "emojiKarma",
+                        "google",
+                        "atom"
                     ],
                     "enumDescriptions": [
                         "type(scope): description\n\nbody\n\nfooter",
@@ -136,7 +138,9 @@
                         "type(scope): message",
                         "type: message",
                         ":emoji: message",
-                        ":emoji: type(scope): message"
+                        ":emoji: type(scope): message",
+                        "Type: Description\n\nBody\n\nFooter",
+                        "type(scope): subject\n\nbody\n\nfooter"
                     ],
                     "default": "conventional",
                     "description": "Format style for commit messages. All formats support English, some may have limited support for other languages",
@@ -264,13 +268,14 @@
         "terser-webpack-plugin": "^5.3.14",
         "ts-loader": "^9.5.4",
         "typescript": "^5.9.2",
-        "typescript-eslint": "^8.40.0",
+        "typescript-eslint": "^8.41.0",
         "webpack": "^5.101.3",
         "webpack-bundle-analyzer": "^4.10.2",
         "webpack-cli": "^6.0.1"
     },
     "dependencies": {
         "@amplitude/analytics-node": "^1.5.4",
+        "@amplitude/analytics-types": "^2.10.0",
         "axios": "^1.11.0"
     }
 }
