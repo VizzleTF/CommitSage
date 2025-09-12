@@ -106,16 +106,16 @@ export class ConfigService {
         return this.projectConfigCache;
     }
 
-    private static getNestedProjectValue<T>(sections: string[], defaultValue: T): T | undefined {
+    private static getNestedProjectValue<T>(sections: string[], _defaultValue: T): T | undefined {
         const projectConfig = this.getProjectConfig();
         if (!projectConfig) {
             return undefined;
         }
 
-        let current: any = projectConfig;
+        let current: Record<string, unknown> = projectConfig as Record<string, unknown>;
         for (const section of sections) {
             if (current && typeof current === 'object' && section in current) {
-                current = current[section];
+                current = current[section] as Record<string, unknown>;
             } else {
                 return undefined;
             }

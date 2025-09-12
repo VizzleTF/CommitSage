@@ -34,7 +34,7 @@ export class AIService {
             const serviceType = this.getServiceTypeFromProvider(provider);
 
             // Используем фабрику для генерации
-            let result = await AIServiceFactory.generateCommitMessage(serviceType, prompt, progress);
+            const result = await AIServiceFactory.generateCommitMessage(serviceType, prompt, progress);
 
             // Post-process the commit message to remove think tags
             result.message = removeThinkTags(result.message);

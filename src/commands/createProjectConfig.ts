@@ -80,4 +80,4 @@ export async function createProjectConfig(): Promise<void> {
             `Failed to create .commitsage file: ${(error as Error).message}`
         );
     }
-} 
+}

@@ -1,6 +1,6 @@
 import axios, { AxiosError } from 'axios';
 import { Logger } from '../utils/logger';
-import { CommitMessage, ProgressReporter, IAIService } from '../models/types';
+import { CommitMessage, ProgressReporter } from '../models/types';
 import { ConfigService } from '../utils/configService';
 import { BaseAIService } from './baseAIService';
 import { HttpUtils } from '../utils/httpUtils';
@@ -16,10 +16,6 @@ interface ApiErrorResponse {
     status: number;
     data: unknown;
 }
-
-type ErrorWithResponse = AxiosError & {
-    response?: ApiErrorResponse;
-};
 
 // AI сервис для работы с локальным Ollama API  
 // Реализует интерфейс IAIService со статическими методами

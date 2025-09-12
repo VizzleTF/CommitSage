@@ -1,4 +1,4 @@
-import { CommitMessage, ProgressReporter, IAIService, IModelService } from '../models/types';
+import { CommitMessage, ProgressReporter, IModelService } from '../models/types';
 import { GeminiService } from './geminiService';
 import { OpenAIService } from './openaiService';
 import { CodestralService } from './codestralService';
@@ -113,4 +113,4 @@ export class AIServiceFactory {
         }
         return service.fetchAvailableModels(baseUrl, apiKey);
     }
-} 
+}

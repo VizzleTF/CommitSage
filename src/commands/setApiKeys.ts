@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
 import { ConfigService } from '../utils/configService';
 
-export function registerSetApiKeyCommands(context: vscode.ExtensionContext): vscode.Disposable[] {
+export function registerSetApiKeyCommands(_context: vscode.ExtensionContext): vscode.Disposable[] {
     return [
         vscode.commands.registerCommand('commitsage.setApiKey', () =>
             ConfigService.promptForApiKey()
@@ -13,4 +13,4 @@ export function registerSetApiKeyCommands(context: vscode.ExtensionContext): vsc
             ConfigService.promptForCodestralApiKey()
         )
     ];
-} 
+}
