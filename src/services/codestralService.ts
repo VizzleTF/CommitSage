@@ -1,6 +1,6 @@
 import axios, { AxiosError } from 'axios';
 import { Logger } from '../utils/logger';
-import { CommitMessage, ProgressReporter, IAIService } from '../models/types';
+import { CommitMessage, ProgressReporter } from '../models/types';
 import { ConfigService } from '../utils/configService';
 import { ConfigurationError } from '../models/errors';
 import { BaseAIService } from './baseAIService';
@@ -19,10 +19,6 @@ interface ApiErrorResponse {
     status: number;
     data: unknown;
 }
-
-type ErrorWithResponse = AxiosError & {
-    response?: ApiErrorResponse;
-};
 
 // AI сервис для работы с Mistral Codestral API  
 // Реализует интерфейс IAIService со статическими методами

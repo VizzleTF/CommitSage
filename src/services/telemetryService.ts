@@ -42,7 +42,6 @@ interface QueuedEvent {
 
 declare const setInterval: (callback: () => void, ms: number) => number;
 declare const clearInterval: (intervalId: number) => void;
-declare const process: { platform: string };
 
 export class TelemetryService {
     private static disposables: vscode.Disposable[] = [];

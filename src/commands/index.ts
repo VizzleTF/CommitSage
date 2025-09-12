@@ -20,4 +20,4 @@ export function registerCommands(context: vscode.ExtensionContext): void {
         void vscode.window.showErrorMessage('Failed to register Commit Sage commands');
         throw error;
     }
-} 
+}

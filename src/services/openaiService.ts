@@ -22,8 +22,6 @@ interface ModelsResponse {
     }>;
 }
 
-type ApiHeaders = Record<string, string>;
-
 // AI сервис для работы с OpenAI/совместимыми API  
 // Реализует интерфейс IModelService со статическими методами (включая fetchAvailableModels)
 export class OpenAIService {

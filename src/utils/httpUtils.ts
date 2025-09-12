@@ -1,4 +1,4 @@
-import { AxiosError } from 'axios';
+import { AxiosError }from 'axios';
 
 /**
  * Утилиты для работы с HTTP запросами
@@ -53,7 +53,7 @@ export class HttpUtils {
     /**
      * Извлечение сообщения об ошибке из ответа API
      */
-    static extractErrorMessage(responseData: any): string | undefined {
+    static extractErrorMessage(responseData: { error?: { message?: string } }): string | undefined {
         return responseData?.error?.message;
     }
-} 
+}

@@ -10,7 +10,7 @@ export interface ProgressReporter {
 /**
  * Базовый интерфейс для всех AI сервисов
  * Определяет основной контракт для генерации commit сообщений
- * 
+ *
  * @example
  * ```typescript
  * class MyAIService implements IAIService {
@@ -31,7 +31,7 @@ export interface IAIService {
 /**
  * Расширенный интерфейс для сервисов с поддержкой получения списка моделей
  * Наследует IAIService и добавляет возможность получения доступных моделей
- * 
+ *
  * @example
  * ```typescript
  * class OpenAIService implements IModelService {
