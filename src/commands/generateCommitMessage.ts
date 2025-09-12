@@ -2,7 +2,7 @@ import * as vscode from 'vscode';
 import { CommitMessageUI } from '../services/aiService';
 import { Logger } from '../utils/logger';
 
-export function registerGenerateCommitMessageCommand(context: vscode.ExtensionContext): vscode.Disposable {
+export function registerGenerateCommitMessageCommand(_context: vscode.ExtensionContext): vscode.Disposable {
     return vscode.commands.registerCommand(
         'commitsage.generateCommitMessage',
         async (sourceControlRepository?: vscode.SourceControl) => {
@@ -14,4 +14,4 @@ export function registerGenerateCommitMessageCommand(context: vscode.ExtensionCo
             }
         }
     );
-} 
+}
