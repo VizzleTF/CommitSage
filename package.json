@@ -277,7 +277,7 @@
         "webpack-cli": "^6.0.1"
     },
     "dependencies": {
-        "@amplitude/analytics-node": "^1.5.8",
+        "@amplitude/analytics-node": "^1.5.9",
         "@amplitude/analytics-types": "^2.10.0",
         "axios": "^1.12.0"
     }
