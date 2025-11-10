@@ -262,7 +262,7 @@
         "@types/vscode": "^1.93.0",
         "@typescript-eslint/eslint-plugin": "^8.46.3",
         "@typescript-eslint/parser": "^8.46.3",
-        "@vscode/vsce": "^3.6.2",
+        "@vscode/vsce": "^3.7.0",
         "dotenv-webpack": "^8.1.1",
         "eslint": "^9.39.1",
         "eslint-import-resolver-typescript": "^4.4.4",
