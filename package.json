@@ -271,7 +271,7 @@
         "terser-webpack-plugin": "^5.3.14",
         "ts-loader": "^9.5.4",
         "typescript": "^5.9.3",
-        "typescript-eslint": "^8.47.0",
+        "typescript-eslint": "^8.48.0",
         "webpack": "^5.103.0",
         "webpack-bundle-analyzer": "^5.0.1",
         "webpack-cli": "^6.0.1"
