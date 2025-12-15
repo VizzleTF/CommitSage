@@ -268,7 +268,7 @@
         "eslint-import-resolver-typescript": "^4.4.4",
         "eslint-plugin-import": "^2.32.0",
         "eslint-plugin-unused-imports": "^4.3.0",
-        "terser-webpack-plugin": "^5.3.15",
+        "terser-webpack-plugin": "^5.3.16",
         "ts-loader": "^9.5.4",
         "typescript": "^5.9.3",
         "typescript-eslint": "^8.49.0",
