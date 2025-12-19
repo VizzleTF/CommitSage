@@ -1,281 +1,281 @@
 {
-    "name": "geminicommit",
-    "displayName": "Commit Sage",
-    "description": "Free AI commit messages using Gemini, Codestral, Ollama, or custom LLM",
-    "version": "2.2.29",
-    "publisher": "VizzleTF",
-    "repository": {
-        "type": "git",
-        "url": "https://github.com/VizzleTF/CommitSage.git"
-    },
-    "bugs": {
-        "url": "https://github.com/VizzleTF/CommitSage/issues"
-    },
-    "engines": {
-        "vscode": "^1.93.0"
-    },
-    "categories": [
-        "Machine Learning",
-        "Programming Languages",
-        "AI"
-    ],
-    "tags": [
-        "Machine Learning",
-        "Programming Languages",
-        "AI Assistant",
-        "AI",
-        "AutoCommit",
-        "LLM",
-        "Git",
-        "Ollama"
-    ],
-    "activationEvents": [
-        "onCommand:commitsage.generateCommitMessage",
-        "onCommand:commitsage.setApiKey",
-        "onCommand:commitsage.setOpenAIApiKey",
-        "onCommand:commitsage.setCodestralApiKey",
-        "onView:scm"
-    ],
-    "icon": "icon.png",
-    "main": "./dist/extension.js",
-    "sideEffects": false,
-    "contributes": {
-        "commands": [
-            {
-                "command": "commitsage.generateCommitMessage",
-                "title": "Commit Sage: Generate Commit Message",
-                "icon": {
-                    "light": "./icons/button-light.svg",
-                    "dark": "./icons/button-dark.svg"
-                }
-            },
-            {
-                "command": "commitsage.setApiKey",
-                "title": "Commit Sage: Set Gemini API Key"
-            },
-            {
-                "command": "commitsage.setOpenAIApiKey",
-                "title": "Commit Sage: Set OpenAI API Key"
-            },
-            {
-                "command": "commitsage.setCodestralApiKey",
-                "title": "Commit Sage: Set Codestral API Key"
-            },
-            {
-                "command": "commitsage.createProjectConfig",
-                "title": "Commit Sage: Create Project Configuration (.commitsage)"
-            }
-        ],
-        "menus": {
-            "scm/title": [
-                {
-                    "when": "scmProvider == git",
-                    "command": "commitsage.generateCommitMessage",
-                    "group": "navigation",
-                    "arguments": [
-                        "$scmProvider"
-                    ]
-                }
-            ],
-            "commandPalette": [
-                {
-                    "command": "commitsage.generateCommitMessage",
-                    "when": "workspaceFolderCount != 0"
-                }
-            ]
-        },
-        "keybindings": [
-            {
-                "command": "commitsage.generateCommitMessage",
-                "key": "ctrl+g",
-                "mac": "cmd+g",
-                "when": "scmProvider == git"
-            }
-        ],
-        "configuration": {
-            "title": "Commit Sage",
-            "properties": {
-                "commitSage.provider.type": {
-                    "type": "string",
-                    "enum": [
-                        "gemini",
-                        "codestral",
-                        "openai",
-                        "ollama"
-                    ],
-                    "default": "gemini",
-                    "description": "Select the AI provider for commit message generation",
-                    "order": 1
-                },
-                "commitSage.commit.commitLanguage": {
-                    "type": "string",
-                    "enum": [
-                        "english",
-                        "russian",
-                        "chinese",
-                        "japanese",
-                        "spanish"
-                    ],
-                    "default": "english",
-                    "description": "Language for generated commit messages. Some commit formats may have limited support for non-English languages",
-                    "order": 2
-                },
-                "commitSage.commit.commitFormat": {
-                    "type": "string",
-                    "enum": [
-                        "conventional",
-                        "angular",
-                        "karma",
-                        "semantic",
-                        "emoji",
-                        "emojiKarma",
-                        "google",
-                        "atom"
-                    ],
-                    "enumDescriptions": [
-                        "type(scope): description\n\nbody\n\nfooter",
-                        "type(scope): short summary\n\nbody\n\nfooter",
-                        "type(scope): message",
-                        "type: message",
-                        ":emoji: message",
-                        ":emoji: type(scope): message",
-                        "Type: Description\n\nBody\n\nFooter",
-                        "type(scope): subject\n\nbody\n\nfooter"
-                    ],
-                    "default": "conventional",
-                    "description": "Format style for commit messages. All formats support English, some may have limited support for other languages",
-                    "order": 3
-                },
-                "commitSage.commit.useCustomInstructions": {
-                    "type": "boolean",
-                    "default": false,
-                    "description": "Use custom instructions for commit message generation. When enabled, customInstructions must not be empty",
-                    "order": 4
-                },
-                "commitSage.commit.customInstructions": {
-                    "type": "string",
-                    "default": "",
-                    "description": "Custom instructions for commit message generation. Required when useCustomInstructions is enabled",
-                    "editPresentation": "multilineText",
-                    "order": 5
-                },
-                "commitSage.commit.onlyStagedChanges": {
-                    "type": "boolean",
-                    "default": false,
-                    "description": "Generate commit message only for staged changes. When disabled: commits staged changes if present, otherwise commits all tracked changes",
-                    "order": 6
-                },
-                "commitSage.commit.autoCommit": {
-                    "type": "boolean",
-                    "default": false,
-                    "description": "Automatically commit changes after generating the message. Consider disabling promptForRefs when using this feature",
-                    "order": 7
-                },
-                "commitSage.commit.autoPush": {
-                    "type": "boolean",
-                    "default": false,
-                    "description": "Automatically push changes after committing. Requires Auto Commit to be enabled. Will be ignored if Auto Commit is disabled",
-                    "order": 8
-                },
-                "commitSage.commit.promptForRefs": {
-                    "type": "boolean",
-                    "default": false,
-                    "description": "Prompt for entering refs (e.g., issue numbers) when generating commit messages. Note: This may interrupt automatic commit flow if Auto Commit is enabled",
-                    "order": 9
-                },
-                "commitSage.gemini.model": {
-                    "type": "string",
-                    "enum": [
-                        "auto",
-                        "gemini-2.0-pro-exp",
-                        "gemini-2.0-flash",
-                        "gemini-2.0-flash-exp",
-                        "gemini-2.0-flash-thinking-exp",
-                        "gemini-2.0-flash-lite",
-                        "gemini-2.5-pro",
-                        "gemini-2.5-flash",
-                        "gemini-2.5-flash-lite"
-                    ],
-                    "default": "auto",
-                    "description": "Select Gemini model for commit message generation. Use 'auto' to automatically try all available models until success. Only used when Gemini provider is selected",
-                    "order": 10
-                },
-                "commitSage.codestral.model": {
-                    "type": "string",
-                    "enum": [
-                        "codestral-2405",
-                        "codestral-latest"
-                    ],
-                    "default": "codestral-latest",
-                    "description": "Select Codestral model for commit message generation. Only used when Codestral provider is selected",
-                    "order": 11
-                },
-                "commitSage.openai.model": {
-                    "type": "string",
-                    "default": "gpt-3.5-turbo",
-                    "description": "Select OpenAI model for commit message generation. Only used when OpenAI provider is selected",
-                    "order": 12
-                },
-                "commitSage.openai.baseUrl": {
-                    "type": "string",
-                    "default": "https://api.openai.com/v1",
-                    "description": "Base URL for OpenAI API. Change only if using Azure OpenAI or a custom endpoint",
-                    "order": 13
-                },
-                "commitSage.ollama.baseUrl": {
-                    "type": "string",
-                    "default": "http://localhost:11434",
-                    "description": "Base URL for Ollama API. Only used when Ollama provider is selected",
-                    "order": 14
-                },
-                "commitSage.ollama.model": {
-                    "type": "string",
-                    "default": "llama3.2",
-                    "description": "Model name for Ollama. Make sure the model is installed locally. Only used when Ollama provider is selected",
-                    "order": 15
-                },
-                "commitSage.telemetry.enabled": {
-                    "type": "boolean",
-                    "default": true,
-                    "description": "Enable telemetry for Commit Sage",
-                    "order": 16
-                }
-            }
+  "name": "geminicommit",
+  "displayName": "Commit Sage",
+  "description": "Free AI commit messages using Gemini, Codestral, Ollama, or custom LLM",
+  "version": "2.3.0",
+  "publisher": "VizzleTF",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/VizzleTF/CommitSage.git"
+  },
+  "bugs": {
+    "url": "https://github.com/VizzleTF/CommitSage/issues"
+  },
+  "engines": {
+    "vscode": "^1.93.0"
+  },
+  "categories": [
+    "Machine Learning",
+    "Programming Languages",
+    "AI"
+  ],
+  "tags": [
+    "Machine Learning",
+    "Programming Languages",
+    "AI Assistant",
+    "AI",
+    "AutoCommit",
+    "LLM",
+    "Git",
+    "Ollama"
+  ],
+  "activationEvents": [
+    "onCommand:commitsage.generateCommitMessage",
+    "onCommand:commitsage.setApiKey",
+    "onCommand:commitsage.setOpenAIApiKey",
+    "onCommand:commitsage.setCodestralApiKey",
+    "onView:scm"
+  ],
+  "icon": "icon.png",
+  "main": "./dist/extension.js",
+  "sideEffects": false,
+  "contributes": {
+    "commands": [
+      {
+        "command": "commitsage.generateCommitMessage",
+        "title": "Commit Sage: Generate Commit Message",
+        "icon": {
+          "light": "./icons/button-light.svg",
+          "dark": "./icons/button-dark.svg"
         }
+      },
+      {
+        "command": "commitsage.setApiKey",
+        "title": "Commit Sage: Set Gemini API Key"
+      },
+      {
+        "command": "commitsage.setOpenAIApiKey",
+        "title": "Commit Sage: Set OpenAI API Key"
+      },
+      {
+        "command": "commitsage.setCodestralApiKey",
+        "title": "Commit Sage: Set Codestral API Key"
+      },
+      {
+        "command": "commitsage.createProjectConfig",
+        "title": "Commit Sage: Create Project Configuration (.commitsage)"
+      }
+    ],
+    "menus": {
+      "scm/title": [
+        {
+          "when": "scmProvider == git",
+          "command": "commitsage.generateCommitMessage",
+          "group": "navigation",
+          "arguments": [
+            "$scmProvider"
+          ]
+        }
+      ],
+      "commandPalette": [
+        {
+          "command": "commitsage.generateCommitMessage",
+          "when": "workspaceFolderCount != 0"
+        }
+      ]
     },
-    "scripts": {
-        "vscode:prepublish": "webpack --mode production",
-        "vscode:prepublish:tsc": "tsc -p ./",
-        "compile": "webpack --mode development",
-        "watch": "webpack --mode development --watch",
-        "build:prod": "webpack --mode production",
-        "build:analyze": "ANALYZE=true webpack --mode production",
-        "package": "vsce package",
-        "package:nowebpack": "npm run vscode:prepublish:tsc && vsce package",
-        "package:analyze": "npm run build:analyze && vsce package"
-    },
-    "devDependencies": {
-        "@types/node": "^25.0.2",
-        "@types/vscode": "^1.93.0",
-        "@typescript-eslint/eslint-plugin": "^8.49.0",
-        "@typescript-eslint/parser": "^8.48.1",
-        "@vscode/vsce": "^3.7.1",
-        "dotenv-webpack": "^8.1.1",
-        "eslint": "^9.39.1",
-        "eslint-import-resolver-typescript": "^4.4.4",
-        "eslint-plugin-import": "^2.32.0",
-        "eslint-plugin-unused-imports": "^4.3.0",
-        "terser-webpack-plugin": "^5.3.16",
-        "ts-loader": "^9.5.4",
-        "typescript": "^5.9.3",
-        "typescript-eslint": "^8.49.0",
-        "webpack": "^5.103.0",
-        "webpack-bundle-analyzer": "^5.1.0",
-        "webpack-cli": "^6.0.1"
-    },
-    "dependencies": {
-        "@amplitude/analytics-node": "^1.5.27",
-        "@amplitude/analytics-types": "^2.11.0",
-        "axios": "^1.13.2"
+    "keybindings": [
+      {
+        "command": "commitsage.generateCommitMessage",
+        "key": "ctrl+g",
+        "mac": "cmd+g",
+        "when": "scmProvider == git"
+      }
+    ],
+    "configuration": {
+      "title": "Commit Sage",
+      "properties": {
+        "commitSage.provider.type": {
+          "type": "string",
+          "enum": [
+            "gemini",
+            "codestral",
+            "openai",
+            "ollama"
+          ],
+          "default": "gemini",
+          "description": "Select the AI provider for commit message generation",
+          "order": 1
+        },
+        "commitSage.commit.commitLanguage": {
+          "type": "string",
+          "enum": [
+            "english",
+            "russian",
+            "chinese",
+            "japanese",
+            "spanish"
+          ],
+          "default": "english",
+          "description": "Language for generated commit messages. Some commit formats may have limited support for non-English languages",
+          "order": 2
+        },
+        "commitSage.commit.commitFormat": {
+          "type": "string",
+          "enum": [
+            "conventional",
+            "angular",
+            "karma",
+            "semantic",
+            "emoji",
+            "emojiKarma",
+            "google",
+            "atom"
+          ],
+          "enumDescriptions": [
+            "type(scope): description\n\nbody\n\nfooter",
+            "type(scope): short summary\n\nbody\n\nfooter",
+            "type(scope): message",
+            "type: message",
+            ":emoji: message",
+            ":emoji: type(scope): message",
+            "Type: Description\n\nBody\n\nFooter",
+            "type(scope): subject\n\nbody\n\nfooter"
+          ],
+          "default": "conventional",
+          "description": "Format style for commit messages. All formats support English, some may have limited support for other languages",
+          "order": 3
+        },
+        "commitSage.commit.useCustomInstructions": {
+          "type": "boolean",
+          "default": false,
+          "description": "Use custom instructions for commit message generation. When enabled, customInstructions must not be empty",
+          "order": 4
+        },
+        "commitSage.commit.customInstructions": {
+          "type": "string",
+          "default": "",
+          "description": "Custom instructions for commit message generation. Required when useCustomInstructions is enabled",
+          "editPresentation": "multilineText",
+          "order": 5
+        },
+        "commitSage.commit.onlyStagedChanges": {
+          "type": "boolean",
+          "default": false,
+          "description": "Generate commit message only for staged changes. When disabled: commits staged changes if present, otherwise commits all tracked changes",
+          "order": 6
+        },
+        "commitSage.commit.autoCommit": {
+          "type": "boolean",
+          "default": false,
+          "description": "Automatically commit changes after generating the message. Consider disabling promptForRefs when using this feature",
+          "order": 7
+        },
+        "commitSage.commit.autoPush": {
+          "type": "boolean",
+          "default": false,
+          "description": "Automatically push changes after committing. Requires Auto Commit to be enabled. Will be ignored if Auto Commit is disabled",
+          "order": 8
+        },
+        "commitSage.commit.promptForRefs": {
+          "type": "boolean",
+          "default": false,
+          "description": "Prompt for entering refs (e.g., issue numbers) when generating commit messages. Note: This may interrupt automatic commit flow if Auto Commit is enabled",
+          "order": 9
+        },
+        "commitSage.gemini.model": {
+          "type": "string",
+          "enum": [
+            "auto",
+            "gemini-2.0-pro-exp",
+            "gemini-2.0-flash",
+            "gemini-2.0-flash-exp",
+            "gemini-2.0-flash-thinking-exp",
+            "gemini-2.0-flash-lite",
+            "gemini-2.5-pro",
+            "gemini-2.5-flash",
+            "gemini-2.5-flash-lite"
+          ],
+          "default": "auto",
+          "description": "Select Gemini model for commit message generation. Use 'auto' to automatically try all available models until success. Only used when Gemini provider is selected",
+          "order": 10
+        },
+        "commitSage.codestral.model": {
+          "type": "string",
+          "enum": [
+            "codestral-2405",
+            "codestral-latest"
+          ],
+          "default": "codestral-latest",
+          "description": "Select Codestral model for commit message generation. Only used when Codestral provider is selected",
+          "order": 11
+        },
+        "commitSage.openai.model": {
+          "type": "string",
+          "default": "gpt-3.5-turbo",
+          "description": "Select OpenAI model for commit message generation. Only used when OpenAI provider is selected",
+          "order": 12
+        },
+        "commitSage.openai.baseUrl": {
+          "type": "string",
+          "default": "https://api.openai.com/v1",
+          "description": "Base URL for OpenAI API. Change only if using Azure OpenAI or a custom endpoint",
+          "order": 13
+        },
+        "commitSage.ollama.baseUrl": {
+          "type": "string",
+          "default": "http://localhost:11434",
+          "description": "Base URL for Ollama API. Only used when Ollama provider is selected",
+          "order": 14
+        },
+        "commitSage.ollama.model": {
+          "type": "string",
+          "default": "llama3.2",
+          "description": "Model name for Ollama. Make sure the model is installed locally. Only used when Ollama provider is selected",
+          "order": 15
+        },
+        "commitSage.telemetry.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable telemetry for Commit Sage",
+          "order": 16
+        }
+      }
     }
+  },
+  "scripts": {
+    "vscode:prepublish": "webpack --mode production",
+    "vscode:prepublish:tsc": "tsc -p ./",
+    "compile": "webpack --mode development",
+    "watch": "webpack --mode development --watch",
+    "build:prod": "webpack --mode production",
+    "build:analyze": "ANALYZE=true webpack --mode production",
+    "package": "vsce package",
+    "package:nowebpack": "npm run vscode:prepublish:tsc && vsce package",
+    "package:analyze": "npm run build:analyze && vsce package"
+  },
+  "devDependencies": {
+    "@types/node": "^25.0.2",
+    "@types/vscode": "^1.93.0",
+    "@typescript-eslint/eslint-plugin": "^8.49.0",
+    "@typescript-eslint/parser": "^8.48.1",
+    "@vscode/vsce": "^3.7.1",
+    "dotenv-webpack": "^8.1.1",
+    "eslint": "^9.39.1",
+    "eslint-import-resolver-typescript": "^4.4.4",
+    "eslint-plugin-import": "^2.32.0",
+    "eslint-plugin-unused-imports": "^4.3.0",
+    "terser-webpack-plugin": "^5.3.16",
+    "ts-loader": "^9.5.4",
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.49.0",
+    "webpack": "^5.103.0",
+    "webpack-bundle-analyzer": "^5.1.0",
+    "webpack-cli": "^6.0.1"
+  },
+  "dependencies": {
+    "@amplitude/analytics-node": "^1.5.27",
+    "@amplitude/analytics-types": "^2.11.0",
+    "axios": "^1.13.2"
+  }
 }
