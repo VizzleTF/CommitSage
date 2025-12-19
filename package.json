@@ -29,13 +29,6 @@
     "Git",
     "Ollama"
   ],
-  "activationEvents": [
-    "onCommand:commitsage.generateCommitMessage",
-    "onCommand:commitsage.setApiKey",
-    "onCommand:commitsage.setOpenAIApiKey",
-    "onCommand:commitsage.setCodestralApiKey",
-    "onView:scm"
-  ],
   "icon": "icon.png",
   "main": "./dist/extension.js",
   "sideEffects": false,
