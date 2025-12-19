@@ -4,9 +4,9 @@
   },
   "commit": {
     "commitLanguage": "english",
-    "commitFormat": "conventional"
+    "commitFormat": "emojiKarma"
   },
   "gemini": {
-    "model": "gemini-2.5-flash-lite"
+    "model": "auto"
   }
 }
