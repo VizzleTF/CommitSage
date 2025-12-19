@@ -40,8 +40,13 @@ esac
 
 echo "New version will be: $new_version"
 
-# Update package.json
-sed -i '' "s/\"version\": \"$current_version\"/\"version\": \"$new_version\"/" package.json
+# Update package.json using Node.js (cross-platform)
+node -e "
+const fs = require('fs');
+const pkg = JSON.parse(fs.readFileSync('./package.json', 'utf8'));
+pkg.version = '$new_version';
+fs.writeFileSync('./package.json', JSON.stringify(pkg, null, 2) + '\n', 'utf8');
+"
 
 # Commit changes
 git add package.json

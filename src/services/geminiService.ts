@@ -34,20 +34,11 @@ export class GeminiService {
      * Получает список доступных моделей Gemini через API
      */
     private static async getAvailableModels(apiKey: string): Promise<string[]> {
-        // #region agent log
-        fetch('http://127.0.0.1:7242/ingest/677a5018-8c46-4867-8036-e446f1e21911',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'geminiService.ts:36',message:'getAvailableModels entry',data:{apiKeyLength:apiKey?.length},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'A,B,C,E'})}).catch(()=>{});
-        // #endregion
         try {
             const apiUrl = `https://generativelanguage.googleapis.com/v1/models?key=${apiKey}`;
             const requestConfig = HttpUtils.createRequestConfig({});
-            // #region agent log
-            fetch('http://127.0.0.1:7242/ingest/677a5018-8c46-4867-8036-e446f1e21911',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'geminiService.ts:41',message:'Before API request',data:{apiUrl:apiUrl.replace(apiKey,'***'),requestConfig},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'E'})}).catch(()=>{});
-            // #endregion
             
             const response = await axios.get<GeminiModelsResponse>(apiUrl, requestConfig);
-            // #region agent log
-            fetch('http://127.0.0.1:7242/ingest/677a5018-8c46-4867-8036-e446f1e21911',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'geminiService.ts:46',message:'API response received',data:{modelsCount:response.data.models?.length,firstModel:response.data.models?.[0]},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'A,B'})}).catch(()=>{});
-            // #endregion
             
             // Фильтруем только модели, поддерживающие generateContent
             const models = response.data.models
@@ -55,16 +46,10 @@ export class GeminiService {
                     model.supportedGenerationMethods?.includes('generateContent')
                 )
                 .map((model: GeminiModel) => model.name.replace('models/', ''));
-            // #region agent log
-            fetch('http://127.0.0.1:7242/ingest/677a5018-8c46-4867-8036-e446f1e21911',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'geminiService.ts:57',message:'After filtering models',data:{filteredCount:models.length,models:models},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'C'})}).catch(()=>{});
-            // #endregion
             
             void Logger.log(`Found ${models.length} available Gemini models: ${models.join(', ')}`);
             return models;
         } catch (error) {
-            // #region agent log
-            fetch('http://127.0.0.1:7242/ingest/677a5018-8c46-4867-8036-e446f1e21911',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'geminiService.ts:65',message:'Catch block - error occurred',data:{errorMessage:error instanceof Error ? error.message : String(error),errorType:error?.constructor?.name},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'D,E'})}).catch(()=>{});
-            // #endregion
             void Logger.error('Failed to fetch available Gemini models:', error as Error);
             // В случае ошибки возвращаем дефолтный список моделей
             const fallbackModels = [
@@ -73,9 +58,6 @@ export class GeminiService {
                 'gemini-2.5-flash',
                 'gemini-2.5-pro'
             ];
-            // #region agent log
-            fetch('http://127.0.0.1:7242/ingest/677a5018-8c46-4867-8036-e446f1e21911',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'geminiService.ts:77',message:'Returning fallback models',data:{fallbackModels},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'D'})}).catch(()=>{});
-            // #endregion
             return fallbackModels;
         }
     }
@@ -153,25 +135,13 @@ export class GeminiService {
         try {
             const apiKey = await ConfigService.getApiKey();
             const configuredModel = ConfigService.getGeminiModel();
-            // #region agent log
-            fetch('http://127.0.0.1:7242/ingest/677a5018-8c46-4867-8036-e446f1e21911',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'geminiService.ts:138',message:'generateCommitMessage entry',data:{configuredModel,attempt},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'A'})}).catch(()=>{});
-            // #endregion
             
             // Проверяем режим "auto"
             if (configuredModel === 'auto') {
-                // #region agent log
-                fetch('http://127.0.0.1:7242/ingest/677a5018-8c46-4867-8036-e446f1e21911',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'geminiService.ts:145',message:'Auto mode detected, fetching models',data:{},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'A'})}).catch(()=>{});
-                // #endregion
                 progress.report({ message: "Fetching available Gemini models...", increment: 0 });
                 const availableModels = await this.getAvailableModels(apiKey);
-                // #region agent log
-                fetch('http://127.0.0.1:7242/ingest/677a5018-8c46-4867-8036-e446f1e21911',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'geminiService.ts:151',message:'Models fetched',data:{availableModelsCount:availableModels.length,availableModels},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'C,D'})}).catch(()=>{});
-                // #endregion
                 
                 if (availableModels.length === 0) {
-                    // #region agent log
-                    fetch('http://127.0.0.1:7242/ingest/677a5018-8c46-4867-8036-e446f1e21911',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'geminiService.ts:157',message:'ERROR: No models available',data:{},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'C,D'})}).catch(()=>{});
-                    // #endregion
                     throw new Error('No available Gemini models found');
                 }
                 
