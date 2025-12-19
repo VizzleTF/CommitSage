@@ -1,4 +1,5 @@
-import { AxiosError }from 'axios';
+import { AxiosError } from 'axios';
+import { ConfigService } from './configService';
 
 /**
  * Утилиты для работы с HTTP запросами
@@ -26,6 +27,14 @@ export class HttpUtils {
         return headers;
     }
 
+    private static getConfiguredTimeout(): number {
+        const timeoutSeconds = ConfigService.getApiRequestTimeout();
+        if (timeoutSeconds === -1) {
+            return 0;
+        }
+        return timeoutSeconds * 1000;
+    }
+
     /**
      * Создание конфигурации для HTTP запросов
      */
@@ -35,7 +44,7 @@ export class HttpUtils {
     ): { headers: Record<string, string>; timeout: number } {
         return {
             headers,
-            timeout: timeout || this.DEFAULT_TIMEOUT
+            timeout: timeout !== undefined ? timeout : this.getConfiguredTimeout()
         };
     }
 

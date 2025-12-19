@@ -14,6 +14,7 @@ Commit Sage is a VSCode extension that automatically generates commit messages u
 ## Features
 
 - 🤖 AI-powered commit message generation
+- 🔄 Auto model selection for Gemini (tries available models until success)
 - 🌍 Multiple language support (English, Russian, Chinese, Japanese, Spanish)
 - 📝 Various commit formats (Conventional, Angular, Karma, Semantic, Emoji, EmojiKarma)
 - 🔄 Smart handling of staged/unstaged changes
@@ -36,8 +37,13 @@ Get your API key:
 
 - **Gemini Settings**:
   - Model (`commitSage.gemini.model`): 
-    - Options: `gemini-1.0-pro`, `gemini-1.5-pro`, `gemini-1.5-flash`, `gemini-2.0-flash-exp`
-    - Default: `gemini-1.5-flash`
+    - Options: `auto`, `gemini-2.0-pro-exp`, `gemini-2.0-flash`, `gemini-2.0-flash-exp`, `gemini-2.0-flash-thinking-exp`, `gemini-2.0-flash-lite`, `gemini-2.5-pro`, `gemini-2.5-flash`, `gemini-2.5-flash-lite`
+    - Default: `gemini-2.0-flash`
+  - **Auto Mode** (`auto`):
+    - Automatically fetches the list of available Gemini models from the API
+    - Tries each model sequentially until one succeeds
+    - Useful when you don't want to manually update model names or when specific models are unavailable
+    - Provides maximum reliability by automatically switching to working models
 
 - **OpenAI Settings**:
   - Model (`commitSage.openai.model`): Default `gpt-3.5-turbo`
@@ -121,7 +127,7 @@ You can override extension settings for individual projects by creating a `.comm
     "autoPush": false
   },
   "gemini": {
-    "model": "gemini-1.5-flash"
+    "model": "auto"
   },
   "telemetry": {
     "enabled": false
@@ -222,7 +228,7 @@ Commit Sage - расширение VSCode для автоматической г
     "autoPush": false
   },
   "gemini": {
-    "model": "gemini-1.5-flash"
+    "model": "auto"
   },
   "telemetry": {
     "enabled": false
