@@ -523,4 +523,8 @@ export class ConfigService {
             await this.setOpenAIApiKey(key);
         }
     }
+
+    static getApiRequestTimeout(): number {
+        return this.getConfig<number>('', 'apiRequestTimeout', 30);
+    }
 }
