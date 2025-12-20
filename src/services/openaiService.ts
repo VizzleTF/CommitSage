@@ -2,7 +2,7 @@ import axios, { AxiosError } from 'axios';
 import { Logger } from '../utils/logger';
 import { ConfigService } from '../utils/configService';
 import { ProgressReporter, CommitMessage, IModelService } from '../models/types';
-import { OpenAIError, ConfigurationError } from '../models/errors';
+import { OpenAIError, ApiKeyInvalidError } from '../models/errors';
 import { BaseAIService } from './baseAIService';
 import { HttpUtils } from '../utils/httpUtils';
 import { RetryUtils } from '../utils/retryUtils';
@@ -64,15 +64,8 @@ export class OpenAIService {
         } catch (error) {
             // Обработка специальных случаев для OpenAI
             const axiosError = error as AxiosError;
-            if (axiosError.response?.status === 401 && attempt === 1) {
-                await ConfigService.removeOpenAIApiKey();
-                await ConfigService.promptForOpenAIApiKey();
-                return this.generateCommitMessage(prompt, progress, attempt + 1);
-            }
-
-            if (error instanceof ConfigurationError && attempt === 1) {
-                await ConfigService.promptForOpenAIApiKey();
-                return this.generateCommitMessage(prompt, progress, attempt + 1);
+            if (axiosError.response?.status === 401) {
+                throw new ApiKeyInvalidError('OpenAI');
             }
 
             // Используем retry utils для retry логики

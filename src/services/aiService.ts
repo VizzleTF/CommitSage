@@ -9,10 +9,15 @@ import { TelemetryService } from './telemetryService';
 import { errorMessages } from '../utils/constants';
 import { removeThinkTags } from '../utils/textProcessing';
 import { AIServiceFactory, AIServiceType } from './aiServiceFactory';
+import { UserCancelledError, ApiKeyInvalidError } from '../models/errors';
 
 const MAX_DIFF_LENGTH = 100000;
 
 export class AIService {
+    static requiresApiKey(provider: string): boolean {
+        return ['gemini', 'openai', 'codestral'].includes(provider.toLowerCase());
+    }
+
     static async generateCommitMessage(
         diff: string,
         blameAnalysis: string,
@@ -90,11 +95,36 @@ export class CommitMessageUI {
                 }
             }
 
-            await this.executeWithProgress(async progress => {
-                const commitMessage = await this.generateAndApplyMessage(progress, sourceControlRepository!);
+            // Pre-check API key if required for the provider
+            const provider = ConfigService.getProvider();
+            if (AIService.requiresApiKey(provider)) {
+                await this.ensureApiKey(provider);
+            }
+
+            await this.executeWithProgress(async (progress, token) => {
+                // Check for cancellation
+                if (token.isCancellationRequested) {
+                    throw new UserCancelledError();
+                }
+
+                const commitMessage = await this.generateAndApplyMessage(progress, sourceControlRepository!, token);
                 void Logger.log(`Commit message generated: ${commitMessage.message}`);
             });
         } catch (error: unknown) {
+            // Don't show error for user cancellation
+            if (error instanceof UserCancelledError) {
+                void Logger.log('Operation cancelled by user');
+                return;
+            }
+
+            // Handle invalid API key error - prompt for new key and retry
+            if (error instanceof ApiKeyInvalidError) {
+                void Logger.error('Invalid API key', error);
+                const provider = ConfigService.getProvider();
+                await this.handleInvalidApiKey(provider);
+                return;
+            }
+
             void Logger.error('Error in CommitMessageUI:', error instanceof Error ? error : new Error(String(error)));
             void TelemetryService.sendEvent('message_generation_failed', {
                 error: error instanceof Error ? error.message : String(error),
@@ -105,6 +135,60 @@ export class CommitMessageUI {
         }
     }
 
+    private static async ensureApiKey(provider: string): Promise<void> {
+        try {
+            switch (provider) {
+                case 'gemini':
+                    await ConfigService.getApiKey();
+                    break;
+                case 'openai':
+                    await ConfigService.getOpenAIApiKey();
+                    break;
+                case 'codestral':
+                    await ConfigService.getCodestralApiKey();
+                    break;
+            }
+        } catch (error) {
+            // If user cancelled the API key input, throw UserCancelledError
+            if (error instanceof Error && error.message.includes('cancelled')) {
+                throw new UserCancelledError('API key input was cancelled');
+            }
+            throw error;
+        }
+    }
+
+    private static async handleInvalidApiKey(provider: string): Promise<void> {
+        const selection = await Logger.showError(
+            'Invalid or expired API key. Please enter a new one.',
+        );
+
+        // Prompt for new API key
+        try {
+            switch (provider) {
+                case 'gemini':
+                    await ConfigService.removeApiKey();
+                    await ConfigService.promptForApiKey();
+                    break;
+                case 'openai':
+                    await ConfigService.removeOpenAIApiKey();
+                    await ConfigService.promptForOpenAIApiKey();
+                    break;
+                case 'codestral':
+                    await ConfigService.removeCodestralApiKey();
+                    await ConfigService.promptForCodestralApiKey();
+                    break;
+            }
+
+            // Retry generation
+            void Logger.log('API key updated, retrying commit message generation');
+            await this.generateAndSetCommitMessage();
+        } catch (error) {
+            if (error instanceof Error && error.message.includes('cancelled')) {
+                void Logger.log('User cancelled API key update');
+            }
+        }
+    }
+
     private static async initializeAndValidate(): Promise<void> {
         if (!vscode.workspace.workspaceFolders) {
             throw new Error('No workspace folder is open');
@@ -112,13 +196,13 @@ export class CommitMessageUI {
     }
 
     private static async executeWithProgress(
-        action: (progress: vscode.Progress<{ message?: string; increment?: number }>) => Promise<void>
+        action: (progress: vscode.Progress<{ message?: string; increment?: number }>, token: vscode.CancellationToken) => Promise<void>
     ): Promise<void> {
         await vscode.window.withProgress(
             {
                 location: vscode.ProgressLocation.Notification,
                 title: 'CommitSage',
-                cancellable: false
+                cancellable: true
             },
             action
         );
@@ -126,9 +210,14 @@ export class CommitMessageUI {
 
     private static async generateAndApplyMessage(
         progress: ProgressReporter,
-        sourceControlRepository: vscode.SourceControl
+        sourceControlRepository: vscode.SourceControl,
+        token: vscode.CancellationToken
     ): Promise<CommitMessage> {
         progress.report({ message: "Analyzing changes...", increment: 10 });
+
+        if (token.isCancellationRequested) {
+            throw new UserCancelledError();
+        }
 
         if (!sourceControlRepository?.rootUri) {
             throw new Error('No Git repository found');
@@ -138,6 +227,10 @@ export class CommitMessageUI {
         const onlyStagedSetting = ConfigService.getOnlyStagedChanges();
         const hasStagedChanges = await GitService.hasChanges(repoPath, 'staged');
         const useStagedChanges = onlyStagedSetting || hasStagedChanges;
+
+        if (token.isCancellationRequested) {
+            throw new UserCancelledError();
+        }
 
         const diff = await GitService.getDiff(repoPath, useStagedChanges);
         if (!diff) {
@@ -149,6 +242,10 @@ export class CommitMessageUI {
             changedFiles.map(file => GitBlameAnalyzer.analyzeChanges(repoPath, file))
         );
         const blameAnalysis = blameAnalyses.filter(analysis => analysis).join('\n\n');
+
+        if (token.isCancellationRequested) {
+            throw new UserCancelledError();
+        }
 
         const commitMessage = await AIService.generateCommitMessage(diff, blameAnalysis, progress);
 

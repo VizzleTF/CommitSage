@@ -2,7 +2,7 @@ import axios, { AxiosError } from 'axios';
 import { Logger } from '../utils/logger';
 import { CommitMessage, ProgressReporter } from '../models/types';
 import { ConfigService } from '../utils/configService';
-import { ConfigurationError } from '../models/errors';
+import { ApiKeyInvalidError } from '../models/errors';
 import { BaseAIService } from './baseAIService';
 import { HttpUtils } from '../utils/httpUtils';
 import { RetryUtils } from '../utils/retryUtils';
@@ -56,15 +56,8 @@ export class CodestralService {
         } catch (error) {
             // Обработка специальных случаев для Codestral
             const axiosError = error as AxiosError;
-            if (axiosError.response?.status === 401 && attempt === 1) {
-                await ConfigService.removeCodestralApiKey();
-                await ConfigService.promptForCodestralApiKey();
-                return this.generateCommitMessage(prompt, progress, attempt + 1);
-            }
-
-            if (error instanceof ConfigurationError && attempt === 1) {
-                await ConfigService.promptForCodestralApiKey();
-                return this.generateCommitMessage(prompt, progress, attempt + 1);
+            if (axiosError.response?.status === 401) {
+                throw new ApiKeyInvalidError('Codestral');
             }
 
             // Используем retry utils для retry логики

@@ -12,26 +12,42 @@ export class Logger {
         this.outputChannel.appendLine(`[${timestamp}] [INFO] ${message}`);
     }
 
-    static async error(message: string, error?: Error): Promise<void> {
+    static error(message: string, error?: Error): void {
         const timestamp = new Date().toISOString();
         const errorMessage = error ? `: ${error.message}\n${error.stack}` : '';
         this.outputChannel.appendLine(`[${timestamp}] [ERROR] ${message}${errorMessage}`);
-
-        await vscode.window.showErrorMessage(
-            `Commit Sage: ${message}`,
-            { modal: false },
-            'Show Details',
-            'OK'
-        ).then(selection => {
-            if (selection === 'Show Details') {
-                this.show();
-            }
-        });
     }
 
     static warn(message: string): void {
         const timestamp = new Date().toISOString();
         this.outputChannel.appendLine(`[${timestamp}] [WARN] ${message}`);
+    }
+
+    static async showError(message: string, ...actions: string[]): Promise<string | undefined> {
+        const selection = await vscode.window.showErrorMessage(
+            `Commit Sage: ${message}`,
+            ...actions
+        );
+
+        if (selection === 'Show Details') {
+            this.show();
+        }
+
+        return selection;
+    }
+
+    static async showWarning(message: string, ...actions: string[]): Promise<string | undefined> {
+        return await vscode.window.showWarningMessage(
+            `Commit Sage: ${message}`,
+            ...actions
+        );
+    }
+
+    static async showInfo(message: string, ...actions: string[]): Promise<string | undefined> {
+        return await vscode.window.showInformationMessage(
+            `Commit Sage: ${message}`,
+            ...actions
+        );
     }
 
     static show(): void {

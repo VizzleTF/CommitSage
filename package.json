@@ -55,6 +55,18 @@
         "title": "Commit Sage: Set Codestral API Key"
       },
       {
+        "command": "commitsage.removeApiKey",
+        "title": "Commit Sage: Remove Gemini API Key"
+      },
+      {
+        "command": "commitsage.removeOpenAIApiKey",
+        "title": "Commit Sage: Remove OpenAI API Key"
+      },
+      {
+        "command": "commitsage.removeCodestralApiKey",
+        "title": "Commit Sage: Remove Codestral API Key"
+      },
+      {
         "command": "commitsage.createProjectConfig",
         "title": "Commit Sage: Create Project Configuration (.commitsage)"
       }

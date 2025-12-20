@@ -7,14 +7,14 @@ export async function createProjectConfig(): Promise<void> {
     try {
         const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
         if (!workspaceFolder) {
-            await vscode.window.showErrorMessage('No workspace folder found. Please open a project first.');
+            await Logger.showError('No workspace folder found. Please open a project first.');
             return;
         }
 
         const configPath = path.join(workspaceFolder.uri.fsPath, '.commitsage');
 
         if (fs.existsSync(configPath)) {
-            const selection = await vscode.window.showWarningMessage(
+            const selection = await Logger.showWarning(
                 'A .commitsage file already exists in this project.',
                 'Open Existing',
                 'Overwrite',
@@ -70,14 +70,10 @@ export async function createProjectConfig(): Promise<void> {
         const uri = vscode.Uri.file(configPath);
         void vscode.window.showTextDocument(uri);
 
-        await vscode.window.showInformationMessage(
-            'Project configuration file (.commitsage) has been created and opened for editing.'
-        );
+        void Logger.log('Project configuration file (.commitsage) has been created and opened for editing.');
 
     } catch (error) {
         void Logger.error('Error creating .commitsage file:', error as Error);
-        await vscode.window.showErrorMessage(
-            `Failed to create .commitsage file: ${(error as Error).message}`
-        );
+        await Logger.showError(`Failed to create .commitsage file: ${(error as Error).message}`);
     }
 }
