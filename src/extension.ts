@@ -19,7 +19,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         await GitService.initialize();
     } catch (error) {
         void Logger.error('Failed during initialization:', error as Error);
-        void vscode.window.showErrorMessage(`Commit Sage initialization failed: ${(error as Error).message}`);
+        void Logger.showError(`Initialization failed: ${(error as Error).message}`);
         return;
     }
 

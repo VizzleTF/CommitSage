@@ -60,3 +60,17 @@ export class ConfigurationError extends Error {
         this.name = 'ConfigurationError';
     }
 }
+
+export class UserCancelledError extends Error {
+    constructor(message: string = 'Operation cancelled by user') {
+        super(message);
+        this.name = 'UserCancelledError';
+    }
+}
+
+export class ApiKeyInvalidError extends Error {
+    constructor(provider: string) {
+        super(`Invalid or expired API key for ${provider}`);
+        this.name = 'ApiKeyInvalidError';
+    }
+}
