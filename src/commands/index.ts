@@ -17,7 +17,7 @@ export function registerCommands(context: vscode.ExtensionContext): void {
         context.subscriptions.push(...disposables);
     } catch (error) {
         void Logger.error('Failed to register commands:', error as Error);
-        void vscode.window.showErrorMessage('Failed to register Commit Sage commands');
+        void Logger.showError('Failed to register commands');
         throw error;
     }
 }

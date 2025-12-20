@@ -10,7 +10,7 @@ export function registerGenerateCommitMessageCommand(_context: vscode.ExtensionC
                 await CommitMessageUI.generateAndSetCommitMessage(sourceControlRepository);
             } catch (error) {
                 void Logger.error('Error in generateCommitMessage command:', error as Error);
-                void vscode.window.showErrorMessage(`Error: ${(error as Error).message}`);
+                void Logger.showError((error as Error).message);
             }
         }
     );

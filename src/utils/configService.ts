@@ -193,10 +193,10 @@ export class ConfigService {
             }
 
             await this.secretStorage.store('commitsage.apiKey', key);
-            await vscode.window.showInformationMessage('Google API key has been successfully validated and saved');
+            void Logger.log('Google API key has been validated and set');
         } catch (error) {
             void Logger.error('Failed to validate and set Google API key:', error as Error);
-            await vscode.window.showErrorMessage(`Failed to set API key: ${(error as Error).message}`);
+            await Logger.showError(`Failed to set API key: ${(error as Error).message}`);
             throw error;
         }
     }
@@ -235,11 +235,9 @@ export class ConfigService {
 
             await this.secretStorage.store('commitsage.codestralApiKey', key);
             void Logger.log('Codestral API key has been validated and set');
-
-            await vscode.window.showInformationMessage('Codestral API key has been successfully validated and saved');
         } catch (error) {
             void Logger.error('Failed to validate and set Codestral API key:', error as Error);
-            await vscode.window.showErrorMessage(`Failed to set API key: ${(error as Error).message}`);
+            await Logger.showError(`Failed to set API key: ${(error as Error).message}`);
             throw error;
         }
     }
@@ -248,7 +246,6 @@ export class ConfigService {
         try {
             await this.secretStorage.delete('commitsage.apiKey');
             void Logger.log('Google API key has been removed');
-            await vscode.window.showInformationMessage('Google API key has been removed');
         } catch (error) {
             void Logger.error('Error removing Google API key:', error as Error);
             throw error;
@@ -259,7 +256,6 @@ export class ConfigService {
         try {
             await this.secretStorage.delete('commitsage.codestralApiKey');
             void Logger.log('Codestral API key has been removed');
-            await vscode.window.showInformationMessage('Codestral API key has been removed');
         } catch (error) {
             void Logger.error('Error removing Codestral API key:', error as Error);
             throw error;
@@ -323,40 +319,6 @@ export class ConfigService {
         return this.getConfig<boolean>('commit', 'autoPush', false);
     }
 
-    static async validateAutoPushState(): Promise<void> {
-        const isAutoPushEnabled = this.getAutoPushEnabled();
-        const isAutoCommitEnabled = this.getAutoCommitEnabled();
-
-        if (isAutoPushEnabled && !isAutoCommitEnabled) {
-            const selection = await vscode.window.showWarningMessage(
-                'Auto Push requires Auto Commit to be enabled.',
-                {
-                    modal: true,
-                    detail: 'Choose how to resolve this configuration conflict'
-                },
-                { title: 'Enable Auto Commit', isCloseAffordance: false },
-                { title: 'Disable Auto Push', isCloseAffordance: false },
-                { title: 'Open Settings', isCloseAffordance: true }
-            );
-
-            const config = vscode.workspace.getConfiguration('commitSage');
-
-            switch (selection?.title) {
-                case 'Enable Auto Commit':
-                    await config.update('commit.autoCommit', true, vscode.ConfigurationTarget.Global);
-                    break;
-                case 'Disable Auto Push':
-                    await config.update('commit.autoPush', false, vscode.ConfigurationTarget.Global);
-                    break;
-                case 'Open Settings':
-                    await vscode.commands.executeCommand(
-                        'workbench.action.openSettings',
-                        '@ext:VizzleTF.commitsage commit'
-                    );
-                    break;
-            }
-        }
-    }
 
     static clearCache(): void {
         this.cache.clear();
@@ -434,10 +396,9 @@ export class ConfigService {
             const config = vscode.workspace.getConfiguration('commitSage');
             await config.update('openai.baseUrl', normalizedEndpoint, true);
             void Logger.log('OpenAI endpoint has been validated and set');
-            await vscode.window.showInformationMessage('OpenAI endpoint has been successfully validated and saved');
         } catch (error) {
             void Logger.error('Failed to validate and set OpenAI endpoint:', error as Error);
-            await vscode.window.showErrorMessage(`Failed to set OpenAI endpoint: ${(error as Error).message}`);
+            await Logger.showError(`Failed to set OpenAI endpoint: ${(error as Error).message}`);
             throw error;
         }
     }
@@ -484,10 +445,10 @@ export class ConfigService {
             }
 
             await this.secretStorage.store('commitsage.openaiApiKey', key);
-            await vscode.window.showInformationMessage('OpenAI API key has been successfully validated and saved');
+            void Logger.log('OpenAI API key has been validated and set');
         } catch (error) {
             void Logger.error('Failed to validate and set OpenAI API key:', error as Error);
-            await vscode.window.showErrorMessage(`Failed to set API key: ${(error as Error).message}`);
+            await Logger.showError(`Failed to set API key: ${(error as Error).message}`);
             throw error;
         }
     }
@@ -496,7 +457,6 @@ export class ConfigService {
         try {
             await this.secretStorage.delete('commitsage.openaiApiKey');
             void Logger.log('OpenAI API key has been removed');
-            await vscode.window.showInformationMessage('OpenAI API key has been removed');
         } catch (error) {
             void Logger.error('Error removing OpenAI API key:', error as Error);
             throw error;

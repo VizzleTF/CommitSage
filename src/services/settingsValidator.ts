@@ -54,7 +54,7 @@ export class SettingsValidator {
         const isAutoCommitEnabled = ConfigService.getAutoCommitEnabled();
 
         if (isAutoPushEnabled && !isAutoCommitEnabled) {
-            const selection = await vscode.window.showWarningMessage(
+            const selection = await Logger.showWarning(
                 'Auto Push requires Auto Commit to be enabled. Choose an action:',
                 'Enable Auto Commit',
                 'Disable Auto Push',
@@ -83,28 +83,9 @@ export class SettingsValidator {
         const instructions = ConfigService.getCustomInstructions();
 
         if (useCustomInstructions && !instructions.trim()) {
-            const selection = await vscode.window.showWarningMessage(
-                'Custom Instructions are enabled but empty. What would you like to do?',
-                'Add Instructions',
-                'Disable Custom Instructions',
-                'Open Settings'
-            );
-
-            if (selection === 'Add Instructions') {
-                void vscode.commands.executeCommand(
-                    'workbench.action.openSettings',
-                    'commitSage.commit.customInstructions'
-                );
-            } else if (selection === 'Disable Custom Instructions') {
-                const config = vscode.workspace.getConfiguration('commitSage');
-                await config.update('commit.useCustomInstructions', false, true);
-                void Logger.log('Custom Instructions have been disabled');
-            } else if (selection === 'Open Settings') {
-                void vscode.commands.executeCommand(
-                    'workbench.action.openSettings',
-                    'commitSage.commit'
-                );
-            }
+            void Logger.showWarning(
+                'Custom Instructions are enabled but empty. Please add some instructions.'
+            )
         }
     }
 
@@ -113,7 +94,7 @@ export class SettingsValidator {
         const promptForRefs = ConfigService.shouldPromptForRefs();
 
         if (autoCommitEnabled && promptForRefs) {
-            const selection = await vscode.window.showWarningMessage(
+            const selection = await Logger.showWarning(
                 'Prompting for refs may interrupt the automatic commit flow. Choose an action:',
                 'Disable Refs Prompt',
                 'Disable Auto Commit',

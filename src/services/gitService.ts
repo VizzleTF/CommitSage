@@ -66,7 +66,7 @@ export class GitService {
             }
 
             await this.executeGitCommand(['commit', '-m', message], repoPath);
-            void vscode.window.showInformationMessage('Changes committed successfully');
+            void Logger.log('Changes committed successfully');
 
             void TelemetryService.sendEvent('commit_completed', {
                 hasStaged: hasStagedChanges,

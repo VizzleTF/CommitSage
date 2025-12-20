@@ -2,7 +2,7 @@ import axios, { AxiosError } from 'axios';
 import { Logger } from '../utils/logger';
 import { ConfigService } from '../utils/configService';
 import { ProgressReporter, CommitMessage, IAIService } from '../models/types';
-import { ConfigurationError } from '../models/errors';
+import { ApiKeyInvalidError } from '../models/errors';
 import { BaseAIService } from './baseAIService';
 import { HttpUtils } from '../utils/httpUtils';
 import { RetryUtils } from '../utils/retryUtils';
@@ -177,15 +177,8 @@ export class GeminiService {
         } catch (error) {
             // Обработка специальных случаев для Gemini
             const axiosError = error as AxiosError;
-            if (axiosError.response?.status === 401 && attempt === 1) {
-                await ConfigService.removeApiKey();
-                await ConfigService.promptForApiKey();
-                return this.generateCommitMessage(prompt, progress, attempt + 1);
-            }
-
-            if (error instanceof ConfigurationError && attempt === 1) {
-                await ConfigService.promptForApiKey();
-                return this.generateCommitMessage(prompt, progress, attempt + 1);
+            if (axiosError.response?.status === 401) {
+                throw new ApiKeyInvalidError('Gemini');
             }
 
             // Используем retry utils для retry логики
