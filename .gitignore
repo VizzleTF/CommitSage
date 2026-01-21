@@ -13,3 +13,5 @@ coverage
 src/constants/apiKeys.ts
 test-gemini-api.sh
 .cursor
+.vscode
+.claude
