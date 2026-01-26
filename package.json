@@ -286,6 +286,6 @@
   "dependencies": {
     "@amplitude/analytics-node": "^1.5.33",
     "@amplitude/analytics-types": "^2.11.1",
-    "axios": "^1.13.2"
+    "axios": "^1.13.3"
   }
 }
