@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
-import { CommitMessageUI } from '../services/aiService';
+import { CommitMessageUI } from '../services/commitWorkflow';
 import { Logger } from '../utils/logger';
+import { toError } from '../utils/errorUtils';
 
 export function registerGenerateCommitMessageCommand(_context: vscode.ExtensionContext): vscode.Disposable {
     return vscode.commands.registerCommand(
@@ -9,8 +10,8 @@ export function registerGenerateCommitMessageCommand(_context: vscode.ExtensionC
             try {
                 await CommitMessageUI.generateAndSetCommitMessage(sourceControlRepository);
             } catch (error) {
-                void Logger.error('Error in generateCommitMessage command:', error as Error);
-                void Logger.showError((error as Error).message);
+                Logger.error('Error in generateCommitMessage command:', toError(error));
+                void Logger.showError(toError(error).message);
             }
         }
     );

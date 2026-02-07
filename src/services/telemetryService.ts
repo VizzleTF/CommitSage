@@ -1,4 +1,3 @@
-/// <reference types="node" />
 import * as vscode from 'vscode';
 import * as amplitude from '@amplitude/analytics-node';
 import { Logger } from '../utils/logger';
@@ -6,6 +5,7 @@ import { ConfigService } from '../utils/configService';
 import { AMPLITUDE_API_KEY } from '../constants/apiKeys';
 import { EventOptions } from '@amplitude/analytics-types';
 import { EnvironmentUtils } from '../utils/environmentUtils';
+import { toError } from '../utils/errorUtils';
 
 const TELEMETRY_CONFIG = {
     maxRetries: 3,
@@ -40,22 +40,19 @@ interface QueuedEvent {
     timestamp: number;
 }
 
-declare const setInterval: (callback: () => void, ms: number) => number;
-declare const clearInterval: (intervalId: number) => void;
-
 export class TelemetryService {
     private static disposables: vscode.Disposable[] = [];
     private static enabled: boolean = true;
     private static initialized: boolean = false;
     private static eventQueue: QueuedEvent[] = [];
-    private static flushInterval: number | null = null;
+    private static flushInterval: ReturnType<typeof setInterval> | null = null;
 
     static async initialize(context: vscode.ExtensionContext): Promise<void> {
-        void Logger.log('Initializing telemetry service');
+        Logger.log('Initializing telemetry service');
 
         try {
             if (!AMPLITUDE_API_KEY) {
-                void Logger.error('Amplitude API key not found');
+                Logger.error('Amplitude API key not found');
                 return;
             }
 
@@ -67,7 +64,7 @@ export class TelemetryService {
             });
 
             this.initialized = true;
-            void Logger.log('Amplitude service initialized successfully');
+            Logger.log('Amplitude service initialized successfully');
 
             this.enabled = vscode.env.isTelemetryEnabled && ConfigService.isTelemetryEnabled();
 
@@ -79,18 +76,18 @@ export class TelemetryService {
             this.startQueueProcessor();
 
             context.subscriptions.push(...this.disposables);
-            void Logger.log('Telemetry service initialized');
+            Logger.log('Telemetry service initialized');
 
             this.sendEvent('extension_activated');
         } catch (error) {
-            void Logger.error('Failed to initialize Amplitude:', error as Error);
+            Logger.error('Failed to initialize Amplitude:', toError(error));
             this.initialized = false;
         }
     }
 
     static sendEvent(eventName: TelemetryEventName, customProperties: Record<string, unknown> = {}): void {
         if (!this.enabled) {
-            void Logger.log('Telemetry disabled, skipping event');
+            Logger.log('Telemetry disabled, skipping event');
             return;
         }
 
@@ -115,11 +112,11 @@ export class TelemetryService {
     private static queueEvent(event: QueuedEvent): void {
         if (this.eventQueue.length >= TELEMETRY_CONFIG.queueSizeLimit) {
             this.eventQueue.shift();
-            void Logger.warn('Telemetry event queue full, removing oldest event');
+            Logger.warn('Telemetry event queue full, removing oldest event');
         }
 
         this.eventQueue.push(event);
-        void Logger.log(`Event queued: ${event.eventName}`);
+        Logger.log(`Event queued: ${event.eventName}`);
 
         if (this.initialized) {
             void this.processEventQueue();
@@ -134,7 +131,7 @@ export class TelemetryService {
         const currentEvent = this.eventQueue[0];
 
         try {
-            void Logger.log(`Processing telemetry event: ${currentEvent.eventName}`);
+            Logger.log(`Processing telemetry event: ${currentEvent.eventName}`);
 
             /* eslint-disable @typescript-eslint/naming-convention */
             const options: EventOptions = {
@@ -146,16 +143,16 @@ export class TelemetryService {
             await amplitude.track(currentEvent.eventName, currentEvent.properties, options);
 
             this.eventQueue.shift();
-            void Logger.log(`Telemetry event sent successfully: ${currentEvent.eventName}`);
+            Logger.log(`Telemetry event sent successfully: ${currentEvent.eventName}`);
         } catch (error) {
-            void Logger.error('Failed to send telemetry:', error as Error);
+            Logger.error('Failed to send telemetry:', toError(error));
 
             if (currentEvent.retryCount < TELEMETRY_CONFIG.maxRetries) {
                 currentEvent.retryCount++;
-                void Logger.log(`Retrying event ${currentEvent.eventName} (attempt ${currentEvent.retryCount}/${TELEMETRY_CONFIG.maxRetries})`);
+                Logger.log(`Retrying event ${currentEvent.eventName} (attempt ${currentEvent.retryCount}/${TELEMETRY_CONFIG.maxRetries})`);
                 await this.delay(TELEMETRY_CONFIG.retryDelay * currentEvent.retryCount);
             } else {
-                void Logger.error(`Failed to send event ${currentEvent.eventName} after ${TELEMETRY_CONFIG.maxRetries} attempts, discarding`);
+                Logger.error(`Failed to send event ${currentEvent.eventName} after ${TELEMETRY_CONFIG.maxRetries} attempts, discarding`);
                 this.eventQueue.shift();
             }
         }
@@ -174,7 +171,7 @@ export class TelemetryService {
     private static handleTelemetryStateChange(enabled: boolean): void {
         this.enabled = enabled;
         amplitude.setOptOut(!enabled);
-        void Logger.log(`Telemetry enabled state changed to: ${enabled}`);
+        Logger.log(`Telemetry enabled state changed to: ${enabled}`);
     }
 
     private static handleConfigChange(event: vscode.ConfigurationChangeEvent): void {
@@ -196,7 +193,7 @@ export class TelemetryService {
             return;
         }
 
-        void Logger.log(`Flushing ${this.eventQueue.length} remaining telemetry events`);
+        Logger.log(`Flushing ${this.eventQueue.length} remaining telemetry events`);
 
         // Process all remaining events
         while (this.eventQueue.length > 0) {
@@ -215,12 +212,12 @@ export class TelemetryService {
         }
 
         if (this.eventQueue.length > 0) {
-            void Logger.log(`Attempting to send ${this.eventQueue.length} remaining telemetry events`);
+            Logger.log(`Attempting to send ${this.eventQueue.length} remaining telemetry events`);
             void this.processEventQueue();
         }
 
         this.disposables.forEach(d => void d.dispose());
         this.initialized = false;
-        void Logger.log('Telemetry service disposed');
+        Logger.log('Telemetry service disposed');
     }
 }

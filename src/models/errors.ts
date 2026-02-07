@@ -26,20 +26,6 @@ export class NoRepositorySelectedError extends Error {
     }
 }
 
-export class EmptyCommitMessageError extends Error {
-    constructor() {
-        super('Generated commit message is empty.');
-        this.name = 'EmptyCommitMessageError';
-    }
-}
-
-export class ApiKeyNotSetError extends Error {
-    constructor() {
-        super('API key is not set. Please set it in the extension settings.');
-        this.name = 'ApiKeyNotSetError';
-    }
-}
-
 export class OpenAIError extends Error {
     constructor(message: string) {
         super(message);

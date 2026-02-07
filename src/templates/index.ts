@@ -7,6 +7,7 @@ import { emojiKarmaTemplate } from './formats/emojiKarma';
 import { googleTemplate } from './formats/google';
 import { atomTemplate } from './formats/atom';
 import type { CommitLanguage } from '../utils/configService';
+import { Logger } from '../utils/logger';
 
 export interface CommitTemplate {
     english: string;
@@ -40,14 +41,14 @@ const isValidLanguage = (language: string): language is SupportedLanguage =>
 
 export function getTemplate(format: CommitFormat, language: CommitLanguage): string {
     if (!isValidFormat(format)) {
-        console.warn(`Invalid format "${format}", falling back to conventional`);
+        Logger.warn(`Invalid format "${format}", falling back to conventional`);
         format = 'conventional';
     }
 
     const template = templates[format];
 
     if (!isValidLanguage(language)) {
-        console.warn(`Invalid language "${language}", falling back to english`);
+        Logger.warn(`Invalid language "${language}", falling back to english`);
         return template.english;
     }
 

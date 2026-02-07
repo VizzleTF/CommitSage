@@ -5,33 +5,36 @@ import { ConfigService } from './utils/configService';
 import { SettingsValidator } from './services/settingsValidator';
 import { TelemetryService } from './services/telemetryService';
 import { registerCommands } from './commands';
+import { ApiKeyManager } from './services/apiKeyManager';
+import { toError } from './utils/errorUtils';
 
 export async function activate(context: vscode.ExtensionContext): Promise<void> {
-    void Logger.log('Starting extension activation');
+    Logger.log('Starting extension activation');
 
     try {
         await ConfigService.initialize(context);
-        await Logger.initialize();
+        ApiKeyManager.initialize(context.secrets);
+        Logger.initialize();
         await TelemetryService.initialize(context);
 
-        void Logger.log('Validating Git extension');
+        Logger.log('Validating Git extension');
         await GitService.validateGitExtension();
         await GitService.initialize();
     } catch (error) {
-        void Logger.error('Failed during initialization:', error as Error);
-        void Logger.showError(`Initialization failed: ${(error as Error).message}`);
+        Logger.error('Failed during initialization:', toError(error));
+        void Logger.showError(`Initialization failed: ${toError(error).message}`);
         return;
     }
 
     registerCommands(context);
 
     void SettingsValidator.validateAllSettings();
-    void TelemetryService.sendEvent('extension_activated');
-    void Logger.log('Extension activated successfully');
+    TelemetryService.sendEvent('extension_activated');
+    Logger.log('Extension activated successfully');
 }
 
 export async function deactivate(): Promise<void> {
-    void Logger.log('Deactivating extension');
+    Logger.log('Deactivating extension');
 
     try {
         // Send deactivation event before shutting down telemetry
@@ -43,9 +46,9 @@ export async function deactivate(): Promise<void> {
         // Dispose services in reverse order of initialization
         TelemetryService.dispose();
         ConfigService.dispose();
-        Logger.dispose();
 
-        void Logger.log('Extension deactivated successfully');
+        Logger.log('Extension deactivated successfully');
+        Logger.dispose();
     } catch (error) {
         // Fallback logging if Logger is already disposed
         console.error('Error during extension deactivation:', error);

@@ -1,11 +1,13 @@
 import axios, { AxiosError } from 'axios';
 import { Logger } from '../utils/logger';
 import { ConfigService } from '../utils/configService';
-import { ProgressReporter, CommitMessage, IModelService } from '../models/types';
+import { ProgressReporter, CommitMessage } from '../models/types';
 import { OpenAIError, ApiKeyInvalidError } from '../models/errors';
 import { BaseAIService } from './baseAIService';
 import { HttpUtils } from '../utils/httpUtils';
 import { RetryUtils } from '../utils/retryUtils';
+import { ApiKeyManager } from './apiKeyManager';
+import { toError } from '../utils/errorUtils';
 
 interface OpenAIResponse {
     choices: Array<{
@@ -34,7 +36,7 @@ export class OpenAIService {
         attempt: number = 1
     ): Promise<CommitMessage> {
         try {
-            const apiKey = await ConfigService.getOpenAIApiKey();
+            const apiKey = await ApiKeyManager.getKey('openai');
             const model = ConfigService.getOpenAIModel();
             const baseUrl = ConfigService.getOpenAIBaseUrl();
 
@@ -51,7 +53,7 @@ export class OpenAIService {
             const requestConfig = HttpUtils.createRequestConfig(headers);
 
             const response = await axios.post<OpenAIResponse>(
-                `${baseUrl}/chat/completions`,
+                `${baseUrl}${this.chatCompletionsPath}`,
                 payload,
                 requestConfig
             );
@@ -59,23 +61,22 @@ export class OpenAIService {
             progress.report({ message: "Processing generated message...", increment: 90 });
 
             const message = this.extractCommitMessage(response.data);
-            void Logger.log(`Commit message generated using ${model} model`);
+            Logger.log(`Commit message generated using ${model} model`);
             return { message, model };
         } catch (error) {
             // Обработка специальных случаев для OpenAI
-            const axiosError = error as AxiosError;
-            if (axiosError.response?.status === 401) {
+            if (error instanceof AxiosError && error.response?.status === 401) {
                 throw new ApiKeyInvalidError('OpenAI');
             }
 
             // Используем retry utils для retry логики
             return RetryUtils.handleGenerationError(
-                error as Error,
+                toError(error),
                 prompt,
                 progress,
                 attempt,
                 this.generateCommitMessage.bind(this),
-                BaseAIService.handleOpenAIError.bind(BaseAIService)
+                (err: Error) => BaseAIService.handleHttpError(err, 'OpenAI API')
             );
         }
     }
@@ -96,7 +97,7 @@ export class OpenAIService {
 
             const models = response.data.data.map(model => model.id);
             if (models.length > 0) {
-                void Logger.log(`Successfully fetched ${models.length} models`);
+                Logger.log(`Successfully fetched ${models.length} models`);
             }
             return models;
         } catch {

@@ -2,9 +2,8 @@ import * as vscode from "vscode";
 import * as fs from "fs";
 import * as path from "path";
 import { Logger } from "./logger";
-import { ApiKeyValidator } from "./apiKeyValidator";
-import { AiServiceError, ConfigurationError } from "../models/errors";
 import { ProjectConfig } from "../models/types";
+import { toError } from "./errorUtils";
 
 type CacheValue = string | boolean | number;
 
@@ -20,12 +19,9 @@ export class ConfigService {
   private static projectConfigCache: ProjectConfig | null = null;
   private static projectConfigFileWatcher: vscode.FileSystemWatcher | null =
     null;
-  private static secretStorage: vscode.SecretStorage;
   private static disposables: vscode.Disposable[] = [];
 
   static async initialize(context: vscode.ExtensionContext): Promise<void> {
-    this.secretStorage = context.secrets;
-
     const configListener = vscode.workspace.onDidChangeConfiguration(
       (event) => {
         if (event.affectsConfiguration("commitSage")) {
@@ -39,9 +35,9 @@ export class ConfigService {
                 const config = vscode.workspace.getConfiguration("commitSage");
                 void config.update("openai.baseUrl", normalizedEndpoint, true);
               } catch (error: unknown) {
-                void Logger.error(
+                Logger.error(
                   "Failed to update OpenAI base URL:",
-                  error as Error,
+                  toError(error),
                 );
               }
             }
@@ -82,13 +78,12 @@ export class ConfigService {
     });
 
     this.disposables.push(this.projectConfigFileWatcher);
-    context.subscriptions.push(this.projectConfigFileWatcher);
   }
 
   private static invalidateProjectConfig(): void {
     this.projectConfigCache = null;
     this.clearCache();
-    void Logger.log("Project configuration cache invalidated");
+    Logger.log("Project configuration cache invalidated");
   }
 
   private static getProjectConfig(): ProjectConfig | null {
@@ -109,12 +104,12 @@ export class ConfigService {
         const configContent = fs.readFileSync(configPath, "utf8");
         const config = JSON.parse(configContent) as ProjectConfig;
         this.projectConfigCache = config;
-        void Logger.log("Loaded project configuration from .commitsage file");
+        Logger.log("Loaded project configuration from .commitsage file");
       } else {
         this.projectConfigCache = {};
       }
     } catch (error) {
-      void Logger.error("Error reading .commitsage file:", error as Error);
+      Logger.error("Error reading .commitsage file:", toError(error));
       this.projectConfigCache = {};
     }
 
@@ -178,136 +173,8 @@ export class ConfigService {
       }
       return this.cache.get(cacheKey) as T;
     } catch (error) {
-      void Logger.error(`Error getting config ${configKey}:`, error as Error);
+      Logger.error(`Error getting config ${configKey}:`, toError(error));
       return defaultValue;
-    }
-  }
-
-  static async getApiKey(): Promise<string> {
-    try {
-      let key = await this.secretStorage.get("commitsage.apiKey");
-
-      if (!key) {
-        key = await vscode.window.showInputBox({
-          prompt: "Enter your Google API Key",
-          ignoreFocusOut: true,
-          password: true,
-          validateInput: (value: string) => {
-            if (!value) {
-              return "API key cannot be empty";
-            }
-            if (value.length < 32) {
-              return "API key is too short";
-            }
-            if (!/^[A-Za-z0-9_-]+$/.test(value)) {
-              return "API key contains invalid characters";
-            }
-            return null;
-          },
-        });
-
-        if (!key) {
-          throw new ConfigurationError("API key input was cancelled");
-        }
-
-        await this.setApiKey(key);
-      }
-
-      return key;
-    } catch (error) {
-      void Logger.error("Error getting API key:", error as Error);
-      throw new AiServiceError(
-        "Failed to get API key: " + (error as Error).message,
-      );
-    }
-  }
-
-  static async setApiKey(key: string): Promise<void> {
-    try {
-      const validationError = ApiKeyValidator.validateGeminiApiKey(key);
-      if (validationError) {
-        throw new AiServiceError(validationError);
-      }
-
-      await this.secretStorage.store("commitsage.apiKey", key);
-      void Logger.log("Google API key has been validated and set");
-    } catch (error) {
-      void Logger.error(
-        "Failed to validate and set Google API key:",
-        error as Error,
-      );
-      await Logger.showError(
-        `Failed to set API key: ${(error as Error).message}`,
-      );
-      throw error;
-    }
-  }
-
-  static async getCodestralApiKey(): Promise<string> {
-    try {
-      let key = await this.secretStorage.get("commitsage.codestralApiKey");
-
-      if (!key) {
-        key = await vscode.window.showInputBox({
-          prompt: "Enter your Codestral API Key",
-          ignoreFocusOut: true,
-          password: true,
-        });
-
-        if (!key) {
-          throw new ConfigurationError("Codestral API key input was cancelled");
-        }
-
-        await this.setCodestralApiKey(key);
-      }
-
-      return key;
-    } catch (error) {
-      void Logger.error("Error getting Codestral API key:", error as Error);
-      throw new AiServiceError(
-        "Failed to get Codestral API key: " + (error as Error).message,
-      );
-    }
-  }
-
-  static async setCodestralApiKey(key: string): Promise<void> {
-    try {
-      const validationError = ApiKeyValidator.validateCodestralApiKey(key);
-      if (validationError) {
-        throw new AiServiceError(validationError);
-      }
-
-      await this.secretStorage.store("commitsage.codestralApiKey", key);
-      void Logger.log("Codestral API key has been validated and set");
-    } catch (error) {
-      void Logger.error(
-        "Failed to validate and set Codestral API key:",
-        error as Error,
-      );
-      await Logger.showError(
-        `Failed to set API key: ${(error as Error).message}`,
-      );
-      throw error;
-    }
-  }
-
-  static async removeApiKey(): Promise<void> {
-    try {
-      await this.secretStorage.delete("commitsage.apiKey");
-      void Logger.log("Google API key has been removed");
-    } catch (error) {
-      void Logger.error("Error removing Google API key:", error as Error);
-      throw error;
-    }
-  }
-
-  static async removeCodestralApiKey(): Promise<void> {
-    try {
-      await this.secretStorage.delete("commitsage.codestralApiKey");
-      void Logger.log("Codestral API key has been removed");
-    } catch (error) {
-      void Logger.error("Error removing Codestral API key:", error as Error);
-      throw error;
     }
   }
 
@@ -338,7 +205,7 @@ export class ConfigService {
   static getProvider(): string {
     const provider = this.getConfig<string>("provider", "type", "gemini");
     if (!["gemini", "openai", "codestral", "ollama"].includes(provider)) {
-      void Logger.warn(
+      Logger.warn(
         `Invalid provider type: ${provider}, falling back to gemini`,
       );
       return "gemini";
@@ -356,10 +223,6 @@ export class ConfigService {
 
   static getMaxRetries(): number {
     return this.getConfig<number>("general", "maxRetries", 3);
-  }
-
-  static getInitialRetryDelay(): number {
-    return this.getConfig<number>("general", "initialRetryDelayMs", 1000);
   }
 
   static getAutoCommitEnabled(): boolean {
@@ -385,38 +248,8 @@ export class ConfigService {
     }
   }
 
-  static async promptForApiKey(): Promise<void> {
-    const key = await vscode.window.showInputBox({
-      prompt: "Enter your Google API Key",
-      ignoreFocusOut: true,
-      password: true,
-      validateInput: ApiKeyValidator.validateGeminiApiKey,
-    });
-
-    if (key) {
-      await this.setApiKey(key);
-    }
-  }
-
-  static async promptForCodestralApiKey(): Promise<void> {
-    const key = await vscode.window.showInputBox({
-      prompt: "Enter your Codestral API Key",
-      ignoreFocusOut: true,
-      password: true,
-      validateInput: ApiKeyValidator.validateCodestralApiKey,
-    });
-
-    if (key) {
-      await this.setCodestralApiKey(key);
-    }
-  }
-
   static isTelemetryEnabled(): boolean {
     return this.getConfig<boolean>("telemetry", "enabled", true);
-  }
-
-  public static getCommandId(): string {
-    return "@ext:VizzleTF.commitsage commit";
   }
 
   private static validateAndNormalizeEndpoint(endpoint: string): string {
@@ -439,29 +272,6 @@ export class ConfigService {
     return normalizedEndpoint;
   }
 
-  static async setOpenAIEndpoint(endpoint: string): Promise<void> {
-    try {
-      const normalizedEndpoint =
-        await this.validateAndNormalizeEndpoint(endpoint);
-      if (!normalizedEndpoint) {
-        throw new ConfigurationError("Failed to validate endpoint");
-      }
-
-      const config = vscode.workspace.getConfiguration("commitSage");
-      await config.update("openai.baseUrl", normalizedEndpoint, true);
-      void Logger.log("OpenAI endpoint has been validated and set");
-    } catch (error) {
-      void Logger.error(
-        "Failed to validate and set OpenAI endpoint:",
-        error as Error,
-      );
-      await Logger.showError(
-        `Failed to set OpenAI endpoint: ${(error as Error).message}`,
-      );
-      throw error;
-    }
-  }
-
   static getOllamaBaseUrl(): string {
     return this.getConfig<string>(
       "ollama",
@@ -474,65 +284,6 @@ export class ConfigService {
     return this.getConfig<string>("ollama", "model", "mistral");
   }
 
-  static async getOpenAIApiKey(): Promise<string> {
-    try {
-      let key = await this.secretStorage.get("commitsage.openaiApiKey");
-
-      if (!key) {
-        key = await vscode.window.showInputBox({
-          prompt: "Enter your OpenAI API Key",
-          ignoreFocusOut: true,
-          password: true,
-          validateInput: ApiKeyValidator.validateOpenAIApiKey,
-        });
-
-        if (!key) {
-          throw new ConfigurationError("OpenAI API key input was cancelled");
-        }
-
-        await this.setOpenAIApiKey(key);
-      }
-
-      return key;
-    } catch (error) {
-      void Logger.error("Error getting OpenAI API key:", error as Error);
-      throw new AiServiceError(
-        "Failed to get OpenAI API key: " + (error as Error).message,
-      );
-    }
-  }
-
-  static async setOpenAIApiKey(key: string): Promise<void> {
-    try {
-      const validationError = ApiKeyValidator.validateOpenAIApiKey(key);
-      if (validationError) {
-        throw new AiServiceError(validationError);
-      }
-
-      await this.secretStorage.store("commitsage.openaiApiKey", key);
-      void Logger.log("OpenAI API key has been validated and set");
-    } catch (error) {
-      void Logger.error(
-        "Failed to validate and set OpenAI API key:",
-        error as Error,
-      );
-      await Logger.showError(
-        `Failed to set API key: ${(error as Error).message}`,
-      );
-      throw error;
-    }
-  }
-
-  static async removeOpenAIApiKey(): Promise<void> {
-    try {
-      await this.secretStorage.delete("commitsage.openaiApiKey");
-      void Logger.log("OpenAI API key has been removed");
-    } catch (error) {
-      void Logger.error("Error removing OpenAI API key:", error as Error);
-      throw error;
-    }
-  }
-
   static getOpenAIModel(): string {
     return this.getConfig<string>("openai", "model", "gpt-3.5-turbo");
   }
@@ -543,19 +294,6 @@ export class ConfigService {
       "baseUrl",
       "https://api.openai.com/v1",
     );
-  }
-
-  static async promptForOpenAIApiKey(): Promise<void> {
-    const key = await vscode.window.showInputBox({
-      prompt: "Enter your OpenAI API Key",
-      ignoreFocusOut: true,
-      password: true,
-      validateInput: ApiKeyValidator.validateOpenAIApiKey,
-    });
-
-    if (key) {
-      await this.setOpenAIApiKey(key);
-    }
   }
 
   static getApiRequestTimeout(): number {
