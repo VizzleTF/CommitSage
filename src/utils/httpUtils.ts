@@ -1,4 +1,3 @@
-import { AxiosError } from "axios";
 import { ConfigService } from "./configService";
 
 /**
@@ -6,8 +5,6 @@ import { ConfigService } from "./configService";
  * Общие методы для всех AI сервисов
  */
 export class HttpUtils {
-  static readonly DEFAULT_TIMEOUT = 30000;
-
   /**
    * Создание заголовков запроса с API ключом
    */
@@ -46,27 +43,5 @@ export class HttpUtils {
       headers,
       timeout: timeout !== undefined ? timeout : this.getConfiguredTimeout(),
     };
-  }
-
-  /**
-   * Проверка на сетевые ошибки
-   */
-  static isNetworkError(error: AxiosError): boolean {
-    return (
-      error.code === "ECONNREFUSED" ||
-      error.code === "ETIMEDOUT" ||
-      error.message?.includes("ECONNREFUSED") ||
-      error.message?.includes("ETIMEDOUT") ||
-      false
-    );
-  }
-
-  /**
-   * Извлечение сообщения об ошибке из ответа API
-   */
-  static extractErrorMessage(responseData: {
-    error?: { message?: string };
-  }): string | undefined {
-    return responseData?.error?.message;
   }
 }

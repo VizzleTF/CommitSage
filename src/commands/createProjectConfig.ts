@@ -2,6 +2,7 @@ import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as path from 'path';
 import { Logger } from '../utils/logger';
+import { toError } from '../utils/errorUtils';
 
 export async function createProjectConfig(): Promise<void> {
     try {
@@ -65,15 +66,15 @@ export async function createProjectConfig(): Promise<void> {
 
         fs.writeFileSync(configPath, JSON.stringify(templateConfig, null, 2), 'utf8');
 
-        void Logger.log('Created .commitsage configuration file');
+        Logger.log('Created .commitsage configuration file');
 
         const uri = vscode.Uri.file(configPath);
         void vscode.window.showTextDocument(uri);
 
-        void Logger.log('Project configuration file (.commitsage) has been created and opened for editing.');
+        Logger.log('Project configuration file (.commitsage) has been created and opened for editing.');
 
     } catch (error) {
-        void Logger.error('Error creating .commitsage file:', error as Error);
-        await Logger.showError(`Failed to create .commitsage file: ${(error as Error).message}`);
+        Logger.error('Error creating .commitsage file:', toError(error));
+        await Logger.showError(`Failed to create .commitsage file: ${toError(error).message}`);
     }
 }

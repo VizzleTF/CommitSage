@@ -1,11 +1,13 @@
 import axios, { AxiosError } from 'axios';
 import { Logger } from '../utils/logger';
 import { ConfigService } from '../utils/configService';
-import { ProgressReporter, CommitMessage, IAIService } from '../models/types';
+import { ProgressReporter, CommitMessage } from '../models/types';
 import { ApiKeyInvalidError } from '../models/errors';
 import { BaseAIService } from './baseAIService';
 import { HttpUtils } from '../utils/httpUtils';
 import { RetryUtils } from '../utils/retryUtils';
+import { ApiKeyManager } from './apiKeyManager';
+import { toError } from '../utils/errorUtils';
 
 interface GeminiResponse {
     candidates: Array<{
@@ -47,10 +49,10 @@ export class GeminiService {
                 )
                 .map((model: GeminiModel) => model.name.replace('models/', ''));
             
-            void Logger.log(`Found ${models.length} available Gemini models: ${models.join(', ')}`);
+            Logger.log(`Found ${models.length} available Gemini models: ${models.join(', ')}`);
             return models;
         } catch (error) {
-            void Logger.error('Failed to fetch available Gemini models:', error as Error);
+            Logger.error('Failed to fetch available Gemini models:', toError(error));
             // В случае ошибки возвращаем дефолтный список моделей
             const fallbackModels = [
                 'gemini-2.0-flash',
@@ -102,7 +104,7 @@ export class GeminiService {
                 const response = await axios.post<GeminiResponse>(apiUrl, payload, requestConfig);
                 
                 const message = this.extractCommitMessage(response.data);
-                void Logger.log(`Commit message successfully generated using ${model} model (auto mode)`);
+                Logger.log(`Commit message successfully generated using ${model} model (auto mode)`);
                 
                 progress.report({ message: "Processing generated message...", increment: 100 });
                 return { message, model };
@@ -110,7 +112,7 @@ export class GeminiService {
             } catch (error) {
                 const errorMsg = error instanceof Error ? error.message : String(error);
                 errors.push({ model, error: errorMsg });
-                void Logger.log(`Model ${model} failed: ${errorMsg}`);
+                Logger.log(`Model ${model} failed: ${errorMsg}`);
                 
                 // Если это последняя модель, пробрасываем ошибку
                 if (i === models.length - 1) {
@@ -122,8 +124,9 @@ export class GeminiService {
                 continue;
             }
         }
-        
-        // Этот код не должен выполниться, но на всякий случай
+
+        // TypeScript requires a return, but this is unreachable:
+        // the loop always either returns or throws on the last iteration
         throw new Error('Failed to generate commit message with any available model');
     }
 
@@ -133,7 +136,7 @@ export class GeminiService {
         attempt: number = 1
     ): Promise<CommitMessage> {
         try {
-            const apiKey = await ConfigService.getApiKey();
+            const apiKey = await ApiKeyManager.getKey('gemini');
             const configuredModel = ConfigService.getGeminiModel();
             
             // Проверяем режим "auto"
@@ -172,23 +175,22 @@ export class GeminiService {
             progress.report({ message: "Processing generated message...", increment: 90 });
 
             const message = this.extractCommitMessage(response.data);
-            void Logger.log(`Commit message generated using ${configuredModel} model`);
+            Logger.log(`Commit message generated using ${configuredModel} model`);
             return { message, model: configuredModel };
         } catch (error) {
             // Обработка специальных случаев для Gemini
-            const axiosError = error as AxiosError;
-            if (axiosError.response?.status === 401) {
+            if (error instanceof AxiosError && error.response?.status === 401) {
                 throw new ApiKeyInvalidError('Gemini');
             }
 
             // Используем retry utils для retry логики
             return RetryUtils.handleGenerationError(
-                error as Error,
+                toError(error),
                 prompt,
                 progress,
                 attempt,
                 this.generateCommitMessage.bind(this),
-                BaseAIService.handleGeminiError.bind(BaseAIService)
+                (err: Error) => BaseAIService.handleHttpError(err, 'Gemini API')
             );
         }
     }

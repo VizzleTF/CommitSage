@@ -4,6 +4,7 @@ import * as path from 'path';
 import { Logger } from '../utils/logger';
 import { ConfigService } from '../utils/configService';
 import { ProjectConfig } from '../models/types';
+import { toError } from '../utils/errorUtils';
 
 export class SettingsValidator {
     static async validateAllSettings(): Promise<void> {
@@ -28,7 +29,7 @@ export class SettingsValidator {
         try {
             const configContent = fs.readFileSync(configPath, 'utf8');
             JSON.parse(configContent) as ProjectConfig;
-            void Logger.log('Project configuration (.commitsage) validated successfully');
+            Logger.log('Project configuration (.commitsage) validated successfully');
         } catch (error) {
             const selection = await vscode.window.showErrorMessage(
                 'Invalid .commitsage configuration file. The file contains syntax errors.',
@@ -45,7 +46,7 @@ export class SettingsValidator {
                 void vscode.window.showTextDocument(uri);
             }
 
-            void Logger.error('Error validating .commitsage file:', error as Error);
+            Logger.error('Error validating .commitsage file:', toError(error));
         }
     }
 
@@ -64,11 +65,11 @@ export class SettingsValidator {
             if (selection === 'Enable Auto Commit') {
                 const config = vscode.workspace.getConfiguration('commitSage');
                 await config.update('commit.autoCommit', true, true);
-                void Logger.log('Auto Commit has been enabled');
+                Logger.log('Auto Commit has been enabled');
             } else if (selection === 'Disable Auto Push') {
                 const config = vscode.workspace.getConfiguration('commitSage');
                 await config.update('commit.autoPush', false, true);
-                void Logger.log('Auto Push has been disabled');
+                Logger.log('Auto Push has been disabled');
             } else if (selection === 'Open Settings') {
                 void vscode.commands.executeCommand(
                     'workbench.action.openSettings',
@@ -104,13 +105,13 @@ export class SettingsValidator {
             if (selection === 'Disable Refs Prompt') {
                 const config = vscode.workspace.getConfiguration('commitSage');
                 await config.update('commit.promptForRefs', false, true);
-                void Logger.log('Refs prompt has been disabled');
+                Logger.log('Refs prompt has been disabled');
             } else if (selection === 'Disable Auto Commit') {
                 const config = vscode.workspace.getConfiguration('commitSage');
                 await config.update('commit.autoCommit', false, true);
-                void Logger.log('Auto Commit has been disabled');
+                Logger.log('Auto Commit has been disabled');
             } else if (selection === 'Keep Both') {
-                void Logger.log('User chose to keep both Auto Commit and Refs prompt enabled');
+                Logger.log('User chose to keep both Auto Commit and Refs prompt enabled');
             }
         }
     }
