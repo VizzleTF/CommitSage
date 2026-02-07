@@ -1,43 +1,44 @@
 import * as vscode from 'vscode';
-import { ConfigService } from '../utils/configService';
+import { ApiKeyManager } from '../services/apiKeyManager';
 import { Logger } from '../utils/logger';
+import { toError } from '../utils/errorUtils';
 
 export function registerSetApiKeyCommands(_context: vscode.ExtensionContext): vscode.Disposable[] {
     return [
         vscode.commands.registerCommand('commitsage.setApiKey', () =>
-            ConfigService.promptForApiKey()
+            ApiKeyManager.promptForKey('gemini')
         ),
         vscode.commands.registerCommand('commitsage.setOpenAIApiKey', () =>
-            ConfigService.promptForOpenAIApiKey()
+            ApiKeyManager.promptForKey('openai')
         ),
         vscode.commands.registerCommand('commitsage.setCodestralApiKey', () =>
-            ConfigService.promptForCodestralApiKey()
+            ApiKeyManager.promptForKey('codestral')
         ),
         vscode.commands.registerCommand('commitsage.removeApiKey', async () => {
             try {
-                await ConfigService.removeApiKey();
+                await ApiKeyManager.removeKey('gemini');
                 await Logger.showInfo('Gemini API key has been removed');
             } catch (error) {
-                void Logger.error('Error removing Gemini API key:', error as Error);
-                await Logger.showError(`Failed to remove API key: ${(error as Error).message}`);
+                Logger.error('Error removing Gemini API key:', toError(error));
+                await Logger.showError(`Failed to remove API key: ${(toError(error)).message}`);
             }
         }),
         vscode.commands.registerCommand('commitsage.removeOpenAIApiKey', async () => {
             try {
-                await ConfigService.removeOpenAIApiKey();
+                await ApiKeyManager.removeKey('openai');
                 await Logger.showInfo('OpenAI API key has been removed');
             } catch (error) {
-                void Logger.error('Error removing OpenAI API key:', error as Error);
-                await Logger.showError(`Failed to remove API key: ${(error as Error).message}`);
+                Logger.error('Error removing OpenAI API key:', toError(error));
+                await Logger.showError(`Failed to remove API key: ${(toError(error)).message}`);
             }
         }),
         vscode.commands.registerCommand('commitsage.removeCodestralApiKey', async () => {
             try {
-                await ConfigService.removeCodestralApiKey();
+                await ApiKeyManager.removeKey('codestral');
                 await Logger.showInfo('Codestral API key has been removed');
             } catch (error) {
-                void Logger.error('Error removing Codestral API key:', error as Error);
-                await Logger.showError(`Failed to remove API key: ${(error as Error).message}`);
+                Logger.error('Error removing Codestral API key:', toError(error));
+                await Logger.showError(`Failed to remove API key: ${(toError(error)).message}`);
             }
         })
     ];

@@ -47,12 +47,12 @@ export class RetryUtils {
         generateFn: (prompt: string, progress: ProgressReporter, attempt: number) => Promise<CommitMessage>,
         errorHandler: (error: Error) => ApiErrorResult
     ): Promise<CommitMessage> {
-        void Logger.error(`Generation attempt ${attempt} failed:`, error);
+        Logger.error(`Generation attempt ${attempt} failed:`, error);
         const { errorMessage, shouldRetry } = errorHandler(error);
 
         if (shouldRetry && attempt < ConfigService.getMaxRetries()) {
             const delayMs = this.calculateRetryDelay(attempt);
-            void Logger.log(`Retrying in ${delayMs / 1000} seconds...`);
+            Logger.log(`Retrying in ${delayMs / 1000} seconds...`);
             progress.report({
                 message: `Waiting ${delayMs / 1000} seconds before retry...`,
                 increment: 0

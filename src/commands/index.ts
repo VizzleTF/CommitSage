@@ -3,9 +3,10 @@ import { registerGenerateCommitMessageCommand } from './generateCommitMessage';
 import { registerSetApiKeyCommands } from './setApiKeys';
 import { createProjectConfig } from './createProjectConfig';
 import { Logger } from '../utils/logger';
+import { toError } from '../utils/errorUtils';
 
 export function registerCommands(context: vscode.ExtensionContext): void {
-    void Logger.log('Registering commands and views');
+    Logger.log('Registering commands and views');
 
     try {
         const disposables = [
@@ -16,7 +17,7 @@ export function registerCommands(context: vscode.ExtensionContext): void {
 
         context.subscriptions.push(...disposables);
     } catch (error) {
-        void Logger.error('Failed to register commands:', error as Error);
+        Logger.error('Failed to register commands:', toError(error));
         void Logger.showError('Failed to register commands');
         throw error;
     }
