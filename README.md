@@ -10,8 +10,6 @@ Commit Sage is a VSCode extension that automatically generates commit messages u
 
 ![Commit Sage in action](example.gif)
 
-![Alt](https://repobeats.axiom.co/api/embed/6aba05ac56d8a1068ffd74f4266d1c251f7d27b5.svg "Repobeats analytics image")
-
 ## Features
 
 - 🤖 AI-powered commit message generation
