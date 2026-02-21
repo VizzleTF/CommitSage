@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
 import { Logger } from '../utils/logger';
 import { ApiKeyValidator } from '../utils/apiKeyValidator';
-import { AiServiceError, ConfigurationError } from '../models/errors';
+import { AiServiceError, ConfigurationError, UserCancelledError } from '../models/errors';
 import { toError } from '../utils/errorUtils';
 
 interface ApiKeyConfig {
@@ -66,7 +66,7 @@ export class ApiKeyManager {
                 });
 
                 if (!key) {
-                    throw new ConfigurationError(`${config.displayName} API key input was cancelled`);
+                    throw new UserCancelledError(`${config.displayName} API key input was cancelled`);
                 }
 
                 await this.setKey(provider, key);
@@ -74,7 +74,7 @@ export class ApiKeyManager {
 
             return key;
         } catch (error) {
-            if (error instanceof ConfigurationError || error instanceof AiServiceError) {
+            if (error instanceof UserCancelledError || error instanceof ConfigurationError || error instanceof AiServiceError) {
                 throw error;
             }
             Logger.error(`Error getting ${config.displayName} API key:`, toError(error));
@@ -139,6 +139,8 @@ export class ApiKeyManager {
 
         if (key) {
             await this.setKey(provider, key);
+        } else {
+            throw new UserCancelledError(`${config.displayName} API key input was cancelled`);
         }
     }
 }
