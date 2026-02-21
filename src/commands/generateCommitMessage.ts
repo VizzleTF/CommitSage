@@ -1,5 +1,5 @@
 import * as vscode from 'vscode';
-import { CommitMessageUI } from '../services/commitWorkflow';
+import { CommitWorkflow } from '../services/commitWorkflow';
 import { Logger } from '../utils/logger';
 import { toError } from '../utils/errorUtils';
 
@@ -8,7 +8,7 @@ export function registerGenerateCommitMessageCommand(_context: vscode.ExtensionC
         'commitsage.generateCommitMessage',
         async (sourceControlRepository?: vscode.SourceControl) => {
             try {
-                await CommitMessageUI.generateAndSetCommitMessage(sourceControlRepository);
+                await CommitWorkflow.generateAndSetCommitMessage(sourceControlRepository);
             } catch (error) {
                 Logger.error('Error in generateCommitMessage command:', toError(error));
                 void Logger.showError(toError(error).message);

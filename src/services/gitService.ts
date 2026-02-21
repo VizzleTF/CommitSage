@@ -56,7 +56,7 @@ function unquoteGitPath(filePath: string): string {
     const bytes = new Uint8Array([...unquoted].map((c) => c.charCodeAt(0)));
     unquoted = new TextDecoder("utf-8").decode(bytes);
   } catch {
-    // If decoding fails, keep the string as-is
+    Logger.warn(`UTF-8 decoding failed for git path: ${filePath}`);
   }
 
   // Unescape common escape sequences
@@ -235,22 +235,22 @@ export class GitService {
     }
   }
 
-  private static async getStagedDiff(repoPath: string, prefix?: string): Promise<string[]> {
+  private static async getDiffForFiles(
+    repoPath: string,
+    listArgs: string[],
+    diffArgs: string[],
+    prefix?: string
+  ): Promise<string[]> {
     const diffs: string[] = [];
-    const stagedFiles = (
-      await this.executeGitCommand(
-        ["diff", "--cached", "--name-only"],
-        repoPath,
-      )
-    )
+    const files = (await this.executeGitCommand(listArgs, repoPath))
       .split("\n")
       .filter((file) => file.trim())
       .map(unquoteGitPath);
 
-    for (const file of stagedFiles) {
+    for (const file of files) {
       if (!(await this.isSubmodule(file, repoPath))) {
         const fileDiff = await this.executeGitCommand(
-          ["diff", "--cached", "--", file],
+          [...diffArgs, "--", file],
           repoPath,
         );
         if (fileDiff.trim()) {
@@ -261,27 +261,22 @@ export class GitService {
     return diffs;
   }
 
-  private static async getUnstagedDiff(repoPath: string): Promise<string[]> {
-    const diffs: string[] = [];
-    const unstagedFiles = (
-      await this.executeGitCommand(["diff", "--name-only"], repoPath)
-    )
-      .split("\n")
-      .filter((file) => file.trim())
-      .map(unquoteGitPath);
+  private static async getStagedDiff(repoPath: string, prefix?: string): Promise<string[]> {
+    return this.getDiffForFiles(
+      repoPath,
+      ["diff", "--cached", "--name-only"],
+      ["diff", "--cached"],
+      prefix,
+    );
+  }
 
-    for (const file of unstagedFiles) {
-      if (!(await this.isSubmodule(file, repoPath))) {
-        const fileDiff = await this.executeGitCommand(
-          ["diff", "--", file],
-          repoPath,
-        );
-        if (fileDiff.trim()) {
-          diffs.push("# Unstaged changes:\n" + fileDiff);
-        }
-      }
-    }
-    return diffs;
+  private static async getUnstagedDiff(repoPath: string): Promise<string[]> {
+    return this.getDiffForFiles(
+      repoPath,
+      ["diff", "--name-only"],
+      ["diff"],
+      "# Unstaged changes:\n",
+    );
   }
 
   private static async getUntrackedDiff(repoPath: string): Promise<string> {

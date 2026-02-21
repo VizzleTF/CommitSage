@@ -12,7 +12,12 @@
       "Bash(npx eslint:*)",
       "Bash(npm run build:prod:*)",
       "Bash(npx tsc:*)",
-      "Bash(npx webpack:*)"
+      "Bash(npx webpack:*)",
+      "Bash(wc:*)",
+      "Bash(cat:*)",
+      "WebSearch",
+      "WebFetch(domain:code.visualstudio.com)",
+      "WebFetch(domain:www.eliostruyf.com)"
     ]
   }
 }

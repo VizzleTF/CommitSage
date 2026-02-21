@@ -29,7 +29,14 @@ interface GeminiModelsResponse {
     models: GeminiModel[];
 }
 
-// AI сервис для работы с Google Gemini API  
+const GEMINI_GENERATION_CONFIG = {
+    temperature: 0.7,
+    topK: 40,
+    topP: 0.95,
+    maxOutputTokens: 1024
+} as const;
+
+// AI сервис для работы с Google Gemini API
 // Реализует интерфейс IAIService со статическими методами
 export class GeminiService {
     /**
@@ -89,12 +96,7 @@ export class GeminiService {
                 
                 const payload = {
                     contents: [{ parts: [{ text: prompt }] }],
-                    generationConfig: {
-                        temperature: 0.7,
-                        topK: 40,
-                        topP: 0.95,
-                        maxOutputTokens: 1024
-                    }
+                    generationConfig: GEMINI_GENERATION_CONFIG
                 };
                 
                 const requestConfig = HttpUtils.createRequestConfig(
@@ -156,12 +158,7 @@ export class GeminiService {
 
             const payload = {
                 contents: [{ parts: [{ text: prompt }] }],
-                generationConfig: {
-                    temperature: 0.7,
-                    topK: 40,
-                    topP: 0.95,
-                    maxOutputTokens: 1024
-                }
+                generationConfig: GEMINI_GENERATION_CONFIG
             };
 
             // Используем retry utils для прогресса
