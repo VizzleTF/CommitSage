@@ -6,6 +6,7 @@ import { BaseAIService } from './baseAIService';
 import { HttpUtils } from '../utils/httpUtils';
 import { RetryUtils } from '../utils/retryUtils';
 import { toError } from '../utils/errorUtils';
+import { ApiKeyManager } from './apiKeyManager';
 
 interface OllamaResponse {
     message: {
@@ -39,9 +40,12 @@ export class OllamaService {
             Logger.log(`Attempt ${attempt}: Sending request to Ollama API`);
             await RetryUtils.updateProgressForAttempt(progress, attempt);
 
-            const requestConfig = HttpUtils.createRequestConfig(
-                { 'content-type': 'application/json' }
-            );
+            const authToken = await ApiKeyManager.getOptionalKey('ollama');
+            const headers: Record<string, string> = { 'content-type': 'application/json' };
+            if (authToken) {
+                headers['Authorization'] = `Bearer ${authToken}`;
+            }
+            const requestConfig = HttpUtils.createRequestConfig(headers);
 
             const response = await axios.post<OllamaResponse>(apiUrl, payload, requestConfig);
 
@@ -60,6 +64,13 @@ export class OllamaService {
                 attempt,
                 this.generateCommitMessage.bind(this),
                 (err: Error) => {
+                    if (err instanceof AxiosError && err.response?.status === 401) {
+                        return {
+                            errorMessage: 'Ollama authentication failed. Check your auth token via "Set Ollama Auth Token".',
+                            shouldRetry: false,
+                            statusCode: 401
+                        };
+                    }
                     if (err instanceof AxiosError && err.response?.status === 404) {
                         return {
                             errorMessage: 'Model not found. Please check if Ollama is running and the model is installed.',
