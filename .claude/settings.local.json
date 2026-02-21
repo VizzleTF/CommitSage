@@ -3,7 +3,16 @@
     "allow": [
       "mcp__acp__Edit",
       "mcp__acp__Bash",
-      "mcp__acp__Write"
+      "mcp__acp__Write",
+      "mcp__commitsage__list_commit_formats",
+      "mcp__commitsage__analyze_changes",
+      "mcp__commitsage__generate_commit_message",
+      "mcp__commitsage__validate_api_key",
+      "Bash(npm run compile:*)",
+      "Bash(npx eslint:*)",
+      "Bash(npm run build:prod:*)",
+      "Bash(npx tsc:*)",
+      "Bash(npx webpack:*)"
     ]
   }
 }

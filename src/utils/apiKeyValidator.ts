@@ -45,4 +45,11 @@ export class ApiKeyValidator {
         }
         return null;
     }
+
+    static validateOllamaAuthToken(key: string): string | null {
+        if (!key) {
+            return apiValidation.errorMessages.emptyKey;
+        }
+        return null;
+    }
 }
