@@ -8,6 +8,7 @@ import { removeThinkTags } from '../utils/textProcessing';
 import { AIServiceFactory, AIServiceType } from './aiServiceFactory';
 import { toError } from '../utils/errorUtils';
 
+// ~100k chars covers most diffs while staying within safe LLM API context window limits
 const MAX_DIFF_LENGTH = 100000;
 
 export class AIService {

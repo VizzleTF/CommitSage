@@ -10,7 +10,7 @@ import { ApiKeyManager } from './apiKeyManager';
 import { UserCancelledError, ApiKeyInvalidError } from '../models/errors';
 import { toError } from '../utils/errorUtils';
 
-export class CommitMessageUI {
+export class CommitWorkflow {
     private static selectedRepository: vscode.SourceControl | undefined;
 
     static async generateAndSetCommitMessage(sourceControlRepository?: vscode.SourceControl): Promise<void> {
@@ -57,7 +57,6 @@ export class CommitMessageUI {
             }
 
             const err = toError(error);
-            Logger.error('Error in CommitMessageUI:', err);
             TelemetryService.sendEvent('message_generation_failed', {
                 error: err.message,
                 errorType: err.constructor.name,
@@ -68,14 +67,7 @@ export class CommitMessageUI {
     }
 
     private static async ensureApiKey(provider: string): Promise<void> {
-        try {
-            await ApiKeyManager.getKey(provider);
-        } catch (error) {
-            if (error instanceof Error && error.message.includes('cancelled')) {
-                throw new UserCancelledError('API key input was cancelled');
-            }
-            throw error;
-        }
+        await ApiKeyManager.getKey(provider);
     }
 
     private static async handleInvalidApiKey(provider: string): Promise<void> {
@@ -91,7 +83,7 @@ export class CommitMessageUI {
             Logger.log('API key updated, retrying commit message generation');
             await this.generateAndSetCommitMessage();
         } catch (error) {
-            if (error instanceof Error && error.message.includes('cancelled')) {
+            if (error instanceof UserCancelledError) {
                 Logger.log('User cancelled API key update');
             }
         }
@@ -168,7 +160,7 @@ export class CommitMessageUI {
     }
 
     private static async handleError(error: Error): Promise<void> {
-        Logger.error('Error in CommitMessageUI:', error);
+        Logger.error('Error in CommitWorkflow:', error);
         await vscode.window.showErrorMessage(`CommitSage: ${error.message}`);
     }
 

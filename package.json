@@ -36,7 +36,8 @@
     "commands": [
       {
         "command": "commitsage.generateCommitMessage",
-        "title": "Commit Sage: Generate Commit Message",
+        "title": "Generate Commit Message",
+        "category": "Commit Sage",
         "icon": {
           "light": "./icons/button-light.svg",
           "dark": "./icons/button-dark.svg"
@@ -44,27 +45,33 @@
       },
       {
         "command": "commitsage.setApiKey",
-        "title": "Commit Sage: Set Gemini API Key"
+        "title": "Set Gemini API Key",
+        "category": "Commit Sage"
       },
       {
         "command": "commitsage.setOpenAIApiKey",
-        "title": "Commit Sage: Set OpenAI API Key"
+        "title": "Set OpenAI API Key",
+        "category": "Commit Sage"
       },
       {
         "command": "commitsage.setCodestralApiKey",
-        "title": "Commit Sage: Set Codestral API Key"
+        "title": "Set Codestral API Key",
+        "category": "Commit Sage"
       },
       {
         "command": "commitsage.removeApiKey",
-        "title": "Commit Sage: Remove Gemini API Key"
+        "title": "Remove Gemini API Key",
+        "category": "Commit Sage"
       },
       {
         "command": "commitsage.removeOpenAIApiKey",
-        "title": "Commit Sage: Remove OpenAI API Key"
+        "title": "Remove OpenAI API Key",
+        "category": "Commit Sage"
       },
       {
         "command": "commitsage.removeCodestralApiKey",
-        "title": "Commit Sage: Remove Codestral API Key"
+        "title": "Remove Codestral API Key",
+        "category": "Commit Sage"
       },
       {
         "command": "commitsage.setOllamaAuthToken",
@@ -78,7 +85,8 @@
       },
       {
         "command": "commitsage.createProjectConfig",
-        "title": "Commit Sage: Create Project Configuration (.commitsage)"
+        "title": "Create Project Config (.commitsage)",
+        "category": "Commit Sage"
       }
     ],
     "menus": {
@@ -90,6 +98,11 @@
           "arguments": [
             "$scmProvider"
           ]
+        },
+        {
+          "when": "scmProvider == git",
+          "command": "commitsage.createProjectConfig",
+          "group": "1_config@1"
         }
       ],
       "commandPalette": [
