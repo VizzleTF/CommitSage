@@ -40,6 +40,18 @@ export function registerSetApiKeyCommands(_context: vscode.ExtensionContext): vs
                 Logger.error('Error removing Codestral API key:', toError(error));
                 await Logger.showError(`Failed to remove API key: ${(toError(error)).message}`);
             }
+        }),
+        vscode.commands.registerCommand('commitsage.setOllamaAuthToken', () =>
+            ApiKeyManager.promptForKey('ollama')
+        ),
+        vscode.commands.registerCommand('commitsage.removeOllamaAuthToken', async () => {
+            try {
+                await ApiKeyManager.removeKey('ollama');
+                await Logger.showInfo('Ollama auth token has been removed');
+            } catch (error) {
+                Logger.error('Error removing Ollama auth token:', toError(error));
+                await Logger.showError(`Failed to remove auth token: ${(toError(error)).message}`);
+            }
         })
     ];
 }

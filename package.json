@@ -67,6 +67,16 @@
         "title": "Commit Sage: Remove Codestral API Key"
       },
       {
+        "command": "commitsage.setOllamaAuthToken",
+        "title": "Set Ollama Auth Token",
+        "category": "Commit Sage"
+      },
+      {
+        "command": "commitsage.removeOllamaAuthToken",
+        "title": "Remove Ollama Auth Token",
+        "category": "Commit Sage"
+      },
+      {
         "command": "commitsage.createProjectConfig",
         "title": "Commit Sage: Create Project Configuration (.commitsage)"
       }
@@ -271,7 +281,7 @@
     "@typescript-eslint/parser": "^8.55.0",
     "@vscode/vsce": "^3.7.1",
     "dotenv-webpack": "^8.1.1",
-    "eslint": "^10.0.0",
+    "eslint": "^9.0.0",
     "eslint-import-resolver-typescript": "^4.4.4",
     "eslint-plugin-import": "^2.32.0",
     "eslint-plugin-unused-imports": "^4.4.1",

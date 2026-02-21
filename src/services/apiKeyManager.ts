@@ -26,6 +26,11 @@ const API_KEY_CONFIGS: Record<string, ApiKeyConfig> = {
         displayName: 'Codestral',
         validator: ApiKeyValidator.validateCodestralApiKey,
     },
+    ollama: {
+        secretKey: 'commitsage.ollamaAuthToken',
+        displayName: 'Ollama',
+        validator: ApiKeyValidator.validateOllamaAuthToken,
+    },
 };
 
 export class ApiKeyManager {
@@ -110,6 +115,16 @@ export class ApiKeyManager {
         } catch (error) {
             Logger.error(`Error removing ${config.displayName} API key:`, toError(error));
             throw error;
+        }
+    }
+
+    static async getOptionalKey(provider: string): Promise<string | undefined> {
+        const config = this.getConfig(provider);
+        try {
+            return await this.secretStorage.get(config.secretKey) ?? undefined;
+        } catch (error) {
+            Logger.error(`Error getting ${config.displayName} auth token:`, toError(error));
+            return undefined;
         }
     }
 
