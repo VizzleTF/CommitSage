@@ -284,6 +284,10 @@ export class ConfigService {
     return this.getConfig<string>("ollama", "model", "mistral");
   }
 
+  static getOllamaUseAuthToken(): boolean {
+    return this.getConfig<boolean>("ollama", "useAuthToken", false);
+  }
+
   static getOpenAIModel(): string {
     return this.getConfig<string>("openai", "model", "gpt-3.5-turbo");
   }

@@ -28,7 +28,9 @@ export class CommitWorkflow {
 
             // Pre-check API key if required for the provider
             const provider = ConfigService.getProvider();
-            if (ApiKeyManager.requiresApiKey(provider)) {
+            const needsApiKey = ApiKeyManager.requiresApiKey(provider) &&
+                (provider !== 'ollama' || ConfigService.getOllamaUseAuthToken());
+            if (needsApiKey) {
                 await this.ensureApiKey(provider);
             }
 
