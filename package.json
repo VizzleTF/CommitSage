@@ -2,7 +2,7 @@
   "name": "geminicommit",
   "displayName": "Commit Sage",
   "description": "Free AI commit messages using Gemini, Codestral, Ollama, or custom LLM",
-  "version": "2.3.14",
+  "version": "2.3.15",
   "publisher": "VizzleTF",
   "repository": {
     "type": "git",
@@ -300,7 +300,7 @@
     "@typescript-eslint/parser": "^8.56.0",
     "@vscode/vsce": "^3.7.1",
     "dotenv-webpack": "^8.1.1",
-    "eslint": "^10.0.1",
+    "eslint": "^9.0.0",
     "eslint-import-resolver-typescript": "^4.4.4",
     "eslint-plugin-import": "^2.32.0",
     "eslint-plugin-unused-imports": "^4.4.1",
