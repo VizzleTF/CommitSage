@@ -29,14 +29,43 @@ echo "Which part of the version do you want to increment?"
 echo "1) Major (x.0.0)"
 echo "2) Minor (0.x.0)"
 echo "3) Patch (0.0.x)"
-read -p "Enter your choice (1-3): " choice
+echo "4) Recreate last release (delete and re-push last tag)"
+read -p "Enter your choice (1-4): " choice
 
 case $choice in
   1) new_version=$(increment_version $current_version 0);;
   2) new_version=$(increment_version $current_version 1);;
   3) new_version=$(increment_version $current_version 2);;
+  4)
+    # Get the latest tag
+    new_version=$(git describe --tags --abbrev=0 2>/dev/null)
+    if [ -z "$new_version" ]; then
+      echo "No tags found. Exiting."
+      exit 1
+    fi
+    # Remove 'v' prefix if present for consistency
+    new_version=${new_version#v}
+    echo "Recreating release for version: $new_version"
+    ;;
   *) echo "Invalid choice. Exiting."; exit 1;;
 esac
+
+# For option 4, we need to delete the remote tag first
+if [ "$choice" == "4" ]; then
+  # Check if tag exists and delete it
+  tag_name="v$new_version"
+  echo "Deleting tag $tag_name..."
+
+  # Delete local tag
+  if git rev-parse "$tag_name" >/dev/null 2>&1; then
+    git tag -d "$tag_name"
+  fi
+
+  # Delete remote tag
+  if git ls-remote --tags origin | grep -q "refs/tags/$tag_name"; then
+    git push origin ":refs/tags/$tag_name"
+  fi
+fi
 
 echo "New version will be: $new_version"
 
