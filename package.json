@@ -261,17 +261,23 @@
           "description": "Model name for Ollama. Make sure the model is installed locally. Only used when Ollama provider is selected",
           "order": 15
         },
+        "commitSage.ollama.useAuthToken": {
+          "type": "boolean",
+          "default": false,
+          "description": "Enable authentication token for Ollama API. Enable this if your Ollama instance requires an auth token",
+          "order": 16
+        },
         "commitSage.apiRequestTimeout": {
           "type": "number",
           "default": 30,
           "description": "Timeout for API requests in seconds. Set to -1 for no timeout (infinite wait)",
-          "order": 16
+          "order": 17
         },
         "commitSage.telemetry.enabled": {
           "type": "boolean",
           "default": true,
           "description": "Enable telemetry for Commit Sage",
-          "order": 17
+          "order": 18
         }
       }
     }
