@@ -47,6 +47,8 @@ Please provide ONLY the commit message, without any additional text or explanati
                 return 'コミットメッセージを日本語で書いてください。';
             case 'spanish':
                 return 'Por favor, escribe el mensaje del commit en español.';
+            case 'portuguese':
+                return 'Por favor, escreva a menssagem do commit em portugues brasileiro.'
             case 'english':
             default:
                 return 'Please write the commit message in English.';

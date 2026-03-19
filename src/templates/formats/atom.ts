@@ -182,5 +182,42 @@ Probado con múltiples escenarios de usuario y casos límite.
 Añadido manejo integral de errores para fallos de red.
 
 Cierra #123
-Cambio disruptivo: Actualizados endpoints de API de autenticación`
+Cambio disruptivo: Actualizados endpoints de API de autenticación`,
+
+    portuguese: `Gere uma mensagem de commit seguindo o formato Atom:
+<tipo>(<escopo>): <assunto>
+
+<corpo>
+
+<rodapé>
+
+Tipos:
+- feat: Nova funcionalidade
+- fix: Correção de erro
+- docs: Alterações na documentação
+- style: Alterações no estilo do código (formatação, ponto e vírgula, etc.)
+- refactor: Refatoração de código
+- test: Adição ou modificação de testes
+- chore: Tarefas de manutenção
+- perf: Melhorias de desempenho
+- ci: Alterações de CI/CD
+- build: Alterações no sistema de build
+- revert: Reverter commit anterior
+
+Escopo (opcional): A parte do código afetada (ex: auth, ui, api, core)
+
+Exemplo:
+feat(auth): adicionar integração OAuth2 com provedor Google
+
+Implementado o fluxo OAuth2 completo, incluindo:
+- Troca de código de autorização
+- Mecanismo de renovação de token (refresh)
+- Recuperação de perfil de usuário
+- Gerenciamento de sessão
+
+Testado com múltiplos cenários de usuário e casos de borda.
+Adicionado tratamento de erros abrangente para falhas de rede.
+
+Fecha #123
+Mudança quebra-padrão: Atualizados os endpoints da API de autenticação`,
 };

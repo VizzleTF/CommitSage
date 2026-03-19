@@ -122,5 +122,30 @@ Emojis comunes (Gitmoji + Conventional Emoji Commits):
 
 Ejemplo:
 ✨ añadir característica de colaboración en tiempo real
-🐛 corregir expiración del token de autenticación`
+🐛 corregir expiración del token de autenticación`,
+
+    portuguese: `Gere uma mensagem de commit seguindo o formato Emoji:
+:emoji: mensagem de commit
+
+Emojis comuns (Gitmoji + Conventional Emoji Commits):
+✨ :sparkles: - Nova funcionalidade
+🐛 :bug: - Correção de bug
+📝 :memo: - Atualizações de documentação
+🎨 :art: - Mudanças de estilo/formatação de código
+♻️ :recycle: - Refatoração sem mudanças de funcionalidade
+🧪 :test_tube: - Adição ou alteração de testes
+🛠️ :hammer_and_wrench: - Build/ferramentas/dependências
+🤖 :robot: - Configuração de CI/CD
+⚡️ :zap: - Otimização de desempenho
+🔧 :wrench: - Manutenção/tarefas genéricas
+🔒 :lock: - Correções de segurança
+🚀 :rocket: - Release/implantação
+🔥 :fire: - Remover código ou arquivos
+⬆️ :arrow_up: - Atualizar dependências
+⬇️ :arrow_down: - Reverter atualização de dependências
+✅ :white_check_mark: - Corrigir build do CI
+
+Exemplo:
+✨ adicionar funcionalidade de colaboração em tempo real
+🐛 corrigir expiração do token de autenticação`,
 };

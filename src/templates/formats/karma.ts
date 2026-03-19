@@ -72,5 +72,20 @@ Tipos:
 - chore: Mantenimiento
 
 Ejemplo:
-chore(ci): actualizar script de despliegue a Node 16`
+chore(ci): actualizar script de despliegue a Node 16`,
+
+    portuguese: `Gere uma mensagem de commit seguindo o formato Karma:
+<tipo>(<escopo>): <mensagem>
+
+Tipos:
+- feat: Nova funcionalidade
+- fix: Correção de bug
+- docs: Alteração na documentação
+- style: Formatação, ponto e vírgula, etc.
+- refactor: Refatoração de código
+- test: Adição de testes
+- chore: Manutenção
+
+Exemplo:
+chore(ci): atualizar script de deploy para Node 16`,
 };
