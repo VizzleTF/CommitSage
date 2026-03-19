@@ -167,5 +167,39 @@ Emojis comunes (Gitmoji + Conventional Emoji Commits):
 
 Ejemplo:
 ✨ feat(auth): añadir sistema de autenticación de usuario
-🐛 fix(api): resolver problema de expiración del token`
+🐛 fix(api): resolver problema de expiración del token`,
+
+    portuguese: `Gere uma mensagem de commit seguindo o formato Emoji-Karma:
+:emoji: tipo(escopo): mensagem
+
+Tipos:
+- feat: Nova funcionalidade
+- fix: Correção de bug
+- docs: Alteração na documentação
+- style: Formatação, ponto e vírgula, etc.
+- refactor: Refatoração de código
+- test: Adição de testes
+- chore: Manutenção
+
+Emojis comuns (Gitmoji + Conventional Emoji Commits):
+✨ :sparkles: - Nova funcionalidade
+🐛 :bug: - Correção de erro
+📝 :memo: - Atualizações de documentação
+🎨 :art: - Mudanças de estilo/formatação de código
+♻️ :recycle: - Refatoração sem mudanças de funcionalidade
+🧪 :test_tube: - Adição ou alteração de testes
+🛠️ :hammer_and_wrench: - Build/ferramentas/dependências
+🤖 :robot: - Configuração de CI/CD
+⚡️ :zap: - Otimização de desempenho
+🔧 :wrench: - Manutenção/tarefas genéricas
+🔒 :lock: - Correções de segurança
+🚀 :rocket: - Release/implantação
+🔥 :fire: - Remover código ou arquivos
+⬆️ :arrow_up: - Atualizar dependências
+⬇️ :arrow_down: - Reverter atualização de dependências
+✅ :white_check_mark: - Corrigir build do CI
+
+Exemplo:
+✨ feat(auth): adicionar sistema de autenticação de usuário
+🐛 fix(api): resolver problema de expiração de token`,
 };

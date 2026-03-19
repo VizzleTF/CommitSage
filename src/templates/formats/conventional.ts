@@ -202,5 +202,46 @@ feat(auth): añadir autenticación de usuario
 
 - Implementada integración con proveedor OAuth2
 - Creado módulo de servicio de autenticación
-- Añadida gestión de sesiones`
+- Añadida gestión de sesiones`,
+
+    portuguese: `Gere uma mensagem de commit no formato Conventional Commits:
+<tipo>[escopo opcional]: <descrição>
+
+[corpo opcional com tópicos]
+
+Regras:
+1. Primeira linha: tipo(escopo): descrição (máx 50 chars)
+2. Para mudanças pequenas, use apenas a primeira linha
+3. Para mudanças complexas, liste pontos-chave no corpo:
+   - Cada linha começa com "- "
+   - Cada linha com no máximo 50 caracteres
+   - Limite de 5 tópicos
+   - Resuma as mudanças de forma concisa
+
+Regras de seleção de tipo:
+- docs: QUALQUER mudança em arquivos de documentação (*.md, docs/*)
+- feat: Novas funcionalidades ou mudanças funcionais significativas
+- fix: Correções de bugs e erros
+- style: Formatação, ponto e vírgula, etc (sem mudança de código)
+- refactor: Mudanças de código que não corrigem bugs nem add funções
+- perf: Melhorias de desempenho
+- test: Adição ou atualização de testes
+- build: Sistema de build ou dependências
+- ci: Mudanças de CI/CD
+- chore: Outras tarefas de manutenção
+
+Exemplos:
+Mudança de documentação:
+docs: atualizar guias de instalação e uso
+
+- Adicionada descrição de novos recursos
+- Atualizada seção de configuração
+- Adicionados exemplos de uso
+
+Mudança de funcionalidade:
+feat(auth): adicionar autenticação de usuário
+
+- Implementada integração com provedor OAuth2
+- Criado módulo de serviço de autenticação
+- Adicionado gerenciamento de sessões`,
 };
