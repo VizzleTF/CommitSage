@@ -151,10 +151,11 @@ export class GitService {
   static async getDiff(
     repoPath: string,
     onlyStagedChanges: boolean,
+    knownHasStagedChanges?: boolean,
   ): Promise<string> {
     try {
       const hasHead = await this.hasHead(repoPath);
-      const hasStagedChanges = await this.hasChanges(repoPath, "staged");
+      const hasStagedChanges = knownHasStagedChanges ?? await this.hasChanges(repoPath, "staged");
       const hasUnstagedChanges =
         !onlyStagedChanges && (await this.hasChanges(repoPath, "unstaged"));
       const hasUntrackedFiles =
@@ -219,7 +220,7 @@ export class GitService {
         throw error;
       }
       Logger.error("Error getting diff:", toError(error));
-      throw new Error(`Failed to get diff: ${(toError(error)).message}`);
+      throw new Error(`Failed to get diff: ${(toError(error)).message}`, { cause: error });
     }
   }
 
@@ -241,24 +242,28 @@ export class GitService {
     diffArgs: string[],
     prefix?: string
   ): Promise<string[]> {
-    const diffs: string[] = [];
     const files = (await this.executeGitCommand(listArgs, repoPath))
       .split("\n")
       .filter((file) => file.trim())
       .map(unquoteGitPath);
 
-    for (const file of files) {
-      if (!(await this.isSubmodule(file, repoPath))) {
+    const results = await Promise.all(
+      files.map(async (file) => {
+        if (await this.isSubmodule(file, repoPath)) {
+          return null;
+        }
         const fileDiff = await this.executeGitCommand(
           [...diffArgs, "--", file],
           repoPath,
         );
-        if (fileDiff.trim()) {
-          diffs.push(prefix ? prefix + fileDiff : fileDiff);
+        if (!fileDiff.trim()) {
+          return null;
         }
-      }
-    }
-    return diffs;
+        return prefix ? prefix + fileDiff : fileDiff;
+      })
+    );
+
+    return results.filter((d): d is string => d !== null);
   }
 
   private static async getStagedDiff(repoPath: string, prefix?: string): Promise<string[]> {
@@ -334,7 +339,14 @@ export class GitService {
               ["show", `HEAD:${file}`],
               repoPath,
             );
-            return `diff --git a/${file} b/${file}\ndeleted file mode 100644\n--- a/${file}\n+++ /dev/null\n@@ -1 +0,0 @@\n-${oldContent.trim()}\n`;
+            const lines = oldContent.split("\n");
+            // Remove trailing empty line that git show adds
+            if (lines[lines.length - 1] === "") {
+              lines.pop();
+            }
+            const lineCount = lines.length;
+            const contentDiff = lines.map((line) => `-${line}`).join("\n");
+            return `diff --git a/${file} b/${file}\ndeleted file mode 100644\n--- a/${file}\n+++ /dev/null\n@@ -1,${lineCount} +0,0 @@\n${contentDiff}\n`;
           } catch {
             return "";
           }
@@ -420,10 +432,6 @@ export class GitService {
           // Unquote paths that git quoted due to spaces or special characters
           filePath = unquoteGitPath(filePath);
 
-          // Log file status for debugging
-          Logger.log(`File ${filePath} has status: ${status}`);
-
-          // Return relative path as git status returns it
           return filePath;
         });
     } catch (error) {
@@ -444,24 +452,20 @@ export class GitService {
   }
 
   static async getRepositories(): Promise<vscode.SourceControl[]> {
-    try {
-      const extension =
-        vscode.extensions.getExtension<GitExtension>("vscode.git");
-      if (!extension) {
-        throw new GitExtensionNotFoundError();
-      }
-
-      const gitExtension = await extension.activate();
-      const git = gitExtension.getAPI(1);
-
-      if (!git?.repositories?.length) {
-        throw new NoRepositoriesFoundError();
-      }
-
-      return git.repositories;
-    } catch {
+    const extension =
+      vscode.extensions.getExtension<GitExtension>("vscode.git");
+    if (!extension) {
       throw new GitExtensionNotFoundError();
     }
+
+    const gitExtension = await extension.activate();
+    const git = gitExtension.getAPI(1);
+
+    if (!git?.repositories?.length) {
+      throw new NoRepositoriesFoundError();
+    }
+
+    return git.repositories;
   }
 
   static async selectRepository(

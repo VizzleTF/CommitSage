@@ -79,5 +79,4 @@ export class CodestralService {
         return BaseAIService.extractAndValidateMessage(content, 'Codestral');
     }
 
-
 }

@@ -24,7 +24,7 @@ interface ModelsResponse {
     }>;
 }
 
-// AI сервис для работы с OpenAI/совместимыми API  
+// AI сервис для работы с OpenAI/совместимыми API
 // Реализует интерфейс IModelService со статическими методами (включая fetchAvailableModels)
 export class OpenAIService {
     private static readonly chatCompletionsPath = '/chat/completions';
@@ -112,6 +112,5 @@ export class OpenAIService {
         }
         return BaseAIService.validateCommitMessage(content);
     }
-
 
 }

@@ -46,6 +46,7 @@ export class TelemetryService {
     private static initialized: boolean = false;
     private static eventQueue: QueuedEvent[] = [];
     private static flushInterval: ReturnType<typeof setInterval> | null = null;
+    private static isProcessing: boolean = false;
 
     static async initialize(context: vscode.ExtensionContext): Promise<void> {
         Logger.log('Initializing telemetry service');
@@ -56,6 +57,8 @@ export class TelemetryService {
                 return;
             }
 
+            this.enabled = vscode.env.isTelemetryEnabled && ConfigService.isTelemetryEnabled();
+
             amplitude.init(AMPLITUDE_API_KEY, {
                 serverZone: 'EU',
                 flushQueueSize: 1,
@@ -65,8 +68,6 @@ export class TelemetryService {
 
             this.initialized = true;
             Logger.log('Amplitude service initialized successfully');
-
-            this.enabled = vscode.env.isTelemetryEnabled && ConfigService.isTelemetryEnabled();
 
             this.disposables.push(
                 vscode.env.onDidChangeTelemetryEnabled(this.handleTelemetryStateChange.bind(this)),
@@ -124,10 +125,11 @@ export class TelemetryService {
     }
 
     private static async processEventQueue(): Promise<void> {
-        if (!this.initialized || !this.enabled || this.eventQueue.length === 0) {
+        if (!this.initialized || !this.enabled || this.eventQueue.length === 0 || this.isProcessing) {
             return;
         }
 
+        this.isProcessing = true;
         const currentEvent = this.eventQueue[0];
 
         try {
@@ -155,6 +157,8 @@ export class TelemetryService {
                 Logger.error(`Failed to send event ${currentEvent.eventName} after ${TELEMETRY_CONFIG.maxRetries} attempts, discarding`);
                 this.eventQueue.shift();
             }
+        } finally {
+            this.isProcessing = false;
         }
     }
 

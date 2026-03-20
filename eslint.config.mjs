@@ -60,6 +60,15 @@ export default tseslint.config(
                     format: ['camelCase']
                 },
                 {
+                    selector: 'classProperty',
+                    modifiers: ['static', 'readonly'],
+                    format: ['camelCase', 'UPPER_CASE']
+                },
+                {
+                    selector: 'enumMember',
+                    format: ['camelCase', 'UPPER_CASE']
+                },
+                {
                     selector: 'typeLike',
                     format: ['PascalCase']
                 },

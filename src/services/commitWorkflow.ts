@@ -11,8 +11,6 @@ import { UserCancelledError, ApiKeyInvalidError } from '../models/errors';
 import { toError } from '../utils/errorUtils';
 
 export class CommitWorkflow {
-    private static selectedRepository: vscode.SourceControl | undefined;
-
     static async generateAndSetCommitMessage(sourceControlRepository?: vscode.SourceControl): Promise<void> {
         try {
             await this.initializeAndValidate();
@@ -50,11 +48,10 @@ export class CommitWorkflow {
                 return;
             }
 
-            // Handle invalid API key error - prompt for new key and retry
             if (error instanceof ApiKeyInvalidError) {
                 Logger.error('Invalid API key', error);
                 const provider = ConfigService.getProvider();
-                await this.handleInvalidApiKey(provider);
+                await this.handleInvalidApiKey(provider, sourceControlRepository);
                 return;
             }
 
@@ -72,7 +69,7 @@ export class CommitWorkflow {
         await ApiKeyManager.getKey(provider);
     }
 
-    private static async handleInvalidApiKey(provider: string): Promise<void> {
+    private static async handleInvalidApiKey(provider: string, sourceControlRepository?: vscode.SourceControl): Promise<void> {
         await Logger.showError(
             'Invalid or expired API key. Please enter a new one.',
         );
@@ -81,9 +78,8 @@ export class CommitWorkflow {
             await ApiKeyManager.removeKey(provider);
             await ApiKeyManager.promptForKey(provider);
 
-            // Retry generation
             Logger.log('API key updated, retrying commit message generation');
-            await this.generateAndSetCommitMessage();
+            await this.generateAndSetCommitMessage(sourceControlRepository);
         } catch (error) {
             if (error instanceof UserCancelledError) {
                 Logger.log('User cancelled API key update');
@@ -134,7 +130,7 @@ export class CommitWorkflow {
             throw new UserCancelledError();
         }
 
-        const diff = await GitService.getDiff(repoPath, useStagedChanges);
+        const diff = await GitService.getDiff(repoPath, useStagedChanges, hasStagedChanges);
         if (!diff) {
             throw new Error('No changes to commit');
         }
@@ -152,10 +148,9 @@ export class CommitWorkflow {
         const commitMessage = await AIService.generateCommitMessage(diff, blameAnalysis, progress);
 
         sourceControlRepository.inputBox.value = commitMessage.message;
-        this.selectedRepository = sourceControlRepository;
 
         if (ConfigService.getAutoCommitEnabled()) {
-            await this.handleAutoCommit();
+            await this.handleAutoCommit(sourceControlRepository);
         }
 
         return commitMessage;
@@ -166,16 +161,16 @@ export class CommitWorkflow {
         await vscode.window.showErrorMessage(`CommitSage: ${error.message}`);
     }
 
-    private static async handleAutoCommit(): Promise<void> {
+    private static async handleAutoCommit(repository: vscode.SourceControl): Promise<void> {
         try {
-            if (!this.selectedRepository?.inputBox.value) {
+            if (!repository.inputBox.value) {
                 throw new Error('No commit message available');
             }
 
-            await GitService.commitChanges(this.selectedRepository.inputBox.value, this.selectedRepository);
+            await GitService.commitChanges(repository.inputBox.value, repository);
 
             if (ConfigService.getAutoPushEnabled()) {
-                await GitService.pushChanges(this.selectedRepository);
+                await GitService.pushChanges(repository);
             }
         } catch (error) {
             Logger.error('Auto-commit/push failed:', toError(error));

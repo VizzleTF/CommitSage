@@ -2,32 +2,15 @@ import { ApiErrorResult } from '../models/types';
 import { errorMessages } from '../utils/constants';
 import { AxiosError } from 'axios';
 
-/**
- * Базовый утилитарный класс для всех AI сервисов
- * Предоставляет специализированную логику для AI операций и обработки ошибок
- */
 export class BaseAIService {
-    /**
-     * Общий метод для очистки commit сообщения
-     */
-    static cleanCommitMessage(message: string): string {
-        return message.trim();
-    }
-
-    /**
-     * Общий метод для проверки пустого ответа
-     */
     static validateCommitMessage(message: string): string {
-        const cleanMessage = this.cleanCommitMessage(message);
-        if (!cleanMessage.trim()) {
+        const cleanMessage = message.trim();
+        if (!cleanMessage) {
             throw new Error("Generated commit message is empty.");
         }
         return cleanMessage;
     }
 
-    /**
-     * Общий метод для валидации и извлечения commit сообщения из ответа
-     */
     static extractAndValidateMessage(content: string | undefined | null, serviceName: string): string {
         if (!content) {
             throw new Error(`Invalid response format from ${serviceName} API`);
@@ -35,10 +18,6 @@ export class BaseAIService {
         return this.validateCommitMessage(content);
     }
 
-    /**
-     * Универсальная обработка HTTP ошибок для всех AI сервисов
-     * Стандартизирует ответы на основе статус кодов
-     */
     static handleHttpError(error: Error, serviceName: string): ApiErrorResult {
         if (error instanceof AxiosError) {
             if (error.response) {
@@ -88,7 +67,6 @@ export class BaseAIService {
                 }
             }
 
-            // Сетевые ошибки Axios
             if (error.code === 'ECONNREFUSED' ||
                 error.code === 'ETIMEDOUT' ||
                 error.message?.includes('ECONNREFUSED') ||
@@ -106,4 +84,4 @@ export class BaseAIService {
         };
     }
 
-} 
+}

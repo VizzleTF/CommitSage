@@ -292,7 +292,10 @@
     "build:analyze": "ANALYZE=true webpack --mode production",
     "package": "vsce package",
     "package:nowebpack": "npm run vscode:prepublish:tsc && vsce package",
-    "package:analyze": "npm run build:analyze && vsce package"
+    "package:analyze": "npm run build:analyze && vsce package",
+    "lint": "eslint src/**/*.ts",
+    "lint:fix": "eslint src/**/*.ts --fix",
+    "typecheck": "tsc --noEmit"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

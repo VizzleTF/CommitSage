@@ -64,4 +64,4 @@ export class RetryUtils {
 
         throw new Error(`Failed to generate commit message: ${errorMessage}`);
     }
-} 
+}
