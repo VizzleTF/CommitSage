@@ -48,7 +48,7 @@ Please provide ONLY the commit message, without any additional text or explanati
             case 'spanish':
                 return 'Por favor, escribe el mensaje del commit en español.';
             case 'portuguese':
-                return 'Por favor, escreva a menssagem do commit em portugues brasileiro.'
+                return 'Por favor, escreva a mensagem do commit em português brasileiro.';
             case 'english':
             default:
                 return 'Please write the commit message in English.';
