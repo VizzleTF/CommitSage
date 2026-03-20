@@ -162,5 +162,38 @@ refactor(core): optimizar consultas de base de datos
 
 - Implementar caché de consultas
 - Añadir pool de conexiones
-- Actualizar manejo de errores`
+- Actualizar manejo de errores`,
+
+    portuguese: `Gere uma mensagem de commit seguindo o formato Angular:
+<tipo>(<escopo>): <resumo curto>
+
+[corpo opcional com tópicos]
+
+Regras:
+1. Primeira linha: tipo(escopo): resumo (máx 50 caracteres)
+2. Para mudanças pequenas use apenas a primeira linha
+3. Para mudanças complexas liste pontos-chave no corpo:
+   - Cada linha começa com "- "
+   - Cada linha máx 50 caracteres
+
+Tipos:
+build: Build/dependências
+ci: Configuração de CI
+docs: Documentação
+feat: Nova funcionalidade
+fix: Correção de bug
+perf: Performance
+refactor: Refatoração de código
+test: Testes
+
+Exemplos:
+Mudança pequena:
+feat(api): adiciona método de validação de dados
+
+Mudança complexa:
+refactor(core): otimiza consultas ao banco de dados
+
+- Implementar cache de consulta
+- Adicionar pool de conexões
+- Atualizar tratamento de erros`
 };
