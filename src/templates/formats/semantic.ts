@@ -72,5 +72,20 @@ Tipos:
 - chore: Cambios en proceso de build o herramientas auxiliares
 
 Ejemplo:
-feat: añadir funcionalidad de subida de avatar de usuario`
+feat: añadir funcionalidad de subida de avatar de usuario`,
+
+    portuguese: `Gere uma mensagem de commit seguindo o formato Semântico:
+tipo: mensagem
+
+Tipos:
+- feat: Nova funcionalidade
+- fix: Correção de bug
+- docs: Alterações na documentação
+- style: Alterações no estilo do código
+- refactor: Refatoração de código
+- test: Atualizações de testes
+- chore: Mudanças no processo de build ou ferramentas auxiliares
+
+Exemplo:
+feat: adicionar funcionalidade de upload de avatar do usuário`,
 };

@@ -45,7 +45,7 @@ export interface ProjectConfig {
         type?: 'gemini' | 'codestral' | 'openai' | 'ollama';
     };
     commit?: {
-        commitLanguage?: 'english' | 'russian' | 'chinese' | 'japanese' | 'spanish';
+        commitLanguage?: 'english' | 'russian' | 'chinese' | 'japanese' | 'spanish' | 'portuguese';
         commitFormat?: 'conventional' | 'angular' | 'karma' | 'semantic' | 'emoji' | 'emojiKarma' | 'google' | 'atom';
         useCustomInstructions?: boolean;
         customInstructions?: string;
