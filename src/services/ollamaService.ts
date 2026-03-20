@@ -96,5 +96,4 @@ export class OllamaService {
         return BaseAIService.extractAndValidateMessage(content, 'Ollama');
     }
 
-
 }

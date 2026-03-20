@@ -36,100 +36,81 @@ const GEMINI_GENERATION_CONFIG = {
     maxOutputTokens: 1024
 } as const;
 
-// AI сервис для работы с Google Gemini API
-// Реализует интерфейс IAIService со статическими методами
 export class GeminiService {
-    /**
-     * Получает список доступных моделей Gemini через API
-     */
     private static async getAvailableModels(apiKey: string): Promise<string[]> {
         try {
             const apiUrl = `https://generativelanguage.googleapis.com/v1/models?key=${apiKey}`;
             const requestConfig = HttpUtils.createRequestConfig({});
-            
+
             const response = await axios.get<GeminiModelsResponse>(apiUrl, requestConfig);
-            
-            // Фильтруем только модели, поддерживающие generateContent
+
             const models = response.data.models
-                .filter((model: GeminiModel) => 
+                .filter((model: GeminiModel) =>
                     model.supportedGenerationMethods?.includes('generateContent')
                 )
                 .map((model: GeminiModel) => model.name.replace('models/', ''));
-            
+
             Logger.log(`Found ${models.length} available Gemini models: ${models.join(', ')}`);
             return models;
         } catch (error) {
             Logger.error('Failed to fetch available Gemini models:', toError(error));
-            // В случае ошибки возвращаем дефолтный список моделей
-            const fallbackModels = [
+            return [
                 'gemini-2.0-flash',
                 'gemini-2.0-flash-exp',
                 'gemini-2.5-flash',
                 'gemini-2.5-pro'
             ];
-            return fallbackModels;
         }
     }
 
-    /**
-     * Пробует сгенерировать сообщение коммита, перебирая модели по очереди
-     */
     private static async tryGenerateWithModels(
         prompt: string,
         progress: ProgressReporter,
         models: string[],
         apiKey: string
     ): Promise<CommitMessage> {
-        const errors: Array<{ model: string; error: string }> = [];
-        
-        for (let i = 0; i < models.length; i++) {
-            const model = models[i];
-            const modelProgress = Math.floor(((i + 1) / models.length) * 100);
-            
+        const errors: Array<{ model: string; error: string; status?: number }> = [];
+
+        for (const model of models) {
             try {
-                progress.report({ 
-                    message: `Trying model ${i + 1}/${models.length}: ${model}...`, 
-                    increment: 0 
+                progress.report({
+                    message: `Trying model ${model}...`,
+                    increment: 0
                 });
-                
+
                 const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
-                
+
                 const payload = {
                     contents: [{ parts: [{ text: prompt }] }],
                     generationConfig: GEMINI_GENERATION_CONFIG
                 };
-                
+
                 const requestConfig = HttpUtils.createRequestConfig(
                     { 'content-type': 'application/json' }
                 );
-                
+
                 const response = await axios.post<GeminiResponse>(apiUrl, payload, requestConfig);
-                
+
                 const message = this.extractCommitMessage(response.data);
                 Logger.log(`Commit message successfully generated using ${model} model (auto mode)`);
-                
+
                 progress.report({ message: "Processing generated message...", increment: 100 });
                 return { message, model };
-                
+
             } catch (error) {
+                const status = error instanceof AxiosError ? error.response?.status : undefined;
                 const errorMsg = error instanceof Error ? error.message : String(error);
-                errors.push({ model, error: errorMsg });
+                errors.push({ model, error: errorMsg, status });
                 Logger.log(`Model ${model} failed: ${errorMsg}`);
-                
-                // Если это последняя модель, пробрасываем ошибку
-                if (i === models.length - 1) {
-                    const errorSummary = errors.map(e => `${e.model}: ${e.error}`).join('; ');
-                    throw new Error(`All models failed. Errors: ${errorSummary}`);
-                }
-                
-                // Иначе продолжаем со следующей моделью
-                continue;
             }
         }
 
-        // TypeScript requires a return, but this is unreachable:
-        // the loop always either returns or throws on the last iteration
-        throw new Error('Failed to generate commit message with any available model');
+        const allUnauthorized = errors.length > 0 && errors.every(e => e.status === 401);
+        if (allUnauthorized) {
+            throw new ApiKeyInvalidError('Gemini');
+        }
+
+        throw new Error(`All models failed. Errors: ${errors.map(e => `${e.model}: ${e.error}`).join('; ')}`);
     }
 
     static async generateCommitMessage(
@@ -140,20 +121,18 @@ export class GeminiService {
         try {
             const apiKey = await ApiKeyManager.getKey('gemini');
             const configuredModel = ConfigService.getGeminiModel();
-            
-            // Проверяем режим "auto"
+
             if (configuredModel === 'auto') {
                 progress.report({ message: "Fetching available Gemini models...", increment: 0 });
                 const availableModels = await this.getAvailableModels(apiKey);
-                
+
                 if (availableModels.length === 0) {
                     throw new Error('No available Gemini models found');
                 }
-                
+
                 return await this.tryGenerateWithModels(prompt, progress, availableModels, apiKey);
             }
-            
-            // Стандартный режим с одной моделью
+
             const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${configuredModel}:generateContent?key=${apiKey}`;
 
             const payload = {
@@ -161,7 +140,6 @@ export class GeminiService {
                 generationConfig: GEMINI_GENERATION_CONFIG
             };
 
-            // Используем retry utils для прогресса
             await RetryUtils.updateProgressForAttempt(progress, attempt);
 
             const requestConfig = HttpUtils.createRequestConfig(
@@ -175,12 +153,10 @@ export class GeminiService {
             Logger.log(`Commit message generated using ${configuredModel} model`);
             return { message, model: configuredModel };
         } catch (error) {
-            // Обработка специальных случаев для Gemini
             if (error instanceof AxiosError && error.response?.status === 401) {
                 throw new ApiKeyInvalidError('Gemini');
             }
 
-            // Используем retry utils для retry логики
             return RetryUtils.handleGenerationError(
                 toError(error),
                 prompt,
@@ -196,6 +172,5 @@ export class GeminiService {
         const content = response.candidates?.[0]?.content?.parts?.[0]?.text;
         return BaseAIService.extractAndValidateMessage(content, 'Gemini');
     }
-
 
 }

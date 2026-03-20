@@ -86,7 +86,7 @@ export class SettingsValidator {
         if (useCustomInstructions && !instructions.trim()) {
             void Logger.showWarning(
                 'Custom Instructions are enabled but empty. Please add some instructions.'
-            )
+            );
         }
     }
 
