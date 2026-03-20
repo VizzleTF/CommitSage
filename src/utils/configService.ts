@@ -12,7 +12,8 @@ export type CommitLanguage =
   | "russian"
   | "chinese"
   | "japanese"
-  | "spanish";
+  | "spanish"
+  | "portuguese";
 
 export class ConfigService {
   private static cache = new Map<string, CacheValue>();

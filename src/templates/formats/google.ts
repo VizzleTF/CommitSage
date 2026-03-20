@@ -147,5 +147,35 @@ Añadida gestión de tokens JWT y mecanismo de actualización.
 Incluida cobertura completa de pruebas para flujos de autenticación.
 
 Cierra #123
-Revisado por: @teammate`
+Revisado por: @teammate`,
+
+    portuguese: `Gere uma mensagem de commit seguindo o formato Google:
+<Tipo>: <Descrição>
+
+<Corpo>
+
+<Rodapé>
+
+Tipos:
+- feat: Nova funcionalidade
+- fix: Correção de bug
+- docs: Alterações na documentação
+- style: Alterações no estilo do código (formatação, ponto e vírgula, etc.)
+- refactor: Refatoração de código
+- test: Adição ou modificação de testes
+- chore: Tarefas de manutenção
+- perf: Melhorias de desempenho
+- ci: Alterações de CI/CD
+- build: Alterações no sistema de build
+- revert: Reverter commit anterior
+
+Exemplo:
+feat: Adicionar sistema de autenticação de usuário
+
+Implementada integração OAuth2 com provedores Google e GitHub.
+Adicionado gerenciamento de tokens JWT e mecanismo de atualização.
+Incluída cobertura de testes abrangente para os fluxos de autenticação.
+
+Fecha #123
+Revisado por: @teammate`,
 };
