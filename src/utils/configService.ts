@@ -47,7 +47,6 @@ export class ConfigService {
       },
     );
 
-    // Инициализируем наблюдение за файлом .commitsage
     this.initializeProjectConfigWatcher(context);
 
     this.disposables.push(configListener);
@@ -55,7 +54,7 @@ export class ConfigService {
   }
 
   private static initializeProjectConfigWatcher(
-    context: vscode.ExtensionContext,
+    _context: vscode.ExtensionContext,
   ): void {
     const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
     if (!workspaceFolder) {
@@ -147,17 +146,15 @@ export class ConfigService {
     defaultValue: T,
   ): T {
     const configKey = section ? `${section}.${key}` : key;
-    const cacheKey = configKey;
     try {
-      if (!this.cache.has(cacheKey)) {
-        // Сначала проверяем настройки проекта
+      if (!this.cache.has(configKey)) {
         const projectValue = this.getNestedProjectValue<T>(
           section ? [section, key] : [key],
           defaultValue,
         );
 
         if (projectValue !== undefined) {
-          this.cache.set(cacheKey, projectValue);
+          this.cache.set(configKey, projectValue);
           return projectValue;
         }
 
@@ -170,9 +167,9 @@ export class ConfigService {
           value?.defaultValue ??
           defaultValue;
 
-        this.cache.set(cacheKey, effectiveValue);
+        this.cache.set(configKey, effectiveValue);
       }
-      return this.cache.get(cacheKey) as T;
+      return this.cache.get(configKey) as T;
     } catch (error) {
       Logger.error(`Error getting config ${configKey}:`, toError(error));
       return defaultValue;
