@@ -295,6 +295,7 @@
     "package:analyze": "npm run build:analyze && vsce package"
   },
   "devDependencies": {
+    "@eslint/js": "^10.0.1",
     "@types/node": "^25.3.5",
     "@types/vscode": "^1.93.0",
     "@typescript-eslint/eslint-plugin": "^8.57.0",
@@ -303,7 +304,7 @@
     "dotenv-webpack": "^9.0.0",
     "eslint": "^10.0.3",
     "eslint-import-resolver-typescript": "^4.4.4",
-    "eslint-plugin-import": "^2.32.0",
+    "eslint-plugin-import-x": "^4.16.2",
     "eslint-plugin-unused-imports": "^4.4.1",
     "terser-webpack-plugin": "^5.4.0",
     "ts-loader": "^9.5.4",

@@ -1,6 +1,6 @@
 import eslint from '@eslint/js';
 import tseslint from 'typescript-eslint';
-import importPlugin from 'eslint-plugin-import';
+import importPlugin from 'eslint-plugin-import-x';
 import unusedImportsPlugin from 'eslint-plugin-unused-imports';
 
 export default tseslint.config(
@@ -23,7 +23,7 @@ export default tseslint.config(
             }
         },
         settings: {
-            'import/resolver': {
+            'import-x/resolver': {
                 typescript: {
                     project: './tsconfig.json',
                     alwaysTryTypes: true
@@ -35,7 +35,7 @@ export default tseslint.config(
             }
         },
         plugins: {
-            'import': importPlugin,
+            'import-x': importPlugin,
             'unused-imports': unusedImportsPlugin
         },
         rules: {
@@ -94,7 +94,7 @@ export default tseslint.config(
             '@typescript-eslint/no-floating-promises': 'error',
             'no-trailing-spaces': 'error',
             'no-multiple-empty-lines': ['error', { max: 1 }],
-            'import/no-unresolved': 'error',
+            'import-x/no-unresolved': 'error',
             'unused-imports/no-unused-imports': 'error',
             'unused-imports/no-unused-vars': [
                 'warn',
