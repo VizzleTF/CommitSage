@@ -35,9 +35,9 @@ Get your API key:
   - Default: `gemini`
 
 - **Gemini Settings**:
-  - Model (`commitSage.gemini.model`): 
-    - Options: `auto`, `gemini-2.0-pro-exp`, `gemini-2.0-flash`, `gemini-2.0-flash-exp`, `gemini-2.0-flash-thinking-exp`, `gemini-2.0-flash-lite`, `gemini-2.5-pro`, `gemini-2.5-flash`, `gemini-2.5-flash-lite`
-    - Default: `gemini-2.0-flash`
+  - Model (`commitSage.gemini.model`):
+    - Options: `auto`, `gemini-2.0-flash`, `gemini-2.0-flash-001`, `gemini-2.0-flash-lite`, `gemini-2.0-flash-lite-001`, `gemini-2.5-pro`, `gemini-2.5-flash`, `gemini-2.5-flash-lite`
+    - Default: `auto`
   - **Auto Mode** (`auto`):
     - Automatically fetches the list of available Gemini models from the API
     - Tries each model sequentially until one succeeds
@@ -164,6 +164,25 @@ Settings are loaded in the following order (higher priority overrides lower):
 - Internet connection (except for Ollama)
 - API key for OpenAI/Codestral (if using those providers)
 
+## Documentation
+
+Detailed guides are available in the [`docs/`](docs/) directory:
+
+- [Providers](docs/providers.md) — setup and comparison of all AI providers
+- [Configuration Reference](docs/configuration.md) — all settings with defaults
+- [Commit Formats](docs/commit-formats.md) — format descriptions and examples
+- [Troubleshooting](docs/troubleshooting.md) — common errors and solutions
+- [Adding a Provider](docs/adding-providers.md) — contributor guide
+- [Adding a Language](docs/adding-languages.md) — contributor guide
+- [Adding a Format](docs/adding-formats.md) — contributor guide
+
+## Privacy & Security
+
+- **API keys** are stored in VS Code's secure storage (OS keychain), never in plain text files
+- **Code changes** are sent to the selected AI provider for analysis — do not use cloud providers on repositories containing secrets
+- **Ollama** runs locally — no data leaves your machine
+- **Telemetry** collects anonymous usage events (provider type, errors) to help improve the extension; disable via `commitSage.telemetry.enabled: false`
+
 ## License
 
 MIT
@@ -171,6 +190,8 @@ MIT
 ## Support
 
 If you encounter any issues or have suggestions, please [open an issue](https://github.com/VizzleTF/CommitSage/issues).
+
+For troubleshooting common problems, see [docs/troubleshooting.md](docs/troubleshooting.md).
 
 ---
 

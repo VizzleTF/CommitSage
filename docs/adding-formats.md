@@ -35,7 +35,9 @@ Example:
 
 Each template contains detailed instructions for the AI model in the target language. When writing translations, preserve the structure from existing templates (e.g., `conventional.ts`).
 
-The `CommitTemplate` type requires entries for all languages in `SUPPORTED_LANGUAGES` — the TypeScript compiler will flag any missing translations.
+The `CommitTemplate` type requires entries for **all 9 languages**: `english`, `russian`, `chinese`, `japanese`, `korean`, `german`, `french`, `spanish`, `portuguese`. The TypeScript compiler will flag any missing translations — `npm run compile` will fail until every language key is present.
+
+A complete template is not just one line — it includes format rules, commit type guidance, examples, and constraints written in the target language. Look at `src/templates/formats/conventional.ts` for a realistic example of the level of detail expected.
 
 ## 2. `src/templates/index.ts` — register the template
 
