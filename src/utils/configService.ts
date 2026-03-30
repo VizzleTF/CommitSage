@@ -16,7 +16,32 @@ export class ConfigService {
     null;
   private static disposables: vscode.Disposable[] = [];
 
+  private static migrateProjectConfig(): void {
+    const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
+    if (!workspaceFolder) {
+      return;
+    }
+
+    const legacyPath = path.join(workspaceFolder.uri.fsPath, ".commitsage");
+
+    try {
+      if (fs.existsSync(legacyPath) && fs.statSync(legacyPath).isFile()) {
+        const content = fs.readFileSync(legacyPath, "utf8");
+        // Validate JSON before migrating to avoid writing broken config
+        JSON.parse(content);
+        fs.unlinkSync(legacyPath);
+        fs.mkdirSync(legacyPath, { recursive: true });
+        fs.writeFileSync(path.join(legacyPath, "config.json"), content, "utf8");
+        Logger.log("Migrated .commitsage file to .commitsage/config.json");
+      }
+    } catch (error) {
+      Logger.error("Failed to migrate .commitsage config:", toError(error));
+    }
+  }
+
   static async initialize(context: vscode.ExtensionContext): Promise<void> {
+    this.migrateProjectConfig();
+
     const configListener = vscode.workspace.onDidChangeConfiguration(
       (event) => {
         if (event.affectsConfiguration("commitSage")) {
@@ -55,7 +80,7 @@ export class ConfigService {
       return;
     }
 
-    const pattern = new vscode.RelativePattern(workspaceFolder, ".commitsage");
+    const pattern = new vscode.RelativePattern(workspaceFolder, "{.commitsage,.commitsage/config.json}");
     this.projectConfigFileWatcher =
       vscode.workspace.createFileSystemWatcher(pattern);
 
@@ -80,6 +105,10 @@ export class ConfigService {
     Logger.log("Project configuration cache invalidated");
   }
 
+  static getProjectRootPath(): string | undefined {
+    return vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+  }
+
   private static getProjectConfig(): ProjectConfig | null {
     if (this.projectConfigCache !== null) {
       return this.projectConfigCache;
@@ -91,11 +120,19 @@ export class ConfigService {
       return this.projectConfigCache;
     }
 
-    const configPath = path.join(workspaceFolder.uri.fsPath, ".commitsage");
+    const rootPath = workspaceFolder.uri.fsPath;
+    // Support both legacy `.commitsage` file and new `.commitsage/config.json` directory layout
+    const legacyConfigPath = path.join(rootPath, ".commitsage");
+    const dirConfigPath = path.join(rootPath, ".commitsage", "config.json");
 
     try {
-      if (fs.existsSync(configPath)) {
-        const configContent = fs.readFileSync(configPath, "utf8");
+      if (fs.existsSync(dirConfigPath)) {
+        const configContent = fs.readFileSync(dirConfigPath, "utf8");
+        const config = JSON.parse(configContent) as ProjectConfig;
+        this.projectConfigCache = config;
+        Logger.log("Loaded project configuration from .commitsage/config.json");
+      } else if (fs.existsSync(legacyConfigPath) && fs.statSync(legacyConfigPath).isFile()) {
+        const configContent = fs.readFileSync(legacyConfigPath, "utf8");
         const config = JSON.parse(configContent) as ProjectConfig;
         this.projectConfigCache = config;
         Logger.log("Loaded project configuration from .commitsage file");
@@ -103,7 +140,7 @@ export class ConfigService {
         this.projectConfigCache = {};
       }
     } catch (error) {
-      Logger.error("Error reading .commitsage file:", toError(error));
+      Logger.error("Error reading .commitsage config:", toError(error));
       this.projectConfigCache = {};
     }
 
@@ -176,6 +213,10 @@ export class ConfigService {
 
   static getCommitLanguage(): string {
     return this.getConfig<string>("commit", "commitLanguage", "english");
+  }
+
+  static getCustomLanguageName(): string {
+    return this.getConfig<string>("commit", "customLanguageName", "");
   }
 
   static getCommitFormat(): string {

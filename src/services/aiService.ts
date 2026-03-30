@@ -22,7 +22,7 @@ export class AIService {
         }
 
         const truncatedDiff = this.truncateDiff(diff);
-        const prompt = PromptService.generatePrompt(truncatedDiff, blameAnalysis);
+        const prompt = await PromptService.generatePrompt(truncatedDiff, blameAnalysis, progress);
 
         progress.report({ message: "Generating commit message...", increment: 50 });
 

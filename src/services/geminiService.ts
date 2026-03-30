@@ -1,7 +1,7 @@
 import axios, { AxiosError } from 'axios';
 import { Logger } from '../utils/logger';
 import { ConfigService } from '../utils/configService';
-import { ProgressReporter, CommitMessage } from '../models/types';
+import { ProgressReporter, CommitMessage, GenerateOptions } from '../models/types';
 import { ApiKeyInvalidError } from '../models/errors';
 import { BaseAIService } from './baseAIService';
 import { HttpUtils } from '../utils/httpUtils';
@@ -67,7 +67,8 @@ export class GeminiService {
         prompt: string,
         progress: ProgressReporter,
         models: string[],
-        apiKey: string
+        apiKey: string,
+        options?: GenerateOptions
     ): Promise<CommitMessage> {
         const errors: Array<{ model: string; error: string; status?: number }> = [];
 
@@ -82,7 +83,9 @@ export class GeminiService {
 
                 const payload = {
                     contents: [{ parts: [{ text: prompt }] }],
-                    generationConfig: GEMINI_GENERATION_CONFIG
+                    generationConfig: options?.maxTokens
+                        ? { ...GEMINI_GENERATION_CONFIG, maxOutputTokens: options.maxTokens }
+                        : GEMINI_GENERATION_CONFIG
                 };
 
                 const requestConfig = HttpUtils.createRequestConfig(
@@ -116,7 +119,8 @@ export class GeminiService {
     static async generateCommitMessage(
         prompt: string,
         progress: ProgressReporter,
-        attempt: number = 1
+        attempt: number = 1,
+        options?: GenerateOptions
     ): Promise<CommitMessage> {
         try {
             const apiKey = await ApiKeyManager.getKey('gemini');
@@ -130,14 +134,16 @@ export class GeminiService {
                     throw new Error('No available Gemini models found');
                 }
 
-                return await this.tryGenerateWithModels(prompt, progress, availableModels, apiKey);
+                return await this.tryGenerateWithModels(prompt, progress, availableModels, apiKey, options);
             }
 
             const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${configuredModel}:generateContent?key=${apiKey}`;
 
             const payload = {
                 contents: [{ parts: [{ text: prompt }] }],
-                generationConfig: GEMINI_GENERATION_CONFIG
+                generationConfig: options?.maxTokens
+                    ? { ...GEMINI_GENERATION_CONFIG, maxOutputTokens: options.maxTokens }
+                    : GEMINI_GENERATION_CONFIG
             };
 
             await RetryUtils.updateProgressForAttempt(progress, attempt);
@@ -162,7 +168,7 @@ export class GeminiService {
                 prompt,
                 progress,
                 attempt,
-                this.generateCommitMessage.bind(this),
+                (p, pr, a) => this.generateCommitMessage(p, pr, a, options),
                 (err: Error) => BaseAIService.handleHttpError(err, 'Gemini API')
             );
         }

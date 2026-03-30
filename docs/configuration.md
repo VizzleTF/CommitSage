@@ -53,7 +53,8 @@ Settings are resolved in the following order (higher priority wins):
 
 | Setting | Type | Default | Description |
 |---------|------|---------|-------------|
-| `commitSage.commit.commitLanguage` | `string` | `"english"` | Language for generated messages: `english`, `russian`, `chinese`, `japanese`, `korean`, `german`, `french`, `spanish`, `portuguese` |
+| `commitSage.commit.commitLanguage` | `string` | `"english"` | Language for generated messages: `english`, `russian`, `chinese`, `japanese`, `korean`, `german`, `french`, `spanish`, `portuguese`, `custom` |
+| `commitSage.commit.customLanguageName` | `string` | `""` | Language name used when `commitLanguage` is `custom` (e.g. `"Ukrainian"`, `"Italian"`). The format template is translated by the LLM and cached in `.commitsage/translations.json`. See [custom-language.md](custom-language.md) |
 | `commitSage.commit.commitFormat` | `string` | `"conventional"` | Commit format: `conventional`, `angular`, `karma`, `semantic`, `emoji`, `emojiKarma`, `google`, `atom` |
 | `commitSage.commit.onlyStagedChanges` | `boolean` | `false` | When `true`, only analyzes staged changes. When `false`, uses staged if present, otherwise all changes |
 | `commitSage.commit.autoCommit` | `boolean` | `false` | Automatically commit after message generation |
@@ -73,9 +74,16 @@ Settings are resolved in the following order (higher priority wins):
 
 ---
 
-## Project Configuration File (`.commitsage`)
+## Project Configuration (`.commitsage`)
 
-Create a `.commitsage` JSON file in your project root to override settings per-project.
+CommitSage supports two layouts for project-level configuration:
+
+| Layout | When used |
+|--------|-----------|
+| `.commitsage` (single JSON file) | Legacy; still supported |
+| `.commitsage/config.json` (directory) | Used when custom language cache is active |
+
+Both are read automatically. If you use the [custom language](custom-language.md) feature, `.commitsage` is migrated to a directory transparently.
 
 **Create via Command Palette:** "Commit Sage: Create Project Configuration (.commitsage)"
 
@@ -88,6 +96,7 @@ Create a `.commitsage` JSON file in your project root to override settings per-p
   },
   "commit": {
     "commitLanguage": "english",
+    "customLanguageName": "",
     "commitFormat": "conventional",
     "useCustomInstructions": false,
     "customInstructions": "",
@@ -116,6 +125,19 @@ Create a `.commitsage` JSON file in your project root to override settings per-p
 }
 ```
 
+### Custom Language Example
+
+```json
+{
+  "commit": {
+    "commitLanguage": "custom",
+    "customLanguageName": "Ukrainian"
+  }
+}
+```
+
+On first use, this generates `.commitsage/language.json` with the translated template. See [custom-language.md](custom-language.md) for details.
+
 ### Partial Override Example
 
 You only need to include the keys you want to override. Omitted keys fall through to VS Code settings (workspace → global). For example, to switch a single project to Ollama with emoji commits:
@@ -133,7 +155,7 @@ You only need to include the keys you want to override. Omitted keys fall throug
 
 ### Notes
 
-- The file is automatically watched — changes take effect immediately without reloading VS Code
+- Config is automatically watched — changes take effect immediately without reloading VS Code
 - Invalid JSON will show an error notification (check for trailing commas or missing quotes)
 - API keys are **not** stored in this file — they are managed via VS Code's secure storage
 - You only need to include the settings you want to override; omitted settings fall through to VS Code settings
