@@ -144,7 +144,10 @@ jobs:
 
   notify:
     needs: [build, release, publish-vscode, publish-openvsx]
-    if: always() && needs.build.result == 'success'
+    if: >-
+      needs.release.result == 'success' &&
+      needs.publish-vscode.result == 'success' &&
+      needs.publish-openvsx.result == 'success'
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
