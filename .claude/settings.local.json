@@ -18,7 +18,10 @@
       "WebSearch",
       "WebFetch(domain:code.visualstudio.com)",
       "WebFetch(domain:www.eliostruyf.com)",
-      "Bash(npm install:*)"
+      "Bash(npm install:*)",
+      "Bash(gh pr:*)",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:devblogs.microsoft.com)"
     ]
   }
 }
