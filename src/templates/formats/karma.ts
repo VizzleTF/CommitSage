@@ -59,6 +59,51 @@ chore(ci): 更新部署脚本至 Node 16`,
 例：
 chore(ci): デプロイスクリプトをNode 16に更新`,
 
+    german: `Erstellen Sie eine Commit-Nachricht im Karma-Format:
+<Typ>(<Bereich>): <Nachricht>
+
+Typen:
+- feat: Neue Funktion
+- fix: Fehlerbehebung
+- docs: Dokumentationsänderung
+- style: Formatierung, fehlende Semikolons usw.
+- refactor: Code-Refactoring
+- test: Tests hinzufügen
+- chore: Wartung
+
+Beispiel:
+chore(ci): Deployment-Skript auf Node 16 aktualisieren`,
+
+    french: `Générez un message de commit au format Karma :
+<type>(<portée>): <message>
+
+Types :
+- feat: Nouvelle fonctionnalité
+- fix: Correction de bug
+- docs: Modification de documentation
+- style: Formatage, points-virgules manquants, etc.
+- refactor: Refactorisation de code
+- test: Ajout de tests
+- chore: Maintenance
+
+Exemple :
+chore(ci): mettre à jour le script de déploiement vers Node 16`,
+
+    korean: `Karma 형식에 따라 커밋 메시지를 생성하세요:
+<타입>(<범위>): <메시지>
+
+타입:
+- feat: 새 기능
+- fix: 버그 수정
+- docs: 문서 변경
+- style: 포맷팅, 세미콜론 누락 등
+- refactor: 코드 리팩토링
+- test: 테스트 추가
+- chore: 유지보수
+
+예시:
+chore(ci): 배포 스크립트를 Node 16으로 업데이트`,
+
     spanish: `Genera un mensaje de commit siguiendo el formato Karma:
 <tipo>(<ámbito>): <mensaje>
 

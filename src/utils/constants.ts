@@ -1,3 +1,6 @@
+export const SUPPORTED_LANGUAGES = ['english', 'russian', 'chinese', 'japanese', 'korean', 'german', 'french', 'spanish', 'portuguese'] as const;
+export type CommitLanguage = typeof SUPPORTED_LANGUAGES[number];
+
 export const errorMessages = {
     commandExecution: 'Error in command execution:',
     generateCommitMessage: 'Failed to generate commit message',

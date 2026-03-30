@@ -59,6 +59,51 @@ feat: 添加用户头像上传功能`,
 例：
 feat: ユーザーアバターのアップロード機能を追加`,
 
+    german: `Erstellen Sie eine Commit-Nachricht im semantischen Format:
+Typ: Nachricht
+
+Typen:
+- feat: Neue Funktion
+- fix: Fehlerbehebung
+- docs: Dokumentationsänderungen
+- style: Änderungen am Codestil
+- refactor: Code-Refactoring
+- test: Test-Aktualisierungen
+- chore: Änderungen am Build-Prozess oder Hilfswerkzeugen
+
+Beispiel:
+feat: Benutzer-Avatar-Upload-Funktion hinzufügen`,
+
+    french: `Générez un message de commit au format sémantique :
+type: message
+
+Types :
+- feat: Nouvelle fonctionnalité
+- fix: Correction de bug
+- docs: Modifications de documentation
+- style: Changements de style de code
+- refactor: Refactorisation de code
+- test: Mises à jour des tests
+- chore: Changements du processus de build ou des outils auxiliaires
+
+Exemple :
+feat: ajouter la fonctionnalité de téléchargement d'avatar utilisateur`,
+
+    korean: `시맨틱 형식에 따라 커밋 메시지를 생성하세요:
+타입: 메시지
+
+타입:
+- feat: 새 기능
+- fix: 버그 수정
+- docs: 문서 변경
+- style: 코드 스타일 변경
+- refactor: 코드 리팩토링
+- test: 테스트 업데이트
+- chore: 빌드 프로세스 또는 보조 도구 변경
+
+예시:
+feat: 사용자 아바타 업로드 기능 추가`,
+
     spanish: `Genera un mensaje de commit siguiendo el formato Semántico:
 tipo: mensaje
 

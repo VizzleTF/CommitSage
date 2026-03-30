@@ -131,6 +131,105 @@ refactor(core): データベースクエリを最適化
 - コネクションプーリングを追加
 - エラー処理を更新`,
 
+    german: `Erstellen Sie eine Commit-Nachricht im Angular-Format:
+<Typ>(<Bereich>): <Kurzbeschreibung>
+
+[optionaler Textkörper mit Aufzählungspunkten]
+
+Regeln:
+1. Erste Zeile: Typ(Bereich): Zusammenfassung (max. 50 Zeichen)
+2. Bei kleinen Änderungen nur die erste Zeile verwenden
+3. Bei komplexen Änderungen Kernpunkte im Textkörper auflisten:
+   - Jede Zeile beginnt mit "- "
+   - Jede Zeile max. 50 Zeichen
+
+Typen:
+build: Build/Abhängigkeiten
+ci: CI-Konfiguration
+docs: Dokumentation
+feat: Neue Funktion
+fix: Fehlerbehebung
+perf: Leistung
+refactor: Codeänderung
+test: Tests
+
+Beispiele:
+Kleine Änderung:
+feat(api): Datenvalidierungsmethode hinzufügen
+
+Komplexe Änderung:
+refactor(core): Datenbankabfragen optimieren
+
+- Query-Caching implementieren
+- Connection Pooling hinzufügen
+- Fehlerbehandlung aktualisieren`,
+
+    french: `Générez un message de commit au format Angular :
+<type>(<portée>): <résumé court>
+
+[corps optionnel avec liste à puces]
+
+Règles :
+1. Première ligne : type(portée): résumé (max 50 caractères)
+2. Pour les petits changements, utiliser uniquement la première ligne
+3. Pour les changements complexes, lister les points clés dans le corps :
+   - Chaque ligne commence par "- "
+   - Chaque ligne max 50 caractères
+
+Types :
+build: Build/dépendances
+ci: Configuration CI
+docs: Documentation
+feat: Nouvelle fonctionnalité
+fix: Correction de bug
+perf: Performance
+refactor: Modification de code
+test: Tests
+
+Exemples :
+Petit changement :
+feat(api): ajouter méthode de validation des données
+
+Changement complexe :
+refactor(core): optimiser les requêtes base de données
+
+- Implémenter le cache de requêtes
+- Ajouter le pool de connexions
+- Mettre à jour la gestion des erreurs`,
+
+    korean: `Angular 형식에 따라 커밋 메시지를 생성하세요:
+<타입>(<범위>): <짧은 요약>
+
+[선택적 본문 (글머리 기호)]
+
+규칙:
+1. 첫 번째 줄: 타입(범위): 요약 (최대 50자)
+2. 작은 변경은 첫 번째 줄만 사용
+3. 복잡한 변경은 본문에 핵심 사항을 나열:
+   - 각 줄은 "- "로 시작
+   - 각 줄 최대 50자
+
+타입:
+build: 빌드/종속성
+ci: CI 설정
+docs: 문서
+feat: 새 기능
+fix: 버그 수정
+perf: 성능
+refactor: 코드 변경
+test: 테스트
+
+예시:
+작은 변경:
+feat(api): 데이터 유효성 검사 메서드 추가
+
+복잡한 변경:
+refactor(core): 데이터베이스 쿼리 최적화
+
+- 쿼리 캐싱 구현
+- 연결 풀링 추가
+- 오류 처리 업데이트`,
+
     spanish: `Genera un mensaje de commit siguiendo el formato Angular:
 <tipo>(<ámbito>): <resumen corto>
 
