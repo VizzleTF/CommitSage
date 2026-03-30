@@ -208,7 +208,7 @@ export class ConfigService {
   }
 
   static getGeminiModel(): string {
-    return this.getConfig<string>("gemini", "model", "gemini-1.5-flash");
+    return this.getConfig<string>("gemini", "model", "auto");
   }
 
   static getCommitLanguage(): string {
