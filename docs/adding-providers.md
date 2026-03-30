@@ -4,6 +4,8 @@ Currently supported: `gemini`, `openai`, `codestral`, `ollama`.
 
 Adding a new provider requires changes in **7 areas**. The examples below use `anthropic`.
 
+> **Reference implementations:** Before starting, read an existing service — `src/services/openaiService.ts` is the best reference for HTTP-based providers. For providers that expose a model listing API (like Gemini), also look at `src/services/geminiService.ts` and the `IModelService` interface in `src/models/types.ts`.
+
 ---
 
 ## 1. `src/services/anthropicService.ts` — provider service
@@ -38,6 +40,25 @@ Key patterns to follow:
 - Report progress via `progress.report()`
 - Support retry logic via the `attempt` parameter
 - Respect `ConfigService.getApiRequestTimeout()` for request timeouts
+
+### Optional: `IModelService` interface
+
+If your provider supports fetching the list of available models dynamically (like Gemini), implement `IModelService` in addition to the service class:
+
+```typescript
+import { IModelService } from '../models/types';
+
+export class AnthropicService implements IModelService {
+    static async getAvailableModels(): Promise<string[]> {
+        // fetch and return model names from the provider API
+    }
+    // ...rest of the service
+}
+```
+
+This enables the `auto` model selection mode for your provider.
+
+---
 
 ## 2. `src/services/aiServiceFactory.ts` — register the provider
 
