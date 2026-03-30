@@ -135,6 +135,108 @@ Example:
 ✨ feat(auth): ユーザー認証システムを追加
 🐛 fix(api): トークン期限切れの問題を解決`,
 
+    german: `Erstellen Sie eine Commit-Nachricht im Emoji-Karma-Format:
+:emoji: Typ(Bereich): Nachricht
+
+Typen:
+- feat: Neue Funktion
+- fix: Fehlerbehebung
+- docs: Dokumentationsänderung
+- style: Formatierung, fehlende Semikolons usw.
+- refactor: Code-Refactoring
+- test: Tests hinzufügen
+- chore: Wartung
+
+Häufig verwendete Emojis (Gitmoji + Conventional Emoji Commits):
+✨ :sparkles: - Neue Funktion
+🐛 :bug: - Fehlerbehebung
+📝 :memo: - Dokumentationsaktualisierung
+🎨 :art: - Codestil-/Formatierungsänderungen
+♻️ :recycle: - Refactoring ohne Funktionsänderung
+🧪 :test_tube: - Tests hinzufügen oder ändern
+🛠️ :hammer_and_wrench: - Build/Werkzeuge/Abhängigkeiten
+🤖 :robot: - CI/CD-Konfiguration
+⚡️ :zap: - Leistungsoptimierung
+🔧 :wrench: - Wartung/Diverses
+🔒 :lock: - Sicherheitskorrekturen
+🚀 :rocket: - Release/Deployment
+🔥 :fire: - Code oder Dateien entfernen
+⬆️ :arrow_up: - Abhängigkeiten aktualisieren
+⬇️ :arrow_down: - Abhängigkeiten herunterstufen
+✅ :white_check_mark: - CI-Build reparieren
+
+Beispiele:
+✨ feat(auth): Benutzerauthentifizierungssystem hinzufügen
+🐛 fix(api): Token-Ablaufproblem beheben`,
+
+    french: `Générez un message de commit au format Emoji-Karma :
+:emoji: type(portée): message
+
+Types :
+- feat: Nouvelle fonctionnalité
+- fix: Correction de bug
+- docs: Modification de documentation
+- style: Formatage, points-virgules manquants, etc.
+- refactor: Refactorisation de code
+- test: Ajout de tests
+- chore: Maintenance
+
+Emojis courants (Gitmoji + Conventional Emoji Commits) :
+✨ :sparkles: - Nouvelle fonctionnalité
+🐛 :bug: - Correction de bug
+📝 :memo: - Mise à jour de documentation
+🎨 :art: - Changements de style/formatage de code
+♻️ :recycle: - Refactorisation sans changement de fonctionnalité
+🧪 :test_tube: - Ajout ou modification de tests
+🛠️ :hammer_and_wrench: - Build/outils/dépendances
+🤖 :robot: - Configuration CI/CD
+⚡️ :zap: - Optimisation des performances
+🔧 :wrench: - Maintenance/tâches diverses
+🔒 :lock: - Corrections de sécurité
+🚀 :rocket: - Release/déploiement
+🔥 :fire: - Suppression de code ou fichiers
+⬆️ :arrow_up: - Mise à jour des dépendances
+⬇️ :arrow_down: - Rétrogradation des dépendances
+✅ :white_check_mark: - Correction du build CI
+
+Exemples :
+✨ feat(auth): ajouter le système d'authentification utilisateur
+🐛 fix(api): résoudre le problème d'expiration du jeton`,
+
+    korean: `Emoji-Karma 형식에 따라 커밋 메시지를 생성하세요:
+:emoji: 타입(범위): 메시지
+
+타입:
+- feat: 새 기능
+- fix: 버그 수정
+- docs: 문서 변경
+- style: 포맷팅, 세미콜론 누락 등
+- refactor: 코드 리팩토링
+- test: 테스트 추가
+- chore: 유지보수
+
+자주 사용하는 이모지 (Gitmoji + Conventional Emoji Commits):
+✨ :sparkles: - 새 기능
+🐛 :bug: - 버그 수정
+📝 :memo: - 문서 업데이트
+🎨 :art: - 코드 스타일/포맷팅 변경
+♻️ :recycle: - 기능 변경 없는 리팩토링
+🧪 :test_tube: - 테스트 추가 또는 변경
+🛠️ :hammer_and_wrench: - 빌드/도구/종속성
+🤖 :robot: - CI/CD 설정
+⚡️ :zap: - 성능 최적화
+🔧 :wrench: - 유지보수/잡무
+🔒 :lock: - 보안 수정
+🚀 :rocket: - 릴리스/배포
+🔥 :fire: - 코드 또는 파일 삭제
+⬆️ :arrow_up: - 종속성 업그레이드
+⬇️ :arrow_down: - 종속성 다운그레이드
+✅ :white_check_mark: - CI 빌드 수정
+
+예시:
+✨ feat(auth): 사용자 인증 시스템 추가
+🐛 fix(api): 토큰 만료 문제 해결`,
+
     spanish: `Genera un mensaje de commit siguiendo el formato Emoji-Karma:
 :emoji: tipo(ámbito): mensaje
 

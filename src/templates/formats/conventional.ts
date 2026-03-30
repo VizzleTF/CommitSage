@@ -163,6 +163,129 @@ feat(auth): ユーザー認証を追加
 - 認証サービスモジュールを作成
 - セッション管理を追加`,
 
+    german: `Erstellen Sie eine Commit-Nachricht im Conventional Commits-Format:
+<Typ>[optionaler Bereich]: <Beschreibung>
+
+[optionaler Textkörper mit Aufzählungspunkten]
+
+Regeln:
+1. Erste Zeile: Typ(Bereich): Beschreibung (max. 50 Zeichen)
+2. Bei kleinen Änderungen nur die erste Zeile verwenden
+3. Bei komplexen Änderungen Kernpunkte im Textkörper auflisten:
+   - Jede Zeile beginnt mit "- "
+   - Jede Zeile max. 50 Zeichen
+   - Auf 5 Aufzählungspunkte begrenzen
+   - Änderungen prägnant zusammenfassen
+
+Regeln zur Typauswahl:
+- docs: ALLE Änderungen an Dokumentationsdateien (*.md, docs/*)
+- feat: Neue Funktionen oder bedeutende funktionale Änderungen
+- fix: Fehlerbehebungen und Korrekturen
+- style: Formatierung, Semikolons usw. (keine Codeänderung)
+- refactor: Codeänderungen ohne Fehlerbehebung oder neue Funktionen
+- perf: Leistungsverbesserungen
+- test: Tests hinzufügen oder aktualisieren
+- build: Build-System oder Abhängigkeiten
+- ci: CI/CD-Änderungen
+- chore: Sonstige Wartungsaufgaben
+
+Beispiele:
+Dokumentationsänderung:
+docs: Installations- und Nutzungsanleitungen aktualisieren
+
+- Beschreibung neuer Funktionen hinzugefügt
+- Konfigurationsabschnitt aktualisiert
+- Nutzungsbeispiele hinzugefügt
+
+Funktionsänderung:
+feat(auth): Benutzerauthentifizierung hinzufügen
+
+- OAuth2-Provider-Integration implementiert
+- Auth-Service-Modul erstellt
+- Sitzungsverwaltung hinzugefügt`,
+
+    french: `Générez un message de commit au format Conventional Commits :
+<type>[portée optionnelle]: <description>
+
+[corps optionnel avec liste à puces]
+
+Règles :
+1. Première ligne : type(portée): description (max 50 caractères)
+2. Pour les petits changements, utiliser uniquement la première ligne
+3. Pour les changements complexes, lister les points clés dans le corps :
+   - Chaque ligne commence par "- "
+   - Chaque ligne max 50 caractères
+   - Limiter à 5 puces
+   - Résumer les changements de manière concise
+
+Règles de sélection du type :
+- docs : TOUT changement dans les fichiers de documentation (*.md, docs/*)
+- feat : Nouvelles fonctionnalités ou changements fonctionnels significatifs
+- fix : Corrections de bugs et d'erreurs
+- style : Formatage, points-virgules, etc. (pas de changement de code)
+- refactor : Changements de code sans correction de bug ni ajout de fonctionnalité
+- perf : Améliorations des performances
+- test : Ajout ou mise à jour de tests
+- build : Système de build ou dépendances
+- ci : Changements CI/CD
+- chore : Autres tâches de maintenance
+
+Exemples :
+Changement de documentation :
+docs: mettre à jour les guides d'installation et d'utilisation
+
+- Ajout de la description des nouvelles fonctionnalités
+- Mise à jour de la section configuration
+- Ajout d'exemples d'utilisation
+
+Changement de fonctionnalité :
+feat(auth): ajouter l'authentification utilisateur
+
+- Intégration du fournisseur OAuth2 implémentée
+- Module de service d'authentification créé
+- Gestion des sessions ajoutée`,
+
+    korean: `Conventional Commits 형식에 따라 커밋 메시지를 생성하세요:
+<타입>[선택적 범위]: <설명>
+
+[선택적 본문 (글머리 기호)]
+
+규칙:
+1. 첫 번째 줄: 타입(범위): 설명 (최대 50자)
+2. 작은 변경은 첫 번째 줄만 사용
+3. 복잡한 변경은 본문에 핵심 사항을 나열:
+   - 각 줄은 "- "로 시작
+   - 각 줄 최대 50자
+   - 5개 항목으로 제한
+   - 변경 사항을 간결하게 요약
+
+타입 선택 규칙:
+- docs: 문서 파일의 모든 변경 (*.md, docs/*)
+- feat: 새로운 기능 또는 중요한 기능 변경
+- fix: 버그 수정 및 오류 수정
+- style: 포맷팅, 세미콜론 등 (코드 변경 없음)
+- refactor: 버그 수정이나 기능 추가 없는 코드 변경
+- perf: 성능 개선
+- test: 테스트 추가 또는 업데이트
+- build: 빌드 시스템 또는 종속성
+- ci: CI/CD 변경
+- chore: 기타 유지보수 작업
+
+예시:
+문서 변경:
+docs: 설치 및 사용 가이드 업데이트
+
+- 새로운 기능 설명 추가
+- 설정 섹션 업데이트
+- 사용 예시 추가
+
+기능 변경:
+feat(auth): 사용자 인증 추가
+
+- OAuth2 제공자 통합 구현
+- 인증 서비스 모듈 생성
+- 세션 관리 추가`,
+
     spanish: `Genera un mensaje de commit siguiendo el formato de Conventional Commits:
 <tipo>[ámbito opcional]: <descripción>
 

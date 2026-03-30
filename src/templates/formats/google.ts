@@ -119,6 +119,96 @@ JWTトークン管理とリフレッシュメカニズムを追加。
 #123を閉じる
 レビュー者：@teammate`,
 
+    german: `Erstellen Sie eine Commit-Nachricht im Google-Format:
+<Typ>: <Beschreibung>
+
+<Textkörper>
+
+<Fußzeile>
+
+Typen:
+- feat: Neue Funktion
+- fix: Fehlerbehebung
+- docs: Dokumentationsänderungen
+- style: Codestil-Änderungen (Formatierung, fehlende Semikolons usw.)
+- refactor: Code-Refactoring
+- test: Tests hinzufügen oder ändern
+- chore: Wartungsaufgaben
+- perf: Leistungsverbesserungen
+- ci: CI/CD-Änderungen
+- build: Build-System-Änderungen
+- revert: Vorherigen Commit rückgängig machen
+
+Beispiel:
+feat: Benutzerauthentifizierungssystem hinzufügen
+
+OAuth2-Integration mit Google- und GitHub-Providern implementiert.
+JWT-Token-Verwaltung und Aktualisierungsmechanismus hinzugefügt.
+Umfassende Testabdeckung für Auth-Flows eingebunden.
+
+Closes #123
+Reviewed-by: @teammate`,
+
+    french: `Générez un message de commit au format Google :
+<Type>: <Description>
+
+<Corps>
+
+<Pied de page>
+
+Types :
+- feat: Nouvelle fonctionnalité
+- fix: Correction de bug
+- docs: Modifications de documentation
+- style: Changements de style de code (formatage, points-virgules manquants, etc.)
+- refactor: Refactorisation de code
+- test: Ajout ou modification de tests
+- chore: Tâches de maintenance
+- perf: Améliorations des performances
+- ci: Changements CI/CD
+- build: Changements du système de build
+- revert: Annuler un commit précédent
+
+Exemple :
+feat: Ajouter le système d'authentification utilisateur
+
+Intégration OAuth2 avec les fournisseurs Google et GitHub implémentée.
+Gestion des jetons JWT et mécanisme de rafraîchissement ajoutés.
+Couverture de tests complète pour les flux d'authentification incluse.
+
+Closes #123
+Reviewed-by: @teammate`,
+
+    korean: `Google 형식에 따라 커밋 메시지를 생성하세요:
+<타입>: <설명>
+
+<본문>
+
+<꼬리말>
+
+타입:
+- feat: 새 기능
+- fix: 버그 수정
+- docs: 문서 변경
+- style: 코드 스타일 변경 (포맷팅, 세미콜론 누락 등)
+- refactor: 코드 리팩토링
+- test: 테스트 추가 또는 수정
+- chore: 유지보수 작업
+- perf: 성능 개선
+- ci: CI/CD 변경
+- build: 빌드 시스템 변경
+- revert: 이전 커밋 되돌리기
+
+예시:
+feat: 사용자 인증 시스템 추가
+
+Google 및 GitHub 제공자와 OAuth2 통합을 구현했습니다.
+JWT 토큰 관리 및 갱신 메커니즘을 추가했습니다.
+인증 흐름에 대한 포괄적인 테스트 커버리지를 포함했습니다.
+
+Closes #123
+Reviewed-by: @teammate`,
+
     spanish: `Genera un mensaje de commit siguiendo el formato Google:
 <Tipo>: <Descripción>
 

@@ -21,13 +21,13 @@ git checkout -b feature/your-feature-name
 ## Development
 
 1. Make your changes
-2. Test your changes:
+2. Build the extension:
 ```bash
-npm run test
+npm run compile
 ```
-3. Build the extension:
+3. Run the linter:
 ```bash
-npm run build
+npm run lint
 ```
 
 ## Submitting Changes
@@ -50,11 +50,18 @@ npm run build
 - Write clear commit messages
 - Add JSDoc comments for public APIs
 
+## Contributor Guides
+
+Detailed guides for common contribution tasks are available in the `docs/` directory:
+
+- [Adding a new language](docs/adding-languages.md)
+- [Adding a new commit format](docs/adding-formats.md)
+- [Adding a new AI provider](docs/adding-providers.md)
+
 ## Testing
 
-- Write unit tests for new features
-- Ensure all tests pass before submitting
-- Test your changes in VS Code
+- Test your changes in VS Code by pressing F5 to launch the Extension Development Host
+- Verify the extension compiles without errors (`npm run compile`)
 
 ## Documentation
 

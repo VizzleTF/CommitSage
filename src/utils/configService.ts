@@ -5,15 +5,9 @@ import { Logger } from "./logger";
 import { ProjectConfig } from "../models/types";
 import { toError } from "./errorUtils";
 
-type CacheValue = string | boolean | number;
+export type { CommitLanguage } from "./constants";
 
-export type CommitLanguage =
-  | "english"
-  | "russian"
-  | "chinese"
-  | "japanese"
-  | "spanish"
-  | "portuguese";
+type CacheValue = string | boolean | number;
 
 export class ConfigService {
   private static cache = new Map<string, CacheValue>();
