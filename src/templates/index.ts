@@ -6,22 +6,13 @@ import { emojiTemplate } from './formats/emoji';
 import { emojiKarmaTemplate } from './formats/emojiKarma';
 import { googleTemplate } from './formats/google';
 import { atomTemplate } from './formats/atom';
-import type { CommitLanguage } from '../utils/configService';
+import { SUPPORTED_LANGUAGES } from '../utils/constants';
+import type { CommitLanguage } from '../utils/constants';
 import { Logger } from '../utils/logger';
 
-export interface CommitTemplate {
-    english: string;
-    russian: string;
-    chinese: string;
-    japanese: string;
-    spanish: string;
-    portuguese: string;
-}
+export type CommitTemplate = Record<CommitLanguage, string>;
 
 export type CommitFormat = 'conventional' | 'angular' | 'karma' | 'semantic' | 'emoji' | 'emojiKarma' | 'google' | 'atom';
-
-const SUPPORTED_LANGUAGES = ['english', 'russian', 'chinese', 'japanese', 'spanish', 'portuguese'] as const;
-type SupportedLanguage = typeof SUPPORTED_LANGUAGES[number];
 
 const templates: Record<CommitFormat, CommitTemplate> = {
     conventional: conventionalTemplate,
@@ -37,8 +28,8 @@ const templates: Record<CommitFormat, CommitTemplate> = {
 const isValidFormat = (format: string): format is CommitFormat =>
     Object.keys(templates).includes(format);
 
-const isValidLanguage = (language: string): language is SupportedLanguage =>
-    SUPPORTED_LANGUAGES.includes(language as SupportedLanguage);
+const isValidLanguage = (language: string): language is CommitLanguage =>
+    SUPPORTED_LANGUAGES.includes(language as CommitLanguage);
 
 export function getTemplate(format: CommitFormat, language: CommitLanguage): string {
     if (!isValidFormat(format)) {

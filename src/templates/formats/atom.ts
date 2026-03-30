@@ -147,6 +147,117 @@ feat(auth): GoogleプロバイダーとのOAuth2統合を追加
 #123を閉じる
 破壊的変更：認証APIエンドポイントを更新`,
 
+    german: `Erstellen Sie eine Commit-Nachricht im Atom-Format:
+<Typ>(<Bereich>): <Betreff>
+
+<Textkörper>
+
+<Fußzeile>
+
+Typen:
+- feat: Neue Funktion
+- fix: Fehlerbehebung
+- docs: Dokumentationsänderungen
+- style: Codestil-Änderungen (Formatierung, fehlende Semikolons usw.)
+- refactor: Code-Refactoring
+- test: Tests hinzufügen oder ändern
+- chore: Wartungsaufgaben
+- perf: Leistungsverbesserungen
+- ci: CI/CD-Änderungen
+- build: Build-System-Änderungen
+- revert: Vorherigen Commit rückgängig machen
+
+Bereich (optional): Der betroffene Teil der Codebasis (z.B. auth, ui, api, core)
+
+Beispiel:
+feat(auth): OAuth2-Integration mit Google-Provider hinzufügen
+
+Vollständigen OAuth2-Flow implementiert, einschließlich:
+- Autorisierungscode-Austausch
+- Token-Aktualisierungsmechanismus
+- Benutzerprofil-Abruf
+- Sitzungsverwaltung
+
+Mit mehreren Benutzerszenarien und Grenzfällen getestet.
+Umfassende Fehlerbehandlung für Netzwerkausfälle hinzugefügt.
+
+Closes #123
+Breaking-change: Auth-API-Endpunkte aktualisiert`,
+
+    french: `Générez un message de commit au format Atom :
+<type>(<portée>): <sujet>
+
+<corps>
+
+<pied de page>
+
+Types :
+- feat: Nouvelle fonctionnalité
+- fix: Correction de bug
+- docs: Modifications de documentation
+- style: Changements de style de code (formatage, points-virgules manquants, etc.)
+- refactor: Refactorisation de code
+- test: Ajout ou modification de tests
+- chore: Tâches de maintenance
+- perf: Améliorations des performances
+- ci: Changements CI/CD
+- build: Changements du système de build
+- revert: Annuler un commit précédent
+
+Portée (optionnel) : La partie du code concernée (ex : auth, ui, api, core)
+
+Exemple :
+feat(auth): ajouter l'intégration OAuth2 avec le fournisseur Google
+
+Flux OAuth2 complet implémenté, incluant :
+- Échange de code d'autorisation
+- Mécanisme de rafraîchissement des jetons
+- Récupération du profil utilisateur
+- Gestion des sessions
+
+Testé avec plusieurs scénarios utilisateur et cas limites.
+Gestion complète des erreurs pour les pannes réseau ajoutée.
+
+Closes #123
+Breaking-change: Endpoints API d'authentification mis à jour`,
+
+    korean: `Atom 형식에 따라 커밋 메시지를 생성하세요:
+<타입>(<범위>): <제목>
+
+<본문>
+
+<꼬리말>
+
+타입:
+- feat: 새 기능
+- fix: 버그 수정
+- docs: 문서 변경
+- style: 코드 스타일 변경 (포맷팅, 세미콜론 누락 등)
+- refactor: 코드 리팩토링
+- test: 테스트 추가 또는 수정
+- chore: 유지보수 작업
+- perf: 성능 개선
+- ci: CI/CD 변경
+- build: 빌드 시스템 변경
+- revert: 이전 커밋 되돌리기
+
+범위 (선택): 영향을 받는 코드베이스 부분 (예: auth, ui, api, core)
+
+예시:
+feat(auth): Google 제공자와 OAuth2 통합 추가
+
+다음을 포함한 전체 OAuth2 흐름을 구현:
+- 인증 코드 교환
+- 토큰 갱신 메커니즘
+- 사용자 프로필 조회
+- 세션 관리
+
+여러 사용자 시나리오와 엣지 케이스로 테스트 완료.
+네트워크 장애에 대한 포괄적인 오류 처리 추가.
+
+Closes #123
+Breaking-change: 인증 API 엔드포인트 업데이트`,
+
     spanish: `Genera un mensaje de commit siguiendo el formato Atom:
 <tipo>(<ámbito>): <asunto>
 

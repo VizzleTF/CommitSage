@@ -1,3 +1,5 @@
+import type { CommitLanguage } from '../utils/constants';
+
 export interface CommitMessage {
     message: string;
     model: string;
@@ -45,7 +47,7 @@ export interface ProjectConfig {
         type?: 'gemini' | 'codestral' | 'openai' | 'ollama';
     };
     commit?: {
-        commitLanguage?: 'english' | 'russian' | 'chinese' | 'japanese' | 'spanish' | 'portuguese';
+        commitLanguage?: CommitLanguage;
         commitFormat?: 'conventional' | 'angular' | 'karma' | 'semantic' | 'emoji' | 'emojiKarma' | 'google' | 'atom';
         useCustomInstructions?: boolean;
         customInstructions?: string;
