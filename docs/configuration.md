@@ -116,12 +116,29 @@ Create a `.commitsage` JSON file in your project root to override settings per-p
 }
 ```
 
+### Partial Override Example
+
+You only need to include the keys you want to override. Omitted keys fall through to VS Code settings (workspace → global). For example, to switch a single project to Ollama with emoji commits:
+
+```json
+{
+  "provider": {
+    "type": "ollama"
+  },
+  "commit": {
+    "commitFormat": "emoji"
+  }
+}
+```
+
 ### Notes
 
 - The file is automatically watched — changes take effect immediately without reloading VS Code
-- Invalid JSON will show an error notification
+- Invalid JSON will show an error notification (check for trailing commas or missing quotes)
 - API keys are **not** stored in this file — they are managed via VS Code's secure storage
 - You only need to include the settings you want to override; omitted settings fall through to VS Code settings
+
+For troubleshooting configuration problems, see [troubleshooting.md](troubleshooting.md).
 
 ---
 
