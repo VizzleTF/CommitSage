@@ -1,6 +1,6 @@
 import axios, { AxiosError } from 'axios';
 import { Logger } from '../utils/logger';
-import { CommitMessage, ProgressReporter } from '../models/types';
+import { CommitMessage, ProgressReporter, GenerateOptions } from '../models/types';
 import { ConfigService } from '../utils/configService';
 import { BaseAIService } from './baseAIService';
 import { HttpUtils } from '../utils/httpUtils';
@@ -22,7 +22,8 @@ export class OllamaService {
     static async generateCommitMessage(
         prompt: string,
         progress: ProgressReporter,
-        attempt: number = 1
+        attempt: number = 1,
+        _options?: GenerateOptions
     ): Promise<CommitMessage> {
         const baseUrl = ConfigService.getOllamaBaseUrl() || 'http://localhost:11434';
         const model = ConfigService.getOllamaModel() || this.defaultModel;

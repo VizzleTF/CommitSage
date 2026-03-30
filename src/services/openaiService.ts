@@ -1,7 +1,7 @@
 import axios, { AxiosError } from 'axios';
 import { Logger } from '../utils/logger';
 import { ConfigService } from '../utils/configService';
-import { ProgressReporter, CommitMessage } from '../models/types';
+import { ProgressReporter, CommitMessage, GenerateOptions } from '../models/types';
 import { OpenAIError, ApiKeyInvalidError } from '../models/errors';
 import { BaseAIService } from './baseAIService';
 import { HttpUtils } from '../utils/httpUtils';
@@ -33,7 +33,8 @@ export class OpenAIService {
     static async generateCommitMessage(
         prompt: string,
         progress: ProgressReporter,
-        attempt: number = 1
+        attempt: number = 1,
+        options?: GenerateOptions
     ): Promise<CommitMessage> {
         try {
             const apiKey = await ApiKeyManager.getKey('openai');
@@ -44,7 +45,7 @@ export class OpenAIService {
                 model,
                 messages: [{ role: "user", content: prompt }],
                 temperature: 0.7,
-                maxTokens: 1024
+                maxTokens: options?.maxTokens ?? 1024
             };
 
             await RetryUtils.updateProgressForAttempt(progress, attempt);
@@ -75,7 +76,7 @@ export class OpenAIService {
                 prompt,
                 progress,
                 attempt,
-                this.generateCommitMessage.bind(this),
+                (p, pr, a) => this.generateCommitMessage(p, pr, a, options),
                 (err: Error) => BaseAIService.handleHttpError(err, 'OpenAI API')
             );
         }
