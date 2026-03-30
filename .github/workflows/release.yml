@@ -6,257 +6,186 @@ on:
       - 'v*'
 
 permissions:
-  contents: write
-  packages: write
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
 
 jobs:
   build:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
+    outputs:
+      version: ${{ steps.get_version.outputs.VERSION }}
+      notes: ${{ steps.release_notes.outputs.NOTES }}
+      telegram_msg: ${{ steps.release_notes.outputs.TELEGRAM_MSG }}
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v6
-      with:
-        fetch-depth: 0
+      - name: Checkout code
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          fetch-depth: 0
 
-    - name: Setup Node.js
-      uses: actions/setup-node@v6
-      with:
-        node-version: '20'
+      - name: Setup Node.js
+        uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6
+        with:
+          node-version: '20'
+          cache: 'npm'
 
-    - name: Install dependencies
-      run: |
-        npm ci
-        sudo apt-get update && sudo apt-get install -y jq
+      - name: Install dependencies
+        run: npm ci
 
-    - name: Set API Key
-      run: |
-        mkdir -p src/constants
-        echo "export const AMPLITUDE_API_KEY = '${{ secrets.AMPLITUDE_API_KEY }}';" > src/constants/apiKeys.ts
+      - name: Set API Key
+        run: |
+          mkdir -p src/constants
+          echo "export const AMPLITUDE_API_KEY = '${{ secrets.AMPLITUDE_API_KEY }}';" > src/constants/apiKeys.ts
 
-    - name: Build
-      run: npm run compile
+      - name: Build
+        run: npm run compile
 
-    - name: Package Extension
-      run: npm run package
+      - name: Package Extension
+        run: npm run package
 
-    - name: Get version from package.json
-      id: get_version
-      run: echo "VERSION=$(node -p "require('./package.json').version")" >> $GITHUB_OUTPUT
+      - name: Get version from package.json
+        id: get_version
+        run: echo "VERSION=$(node -p "require('./package.json').version")" >> $GITHUB_OUTPUT
 
-    - name: Generate Release Notes
-      id: release_notes
-      run: |
-        LATEST_TAG=$(git describe --tags --abbrev=0)
-        SECOND_LATEST_TAG=$(git describe --tags --abbrev=0 $LATEST_TAG^)
-        
-        # Получаем список изменений и очищаем его
-        CHANGES=$(git log $SECOND_LATEST_TAG..$LATEST_TAG --pretty=format:"- %s")
-        # Удаляем экранированные переносы строк и "Changes:"
-        CLEAN_CHANGES=$(echo "$CHANGES" | sed 's/\\n/\n/g' | sed 's/^Changes://g')
-        
-        # Экранируем обратные кавычки для предотвращения ошибок синтаксиса JavaScript
-        ESCAPED_CHANGES=$(echo "$CLEAN_CHANGES" | sed 's/`/\\`/g')
-        
-        # Определяем тип релиза
-        if echo "$CLEAN_CHANGES" | grep -q "security patch release"; then
-          PREFIX="*🔒 Security Update!*"
-          RELEASE_NOTE="This release contains important security updates."
-        else
-          PREFIX="*🚀 New Release!*"
-          RELEASE_NOTE=""
-        fi
-        
-        # AI суммаризация changelog с помощью Gemini
-        if [ -n "${{ secrets.GEMINI_API_KEY }}" ]; then
-          echo "🤖 Генерируем AI-суммаризацию changelog..."
-          
-          echo '{
-            "contents": [
-              {
-                "parts": [
-                  {
-                    "text": "Extract only the most important changes from this VS Code extension changelog. Return ONLY bullet points, NO introductory text, NO explanations. Format: • description with emoji. Maximum 5 points. Use English. Start immediately with the first bullet point.\n\nChangelog:\nCHANGELOG_PLACEHOLDER"
-                  }
-                ]
-              }
-            ],
-            "generationConfig": {
-              "temperature": 0.3,
-              "maxOutputTokens": 200
-            }
-          }' > ai_prompt.json
-          
-          # Заменяем placeholder на реальный changelog
-          ESCAPED_CHANGELOG=$(echo "$CLEAN_CHANGES" | sed 's/"/\\"/g' | sed 's/$/\\n/g' | tr -d '\n' | sed 's/\\n$//')
-          sed -i "s|CHANGELOG_PLACEHOLDER|$ESCAPED_CHANGELOG|g" ai_prompt.json
-          
-          # Вызываем Gemini API с улучшенной обработкой ошибок
-          RESPONSE=$(curl -s -w "HTTPSTATUS:%{http_code}" -X POST \
-            "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=${{ secrets.GEMINI_API_KEY }}" \
-            -H "Content-Type: application/json" \
-            -d @ai_prompt.json)
-          
-          # Извлекаем HTTP статус и тело ответа
-          HTTP_STATUS=$(echo "$RESPONSE" | grep -o "HTTPSTATUS:[0-9]*" | cut -d: -f2)
-          RESPONSE_BODY=$(echo "$RESPONSE" | sed -E 's/HTTPSTATUS:[0-9]*$//')
-          
-          echo "📊 Gemini API HTTP статус: $HTTP_STATUS"
-          
-          if [ "$HTTP_STATUS" -eq 200 ]; then
-            AI_SUMMARY=$(echo "$RESPONSE_BODY" | jq -r '.candidates[0].content.parts[0].text // empty' 2>/dev/null)
-            
-            # Проверяем успешность AI обработки
-            if [ -n "$AI_SUMMARY" ] && [ "$AI_SUMMARY" != "null" ] && [ "$AI_SUMMARY" != "empty" ]; then
-              echo "✅ AI суммаризация успешна"
-              SUMMARIZED_CHANGES="$AI_SUMMARY"
-            else
-              echo "⚠️ AI вернула пустой ответ, используем сокращенную версию"
-              SUMMARIZED_CHANGES=$(echo "$CLEAN_CHANGES" | head -5 | sed 's/^- /• /')
-            fi
-          else
-            echo "⚠️ Ошибка Gemini API (HTTP: $HTTP_STATUS), используем сокращенную версию"
-            echo "Ответ API: $(echo "$RESPONSE_BODY" | head -c 200)..."
-            SUMMARIZED_CHANGES=$(echo "$CLEAN_CHANGES" | head -5 | sed 's/^- /• /')
-          fi
-          
-          # Очистка временных файлов
-          rm -f ai_prompt.json
-        else
-          echo "📝 Используем сокращенную версию changelog"
-          SUMMARIZED_CHANGES=$(echo "$CLEAN_CHANGES" | head -5 | sed 's/^- /• /')
-        fi
-        
-        # Экранируем специальные символы HTML для Telegram
-        escape_html() {
-          echo "$1" | sed -e 's/&/\&amp;/g' -e 's/</\&lt;/g' -e 's/>/\&gt;/g'
-        }
-        
-        # Экранируем содержимое изменений
-        ESCAPED_SUMMARIZED_CHANGES=$(escape_html "$SUMMARIZED_CHANGES")
-        ESCAPED_TAG=$(escape_html "$LATEST_TAG")
-        
-        # Создаем Telegram сообщение в HTML формате
-        printf '%s\n' \
-          "🎉 <b>CommitSage ${ESCAPED_TAG}</b>" \
-          "" \
-          "✨ <b>What's New:</b>" \
-          "$ESCAPED_SUMMARIZED_CHANGES" \
-          "" \
-          "📦 <b>Download:</b>" \
-          "• <a href=\"https://marketplace.visualstudio.com/items?itemName=VizzleTF.geminicommit\">VS Code Marketplace</a>" \
-          "• <a href=\"https://open-vsx.org/extension/VizzleTF/geminicommit\">Open VSX Registry</a>" \
-          "" \
-          "💬 <a href=\"https://t.me/gemini_commit\">Join community chat</a>" \
-          "#CommitSage #vscode #ai" > telegram_message.txt
-        
-        # Проверяем длину сообщения (лимит Telegram 4096 символов)
-        MSG_LENGTH=$(wc -c < telegram_message.txt)
-        if [ $MSG_LENGTH -gt 4000 ]; then
-          echo "⚠️ Сообщение слишком длинное ($MSG_LENGTH символов), обрезаем..."
-          head -c 3900 telegram_message.txt > telegram_message_short.txt
-          echo "..." >> telegram_message_short.txt
-          mv telegram_message_short.txt telegram_message.txt
-        fi
-        
-        echo "TELEGRAM_MSG<<EOF" >> $GITHUB_OUTPUT
-        cat telegram_message.txt >> $GITHUB_OUTPUT
-        echo "EOF" >> $GITHUB_OUTPUT
-        
-        if [ -n "$RELEASE_NOTE" ]; then
-          echo "NOTES<<EOF" >> $GITHUB_OUTPUT
-          echo "$RELEASE_NOTE" >> $GITHUB_OUTPUT
-          echo "" >> $GITHUB_OUTPUT
-          echo "Changes:" >> $GITHUB_OUTPUT
-          echo "$ESCAPED_CHANGES" >> $GITHUB_OUTPUT
-          echo "EOF" >> $GITHUB_OUTPUT
-        else
-          echo "NOTES<<EOF" >> $GITHUB_OUTPUT
-          echo "Changes:" >> $GITHUB_OUTPUT
-          echo "$ESCAPED_CHANGES" >> $GITHUB_OUTPUT
-          echo "EOF" >> $GITHUB_OUTPUT
-        fi
+      - name: Generate Release Notes
+        id: release_notes
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: bash .github/scripts/generate-release-notes.sh
 
-    - name: Create Release
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        VERSION: ${{ steps.get_version.outputs.VERSION }}
-      uses: actions/github-script@v8
-      with:
-        script: |
-          const fs = require('fs');
-          const { repo: { owner, repo }, sha } = context;
-          const tag = context.ref.substring(10); // remove 'refs/tags/'
-          console.log(`Creating release for version ${process.env.VERSION}`);
-          
-          // Get release notes and sanitize any backtick characters 
-          const releaseNotes = `${{ steps.release_notes.outputs.NOTES }}`.replace(/`/g, '\\`');
-          
-          const release = await github.rest.repos.createRelease({
-            owner,
-            repo,
-            tag_name: tag,
-            name: `Release ${tag}`,
-            body: releaseNotes,
-            draft: false,
-            prerelease: false
-          });
-          
-          const vsixFile = `geminicommit-${process.env.VERSION}.vsix`;
-          console.log(`Looking for file: ${vsixFile}`);
-          
-          if (fs.existsSync(vsixFile)) {
-            const asset = await github.rest.repos.uploadReleaseAsset({
+      - name: Upload VSIX artifact
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: vsix
+          path: '*.vsix'
+          retention-days: 30
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - name: Download VSIX artifact
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: vsix
+
+      - name: Create Release
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8
+        env:
+          VERSION: ${{ needs.build.outputs.version }}
+          RELEASE_NOTES: ${{ needs.build.outputs.notes }}
+        with:
+          script: |
+            const fs = require('fs');
+            const { repo: { owner, repo } } = context;
+            const tag = context.ref.substring(10);
+            const version = process.env.VERSION;
+            const releaseNotes = process.env.RELEASE_NOTES;
+
+            const release = await github.rest.repos.createRelease({
               owner,
               repo,
-              release_id: release.data.id,
-              name: vsixFile,
-              data: fs.readFileSync(vsixFile)
+              tag_name: tag,
+              name: `Release ${tag}`,
+              body: releaseNotes,
+              draft: false,
+              prerelease: false
             });
-            console.log(`Asset uploaded: ${asset.data.browser_download_url}`);
-          } else {
-            console.error(`File not found: ${vsixFile}`);
-            core.setFailed(`VSIX file not found: ${vsixFile}`);
-          }
 
-    - name: Publish to Visual Studio Marketplace
-      env:
-        VSCE_PAT: ${{ secrets.VS_MARKETPLACE_TOKEN }}
-      run: npx vsce publish -p $VSCE_PAT
+            const vsixFile = `geminicommit-${version}.vsix`;
+            if (fs.existsSync(vsixFile)) {
+              const asset = await github.rest.repos.uploadReleaseAsset({
+                owner,
+                repo,
+                release_id: release.data.id,
+                name: vsixFile,
+                data: fs.readFileSync(vsixFile)
+              });
+              console.log(`Asset uploaded: ${asset.data.browser_download_url}`);
+            } else {
+              core.setFailed(`VSIX file not found: ${vsixFile}`);
+            }
 
-    - name: Install ovsx CLI
-      run: npm install -g ovsx
+  publish-vscode:
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Download VSIX artifact
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: vsix
 
-    - name: Publish to Open VSX Registry
-      env:
-        OVSX_PAT: ${{ secrets.OPEN_VSX_TOKEN }}
-      run: ovsx publish -p $OVSX_PAT
+      - name: Publish to Visual Studio Marketplace
+        env:
+          VSCE_PAT: ${{ secrets.VS_MARKETPLACE_TOKEN }}
+        run: npx @vscode/vsce publish --packagePath "geminicommit-${{ needs.build.outputs.version }}.vsix" -p "$VSCE_PAT"
 
-    - name: Send Telegram Notification
-      if: success()
-      uses: appleboy/telegram-action@master
-      with:
-        to: ${{ secrets.TELEGRAM_CHAT_ID }}
-        token: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-        format: html
-        message_file: telegram_message.txt
+  publish-openvsx:
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Download VSIX artifact
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: vsix
 
-    - name: Notify on Security Release
-      if: ${{ contains(steps.release_notes.outputs.NOTES, '🔒 Security Patch Release') }}
-      uses: actions/github-script@v8
-      with:
-        script: |
-          // Sanitize release notes to handle backticks properly
-          const releaseNotes = `${{ steps.release_notes.outputs.NOTES }}`.replace(/`/g, '\\`');
-          
-          const issue = await github.rest.issues.create({
-            owner: context.repo.owner,
-            repo: context.repo.repo,
-            title: `Security Release v${process.env.VERSION} Published`,
-            body: `A new security patch release v${process.env.VERSION} has been published to address critical vulnerabilities.
-                  
-                  Release Notes:
-                  ${releaseNotes}
-                  
-                  The extension has been automatically updated in the Visual Studio Marketplace.`,
-                        labels: ['security']
-          });
+      - name: Publish to Open VSX Registry
+        env:
+          OVSX_PAT: ${{ secrets.OPEN_VSX_TOKEN }}
+        run: npx ovsx publish "geminicommit-${{ needs.build.outputs.version }}.vsix" -p "$OVSX_PAT"
+
+  notify:
+    needs: [build, release, publish-vscode, publish-openvsx]
+    if: always() && needs.build.result == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    steps:
+      - name: Write Telegram message
+        env:
+          MSG: ${{ needs.build.outputs.telegram_msg }}
+        run: printf '%s\n' "$MSG" > telegram_message.txt
+
+      - name: Send Telegram Notification
+        continue-on-error: true
+        uses: appleboy/telegram-action@221e6b684967abe813051ee4a37dd61770a83ad3 # v1.0.1
+        with:
+          to: ${{ secrets.TELEGRAM_CHAT_ID }}
+          token: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          format: html
+          message_file: telegram_message.txt
+
+      - name: Notify on Security Release
+        if: contains(needs.build.outputs.notes, 'important security updates')
+        continue-on-error: true
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8
+        env:
+          VERSION: ${{ needs.build.outputs.version }}
+          RELEASE_NOTES: ${{ needs.build.outputs.notes }}
+        with:
+          script: |
+            const version = process.env.VERSION;
+            const releaseNotes = process.env.RELEASE_NOTES;
+            await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: `Security Release v${version} Published`,
+              body: [
+                `A new security patch release v${version} has been published.`,
+                '',
+                'Release Notes:',
+                releaseNotes,
+                '',
+                'The extension has been automatically updated in the Visual Studio Marketplace.'
+              ].join('\n'),
+              labels: ['security']
+            });
