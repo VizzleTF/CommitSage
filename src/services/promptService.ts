@@ -1,8 +1,10 @@
 import { CommitFormat, getTemplate } from '../templates';
 import { ConfigService } from '../utils/configService';
+import { CustomLanguageService } from './customLanguageService';
 import type { CommitLanguage } from '../utils/constants';
+import type { ProgressReporter } from '../models/types';
 
-const LANGUAGE_PROMPTS: Record<CommitLanguage, string> = {
+const LANGUAGE_PROMPTS: Record<Exclude<CommitLanguage, 'custom'>, string> = {
     english: 'Please write the commit message in English.',
     russian: 'Пожалуйста, напиши сообщение коммита на русском языке.',
     chinese: '请用中文写提交信息。',
@@ -15,7 +17,7 @@ const LANGUAGE_PROMPTS: Record<CommitLanguage, string> = {
 };
 
 export class PromptService {
-    static generatePrompt(diff: string, blameAnalysis: string): string {
+    static async generatePrompt(diff: string, blameAnalysis: string, progress: ProgressReporter): Promise<string> {
         const useCustomInstructions = ConfigService.useCustomInstructions();
         const customInstructions = ConfigService.getCustomInstructions();
 
@@ -32,9 +34,22 @@ Please provide ONLY the commit message, without any additional text or explanati
         }
 
         const format = ConfigService.getCommitFormat() as CommitFormat;
-        const commitLanguage = ConfigService.getCommitLanguage() as CommitLanguage;
-        const languagePrompt = LANGUAGE_PROMPTS[commitLanguage] ?? LANGUAGE_PROMPTS.english;
-        const template = getTemplate(format, commitLanguage);
+        const commitLanguage = ConfigService.getCommitLanguage();
+
+        let template: string;
+        let languagePrompt: string;
+
+        if (commitLanguage === 'custom') {
+            const customLanguageName = ConfigService.getCustomLanguageName();
+            template = await CustomLanguageService.getTemplate(format, customLanguageName, progress);
+            languagePrompt = customLanguageName.trim()
+                ? `Please write the commit message in ${customLanguageName}.`
+                : LANGUAGE_PROMPTS.english;
+        } else {
+            const lang = commitLanguage as Exclude<CommitLanguage, 'custom'>;
+            template = getTemplate(format, lang);
+            languagePrompt = LANGUAGE_PROMPTS[lang] ?? LANGUAGE_PROMPTS.english;
+        }
 
         return `${template}
 

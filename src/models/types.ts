@@ -13,11 +13,16 @@ export interface ProgressReporter {
  * Базовый интерфейс для всех AI сервисов
  * Определяет основной контракт для генерации commit сообщений
  */
+export interface GenerateOptions {
+    maxTokens?: number;
+}
+
 export interface IAIService {
     generateCommitMessage(
         prompt: string,
         progress: ProgressReporter,
-        attempt?: number
+        attempt?: number,
+        options?: GenerateOptions
     ): Promise<CommitMessage>;
 }
 
@@ -47,7 +52,8 @@ export interface ProjectConfig {
         type?: 'gemini' | 'codestral' | 'openai' | 'ollama';
     };
     commit?: {
-        commitLanguage?: CommitLanguage;
+        commitLanguage?: CommitLanguage | 'custom';
+        customLanguageName?: string;
         commitFormat?: 'conventional' | 'angular' | 'karma' | 'semantic' | 'emoji' | 'emojiKarma' | 'google' | 'atom';
         useCustomInstructions?: boolean;
         customInstructions?: string;

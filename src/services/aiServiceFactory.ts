@@ -1,4 +1,4 @@
-import { CommitMessage, ProgressReporter } from '../models/types';
+import { CommitMessage, ProgressReporter, GenerateOptions } from '../models/types';
 import { GeminiService } from './geminiService';
 import { OpenAIService } from './openaiService';
 import { CodestralService } from './codestralService';
@@ -21,7 +21,8 @@ type AIServiceClass = {
     generateCommitMessage(
         prompt: string,
         progress: ProgressReporter,
-        attempt?: number
+        attempt?: number,
+        options?: GenerateOptions
     ): Promise<CommitMessage>;
 };
 
@@ -51,9 +52,10 @@ export class AIServiceFactory {
         type: AIServiceType,
         prompt: string,
         progress: ProgressReporter,
-        attempt?: number
+        attempt?: number,
+        options?: GenerateOptions
     ): Promise<CommitMessage> {
         const service = this.getService(type);
-        return service.generateCommitMessage(prompt, progress, attempt);
+        return service.generateCommitMessage(prompt, progress, attempt, options);
     }
 }

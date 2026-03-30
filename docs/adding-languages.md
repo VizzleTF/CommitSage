@@ -2,7 +2,11 @@
 
 Currently supported: `english`, `russian`, `chinese`, `japanese`, `korean`, `german`, `french`, `spanish`, `portuguese`.
 
-The single source of truth is the `SUPPORTED_LANGUAGES` array in `src/utils/constants.ts`. The `CommitLanguage` type and `CommitTemplate` interface are derived from it automatically, so the TypeScript compiler enforces translation completeness across all templates.
+There is also a special `custom` value — it is not a bundled language but a runtime feature that translates templates on-demand via the LLM. See [custom-language.md](custom-language.md) for that.
+
+The single source of truth for bundled languages is the `SUPPORTED_LANGUAGES` array in `src/utils/constants.ts`. The `CommitLanguage` type and `CommitTemplate` interface are derived from it automatically, so the TypeScript compiler enforces translation completeness across all templates.
+
+> **Note:** `CommitTemplate` is typed as `Record<Exclude<CommitLanguage, 'custom'>, string>` — the `custom` value is intentionally excluded from template objects since it has no static translation.
 
 Adding a new language requires changes in **5 files**. The examples below use `italian`.
 

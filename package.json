@@ -146,11 +146,30 @@
             "german",
             "french",
             "spanish",
-            "portuguese"
+            "portuguese",
+            "custom"
+          ],
+          "enumDescriptions": [
+            "English",
+            "Russian",
+            "Chinese",
+            "Japanese",
+            "Korean",
+            "German",
+            "French",
+            "Spanish",
+            "Portuguese",
+            "Custom language — specify the language name in the 'Custom Language Name' setting below"
           ],
           "default": "english",
           "description": "Language for generated commit messages. Some commit formats may have limited support for non-English languages",
           "order": 2
+        },
+        "commitSage.commit.customLanguageName": {
+          "type": "string",
+          "default": "",
+          "description": "Language name to use when 'custom' is selected as the commit language (e.g. 'Ukrainian', 'Italian', 'Arabic'). The format template will be translated to this language via LLM and cached in .commitsage/language.json",
+          "order": 3
         },
         "commitSage.commit.commitFormat": {
           "type": "string",
@@ -176,44 +195,44 @@
           ],
           "default": "conventional",
           "description": "Format style for commit messages. All formats support English, some may have limited support for other languages",
-          "order": 3
+          "order": 4
         },
         "commitSage.commit.useCustomInstructions": {
           "type": "boolean",
           "default": false,
           "description": "Use custom instructions for commit message generation. When enabled, customInstructions must not be empty",
-          "order": 4
+          "order": 5
         },
         "commitSage.commit.customInstructions": {
           "type": "string",
           "default": "",
           "description": "Custom instructions for commit message generation. Required when useCustomInstructions is enabled",
           "editPresentation": "multilineText",
-          "order": 5
+          "order": 6
         },
         "commitSage.commit.onlyStagedChanges": {
           "type": "boolean",
           "default": false,
           "description": "Generate commit message only for staged changes. When disabled: commits staged changes if present, otherwise commits all tracked changes",
-          "order": 6
+          "order": 7
         },
         "commitSage.commit.autoCommit": {
           "type": "boolean",
           "default": false,
           "description": "Automatically commit changes after generating the message. Consider disabling promptForRefs when using this feature",
-          "order": 7
+          "order": 8
         },
         "commitSage.commit.autoPush": {
           "type": "boolean",
           "default": false,
           "description": "Automatically push changes after committing. Requires Auto Commit to be enabled. Will be ignored if Auto Commit is disabled",
-          "order": 8
+          "order": 9
         },
         "commitSage.commit.promptForRefs": {
           "type": "boolean",
           "default": false,
           "description": "Prompt for entering refs (e.g., issue numbers) when generating commit messages. Note: This may interrupt automatic commit flow if Auto Commit is enabled",
-          "order": 9
+          "order": 10
         },
         "commitSage.gemini.model": {
           "type": "string",
@@ -229,7 +248,7 @@
           ],
           "default": "auto",
           "description": "Select Gemini model for commit message generation. Use 'auto' to automatically try all available models until success. Only used when Gemini provider is selected",
-          "order": 10
+          "order": 11
         },
         "commitSage.codestral.model": {
           "type": "string",
@@ -239,49 +258,49 @@
           ],
           "default": "codestral-latest",
           "description": "Select Codestral model for commit message generation. Only used when Codestral provider is selected",
-          "order": 11
+          "order": 12
         },
         "commitSage.openai.model": {
           "type": "string",
           "default": "gpt-3.5-turbo",
           "description": "Select OpenAI model for commit message generation. Only used when OpenAI provider is selected",
-          "order": 12
+          "order": 13
         },
         "commitSage.openai.baseUrl": {
           "type": "string",
           "default": "https://api.openai.com/v1",
           "description": "Base URL for OpenAI API. Change only if using Azure OpenAI or a custom endpoint",
-          "order": 13
+          "order": 14
         },
         "commitSage.ollama.baseUrl": {
           "type": "string",
           "default": "http://localhost:11434",
           "description": "Base URL for Ollama API. Only used when Ollama provider is selected",
-          "order": 14
+          "order": 15
         },
         "commitSage.ollama.model": {
           "type": "string",
           "default": "llama3.2",
           "description": "Model name for Ollama. Make sure the model is installed locally. Only used when Ollama provider is selected",
-          "order": 15
+          "order": 16
         },
         "commitSage.ollama.useAuthToken": {
           "type": "boolean",
           "default": false,
           "description": "Enable authentication token for Ollama API. Enable this if your Ollama instance requires an auth token",
-          "order": 16
+          "order": 17
         },
         "commitSage.apiRequestTimeout": {
           "type": "number",
           "default": 30,
           "description": "Timeout for API requests in seconds. Set to -1 for no timeout (infinite wait)",
-          "order": 17
+          "order": 18
         },
         "commitSage.telemetry.enabled": {
           "type": "boolean",
           "default": true,
           "description": "Enable telemetry for Commit Sage",
-          "order": 18
+          "order": 19
         }
       }
     }

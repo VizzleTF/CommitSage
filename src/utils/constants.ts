@@ -1,4 +1,4 @@
-export const SUPPORTED_LANGUAGES = ['english', 'russian', 'chinese', 'japanese', 'korean', 'german', 'french', 'spanish', 'portuguese'] as const;
+export const SUPPORTED_LANGUAGES = ['english', 'russian', 'chinese', 'japanese', 'korean', 'german', 'french', 'spanish', 'portuguese', 'custom'] as const;
 export type CommitLanguage = typeof SUPPORTED_LANGUAGES[number];
 
 export const errorMessages = {

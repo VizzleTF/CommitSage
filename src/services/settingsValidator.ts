@@ -20,10 +20,21 @@ export class SettingsValidator {
             return;
         }
 
-        const configPath = path.join(workspaceFolder.uri.fsPath, '.commitsage');
+        const legacyPath = path.join(workspaceFolder.uri.fsPath, '.commitsage');
+        const dirConfigPath = path.join(workspaceFolder.uri.fsPath, '.commitsage', 'config.json');
 
-        if (!fs.existsSync(configPath)) {
+        // Resolve which config file to validate
+        let configPath: string;
+        if (!fs.existsSync(legacyPath)) {
             return;
+        } else if (fs.statSync(legacyPath).isDirectory()) {
+            if (!fs.existsSync(dirConfigPath)) {
+                // Directory exists but no config.json yet — nothing to validate
+                return;
+            }
+            configPath = dirConfigPath;
+        } else {
+            configPath = legacyPath;
         }
 
         try {

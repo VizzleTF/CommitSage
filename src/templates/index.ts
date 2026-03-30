@@ -10,7 +10,7 @@ import { SUPPORTED_LANGUAGES } from '../utils/constants';
 import type { CommitLanguage } from '../utils/constants';
 import { Logger } from '../utils/logger';
 
-export type CommitTemplate = Record<CommitLanguage, string>;
+export type CommitTemplate = Record<Exclude<CommitLanguage, 'custom'>, string>;
 
 export type CommitFormat = 'conventional' | 'angular' | 'karma' | 'semantic' | 'emoji' | 'emojiKarma' | 'google' | 'atom';
 
@@ -28,8 +28,10 @@ const templates: Record<CommitFormat, CommitTemplate> = {
 const isValidFormat = (format: string): format is CommitFormat =>
     Object.keys(templates).includes(format);
 
-const isValidLanguage = (language: string): language is CommitLanguage =>
-    SUPPORTED_LANGUAGES.includes(language as CommitLanguage);
+type KnownLanguage = Exclude<CommitLanguage, 'custom'>;
+
+const isValidLanguage = (language: string): language is KnownLanguage =>
+    SUPPORTED_LANGUAGES.includes(language as CommitLanguage) && language !== 'custom';
 
 export function getTemplate(format: CommitFormat, language: CommitLanguage): string {
     if (!isValidFormat(format)) {
@@ -40,7 +42,9 @@ export function getTemplate(format: CommitFormat, language: CommitLanguage): str
     const template = templates[format];
 
     if (!isValidLanguage(language)) {
-        Logger.warn(`Invalid language "${language}", falling back to english`);
+        if (language !== 'custom') {
+            Logger.warn(`Invalid language "${language}", falling back to english`);
+        }
         return template.english;
     }
 

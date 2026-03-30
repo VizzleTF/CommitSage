@@ -1,6 +1,6 @@
 import axios, { AxiosError } from 'axios';
 import { Logger } from '../utils/logger';
-import { CommitMessage, ProgressReporter } from '../models/types';
+import { CommitMessage, ProgressReporter, GenerateOptions } from '../models/types';
 import { ConfigService } from '../utils/configService';
 import { ApiKeyInvalidError } from '../models/errors';
 import { BaseAIService } from './baseAIService';
@@ -25,7 +25,8 @@ export class CodestralService {
     static async generateCommitMessage(
         prompt: string,
         progress: ProgressReporter,
-        attempt: number = 1
+        attempt: number = 1,
+        _options?: GenerateOptions
     ): Promise<CommitMessage> {
         try {
             const apiKey = await ApiKeyManager.getKey('codestral');
