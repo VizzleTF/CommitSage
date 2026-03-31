@@ -29,7 +29,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     registerCommands(context);
 
     void SettingsValidator.validateAllSettings();
-    TelemetryService.sendEvent('extension_activated');
+    TelemetryService.sendEvent({ name: 'extension_activated' });
     Logger.log('Extension activated successfully');
 }
 
@@ -38,7 +38,7 @@ export async function deactivate(): Promise<void> {
 
     try {
         // Send deactivation event before shutting down telemetry
-        TelemetryService.sendEvent('extension_deactivated');
+        TelemetryService.sendEvent({ name: 'extension_deactivated' });
 
         // Wait for telemetry to flush remaining events
         await TelemetryService.flush();
