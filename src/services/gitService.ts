@@ -11,7 +11,7 @@ import {
   NoRepositorySelectedError,
 } from "../models/errors";
 import { TelemetryService } from "./telemetryService";
-import { toError } from "../utils/errorUtils";
+import { toError, sanitizeErrorForTelemetry } from "../utils/errorUtils";
 
 const GIT_STATUS_CODES = {
   modified: "M",
@@ -103,15 +103,17 @@ export class GitService {
       await this.executeGitCommand(["commit", "-m", message], repoPath);
       Logger.log("Changes committed successfully");
 
-      TelemetryService.sendEvent("commit_completed", {
+      TelemetryService.sendEvent({
+        name: "commit_completed",
         hasStaged: hasStagedChanges,
         hasUntracked: hasUntrackedFiles,
         hasDeleted: hasDeletedFiles,
         messageLength: message.length,
       });
     } catch (error) {
-      TelemetryService.sendEvent("commit_failed", {
-        error: (toError(error)).message,
+      TelemetryService.sendEvent({
+        name: "commit_failed",
+        ...sanitizeErrorForTelemetry(toError(error)),
       });
       Logger.error("Failed to commit changes:", toError(error));
       throw error;
@@ -142,8 +144,13 @@ export class GitService {
       }
 
       await this.executeGitCommand(["push"], repoPath);
+      TelemetryService.sendEvent({ name: "push_completed" });
     } catch (error) {
       Logger.error("Failed to push changes:", toError(error));
+      TelemetryService.sendEvent({
+        name: "push_failed",
+        ...sanitizeErrorForTelemetry(toError(error)),
+      });
       throw error;
     }
   }
