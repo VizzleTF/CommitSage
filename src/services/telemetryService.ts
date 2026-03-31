@@ -5,7 +5,6 @@ import { ConfigService } from '../utils/configService';
 import { AMPLITUDE_API_KEY } from '../constants/apiKeys';
 import { EventOptions } from '@amplitude/analytics-types';
 import { EnvironmentUtils } from '../utils/environmentUtils';
-import { toError } from '../utils/errorUtils';
 
 const TELEMETRY_CONFIG = {
     maxRetries: 3,
@@ -14,27 +13,28 @@ const TELEMETRY_CONFIG = {
     flushInterval: 30000,
 } as const;
 
-type TelemetryEventName =
-    | 'extension_activated'
-    | 'extension_deactivated'
-    | 'message_generation_started'
-    | 'message_generation_completed'
-    | 'message_generation_failed'
-    | 'commit_started'
-    | 'commit_completed'
-    | 'commit_failed'
-    | 'settings_changed'
-    | 'generate_message_started';
+export type TelemetryEvent =
+    | { name: 'extension_activated' }
+    | { name: 'extension_deactivated' }
+    | { name: 'message_generation_started'; diffSize: number; fileCount: number; truncated: boolean; provider: string }
+    | { name: 'message_generation_completed'; provider: string; model: string; durationMs: number; language: string; onlyStagedChanges: boolean }
+    | { name: 'message_generation_failed'; provider: string; error: string; errorType: string }
+    | { name: 'commit_completed'; hasStaged: boolean; hasUntracked: boolean; hasDeleted: boolean; messageLength: number }
+    | { name: 'commit_failed'; error: string; errorType: string }
+    | { name: 'settings_changed'; setting: string }
+    | { name: 'push_completed' }
+    | { name: 'push_failed'; error: string; errorType: string };
 
 interface TelemetryEventProperties {
     vsCodeVersion: string;
     extensionVersion: string | undefined;
     platform: string;
+    environment: string;
     [key: string]: unknown;
 }
 
 interface QueuedEvent {
-    eventName: TelemetryEventName;
+    eventName: string;
     properties: TelemetryEventProperties;
     retryCount: number;
     timestamp: number;
@@ -47,6 +47,7 @@ export class TelemetryService {
     private static eventQueue: QueuedEvent[] = [];
     private static flushInterval: ReturnType<typeof setInterval> | null = null;
     private static isProcessing: boolean = false;
+    private static extensionVersion: string | undefined;
 
     static async initialize(context: vscode.ExtensionContext): Promise<void> {
         Logger.log('Initializing telemetry service');
@@ -58,6 +59,7 @@ export class TelemetryService {
             }
 
             this.enabled = vscode.env.isTelemetryEnabled && ConfigService.isTelemetryEnabled();
+            this.extensionVersion = context.extension.packageJSON.version as string | undefined;
 
             amplitude.init(AMPLITUDE_API_KEY, {
                 serverZone: 'EU',
@@ -78,30 +80,31 @@ export class TelemetryService {
 
             context.subscriptions.push(...this.disposables);
             Logger.log('Telemetry service initialized');
-
-            this.sendEvent('extension_activated');
         } catch (error) {
-            Logger.error('Failed to initialize Amplitude:', toError(error));
+            const err = error instanceof Error ? error : new Error(String(error));
+            Logger.error('Failed to initialize Amplitude:', err);
             this.initialized = false;
         }
     }
 
-    static sendEvent(eventName: TelemetryEventName, customProperties: Record<string, unknown> = {}): void {
+    static sendEvent(event: TelemetryEvent): void {
         if (!this.enabled) {
             Logger.log('Telemetry disabled, skipping event');
             return;
         }
 
+        const { name, ...eventProps } = event;
+
         const properties: TelemetryEventProperties = {
             vsCodeVersion: vscode.version,
-            extensionVersion: vscode.extensions.getExtension('VizzleTF.commitsage')?.packageJSON.version,
+            extensionVersion: this.extensionVersion,
             platform: EnvironmentUtils.getPlatform(),
             environment: EnvironmentUtils.getEnvironmentType(),
-            ...customProperties
+            ...eventProps
         };
 
         const queuedEvent: QueuedEvent = {
-            eventName,
+            eventName: name,
             properties,
             retryCount: 0,
             timestamp: Date.now()
@@ -147,7 +150,8 @@ export class TelemetryService {
             this.eventQueue.shift();
             Logger.log(`Telemetry event sent successfully: ${currentEvent.eventName}`);
         } catch (error) {
-            Logger.error('Failed to send telemetry:', toError(error));
+            const err = error instanceof Error ? error : new Error(String(error));
+            Logger.error('Failed to send telemetry:', err);
 
             if (currentEvent.retryCount < TELEMETRY_CONFIG.maxRetries) {
                 currentEvent.retryCount++;
@@ -173,25 +177,42 @@ export class TelemetryService {
     }
 
     private static handleTelemetryStateChange(enabled: boolean): void {
-        this.enabled = enabled;
-        amplitude.setOptOut(!enabled);
-        Logger.log(`Telemetry enabled state changed to: ${enabled}`);
+        this.enabled = enabled && ConfigService.isTelemetryEnabled();
+        amplitude.setOptOut(!this.enabled);
+        Logger.log(`Telemetry enabled state changed to: ${this.enabled}`);
     }
 
     private static handleConfigChange(event: vscode.ConfigurationChangeEvent): void {
+        if (!event.affectsConfiguration('commitSage')) {
+            return;
+        }
+
         if (event.affectsConfiguration('commitSage.telemetry.enabled')) {
-            this.enabled = ConfigService.isTelemetryEnabled();
+            this.enabled = vscode.env.isTelemetryEnabled && ConfigService.isTelemetryEnabled();
             amplitude.setOptOut(!this.enabled);
         }
+
+        const knownKeys = [
+            'commitSage.provider.type',
+            'commitSage.commit.commitLanguage',
+            'commitSage.commit.commitFormat',
+            'commitSage.commit.onlyStagedChanges',
+            'commitSage.commit.autoCommit',
+            'commitSage.commit.autoPush',
+            'commitSage.telemetry.enabled',
+            'commitSage.gemini.model',
+            'commitSage.openai.model',
+            'commitSage.ollama.model',
+            'commitSage.codestral.model',
+        ];
+        const changedKey = knownKeys.find(k => event.affectsConfiguration(k)) ?? 'commitSage';
+        this.sendEvent({ name: 'settings_changed', setting: changedKey.replace('commitSage.', '') });
     }
 
     private static delay(ms: number): Promise<void> {
         return new Promise(resolve => setTimeout(resolve, ms));
     }
 
-    /**
-     * Flush remaining events in the queue
-     */
     static async flush(): Promise<void> {
         if (!this.initialized || this.eventQueue.length === 0) {
             return;
@@ -199,11 +220,9 @@ export class TelemetryService {
 
         Logger.log(`Flushing ${this.eventQueue.length} remaining telemetry events`);
 
-        // Process all remaining events
         while (this.eventQueue.length > 0) {
             await this.processEventQueue();
 
-            // Prevent infinite loops
             if (this.eventQueue.length > 0) {
                 await this.delay(100);
             }

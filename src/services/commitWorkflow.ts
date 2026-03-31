@@ -8,7 +8,7 @@ import { TelemetryService } from './telemetryService';
 import { AIService } from './aiService';
 import { ApiKeyManager } from './apiKeyManager';
 import { UserCancelledError, ApiKeyInvalidError } from '../models/errors';
-import { toError } from '../utils/errorUtils';
+import { toError, sanitizeErrorForTelemetry } from '../utils/errorUtils';
 
 export class CommitWorkflow {
     static async generateAndSetCommitMessage(sourceControlRepository?: vscode.SourceControl): Promise<void> {
@@ -56,10 +56,10 @@ export class CommitWorkflow {
             }
 
             const err = toError(error);
-            TelemetryService.sendEvent('message_generation_failed', {
-                error: err.message,
-                errorType: err.constructor.name,
-                provider: ConfigService.getProvider()
+            TelemetryService.sendEvent({
+                name: 'message_generation_failed',
+                ...sanitizeErrorForTelemetry(err),
+                provider: ConfigService.getProvider(),
             });
             await this.handleError(err);
         }
@@ -145,7 +145,10 @@ export class CommitWorkflow {
             throw new UserCancelledError();
         }
 
-        const commitMessage = await AIService.generateCommitMessage(diff, blameAnalysis, progress);
+        const commitMessage = await AIService.generateCommitMessage(diff, blameAnalysis, progress, {
+            fileCount: changedFiles.length,
+            onlyStagedChanges: useStagedChanges,
+        });
 
         sourceControlRepository.inputBox.value = commitMessage.message;
 
