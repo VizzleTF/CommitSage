@@ -76,7 +76,7 @@ jobs:
           name: vsix
 
       - name: Create Release
-        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         env:
           VERSION: ${{ needs.build.outputs.version }}
           RELEASE_NOTES: ${{ needs.build.outputs.notes }}
@@ -166,7 +166,7 @@ jobs:
       - name: Notify on Security Release
         if: contains(needs.build.outputs.notes, 'important security updates')
         continue-on-error: true
-        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         env:
           VERSION: ${{ needs.build.outputs.version }}
           RELEASE_NOTES: ${{ needs.build.outputs.notes }}
