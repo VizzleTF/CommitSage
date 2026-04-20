@@ -342,6 +342,6 @@
   "dependencies": {
     "@amplitude/analytics-node": "^1.5.53",
     "@amplitude/analytics-types": "^2.11.1",
-    "axios": "^1.15.0"
+    "axios": "^1.15.1"
   }
 }
