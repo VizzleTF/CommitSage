@@ -325,7 +325,7 @@
     "@types/vscode": "^1.93.0",
     "@typescript-eslint/eslint-plugin": "^8.58.2",
     "@typescript-eslint/parser": "^8.58.2",
-    "@vscode/vsce": "^3.7.1",
+    "@vscode/vsce": "^3.9.1",
     "dotenv-webpack": "^9.0.0",
     "eslint": "^10.2.1",
     "eslint-import-resolver-typescript": "^4.4.4",
