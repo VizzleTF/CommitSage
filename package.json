@@ -340,7 +340,7 @@
     "webpack-cli": "^7.0.2"
   },
   "dependencies": {
-    "@amplitude/analytics-node": "^1.5.54",
+    "@amplitude/analytics-node": "^1.5.56",
     "@amplitude/analytics-types": "^2.11.1",
     "axios": "^1.15.2"
   }
