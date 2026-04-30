@@ -14,6 +14,7 @@ const MAX_DIFF_LENGTH = 100000;
 interface GenerateContext {
     fileCount?: number;
     onlyStagedChanges?: boolean;
+    signal?: AbortSignal;
 }
 
 export class AIService {
@@ -48,7 +49,13 @@ export class AIService {
 
         try {
             const serviceType = provider as AIServiceType;
-            const result = await AIServiceFactory.generateCommitMessage(serviceType, prompt, progress);
+            const result = await AIServiceFactory.generateCommitMessage(
+                serviceType,
+                prompt,
+                progress,
+                undefined,
+                { signal: context.signal }
+            );
 
             // Post-process the commit message to remove think tags
             result.message = removeThinkTags(result.message);

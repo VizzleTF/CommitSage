@@ -23,7 +23,7 @@ export class OllamaService {
         prompt: string,
         progress: ProgressReporter,
         attempt: number = 1,
-        _options?: GenerateOptions
+        options?: GenerateOptions
     ): Promise<CommitMessage> {
         const baseUrl = ConfigService.getOllamaBaseUrl() || 'http://localhost:11434';
         const model = ConfigService.getOllamaModel() || this.defaultModel;
@@ -32,7 +32,7 @@ export class OllamaService {
         const payload = {
             model: model,
             messages: [
-                { role: "user", content: prompt }
+                { role: 'user', content: prompt }
             ],
             stream: false
         };
@@ -46,7 +46,11 @@ export class OllamaService {
             if (authToken) {
                 headers['Authorization'] = `Bearer ${authToken}`;
             }
-            const requestConfig = HttpUtils.createRequestConfig(headers);
+            const requestConfig = HttpUtils.createRequestConfig(
+                headers,
+                undefined,
+                options?.signal
+            );
 
             const response = await axios.post<OllamaResponse>(apiUrl, payload, requestConfig);
 
@@ -63,7 +67,7 @@ export class OllamaService {
                 prompt,
                 progress,
                 attempt,
-                this.generateCommitMessage.bind(this),
+                (p, pr, a) => this.generateCommitMessage(p, pr, a, options),
                 (err: Error) => {
                     if (err instanceof AxiosError && err.response?.status === 401) {
                         return {

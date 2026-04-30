@@ -38,8 +38,21 @@ export class CommitWorkflow {
                     throw new UserCancelledError();
                 }
 
-                const commitMessage = await this.generateAndApplyMessage(progress, sourceControlRepository!, token);
-                Logger.log(`Commit message generated: ${commitMessage.message}`);
+                const controller = new AbortController();
+                const cancelSubscription = token.onCancellationRequested(() => {
+                    controller.abort();
+                });
+                try {
+                    const commitMessage = await this.generateAndApplyMessage(
+                        progress,
+                        sourceControlRepository!,
+                        token,
+                        controller.signal
+                    );
+                    Logger.log(`Commit message generated: ${commitMessage.message}`);
+                } finally {
+                    cancelSubscription.dispose();
+                }
             });
         } catch (error: unknown) {
             // Don't show error for user cancellation
@@ -109,7 +122,8 @@ export class CommitWorkflow {
     private static async generateAndApplyMessage(
         progress: vscode.Progress<{ message?: string; increment?: number }>,
         sourceControlRepository: vscode.SourceControl,
-        token: vscode.CancellationToken
+        token: vscode.CancellationToken,
+        signal: AbortSignal
     ): Promise<CommitMessage> {
         progress.report({ message: "Analyzing changes...", increment: 10 });
 
@@ -148,6 +162,7 @@ export class CommitWorkflow {
         const commitMessage = await AIService.generateCommitMessage(diff, blameAnalysis, progress, {
             fileCount: changedFiles.length,
             onlyStagedChanges: useStagedChanges,
+            signal,
         });
 
         sourceControlRepository.inputBox.value = commitMessage.message;

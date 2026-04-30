@@ -52,7 +52,11 @@ export class OpenAIService {
             await RetryUtils.updateProgressForAttempt(progress, attempt);
 
             const headers = HttpUtils.createRequestHeaders(apiKey);
-            const requestConfig = HttpUtils.createRequestConfig(headers);
+            const requestConfig = HttpUtils.createRequestConfig(
+                headers,
+                undefined,
+                options?.signal
+            );
 
             const response = await axios.post<OpenAIResponse>(
                 `${baseUrl}${this.chatCompletionsPath}`,
