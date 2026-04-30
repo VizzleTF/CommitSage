@@ -12,22 +12,31 @@ export async function createProjectConfig(): Promise<void> {
             return;
         }
 
-        const configPath = path.join(workspaceFolder.uri.fsPath, '.commitsage');
+        const configDir = path.join(workspaceFolder.uri.fsPath, '.commitsage');
+        const configPath = path.join(configDir, 'config.json');
+        const legacyExists =
+            fs.existsSync(configDir) && fs.statSync(configDir).isFile();
+        const configExists = fs.existsSync(configPath);
 
-        if (fs.existsSync(configPath)) {
+        if (legacyExists || configExists) {
             const selection = await Logger.showWarning(
-                'A .commitsage file already exists in this project.',
+                'A .commitsage configuration already exists in this project.',
                 'Open Existing',
                 'Overwrite',
                 'Cancel'
             );
 
             if (selection === 'Open Existing') {
-                const uri = vscode.Uri.file(configPath);
+                const target = legacyExists ? configDir : configPath;
+                const uri = vscode.Uri.file(target);
                 void vscode.window.showTextDocument(uri);
                 return;
             } else if (selection !== 'Overwrite') {
                 return;
+            }
+
+            if (legacyExists) {
+                fs.unlinkSync(configDir);
             }
         }
 
@@ -46,7 +55,7 @@ export async function createProjectConfig(): Promise<void> {
                 promptForRefs: false
             },
             gemini: {
-                model: 'gemini-1.5-flash'
+                model: 'auto'
             },
             codestral: {
                 model: 'codestral-latest'
@@ -64,17 +73,22 @@ export async function createProjectConfig(): Promise<void> {
             }
         };
 
-        fs.writeFileSync(configPath, JSON.stringify(templateConfig, null, 2), 'utf8');
+        await fs.promises.mkdir(configDir, { recursive: true });
+        await fs.promises.writeFile(
+            configPath,
+            JSON.stringify(templateConfig, null, 2),
+            'utf8'
+        );
 
-        Logger.log('Created .commitsage configuration file');
+        Logger.log('Created .commitsage/config.json configuration file');
 
         const uri = vscode.Uri.file(configPath);
         void vscode.window.showTextDocument(uri);
 
-        Logger.log('Project configuration file (.commitsage) has been created and opened for editing.');
+        Logger.log('Project configuration file (.commitsage/config.json) has been created and opened for editing.');
 
     } catch (error) {
-        Logger.error('Error creating .commitsage file:', toError(error));
-        await Logger.showError(`Failed to create .commitsage file: ${toError(error).message}`);
+        Logger.error('Error creating .commitsage/config.json file:', toError(error));
+        await Logger.showError(`Failed to create .commitsage/config.json: ${toError(error).message}`);
     }
 }

@@ -39,8 +39,8 @@ const GEMINI_GENERATION_CONFIG = {
 export class GeminiService {
     private static async getAvailableModels(apiKey: string): Promise<string[]> {
         try {
-            const apiUrl = `https://generativelanguage.googleapis.com/v1/models?key=${apiKey}`;
-            const requestConfig = HttpUtils.createRequestConfig({});
+            const apiUrl = 'https://generativelanguage.googleapis.com/v1/models';
+            const requestConfig = HttpUtils.createRequestConfig({ 'x-goog-api-key': apiKey });
 
             const response = await axios.get<GeminiModelsResponse>(apiUrl, requestConfig);
 
@@ -79,7 +79,7 @@ export class GeminiService {
                     increment: 0
                 });
 
-                const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+                const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
 
                 const payload = {
                     contents: [{ parts: [{ text: prompt }] }],
@@ -89,7 +89,7 @@ export class GeminiService {
                 };
 
                 const requestConfig = HttpUtils.createRequestConfig(
-                    { 'content-type': 'application/json' }
+                    { 'content-type': 'application/json', 'x-goog-api-key': apiKey }
                 );
 
                 const response = await axios.post<GeminiResponse>(apiUrl, payload, requestConfig);
@@ -137,7 +137,7 @@ export class GeminiService {
                 return await this.tryGenerateWithModels(prompt, progress, availableModels, apiKey, options);
             }
 
-            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${configuredModel}:generateContent?key=${apiKey}`;
+            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${configuredModel}:generateContent`;
 
             const payload = {
                 contents: [{ parts: [{ text: prompt }] }],
@@ -149,7 +149,7 @@ export class GeminiService {
             await RetryUtils.updateProgressForAttempt(progress, attempt);
 
             const requestConfig = HttpUtils.createRequestConfig(
-                { 'content-type': 'application/json' }
+                { 'content-type': 'application/json', 'x-goog-api-key': apiKey }
             );
 
             const response = await axios.post<GeminiResponse>(apiUrl, payload, requestConfig);
