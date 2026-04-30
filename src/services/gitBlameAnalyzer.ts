@@ -1,16 +1,16 @@
-import * as path from "path";
-import * as fs from "fs";
-import { Logger } from "../utils/logger";
-import { errorMessages } from "../utils/constants";
-import { GitService } from "./gitService";
-import { toError } from "../utils/errorUtils";
+import * as path from 'path';
+import * as fs from 'fs';
+import { Logger } from '../utils/logger';
+import { errorMessages } from '../utils/constants';
+import { GitService } from './gitService';
+import { toError } from '../utils/errorUtils';
 import {
   BlameInfo,
   analyzeBlameInfo,
   formatAnalysis,
   parseBlameOutput,
   parseChangedLines,
-} from "./gitBlameParser";
+} from './gitBlameParser';
 
 export class GitBlameAnalyzer {
   private static async getGitBlame(
@@ -35,7 +35,7 @@ export class GitBlameAnalyzer {
       const blameOutput = await this.executeGitBlame(filePath, repoPath);
       return parseBlameOutput(blameOutput);
     } catch (error) {
-      Logger.error("Error getting blame info:", toError(error));
+      Logger.error('Error getting blame info:', toError(error));
       throw error;
     }
   }
@@ -45,7 +45,7 @@ export class GitBlameAnalyzer {
     repoPath: string,
   ): Promise<string> {
     const { stdout } = await GitService.execGit(
-      ["blame", "--line-porcelain", "--", filePath],
+      ['blame', '--line-porcelain', '--', filePath],
       repoPath,
     );
     return stdout;
@@ -56,7 +56,7 @@ export class GitBlameAnalyzer {
     filePath: string,
   ): Promise<string> {
     const { stdout } = await GitService.execGit(
-      ["diff", "--unified=0", "--", filePath],
+      ['diff', '--unified=0', '--', filePath],
       repoPath,
     );
     return stdout;
@@ -69,7 +69,7 @@ export class GitBlameAnalyzer {
     try {
       // First check if file is deleted or new, as these don't need blame analysis
       // Use git status to check file state
-      const normalizedPath = path.normalize(filePath.replace(/^\/+/, ""));
+      const normalizedPath = path.normalize(filePath.replace(/^\/+/, ''));
 
       if (await GitService.isFileDeleted(normalizedPath, repoPath)) {
         Logger.log(
@@ -92,7 +92,7 @@ export class GitBlameAnalyzer {
       const authorChanges = analyzeBlameInfo(blame, changedLines);
       return formatAnalysis(authorChanges);
     } catch (error) {
-      Logger.error("Error analyzing changes:", toError(error));
+      Logger.error('Error analyzing changes:', toError(error));
       throw error;
     }
   }

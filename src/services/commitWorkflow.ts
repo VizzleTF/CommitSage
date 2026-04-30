@@ -128,7 +128,7 @@ export class CommitWorkflow {
         token: vscode.CancellationToken,
         signal: AbortSignal
     ): Promise<CommitMessage> {
-        progress.report({ message: "Analyzing changes...", increment: 10 });
+        progress.report({ message: 'Analyzing changes...', increment: 10 });
 
         if (token.isCancellationRequested) {
             throw new UserCancelledError();

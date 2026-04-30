@@ -103,7 +103,7 @@ export class GeminiService {
                 const message = this.extractCommitMessage(response.data);
                 Logger.log(`Commit message successfully generated using ${model} model (auto mode)`);
 
-                progress.report({ message: "Processing generated message...", increment: 100 });
+                progress.report({ message: 'Processing generated message...', increment: 100 });
                 return { message, model };
 
             } catch (error) {
@@ -133,7 +133,7 @@ export class GeminiService {
             const configuredModel = ConfigService.getGeminiModel();
 
             if (configuredModel === 'auto') {
-                progress.report({ message: "Fetching available Gemini models...", increment: 0 });
+                progress.report({ message: 'Fetching available Gemini models...', increment: 0 });
                 const availableModels = await this.getAvailableModels(apiKey, options?.signal);
 
                 if (availableModels.length === 0) {
@@ -161,7 +161,7 @@ export class GeminiService {
             );
 
             const response = await axios.post<GeminiResponse>(apiUrl, payload, requestConfig);
-            progress.report({ message: "Processing generated message...", increment: 90 });
+            progress.report({ message: 'Processing generated message...', increment: 90 });
 
             const message = this.extractCommitMessage(response.data);
             Logger.log(`Commit message generated using ${configuredModel} model`);

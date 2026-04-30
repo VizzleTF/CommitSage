@@ -45,7 +45,7 @@ export class AIService {
         const truncatedDiff = this.truncateDiff(diff);
         const prompt = await PromptService.generatePrompt(truncatedDiff, blameAnalysis, progress);
 
-        progress.report({ message: "Generating commit message...", increment: 50 });
+        progress.report({ message: 'Generating commit message...', increment: 50 });
 
         try {
             const serviceType = provider as AIServiceType;

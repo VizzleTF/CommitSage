@@ -1,11 +1,11 @@
-import * as vscode from "vscode";
-import * as fs from "fs";
-import * as path from "path";
-import { Logger } from "./logger";
-import { ProjectConfig } from "../models/types";
-import { toError } from "./errorUtils";
+import * as vscode from 'vscode';
+import * as fs from 'fs';
+import * as path from 'path';
+import { Logger } from './logger';
+import { ProjectConfig } from '../models/types';
+import { toError } from './errorUtils';
 
-export type { CommitLanguage } from "./constants";
+export type { CommitLanguage } from './constants';
 
 type CacheValue = string | boolean | number;
 
@@ -22,20 +22,20 @@ export class ConfigService {
       return;
     }
 
-    const legacyPath = path.join(workspaceFolder.uri.fsPath, ".commitsage");
+    const legacyPath = path.join(workspaceFolder.uri.fsPath, '.commitsage');
 
     try {
       if (fs.existsSync(legacyPath) && fs.statSync(legacyPath).isFile()) {
-        const content = fs.readFileSync(legacyPath, "utf8");
+        const content = fs.readFileSync(legacyPath, 'utf8');
         // Validate JSON before migrating to avoid writing broken config
         JSON.parse(content);
         fs.unlinkSync(legacyPath);
         fs.mkdirSync(legacyPath, { recursive: true });
-        fs.writeFileSync(path.join(legacyPath, "config.json"), content, "utf8");
-        Logger.log("Migrated .commitsage file to .commitsage/config.json");
+        fs.writeFileSync(path.join(legacyPath, 'config.json'), content, 'utf8');
+        Logger.log('Migrated .commitsage file to .commitsage/config.json');
       }
     } catch (error) {
-      Logger.error("Failed to migrate .commitsage config:", toError(error));
+      Logger.error('Failed to migrate .commitsage config:', toError(error));
     }
   }
 
@@ -44,19 +44,19 @@ export class ConfigService {
 
     const configListener = vscode.workspace.onDidChangeConfiguration(
       (event) => {
-        if (event.affectsConfiguration("commitSage")) {
+        if (event.affectsConfiguration('commitSage')) {
           this.clearCache();
-          if (event.affectsConfiguration("commitSage.openai.baseUrl")) {
+          if (event.affectsConfiguration('commitSage.openai.baseUrl')) {
             const baseUrl = this.getOpenAIBaseUrl();
             if (baseUrl) {
               try {
                 const normalizedEndpoint =
                   this.validateAndNormalizeEndpoint(baseUrl);
-                const config = vscode.workspace.getConfiguration("commitSage");
-                void config.update("openai.baseUrl", normalizedEndpoint, true);
+                const config = vscode.workspace.getConfiguration('commitSage');
+                void config.update('openai.baseUrl', normalizedEndpoint, true);
               } catch (error: unknown) {
                 Logger.error(
-                  "Failed to update OpenAI base URL:",
+                  'Failed to update OpenAI base URL:',
                   toError(error),
                 );
               }
@@ -80,7 +80,7 @@ export class ConfigService {
       return;
     }
 
-    const pattern = new vscode.RelativePattern(workspaceFolder, "{.commitsage,.commitsage/config.json}");
+    const pattern = new vscode.RelativePattern(workspaceFolder, '{.commitsage,.commitsage/config.json}');
     this.projectConfigFileWatcher =
       vscode.workspace.createFileSystemWatcher(pattern);
 
@@ -102,7 +102,7 @@ export class ConfigService {
   private static invalidateProjectConfig(): void {
     this.projectConfigCache = null;
     this.clearCache();
-    Logger.log("Project configuration cache invalidated");
+    Logger.log('Project configuration cache invalidated');
   }
 
   static getProjectRootPath(): string | undefined {
@@ -139,25 +139,25 @@ export class ConfigService {
       return this.projectConfigCache;
     }
     // Support both legacy `.commitsage` file and new `.commitsage/config.json` directory layout
-    const legacyConfigPath = path.join(rootPath, ".commitsage");
-    const dirConfigPath = path.join(rootPath, ".commitsage", "config.json");
+    const legacyConfigPath = path.join(rootPath, '.commitsage');
+    const dirConfigPath = path.join(rootPath, '.commitsage', 'config.json');
 
     try {
       if (fs.existsSync(dirConfigPath)) {
-        const configContent = fs.readFileSync(dirConfigPath, "utf8");
+        const configContent = fs.readFileSync(dirConfigPath, 'utf8');
         const config = JSON.parse(configContent) as ProjectConfig;
         this.projectConfigCache = config;
-        Logger.log("Loaded project configuration from .commitsage/config.json");
+        Logger.log('Loaded project configuration from .commitsage/config.json');
       } else if (fs.existsSync(legacyConfigPath) && fs.statSync(legacyConfigPath).isFile()) {
-        const configContent = fs.readFileSync(legacyConfigPath, "utf8");
+        const configContent = fs.readFileSync(legacyConfigPath, 'utf8');
         const config = JSON.parse(configContent) as ProjectConfig;
         this.projectConfigCache = config;
-        Logger.log("Loaded project configuration from .commitsage file");
+        Logger.log('Loaded project configuration from .commitsage file');
       } else {
         this.projectConfigCache = {};
       }
     } catch (error) {
-      Logger.error("Error reading .commitsage config:", toError(error));
+      Logger.error('Error reading .commitsage config:', toError(error));
       this.projectConfigCache = {};
     }
 
@@ -178,7 +178,7 @@ export class ConfigService {
       unknown
     >;
     for (const section of sections) {
-      if (current && typeof current === "object" && section in current) {
+      if (current && typeof current === 'object' && section in current) {
         current = current[section] as Record<string, unknown>;
       } else {
         return undefined;
@@ -206,7 +206,7 @@ export class ConfigService {
           return projectValue;
         }
 
-        const config = vscode.workspace.getConfiguration("commitSage");
+        const config = vscode.workspace.getConfiguration('commitSage');
         const value = config.inspect<T>(configKey);
 
         const effectiveValue =
@@ -225,62 +225,62 @@ export class ConfigService {
   }
 
   static getGeminiModel(): string {
-    return this.getConfig<string>("gemini", "model", "auto");
+    return this.getConfig<string>('gemini', 'model', 'auto');
   }
 
   static getCommitLanguage(): string {
-    return this.getConfig<string>("commit", "commitLanguage", "english");
+    return this.getConfig<string>('commit', 'commitLanguage', 'english');
   }
 
   static getCustomLanguageName(): string {
-    return this.getConfig<string>("commit", "customLanguageName", "");
+    return this.getConfig<string>('commit', 'customLanguageName', '');
   }
 
   static getCommitFormat(): string {
-    return this.getConfig<string>("commit", "commitFormat", "conventional");
+    return this.getConfig<string>('commit', 'commitFormat', 'conventional');
   }
 
   static useCustomInstructions(): boolean {
-    return this.getConfig<boolean>("commit", "useCustomInstructions", false);
+    return this.getConfig<boolean>('commit', 'useCustomInstructions', false);
   }
 
   static getCustomInstructions(): string {
-    return this.getConfig<string>("commit", "customInstructions", "");
+    return this.getConfig<string>('commit', 'customInstructions', '');
   }
 
   static getCodestralModel(): string {
-    return this.getConfig<string>("codestral", "model", "codestral-2405");
+    return this.getConfig<string>('codestral', 'model', 'codestral-2405');
   }
 
   static getProvider(): string {
-    const provider = this.getConfig<string>("provider", "type", "gemini");
-    if (!["gemini", "openai", "codestral", "ollama"].includes(provider)) {
+    const provider = this.getConfig<string>('provider', 'type', 'gemini');
+    if (!['gemini', 'openai', 'codestral', 'ollama'].includes(provider)) {
       Logger.warn(
         `Invalid provider type: ${provider}, falling back to gemini`,
       );
-      return "gemini";
+      return 'gemini';
     }
     return provider;
   }
 
   static shouldPromptForRefs(): boolean {
-    return this.getConfig<boolean>("commit", "promptForRefs", false);
+    return this.getConfig<boolean>('commit', 'promptForRefs', false);
   }
 
   static getOnlyStagedChanges(): boolean {
-    return this.getConfig<boolean>("commit", "onlyStagedChanges", false);
+    return this.getConfig<boolean>('commit', 'onlyStagedChanges', false);
   }
 
   static getMaxRetries(): number {
-    return this.getConfig<number>("general", "maxRetries", 3);
+    return this.getConfig<number>('general', 'maxRetries', 3);
   }
 
   static getAutoCommitEnabled(): boolean {
-    return this.getConfig<boolean>("commit", "autoCommit", false);
+    return this.getConfig<boolean>('commit', 'autoCommit', false);
   }
 
   static getAutoPushEnabled(): boolean {
-    return this.getConfig<boolean>("commit", "autoPush", false);
+    return this.getConfig<boolean>('commit', 'autoPush', false);
   }
 
   static clearCache(): void {
@@ -299,23 +299,23 @@ export class ConfigService {
   }
 
   static isTelemetryEnabled(): boolean {
-    return this.getConfig<boolean>("telemetry", "enabled", true);
+    return this.getConfig<boolean>('telemetry', 'enabled', true);
   }
 
   private static validateAndNormalizeEndpoint(endpoint: string): string {
     if (!endpoint) {
-      return "";
+      return '';
     }
 
     let normalizedEndpoint = endpoint.trim();
     if (
-      !normalizedEndpoint.startsWith("http://") &&
-      !normalizedEndpoint.startsWith("https://")
+      !normalizedEndpoint.startsWith('http://') &&
+      !normalizedEndpoint.startsWith('https://')
     ) {
       normalizedEndpoint = `https://${normalizedEndpoint}`;
     }
 
-    if (normalizedEndpoint.endsWith("/")) {
+    if (normalizedEndpoint.endsWith('/')) {
       normalizedEndpoint = normalizedEndpoint.slice(0, -1);
     }
 
@@ -324,33 +324,33 @@ export class ConfigService {
 
   static getOllamaBaseUrl(): string {
     return this.getConfig<string>(
-      "ollama",
-      "baseUrl",
-      "http://localhost:11434",
+      'ollama',
+      'baseUrl',
+      'http://localhost:11434',
     );
   }
 
   static getOllamaModel(): string {
-    return this.getConfig<string>("ollama", "model", "llama3.2");
+    return this.getConfig<string>('ollama', 'model', 'llama3.2');
   }
 
   static getOllamaUseAuthToken(): boolean {
-    return this.getConfig<boolean>("ollama", "useAuthToken", false);
+    return this.getConfig<boolean>('ollama', 'useAuthToken', false);
   }
 
   static getOpenAIModel(): string {
-    return this.getConfig<string>("openai", "model", "gpt-3.5-turbo");
+    return this.getConfig<string>('openai', 'model', 'gpt-3.5-turbo');
   }
 
   static getOpenAIBaseUrl(): string {
     return this.getConfig<string>(
-      "openai",
-      "baseUrl",
-      "https://api.openai.com/v1",
+      'openai',
+      'baseUrl',
+      'https://api.openai.com/v1',
     );
   }
 
   static getApiRequestTimeout(): number {
-    return this.getConfig<number>("", "apiRequestTimeout", 30);
+    return this.getConfig<number>('', 'apiRequestTimeout', 30);
   }
 }

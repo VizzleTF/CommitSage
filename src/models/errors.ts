@@ -26,13 +26,6 @@ export class NoRepositorySelectedError extends Error {
     }
 }
 
-export class OpenAIError extends Error {
-    constructor(message: string) {
-        super(message);
-        this.name = 'OpenAIError';
-    }
-}
-
 export class AiServiceError extends Error {
     constructor(message: string) {
         super(`AI service error: ${message}`);

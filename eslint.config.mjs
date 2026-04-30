@@ -11,7 +11,7 @@ export default tseslint.config(
         languageOptions: {
             parserOptions: {
                 project: './tsconfig.json',
-                ecmaVersion: 2020,
+                ecmaVersion: 2022,
                 sourceType: 'module'
             },
             globals: {
@@ -82,6 +82,7 @@ export default tseslint.config(
                 }
             ],
             'semi': ['error', 'always'],
+            'quotes': ['error', 'single', { avoidEscape: true, allowTemplateLiterals: true }],
             '@typescript-eslint/explicit-function-return-type': [
                 'error',
                 {

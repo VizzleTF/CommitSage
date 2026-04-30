@@ -1,30 +1,30 @@
-import * as vscode from "vscode";
-import * as path from "path";
-import * as fs from "fs";
-import { createHash } from "crypto";
-import { spawn } from "child_process";
-import { Logger } from "../utils/logger";
+import * as vscode from 'vscode';
+import * as path from 'path';
+import * as fs from 'fs';
+import { createHash } from 'crypto';
+import { spawn } from 'child_process';
+import { Logger } from '../utils/logger';
 import {
   GitExtensionNotFoundError,
   NoRepositoriesFoundError,
   NoChangesDetectedError,
   NoRepositorySelectedError,
-} from "../models/errors";
-import { TelemetryService } from "./telemetryService";
-import { toError, sanitizeErrorForTelemetry } from "../utils/errorUtils";
-import { unquoteGitPath } from "../utils/gitPath";
-import { ConfigService } from "../utils/configService";
-import { mapLimit } from "../utils/concurrency";
+} from '../models/errors';
+import { TelemetryService } from './telemetryService';
+import { toError, sanitizeErrorForTelemetry } from '../utils/errorUtils';
+import { unquoteGitPath } from '../utils/gitPath';
+import { ConfigService } from '../utils/configService';
+import { mapLimit } from '../utils/concurrency';
 
 const GIT_FANOUT_CONCURRENCY = 8;
 
 const GIT_STATUS_CODES = {
-  modified: "M",
-  added: "A",
-  deleted: "D",
-  renamed: "R",
-  untracked: "??",
-  submodule: "S",
+  modified: 'M',
+  added: 'A',
+  deleted: 'D',
+  renamed: 'R',
+  untracked: '??',
+  submodule: 'S',
 } as const;
 
 type GitStatusCode = (typeof GIT_STATUS_CODES)[keyof typeof GIT_STATUS_CODES];
@@ -39,11 +39,11 @@ const STAGED_STATUS_CODES: GitStatusCode[] = [
 export class GitService {
   static async initialize(): Promise<void> {
     try {
-      Logger.log("Initializing Git service");
+      Logger.log('Initializing Git service');
       await this.validateGitExtension();
-      Logger.log("Git service initialized successfully");
+      Logger.log('Git service initialized successfully');
     } catch (error) {
-      Logger.error("Failed to initialize Git service:", toError(error));
+      Logger.error('Failed to initialize Git service:', toError(error));
       throw error;
     }
   }
@@ -55,13 +55,13 @@ export class GitService {
     try {
       const repo = repository || (await this.getActiveRepository());
       if (!repo?.rootUri) {
-        throw new Error("No active repository found");
+        throw new Error('No active repository found');
       }
 
       const repoPath = repo.rootUri.fsPath;
-      const hasStagedChanges = await this.hasChanges(repoPath, "staged");
-      const hasUntrackedFiles = await this.hasChanges(repoPath, "untracked");
-      const hasDeletedFiles = await this.hasChanges(repoPath, "deleted");
+      const hasStagedChanges = await this.hasChanges(repoPath, 'staged');
+      const hasUntrackedFiles = await this.hasChanges(repoPath, 'untracked');
+      const hasDeletedFiles = await this.hasChanges(repoPath, 'deleted');
 
       if (!hasStagedChanges && !hasUntrackedFiles && !hasDeletedFiles) {
         throw new NoChangesDetectedError();
@@ -71,41 +71,41 @@ export class GitService {
         const filesToStage: string[] = [];
         if (hasUntrackedFiles) {
           const untracked = await this.executeGitCommand(
-            ["ls-files", "--others", "--exclude-standard"],
+            ['ls-files', '--others', '--exclude-standard'],
             repoPath,
           );
           filesToStage.push(
             ...untracked
-              .split("\n")
+              .split('\n')
               .filter((f) => f.trim())
               .map(unquoteGitPath),
           );
         }
         if (hasDeletedFiles) {
           const deleted = await this.executeGitCommand(
-            ["ls-files", "--deleted"],
+            ['ls-files', '--deleted'],
             repoPath,
           );
           filesToStage.push(
             ...deleted
-              .split("\n")
+              .split('\n')
               .filter((f) => f.trim())
               .map(unquoteGitPath),
           );
         }
         if (filesToStage.length > 0) {
           await this.executeGitCommand(
-            ["add", "--", ...filesToStage],
+            ['add', '--', ...filesToStage],
             repoPath,
           );
         }
       }
 
-      await this.executeGitCommand(["commit", "-m", message], repoPath);
-      Logger.log("Changes committed successfully");
+      await this.executeGitCommand(['commit', '-m', message], repoPath);
+      Logger.log('Changes committed successfully');
 
       TelemetryService.sendEvent({
-        name: "commit_completed",
+        name: 'commit_completed',
         hasStaged: hasStagedChanges,
         hasUntracked: hasUntrackedFiles,
         hasDeleted: hasDeletedFiles,
@@ -113,17 +113,17 @@ export class GitService {
       });
     } catch (error) {
       TelemetryService.sendEvent({
-        name: "commit_failed",
+        name: 'commit_failed',
         ...sanitizeErrorForTelemetry(toError(error)),
       });
-      Logger.error("Failed to commit changes:", toError(error));
+      Logger.error('Failed to commit changes:', toError(error));
       throw error;
     }
   }
 
   private static async hasRemotes(repoPath: string): Promise<boolean> {
     try {
-      const result = await this.executeGitCommand(["remote"], repoPath);
+      const result = await this.executeGitCommand(['remote'], repoPath);
       return result.trim().length > 0;
     } catch {
       return false;
@@ -134,22 +134,22 @@ export class GitService {
     try {
       const repo = repository || (await this.getActiveRepository());
       if (!repo?.rootUri) {
-        throw new Error("No active repository found");
+        throw new Error('No active repository found');
       }
 
       const repoPath = repo.rootUri.fsPath;
       if (!(await this.hasRemotes(repoPath))) {
         throw new Error(
-          "Repository has no configured remotes. Please add a remote repository using git remote add <name> <url>",
+          'Repository has no configured remotes. Please add a remote repository using git remote add <name> <url>',
         );
       }
 
-      await this.executeGitCommand(["push"], repoPath);
-      TelemetryService.sendEvent({ name: "push_completed" });
+      await this.executeGitCommand(['push'], repoPath);
+      TelemetryService.sendEvent({ name: 'push_completed' });
     } catch (error) {
-      Logger.error("Failed to push changes:", toError(error));
+      Logger.error('Failed to push changes:', toError(error));
       TelemetryService.sendEvent({
-        name: "push_failed",
+        name: 'push_failed',
         ...sanitizeErrorForTelemetry(toError(error)),
       });
       throw error;
@@ -163,18 +163,18 @@ export class GitService {
   ): Promise<string> {
     try {
       const hasHead = await this.hasHead(repoPath);
-      const hasStagedChanges = knownHasStagedChanges ?? await this.hasChanges(repoPath, "staged");
+      const hasStagedChanges = knownHasStagedChanges ?? await this.hasChanges(repoPath, 'staged');
       const hasUnstagedChanges =
-        !onlyStagedChanges && (await this.hasChanges(repoPath, "unstaged"));
+        !onlyStagedChanges && (await this.hasChanges(repoPath, 'unstaged'));
       const hasUntrackedFiles =
         !onlyStagedChanges &&
         !hasStagedChanges &&
-        (await this.hasChanges(repoPath, "untracked"));
+        (await this.hasChanges(repoPath, 'untracked'));
       const hasDeletedFiles =
         hasHead &&
         !onlyStagedChanges &&
         !hasStagedChanges &&
-        (await this.hasChanges(repoPath, "deleted"));
+        (await this.hasChanges(repoPath, 'deleted'));
 
       if (
         !hasStagedChanges &&
@@ -190,11 +190,11 @@ export class GitService {
       if (onlyStagedChanges && hasStagedChanges) {
         const staged = await this.getStagedDiff(repoPath);
         diffs.push(...staged);
-        return diffs.join("\n\n").trim();
+        return diffs.join('\n\n').trim();
       }
 
       if (hasStagedChanges) {
-        const staged = await this.getStagedDiff(repoPath, "# Staged changes:\n");
+        const staged = await this.getStagedDiff(repoPath, '# Staged changes:\n');
         diffs.push(...staged);
       }
 
@@ -217,7 +217,7 @@ export class GitService {
         }
       }
 
-      const combinedDiff = diffs.join("\n\n").trim();
+      const combinedDiff = diffs.join('\n\n').trim();
       if (!combinedDiff) {
         throw new NoChangesDetectedError();
       }
@@ -227,7 +227,7 @@ export class GitService {
       if (error instanceof NoChangesDetectedError) {
         throw error;
       }
-      Logger.error("Error getting diff:", toError(error));
+      Logger.error('Error getting diff:', toError(error));
       throw new Error(`Failed to get diff: ${(toError(error)).message}`, { cause: error });
     }
   }
@@ -235,10 +235,10 @@ export class GitService {
   private static async isSubmodule(file: string, repoPath: string): Promise<boolean> {
     try {
       const { stdout } = await this.execGit(
-        ["ls-files", "--stage", "--", file],
+        ['ls-files', '--stage', '--', file],
         repoPath,
       );
-      return stdout.includes("160000");
+      return stdout.includes('160000');
     } catch {
       return false;
     }
@@ -251,7 +251,7 @@ export class GitService {
     prefix?: string
   ): Promise<string[]> {
     const files = (await this.executeGitCommand(listArgs, repoPath))
-      .split("\n")
+      .split('\n')
       .filter((file) => file.trim())
       .map(unquoteGitPath);
 
@@ -260,7 +260,7 @@ export class GitService {
         return null;
       }
       const fileDiff = await this.executeGitCommand(
-        [...diffArgs, "--", file],
+        [...diffArgs, '--', file],
         repoPath,
       );
       if (!fileDiff.trim()) {
@@ -275,8 +275,8 @@ export class GitService {
   private static async getStagedDiff(repoPath: string, prefix?: string): Promise<string[]> {
     return this.getDiffForFiles(
       repoPath,
-      ["diff", "--cached", "--name-only"],
-      ["diff", "--cached"],
+      ['diff', '--cached', '--name-only'],
+      ['diff', '--cached'],
       prefix,
     );
   }
@@ -284,19 +284,19 @@ export class GitService {
   private static async getUnstagedDiff(repoPath: string): Promise<string[]> {
     return this.getDiffForFiles(
       repoPath,
-      ["diff", "--name-only"],
-      ["diff"],
-      "# Unstaged changes:\n",
+      ['diff', '--name-only'],
+      ['diff'],
+      '# Unstaged changes:\n',
     );
   }
 
   private static async getUntrackedDiff(repoPath: string): Promise<string> {
     const untrackedFiles = await this.executeGitCommand(
-      ["ls-files", "--others", "--exclude-standard"],
+      ['ls-files', '--others', '--exclude-standard'],
       repoPath,
     );
     const untrackedFileList = untrackedFiles
-      .split("\n")
+      .split('\n')
       .filter((file) => file.trim())
       .map(unquoteGitPath);
     const untrackedDiff = await mapLimit(
@@ -306,38 +306,38 @@ export class GitService {
         try {
           const content = await fs.promises.readFile(
             path.join(repoPath, file),
-            "utf-8",
+            'utf-8',
           );
 
-          if (content.includes("\0")) {
+          if (content.includes('\0')) {
             return `diff --git a/${file} b/${file}\nnew file mode 100644\nBinary file ${file}`;
           }
 
-          const lines = content.split("\n");
+          const lines = content.split('\n');
           const contentDiff = lines
             .map((line: string) => `+${line}`)
-            .join("\n");
+            .join('\n');
           return `diff --git a/${file} b/${file}\nnew file mode 100644\nindex 0000000..${this.calculateFileHash(content)}\n--- /dev/null\n+++ b/${file}\n@@ -0,0 +1,${lines.length} @@\n${contentDiff}`;
         } catch (error) {
           Logger.error(
             `Error reading new file ${file}:`,
             toError(error),
           );
-          return "";
+          return '';
         }
       },
     );
     const validDiffs = untrackedDiff.filter((diff) => diff.trim());
-    return validDiffs.length > 0 ? "# New files:\n" + validDiffs.join("\n") : "";
+    return validDiffs.length > 0 ? '# New files:\n' + validDiffs.join('\n') : '';
   }
 
   private static async getDeletedDiff(repoPath: string): Promise<string> {
     const deletedFiles = await this.executeGitCommand(
-      ["ls-files", "--deleted"],
+      ['ls-files', '--deleted'],
       repoPath,
     );
     const deletedFileList = deletedFiles
-      .split("\n")
+      .split('\n')
       .filter((file) => file.trim())
       .map(unquoteGitPath);
     const deletedDiff = await mapLimit(
@@ -346,29 +346,29 @@ export class GitService {
       async (file) => {
         try {
           const oldContent = await this.executeGitCommand(
-            ["show", `HEAD:${file}`],
+            ['show', `HEAD:${file}`],
             repoPath,
           );
-          const lines = oldContent.split("\n");
+          const lines = oldContent.split('\n');
           // Remove trailing empty line that git show adds
-          if (lines[lines.length - 1] === "") {
+          if (lines[lines.length - 1] === '') {
             lines.pop();
           }
           const lineCount = lines.length;
-          const contentDiff = lines.map((line) => `-${line}`).join("\n");
+          const contentDiff = lines.map((line) => `-${line}`).join('\n');
           return `diff --git a/${file} b/${file}\ndeleted file mode 100644\n--- a/${file}\n+++ /dev/null\n@@ -1,${lineCount} +0,0 @@\n${contentDiff}\n`;
         } catch {
-          return "";
+          return '';
         }
       },
     );
     const validDiffs = deletedDiff.filter((diff) => diff.trim());
-    return validDiffs.length > 0 ? "# Deleted files:\n" + validDiffs.join("\n") : "";
+    return validDiffs.length > 0 ? '# Deleted files:\n' + validDiffs.join('\n') : '';
   }
 
   public static async hasHead(repoPath: string): Promise<boolean> {
     try {
-      await this.execGit(["rev-parse", "HEAD"], repoPath);
+      await this.execGit(['rev-parse', 'HEAD'], repoPath);
       return true;
     } catch {
       return false;
@@ -377,22 +377,22 @@ export class GitService {
 
   static async hasChanges(
     repoPath: string,
-    type: "staged" | "unstaged" | "untracked" | "deleted",
+    type: 'staged' | 'unstaged' | 'untracked' | 'deleted',
   ): Promise<boolean> {
     try {
       let command: string[];
       switch (type) {
-        case "staged":
-          command = ["diff", "--cached", "--name-only"];
+        case 'staged':
+          command = ['diff', '--cached', '--name-only'];
           break;
-        case "unstaged":
-          command = ["diff", "--name-only"];
+        case 'unstaged':
+          command = ['diff', '--name-only'];
           break;
-        case "untracked":
-          command = ["ls-files", "--others", "--exclude-standard"];
+        case 'untracked':
+          command = ['ls-files', '--others', '--exclude-standard'];
           break;
-        case "deleted":
-          command = ["ls-files", "--deleted"];
+        case 'deleted':
+          command = ['ls-files', '--deleted'];
           break;
         default:
           throw new Error(`Invalid change type: ${type}`);
@@ -411,32 +411,28 @@ export class GitService {
     onlyStaged: boolean = false,
   ): Promise<string[]> {
     try {
-      const statusCommand = ["status", "--porcelain"];
+      const statusCommand = ['status', '--porcelain'];
       const output = await this.executeGitCommand(statusCommand, repoPath);
 
       return output
-        .split("\n")
-        .filter((line) => line.trim() !== "")
+        .split('\n')
+        .filter((line) => line.trim() !== '')
         .filter((line) => {
-          if (line.includes("Subproject commit") || line.includes("Entering")) {
-            return false;
-          }
-
           if (onlyStaged) {
             // For staged changes, check first character
             return STAGED_STATUS_CODES.includes(line[0] as GitStatusCode);
           }
           // For all changes, check both staged and unstaged status
           const [staged, unstaged] = [line[0], line[1]];
-          return staged !== " " || unstaged !== " ";
+          return staged !== ' ' || unstaged !== ' ';
         })
         .map((line) => {
           const status = line.substring(0, 2);
           let filePath = line.substring(3).trim();
 
           // Handle renamed files (they have format "R100 old-name -> new-name")
-          if (status.startsWith("R")) {
-            filePath = filePath.split(" -> ")[1];
+          if (status.startsWith('R')) {
+            filePath = filePath.split(' -> ')[1];
           }
 
           // Unquote paths that git quoted due to spaces or special characters
@@ -445,7 +441,7 @@ export class GitService {
           return filePath;
         });
     } catch (error) {
-      Logger.error("Error getting changed files:", toError(error));
+      Logger.error('Error getting changed files:', toError(error));
       return [];
     }
   }
@@ -460,7 +456,7 @@ export class GitService {
 
   static async getRepositories(): Promise<vscode.SourceControl[]> {
     const extension =
-      vscode.extensions.getExtension<GitExtension>("vscode.git");
+      vscode.extensions.getExtension<GitExtension>('vscode.git');
     if (!extension) {
       throw new GitExtensionNotFoundError();
     }
@@ -481,13 +477,13 @@ export class GitService {
     const repoOptions = repos.map((repo) => ({
       label: repo.rootUri
         ? path.basename(repo.rootUri.fsPath)
-        : "Unknown repository",
+        : 'Unknown repository',
       description: repo.rootUri ? repo.rootUri.fsPath : undefined,
       repository: repo,
     }));
 
     const selected = await vscode.window.showQuickPick(repoOptions, {
-      placeHolder: "Select the repository to generate commit message",
+      placeHolder: 'Select the repository to generate commit message',
     });
 
     if (!selected) {
@@ -527,7 +523,7 @@ export class GitService {
 
   static async validateGitExtension(): Promise<void> {
     const extension =
-      vscode.extensions.getExtension<GitExtension>("vscode.git");
+      vscode.extensions.getExtension<GitExtension>('vscode.git');
     if (!extension) {
       throw new GitExtensionNotFoundError();
     }
@@ -544,26 +540,26 @@ export class GitService {
       const timeoutMs =
         timeoutSeconds === -1 ? undefined : timeoutSeconds * 1000;
 
-      const child = spawn("git", args, {
+      const child = spawn('git', args, {
         cwd,
         env: {
           ...process.env,
           // eslint-disable-next-line @typescript-eslint/naming-convention
-          GIT_TERMINAL_PROMPT: "0",
+          GIT_TERMINAL_PROMPT: '0',
         },
         timeout: timeoutMs,
       });
-      let stdout = "";
-      let stderr = "";
+      let stdout = '';
+      let stderr = '';
       let aborted = false;
 
       const onAbort = (): void => {
         aborted = true;
-        child.kill("SIGTERM");
+        child.kill('SIGTERM');
         // Hard-kill if still alive after grace period
         setTimeout(() => {
           if (!child.killed) {
-            child.kill("SIGKILL");
+            child.kill('SIGKILL');
           }
         }, 1500).unref?.();
       };
@@ -572,38 +568,38 @@ export class GitService {
         if (options.signal.aborted) {
           onAbort();
         } else {
-          options.signal.addEventListener("abort", onAbort, { once: true });
+          options.signal.addEventListener('abort', onAbort, { once: true });
         }
       }
 
-      child.stdout.on("data", (data: Buffer) => {
+      child.stdout.on('data', (data: Buffer) => {
         stdout += data.toString();
       });
 
-      child.stderr.on("data", (data: Buffer) => {
+      child.stderr.on('data', (data: Buffer) => {
         stderr += data.toString();
       });
 
-      child.on("error", (err: Error) => {
+      child.on('error', (err: Error) => {
         if (options.signal) {
-          options.signal.removeEventListener("abort", onAbort);
+          options.signal.removeEventListener('abort', onAbort);
         }
         reject(err);
       });
 
-      child.on("close", (code: number | null, signal: NodeJS.Signals | null) => {
+      child.on('close', (code: number | null, signal: NodeJS.Signals | null) => {
         if (options.signal) {
-          options.signal.removeEventListener("abort", onAbort);
+          options.signal.removeEventListener('abort', onAbort);
         }
         if (aborted) {
-          reject(new Error("Git command cancelled"));
+          reject(new Error('Git command cancelled'));
           return;
         }
-        if (signal === "SIGTERM" || signal === "SIGKILL") {
+        if (signal === 'SIGTERM' || signal === 'SIGKILL') {
           // Likely killed by the spawn `timeout` option
           reject(
             new Error(
-              `Git command timed out after ${timeoutSeconds}s: git ${args[0] ?? ""}`,
+              `Git command timed out after ${timeoutSeconds}s: git ${args[0] ?? ''}`,
             ),
           );
           return;
@@ -623,35 +619,35 @@ export class GitService {
     filePath: string,
     repoPath: string,
   ): Promise<boolean> {
-    const normalizedPath = path.normalize(filePath.replace(/^\/+/, ""));
+    const normalizedPath = path.normalize(filePath.replace(/^\/+/, ''));
     const { stdout } = await this.execGit(
-      ["status", "--porcelain", "--", normalizedPath],
+      ['status', '--porcelain', '--', normalizedPath],
       repoPath,
     );
     const status = stdout.slice(0, 2);
-    return status === "??" || status === "A ";
+    return status === '??' || status === 'A ';
   }
 
   public static async isFileDeleted(
     filePath: string,
     repoPath: string,
   ): Promise<boolean> {
-    const normalizedPath = path.normalize(filePath.replace(/^\/+/, ""));
+    const normalizedPath = path.normalize(filePath.replace(/^\/+/, ''));
     const { stdout } = await this.execGit(
-      ["status", "--porcelain", "--", normalizedPath],
+      ['status', '--porcelain', '--', normalizedPath],
       repoPath,
     );
     const status = stdout.slice(0, 2);
-    return status === " D" || status === "D ";
+    return status === ' D' || status === 'D ';
   }
 
   private static calculateFileHash(content: string): string {
     const buffer = Buffer.from(content);
     const header = `blob ${buffer.byteLength}\0`;
-    return createHash("sha1")
+    return createHash('sha1')
       .update(header)
       .update(buffer)
-      .digest("hex")
+      .digest('hex')
       .substring(0, 7);
   }
 }
