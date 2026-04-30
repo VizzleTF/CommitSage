@@ -12,6 +12,7 @@ import {
 } from "../models/errors";
 import { TelemetryService } from "./telemetryService";
 import { toError, sanitizeErrorForTelemetry } from "../utils/errorUtils";
+import { unquoteGitPath } from "../utils/gitPath";
 
 const GIT_STATUS_CODES = {
   modified: "M",
@@ -30,40 +31,6 @@ const STAGED_STATUS_CODES: GitStatusCode[] = [
   GIT_STATUS_CODES.deleted,
   GIT_STATUS_CODES.renamed,
 ];
-
-/**
- * Unquotes a file path returned by git.
- * Git quotes paths containing spaces or special characters (including Unicode).
- * Unicode characters are escaped as octal sequences (e.g., ⚡ → \342\232\241).
- * This function removes the quotes and unescapes the path.
- */
-function unquoteGitPath(filePath: string): string {
-  if (!filePath.startsWith('"') || !filePath.endsWith('"')) {
-    return filePath;
-  }
-  // Remove surrounding quotes
-  let unquoted = filePath.slice(1, -1);
-
-  // Unescape octal sequences (e.g., \342\232\241 for ⚡)
-  // Git uses octal escape sequences for non-ASCII characters
-  unquoted = unquoted.replace(/\\([0-7]{3})/g, (_, octal) => {
-    return String.fromCharCode(parseInt(octal, 8));
-  });
-
-  // Convert the resulting byte sequence to proper UTF-8 string
-  // The octal escapes represent UTF-8 bytes, so we need to decode them
-  try {
-    const bytes = new Uint8Array([...unquoted].map((c) => c.charCodeAt(0)));
-    unquoted = new TextDecoder("utf-8").decode(bytes);
-  } catch {
-    Logger.warn(`UTF-8 decoding failed for git path: ${filePath}`);
-  }
-
-  // Unescape common escape sequences
-  unquoted = unquoted.replace(/\\"/g, '"');
-  unquoted = unquoted.replace(/\\\\/g, "\\");
-  return unquoted;
-}
 
 export class GitService {
   static async initialize(): Promise<void> {
@@ -97,7 +64,37 @@ export class GitService {
       }
 
       if ((hasUntrackedFiles || hasDeletedFiles) && !hasStagedChanges) {
-        await this.executeGitCommand(["add", "-A"], repoPath);
+        const filesToStage: string[] = [];
+        if (hasUntrackedFiles) {
+          const untracked = await this.executeGitCommand(
+            ["ls-files", "--others", "--exclude-standard"],
+            repoPath,
+          );
+          filesToStage.push(
+            ...untracked
+              .split("\n")
+              .filter((f) => f.trim())
+              .map(unquoteGitPath),
+          );
+        }
+        if (hasDeletedFiles) {
+          const deleted = await this.executeGitCommand(
+            ["ls-files", "--deleted"],
+            repoPath,
+          );
+          filesToStage.push(
+            ...deleted
+              .split("\n")
+              .filter((f) => f.trim())
+              .map(unquoteGitPath),
+          );
+        }
+        if (filesToStage.length > 0) {
+          await this.executeGitCommand(
+            ["add", "--", ...filesToStage],
+            repoPath,
+          );
+        }
       }
 
       await this.executeGitCommand(["commit", "-m", message], repoPath);
@@ -451,10 +448,7 @@ export class GitService {
     args: string[],
     cwd: string,
   ): Promise<string> {
-    const { stdout, stderr } = await this.execGit(args, cwd);
-    if (stderr) {
-      throw new Error(stderr);
-    }
+    const { stdout } = await this.execGit(args, cwd);
     return stdout;
   }
 

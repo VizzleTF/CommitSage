@@ -43,9 +43,10 @@ export class OpenAIService {
 
             const payload = {
                 model,
-                messages: [{ role: "user", content: prompt }],
+                messages: [{ role: 'user', content: prompt }],
                 temperature: 0.7,
-                maxTokens: options?.maxTokens ?? 1024
+                // eslint-disable-next-line @typescript-eslint/naming-convention
+                max_tokens: options?.maxTokens ?? 1024
             };
 
             await RetryUtils.updateProgressForAttempt(progress, attempt);

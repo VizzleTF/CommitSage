@@ -6,6 +6,9 @@ out/**
 test/**
 docs/**
 .github/**
+.claude/**
+.commitsage/**
+TECH_DEBT_AUDIT.md
 
 # Configuration files
 .gitignore
