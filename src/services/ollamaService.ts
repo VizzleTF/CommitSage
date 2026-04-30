@@ -2,6 +2,7 @@ import axios, { AxiosError } from 'axios';
 import { Logger } from '../utils/logger';
 import { CommitMessage, ProgressReporter, GenerateOptions } from '../models/types';
 import { ConfigService } from '../utils/configService';
+import { ApiKeyInvalidError } from '../models/errors';
 import { extractAndValidateMessage, handleHttpError } from './baseAIService';
 import { HttpUtils } from '../utils/httpUtils';
 import { RetryUtils } from '../utils/retryUtils';
@@ -23,8 +24,8 @@ export class OllamaService {
         attempt: number = 1,
         options?: GenerateOptions
     ): Promise<CommitMessage> {
-        const baseUrl = ConfigService.getOllamaBaseUrl() || 'http://localhost:11434';
-        const model = ConfigService.getOllamaModel() || this.defaultModel;
+        const baseUrl = ConfigService.get('ollama.baseUrl') || 'http://localhost:11434';
+        const model = ConfigService.get('ollama.model') || this.defaultModel;
         const apiUrl = `${baseUrl}/api/chat`;
 
         const payload: Record<string, unknown> = {
@@ -63,6 +64,10 @@ export class OllamaService {
             Logger.log(`Commit message generated using ${model} model`);
             return { message: commitMessage, model };
         } catch (error) {
+            if (error instanceof AxiosError && error.response?.status === 401) {
+                throw new ApiKeyInvalidError('Ollama');
+            }
+
             return RetryUtils.handleGenerationError(
                 toError(error),
                 prompt,
@@ -70,13 +75,6 @@ export class OllamaService {
                 attempt,
                 (p, pr, a) => this.generateCommitMessage(p, pr, a, options),
                 (err: Error) => {
-                    if (err instanceof AxiosError && err.response?.status === 401) {
-                        return {
-                            errorMessage: 'Ollama authentication failed. Check your auth token via "Set Ollama Auth Token".',
-                            shouldRetry: false,
-                            statusCode: 401
-                        };
-                    }
                     if (err instanceof AxiosError && err.response?.status === 404) {
                         return {
                             errorMessage: 'Model not found. Please check if Ollama is running and the model is installed.',

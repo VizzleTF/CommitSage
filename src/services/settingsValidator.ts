@@ -1,10 +1,6 @@
 import * as vscode from 'vscode';
-import * as fs from 'fs';
-import * as path from 'path';
 import { Logger } from '../utils/logger';
 import { ConfigService } from '../utils/configService';
-import { ProjectConfig } from '../models/types';
-import { toError } from '../utils/errorUtils';
 
 export class SettingsValidator {
     static async validateAllSettings(): Promise<void> {
@@ -15,55 +11,35 @@ export class SettingsValidator {
     }
 
     static async validateProjectConfig(): Promise<void> {
-        const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
-        if (!workspaceFolder) {
+        const result = ConfigService.hasValidProjectConfig();
+        if (result.valid) {
+            if (result.configPath) {
+                Logger.log('Project configuration (.commitsage/config.json) validated successfully');
+            }
             return;
         }
 
-        const legacyPath = path.join(workspaceFolder.uri.fsPath, '.commitsage');
-        const dirConfigPath = path.join(workspaceFolder.uri.fsPath, '.commitsage', 'config.json');
+        Logger.error('Error validating .commitsage file:', result.error ?? new Error('Unknown error'));
 
-        // Resolve which config file to validate
-        let configPath: string;
-        if (!fs.existsSync(legacyPath)) {
-            return;
-        } else if (fs.statSync(legacyPath).isDirectory()) {
-            if (!fs.existsSync(dirConfigPath)) {
-                // Directory exists but no config.json yet — nothing to validate
-                return;
-            }
-            configPath = dirConfigPath;
-        } else {
-            configPath = legacyPath;
-        }
+        const selection = await vscode.window.showErrorMessage(
+            'Invalid .commitsage configuration file. The file contains syntax errors.',
+            {
+                modal: true,
+                detail: 'The project configuration file has JSON syntax errors that prevent it from being loaded.'
+            },
+            { title: 'Open File', isCloseAffordance: false },
+            { title: 'Ignore', isCloseAffordance: true }
+        );
 
-        try {
-            const configContent = fs.readFileSync(configPath, 'utf8');
-            JSON.parse(configContent) as ProjectConfig;
-            Logger.log('Project configuration (.commitsage) validated successfully');
-        } catch (error) {
-            const selection = await vscode.window.showErrorMessage(
-                'Invalid .commitsage configuration file. The file contains syntax errors.',
-                {
-                    modal: true,
-                    detail: 'The project configuration file has JSON syntax errors that prevent it from being loaded.'
-                },
-                { title: 'Open File', isCloseAffordance: false },
-                { title: 'Ignore', isCloseAffordance: true }
-            );
-
-            if (selection?.title === 'Open File') {
-                const uri = vscode.Uri.file(configPath);
-                void vscode.window.showTextDocument(uri);
-            }
-
-            Logger.error('Error validating .commitsage file:', toError(error));
+        if (selection?.title === 'Open File' && result.configPath) {
+            const uri = vscode.Uri.file(result.configPath);
+            void vscode.window.showTextDocument(uri);
         }
     }
 
     static async validateAutoPushState(): Promise<void> {
-        const isAutoPushEnabled = ConfigService.getAutoPushEnabled();
-        const isAutoCommitEnabled = ConfigService.getAutoCommitEnabled();
+        const isAutoPushEnabled = ConfigService.get('commit.autoPush');
+        const isAutoCommitEnabled = ConfigService.get('commit.autoCommit');
 
         if (isAutoPushEnabled && !isAutoCommitEnabled) {
             const selection = await Logger.showWarning(
@@ -91,8 +67,8 @@ export class SettingsValidator {
     }
 
     static async validateCustomInstructions(): Promise<void> {
-        const useCustomInstructions = ConfigService.useCustomInstructions();
-        const instructions = ConfigService.getCustomInstructions();
+        const useCustomInstructions = ConfigService.get('commit.useCustomInstructions');
+        const instructions = ConfigService.get('commit.customInstructions');
 
         if (useCustomInstructions && !instructions.trim()) {
             void Logger.showWarning(
@@ -102,8 +78,8 @@ export class SettingsValidator {
     }
 
     static async validateRefsWithAutoCommit(): Promise<void> {
-        const autoCommitEnabled = ConfigService.getAutoCommitEnabled();
-        const promptForRefs = ConfigService.shouldPromptForRefs();
+        const autoCommitEnabled = ConfigService.get('commit.autoCommit');
+        const promptForRefs = ConfigService.get('commit.promptForRefs');
 
         if (autoCommitEnabled && promptForRefs) {
             const selection = await Logger.showWarning(

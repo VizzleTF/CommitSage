@@ -29,7 +29,7 @@ export class AIService {
         }
 
         const provider = ConfigService.getProvider();
-        const language = ConfigService.getCommitLanguage();
+        const language = ConfigService.get('commit.commitLanguage');
         const diffSize = diff.length;
         const truncated = diffSize > MAX_DIFF_LENGTH;
 

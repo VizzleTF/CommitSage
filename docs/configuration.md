@@ -69,7 +69,8 @@ Settings are resolved in the following order (higher priority wins):
 
 | Setting | Type | Default | Description |
 |---------|------|---------|-------------|
-| `commitSage.apiRequestTimeout` | `number` | `30` | API request timeout in seconds (`-1` for no timeout) |
+| `commitSage.apiRequestTimeout` | `number` | `30` | LLM provider HTTP request timeout in seconds (`-1` for no timeout) |
+| `commitSage.gitTimeout` | `number` | `120` | `git` subprocess timeout in seconds (`-1` for no timeout). Raise if pushes over a slow remote or diffs over huge files time out. |
 | `commitSage.telemetry.enabled` | `boolean` | `true` | Enable anonymous usage telemetry |
 
 ---

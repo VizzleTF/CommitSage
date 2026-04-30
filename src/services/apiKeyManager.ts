@@ -3,6 +3,7 @@ import { Logger } from '../utils/logger';
 import { ApiKeyValidator } from '../utils/apiKeyValidator';
 import { AiServiceError, ConfigurationError, UserCancelledError } from '../models/errors';
 import { toError } from '../utils/errorUtils';
+import { ConfigService } from '../utils/configService';
 
 interface ApiKeyConfig {
     secretKey: string;
@@ -42,6 +43,21 @@ export class ApiKeyManager {
 
     static requiresApiKey(provider: string): boolean {
         return provider in API_KEY_CONFIGS;
+    }
+
+    /**
+     * Whether the current configuration requires an API key/auth token. Same
+     * as `requiresApiKey`, but for ollama also consults `ollama.useAuthToken`
+     * since auth is opt-in for self-hosted Ollama.
+     */
+    static requiresKeyForCurrentConfig(provider: string): boolean {
+        if (!this.requiresApiKey(provider)) {
+            return false;
+        }
+        if (provider === 'ollama') {
+            return ConfigService.get('ollama.useAuthToken');
+        }
+        return true;
     }
 
     private static getConfig(provider: string): ApiKeyConfig {

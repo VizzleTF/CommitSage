@@ -11,15 +11,20 @@ vi.mock('../src/services/apiKeyManager', () => ({
     },
 }));
 
+const SETTINGS: Record<string, string | number | boolean> = {
+    'openai.model': 'gpt-test',
+    'openai.baseUrl': 'https://api.openai.com/v1',
+    'codestral.model': 'codestral-latest',
+    'ollama.model': 'llama3.2',
+    'ollama.baseUrl': 'http://localhost:11434',
+    'gemini.model': 'gemini-2.5-flash',
+    'apiRequestTimeout': 30,
+    'general.maxRetries': 3,
+};
+
 vi.mock('../src/utils/configService', () => ({
     ConfigService: {
-        getOpenAIModel: () => 'gpt-test',
-        getOpenAIBaseUrl: () => 'https://api.openai.com/v1',
-        getCodestralModel: () => 'codestral-latest',
-        getOllamaModel: () => 'llama3.2',
-        getOllamaBaseUrl: () => 'http://localhost:11434',
-        getGeminiModel: () => 'gemini-2.5-flash',
-        getApiRequestTimeout: () => 30,
+        get: (key: string) => SETTINGS[key],
     },
 }));
 
@@ -142,6 +147,21 @@ describe('OllamaService payload', () => {
         expect(payload).toMatchObject({
             options: { num_predict: 4096 },
         });
+    });
+
+    it('throws ApiKeyInvalidError on HTTP 401 (F037)', async () => {
+        const { OllamaService } = await import('../src/services/ollamaService');
+        const { ApiKeyInvalidError } = await import('../src/models/errors');
+        const { AxiosError } = await import('axios');
+
+        const err = new AxiosError('Unauthorized');
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (err as any).response = { status: 401, data: {} };
+        mockedPost.mockRejectedValueOnce(err);
+
+        await expect(
+            OllamaService.generateCommitMessage('hi', progress, 1)
+        ).rejects.toBeInstanceOf(ApiKeyInvalidError);
     });
 });
 

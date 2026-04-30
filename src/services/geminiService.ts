@@ -3,7 +3,7 @@ import { Logger } from '../utils/logger';
 import { ConfigService } from '../utils/configService';
 import { ProgressReporter, CommitMessage, GenerateOptions } from '../models/types';
 import { ApiKeyInvalidError } from '../models/errors';
-import { extractAndValidateMessage, handleHttpError } from './baseAIService';
+import { extractAndValidateMessage, withRetryAndApiKeyGuard } from './baseAIService';
 import { HttpUtils } from '../utils/httpUtils';
 import { RetryUtils } from '../utils/retryUtils';
 import { ApiKeyManager } from './apiKeyManager';
@@ -128,58 +128,57 @@ export class GeminiService {
         attempt: number = 1,
         options?: GenerateOptions
     ): Promise<CommitMessage> {
-        try {
-            const apiKey = await ApiKeyManager.getKey('gemini');
-            const configuredModel = ConfigService.getGeminiModel();
+        const apiKey = await ApiKeyManager.getKey('gemini');
+        const configuredModel = ConfigService.get('gemini.model');
 
-            if (configuredModel === 'auto') {
-                progress.report({ message: 'Fetching available Gemini models...', increment: 0 });
-                const availableModels = await this.getAvailableModels(apiKey, options?.signal);
+        // Auto-mode is structurally different (loops over models, accumulates
+        // 401s rather than failing fast), so it bypasses the helper.
+        if (configuredModel === 'auto') {
+            progress.report({ message: 'Fetching available Gemini models...', increment: 0 });
+            const availableModels = await this.getAvailableModels(apiKey, options?.signal);
 
-                if (availableModels.length === 0) {
-                    throw new Error('No available Gemini models found');
-                }
-
-                return await this.tryGenerateWithModels(prompt, progress, availableModels, apiKey, options);
+            if (availableModels.length === 0) {
+                throw new Error('No available Gemini models found');
             }
 
-            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${configuredModel}:generateContent`;
-
-            const payload = {
-                contents: [{ parts: [{ text: prompt }] }],
-                generationConfig: options?.maxTokens
-                    ? { ...GEMINI_GENERATION_CONFIG, maxOutputTokens: options.maxTokens }
-                    : GEMINI_GENERATION_CONFIG
-            };
-
-            await RetryUtils.updateProgressForAttempt(progress, attempt);
-
-            const requestConfig = HttpUtils.createRequestConfig(
-                { 'content-type': 'application/json', 'x-goog-api-key': apiKey },
-                undefined,
-                options?.signal
-            );
-
-            const response = await axios.post<GeminiResponse>(apiUrl, payload, requestConfig);
-            progress.report({ message: 'Processing generated message...', increment: 90 });
-
-            const message = this.extractCommitMessage(response.data);
-            Logger.log(`Commit message generated using ${configuredModel} model`);
-            return { message, model: configuredModel };
-        } catch (error) {
-            if (error instanceof AxiosError && error.response?.status === 401) {
-                throw new ApiKeyInvalidError('Gemini');
-            }
-
-            return RetryUtils.handleGenerationError(
-                toError(error),
-                prompt,
-                progress,
-                attempt,
-                (p, pr, a) => this.generateCommitMessage(p, pr, a, options),
-                (err: Error) => handleHttpError(err, 'Gemini API')
-            );
+            return this.tryGenerateWithModels(prompt, progress, availableModels, apiKey, options);
         }
+
+        return withRetryAndApiKeyGuard(
+            'Gemini',
+            prompt,
+            progress,
+            attempt,
+            (p, pr, a) => this.generateCommitMessage(p, pr, a, options),
+            async () => {
+                const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${configuredModel}:generateContent`;
+
+                const payload = {
+                    contents: [{ parts: [{ text: prompt }] }],
+                    generationConfig: options?.maxTokens
+                        ? { ...GEMINI_GENERATION_CONFIG, maxOutputTokens: options.maxTokens }
+                        : GEMINI_GENERATION_CONFIG
+                };
+
+                await RetryUtils.updateProgressForAttempt(progress, attempt);
+
+                const requestConfig = HttpUtils.createRequestConfig(
+                    { 'content-type': 'application/json', 'x-goog-api-key': apiKey },
+                    undefined,
+                    options?.signal
+                );
+
+                const response = await axios.post<GeminiResponse>(apiUrl, payload, requestConfig);
+                progress.report({ message: 'Processing generated message...', increment: 90 });
+
+                const message = extractAndValidateMessage(
+                    response.data.candidates?.[0]?.content?.parts?.[0]?.text,
+                    'Gemini'
+                );
+                Logger.log(`Commit message generated using ${configuredModel} model`);
+                return { message, model: configuredModel };
+            }
+        );
     }
 
     private static extractCommitMessage(response: GeminiResponse): string {

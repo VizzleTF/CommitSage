@@ -35,23 +35,28 @@ export class CustomLanguageService {
         }
     }
 
-    private static readTranslations(): TranslationsFile {
+    private static async readTranslations(): Promise<TranslationsFile> {
         const filePath = this.getTranslationsPath();
-        if (!filePath || !fs.existsSync(filePath)) {
+        if (!filePath) {
             return {};
         }
 
         try {
-            const content = fs.readFileSync(filePath, 'utf8');
+            const content = await fs.promises.readFile(filePath, 'utf8');
             return JSON.parse(content) as TranslationsFile;
         } catch (error) {
+            const err = error as NodeJS.ErrnoException;
+            // Missing file is the common case — not an error to log.
+            if (err && err.code === 'ENOENT') {
+                return {};
+            }
             Logger.error('Failed to read translations.json:', toError(error));
             return {};
         }
     }
 
-    static getCachedTemplate(format: CommitFormat, customLanguageName: string): string | null {
-        const translations = this.readTranslations();
+    static async getCachedTemplate(format: CommitFormat, customLanguageName: string): Promise<string | null> {
+        const translations = await this.readTranslations();
         const template = translations[customLanguageName]?.[format];
         if (template) {
             Logger.log(`Using cached custom language template for ${customLanguageName}/${format}`);
@@ -73,7 +78,7 @@ export class CustomLanguageService {
         try {
             await this.ensureCommitsageDirectory();
 
-            const translations = this.readTranslations();
+            const translations = await this.readTranslations();
             if (!translations[customLanguageName]) {
                 translations[customLanguageName] = {};
             }
@@ -138,7 +143,7 @@ Rules:
             return getTemplate(format, 'english');
         }
 
-        const cached = this.getCachedTemplate(format, customLanguageName);
+        const cached = await this.getCachedTemplate(format, customLanguageName);
         if (cached) {
             return cached;
         }

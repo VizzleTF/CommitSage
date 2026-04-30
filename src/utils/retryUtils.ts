@@ -11,7 +11,7 @@ export class RetryUtils {
     ): Promise<void> {
         const progressMessage = attempt === 1
             ? 'Generating commit message...'
-            : `Retry attempt ${attempt}/${ConfigService.getMaxRetries()}...`;
+            : `Retry attempt ${attempt}/${ConfigService.get('general.maxRetries')}...`;
         progress.report({ message: progressMessage, increment: 10 });
     }
 
@@ -35,7 +35,7 @@ export class RetryUtils {
         Logger.error(`Generation attempt ${attempt} failed:`, error);
         const { errorMessage, shouldRetry } = errorHandler(error);
 
-        if (shouldRetry && attempt < ConfigService.getMaxRetries()) {
+        if (shouldRetry && attempt < ConfigService.get('general.maxRetries')) {
             const delayMs = this.calculateRetryDelay(attempt);
             Logger.log(`Retrying in ${delayMs / 1000} seconds...`);
             progress.report({

@@ -37,12 +37,21 @@ const SETTING_DEFAULTS = {
     'openai.model': 'gpt-3.5-turbo',
     'openai.baseUrl': 'https://api.openai.com/v1',
     'apiRequestTimeout': 30,
+    'gitTimeout': 120,
     'telemetry.enabled': true,
 } as const satisfies Record<string, CacheValue>;
 /* eslint-enable @typescript-eslint/naming-convention */
 
 type SettingKey = keyof typeof SETTING_DEFAULTS;
-type SettingValue<K extends SettingKey> = (typeof SETTING_DEFAULTS)[K];
+// Widen the literal-type defaults (e.g. `30`) back to their general types
+// (`number`) so that `ConfigService.get('apiRequestTimeout') === -1` and
+// other equality / comparison checks against non-default values type-check.
+type Widened<T> =
+  T extends boolean ? boolean :
+  T extends number ? number :
+  T extends string ? string :
+  T;
+type SettingValue<K extends SettingKey> = Widened<(typeof SETTING_DEFAULTS)[K]>;
 
 export class ConfigService {
   private static cache = new Map<string, CacheValue>();
@@ -82,7 +91,7 @@ export class ConfigService {
         if (event.affectsConfiguration('commitSage')) {
           this.clearCache();
           if (event.affectsConfiguration('commitSage.openai.baseUrl')) {
-            const baseUrl = this.getOpenAIBaseUrl();
+            const baseUrl = this.get('openai.baseUrl');
             if (baseUrl) {
               try {
                 const normalizedEndpoint =
@@ -161,6 +170,44 @@ export class ConfigService {
     // Fallback: the first folder. Documented limitation for multi-root
     // setups where no editor is active.
     return folders[0].uri.fsPath;
+  }
+
+  /**
+   * Check whether the project's `.commitsage/config.json` (if present)
+   * is valid JSON and a plain object. Used by `SettingsValidator` to
+   * surface a user-facing dialog on parse errors without re-implementing
+   * the parse here. Returns `{ valid: true }` when there is no project
+   * config to validate (treated as "no problem").
+   */
+  static hasValidProjectConfig(): {
+    valid: boolean;
+    error?: Error;
+    configPath?: string;
+  } {
+    const rootPath = this.getProjectRootPath();
+    if (!rootPath) {
+      return { valid: true };
+    }
+    const configPath = path.join(rootPath, '.commitsage', 'config.json');
+    if (!fs.existsSync(configPath)) {
+      return { valid: true };
+    }
+    try {
+      const raw = fs.readFileSync(configPath, 'utf8');
+      const parsed = JSON.parse(raw) as unknown;
+      if (!this.isPlainObject(parsed)) {
+        return {
+          valid: false,
+          configPath,
+          error: new Error(
+            '.commitsage/config.json is not a JSON object at the top level.',
+          ),
+        };
+      }
+      return { valid: true, configPath };
+    } catch (error) {
+      return { valid: false, configPath, error: toError(error) };
+    }
   }
 
   private static getProjectConfig(): ProjectConfig | null {
@@ -317,19 +364,6 @@ export class ConfigService {
     }
   }
 
-  static getGeminiModel(): string { return this.get('gemini.model'); }
-  static getCommitLanguage(): string { return this.get('commit.commitLanguage'); }
-  static getCustomLanguageName(): string { return this.get('commit.customLanguageName'); }
-  static getCommitFormat(): string { return this.get('commit.commitFormat'); }
-  static useCustomInstructions(): boolean { return this.get('commit.useCustomInstructions'); }
-  static getCustomInstructions(): string { return this.get('commit.customInstructions'); }
-  static getCodestralModel(): string { return this.get('codestral.model'); }
-  static shouldPromptForRefs(): boolean { return this.get('commit.promptForRefs'); }
-  static getOnlyStagedChanges(): boolean { return this.get('commit.onlyStagedChanges'); }
-  static getMaxRetries(): number { return this.get('general.maxRetries'); }
-  static getAutoCommitEnabled(): boolean { return this.get('commit.autoCommit'); }
-  static getAutoPushEnabled(): boolean { return this.get('commit.autoPush'); }
-
   static getProvider(): string {
     const provider = this.get('provider.type');
     if (!['gemini', 'openai', 'codestral', 'ollama'].includes(provider)) {
@@ -356,8 +390,6 @@ export class ConfigService {
     }
   }
 
-  static isTelemetryEnabled(): boolean { return this.get('telemetry.enabled'); }
-
   private static validateAndNormalizeEndpoint(endpoint: string): string {
     if (!endpoint) {
       return '';
@@ -378,10 +410,4 @@ export class ConfigService {
     return normalizedEndpoint;
   }
 
-  static getOllamaBaseUrl(): string { return this.get('ollama.baseUrl'); }
-  static getOllamaModel(): string { return this.get('ollama.model'); }
-  static getOllamaUseAuthToken(): boolean { return this.get('ollama.useAuthToken'); }
-  static getOpenAIModel(): string { return this.get('openai.model'); }
-  static getOpenAIBaseUrl(): string { return this.get('openai.baseUrl'); }
-  static getApiRequestTimeout(): number { return this.get('apiRequestTimeout'); }
 }

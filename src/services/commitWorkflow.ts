@@ -29,9 +29,7 @@ export class CommitWorkflow {
 
             // Pre-check API key if required for the provider
             const provider = ConfigService.getProvider();
-            const needsApiKey = ApiKeyManager.requiresApiKey(provider) &&
-                (provider !== 'ollama' || ConfigService.getOllamaUseAuthToken());
-            if (needsApiKey) {
+            if (ApiKeyManager.requiresKeyForCurrentConfig(provider)) {
                 await this.ensureApiKey(provider);
             }
 
@@ -139,7 +137,7 @@ export class CommitWorkflow {
         }
 
         const repoPath = sourceControlRepository.rootUri.fsPath;
-        const onlyStagedSetting = ConfigService.getOnlyStagedChanges();
+        const onlyStagedSetting = ConfigService.get('commit.onlyStagedChanges');
         const hasStagedChanges = await GitService.hasChanges(repoPath, 'staged');
         const useStagedChanges = onlyStagedSetting || hasStagedChanges;
 
@@ -156,7 +154,7 @@ export class CommitWorkflow {
         const blameAnalyses = await mapLimit(
             changedFiles,
             BLAME_CONCURRENCY,
-            (file) => GitBlameAnalyzer.analyzeChanges(repoPath, file)
+            (file) => GitBlameAnalyzer.analyzeChanges(repoPath, file.path, file.status)
         );
         const blameAnalysis = blameAnalyses.filter(analysis => analysis).join('\n\n');
 
@@ -172,7 +170,7 @@ export class CommitWorkflow {
 
         sourceControlRepository.inputBox.value = commitMessage.message;
 
-        if (ConfigService.getAutoCommitEnabled()) {
+        if (ConfigService.get('commit.autoCommit')) {
             await this.handleAutoCommit(sourceControlRepository);
         }
 
@@ -192,7 +190,7 @@ export class CommitWorkflow {
 
             await GitService.commitChanges(repository.inputBox.value, repository);
 
-            if (ConfigService.getAutoPushEnabled()) {
+            if (ConfigService.get('commit.autoPush')) {
                 await GitService.pushChanges(repository);
             }
         } catch (error) {
