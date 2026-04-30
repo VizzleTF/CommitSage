@@ -2,6 +2,7 @@
     "compilerOptions": {
         "module": "commonjs",
         "moduleResolution": "node10",
+        "ignoreDeprecations": "6.0",
         "target": "ES2022",
         "outDir": "dist",
         "lib": [
@@ -19,6 +20,8 @@
     },
     "exclude": [
         "node_modules",
-        ".vscode-test"
+        ".vscode-test",
+        "tests",
+        "vitest.config.ts"
     ]
 }
