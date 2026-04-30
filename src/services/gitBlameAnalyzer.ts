@@ -2,7 +2,7 @@ import * as path from 'path';
 import * as fs from 'fs';
 import { Logger } from '../utils/logger';
 import { errorMessages } from '../utils/constants';
-import { GitService } from './gitService';
+import { GitService, isDeletedStatus, isNewStatus } from './gitService';
 import { toError } from '../utils/errorUtils';
 import {
   BlameInfo,
@@ -65,23 +65,28 @@ export class GitBlameAnalyzer {
   static async analyzeChanges(
     repoPath: string,
     filePath: string,
+    knownStatus?: string,
   ): Promise<string> {
     try {
-      // First check if file is deleted or new, as these don't need blame analysis
-      // Use git status to check file state
       const normalizedPath = path.normalize(filePath.replace(/^\/+/, ''));
 
-      if (await GitService.isFileDeleted(normalizedPath, repoPath)) {
-        Logger.log(
-          `Skipping blame analysis for deleted file: ${normalizedPath}`,
-        );
+      // Decide deleted/new status. If the caller already has the porcelain
+      // status code from `getChangedFiles`, decode it locally — saves one
+      // (or two) `git status --porcelain` subprocess invocations per file.
+      // Otherwise fall back to asking git directly.
+      const isDeleted = knownStatus !== undefined
+        ? isDeletedStatus(knownStatus)
+        : await GitService.isFileDeleted(normalizedPath, repoPath);
+      if (isDeleted) {
+        Logger.log(`Skipping blame analysis for deleted file: ${normalizedPath}`);
         return `Deleted file: ${normalizedPath}`;
       }
 
-      if (await GitService.isNewFile(normalizedPath, repoPath)) {
-        Logger.log(
-          `Skipping blame analysis for new file: ${normalizedPath}`,
-        );
+      const isNew = knownStatus !== undefined
+        ? isNewStatus(knownStatus)
+        : await GitService.isNewFile(normalizedPath, repoPath);
+      if (isNew) {
+        Logger.log(`Skipping blame analysis for new file: ${normalizedPath}`);
         return `New file: ${normalizedPath}`;
       }
 

@@ -1,22 +1,24 @@
 # Tech Debt Audit — CommitSage
 
-Generated: 2026-04-30
-Repo size: ~5,580 LOC TypeScript across 41 files. VS Code extension, single module.
-Tooling actually run: `tsc --noEmit`, `npm audit`, `git log/blame`, manual code reading.
-Tooling not run (not installed, didn't auto-install per skill rules): `knip`, `madge --circular`, `depcheck`.
+Initial audit: 2026-04-30
+Repeat run: 2026-04-30 (post-F033 sweep) — all 14 second-order findings now also resolved.
+Repo size: ~5,800 LOC TypeScript across 42 files. VS Code extension, single module.
+Tooling actually run on repeat: `tsc --noEmit` (clean), `npm audit` (0 vulns), `npm test` (92/92 pass across 11 files), `npm run build:prod` (clean), `git log`, manual code reading.
 
-## Executive summary
+## Executive summary (post-sweep, repeat run COMPLETED)
 
-- **Real correctness bug**: `OpenAIService` sends `maxTokens` (camelCase) instead of `max_tokens` to the OpenAI Chat Completions API, which silently drops the field. The 4096-token translation budget for `customLanguageService` is being ignored for OpenAI/Codestral/Ollama. (`src/services/openaiService.ts:48`, `src/services/codestralService.ts:35-38`, `src/services/ollamaService.ts:32-38`)
-- **Real correctness bug**: `createProjectConfig` writes the legacy flat `.commitsage` file format, which `ConfigService.migrateProjectConfig()` immediately rewrites to `.commitsage/config.json` on next activation — and it writes `gemini-1.5-flash`, a model not in any current enum or README list. (`src/commands/createProjectConfig.ts:15,49`)
-- **Real correctness bug**: `GitService.executeGitCommand` throws on any non-empty stderr regardless of git's exit code; many normal git commands (commit/add hooks, push progress) write to stderr on success and break this. (`src/services/gitService.ts:454-459`)
-- **Security/privacy**: Gemini API keys are passed in the URL query string (`?key=…`), so they end up inside `axios` error messages and stack traces, which then flow into `Logger.error` and into the telemetry pipeline (only file paths are sanitized). (`src/services/geminiService.ts:42,82,140`, `src/utils/errorUtils.ts:8-15`)
-- **No tests at all.** No `*.test.ts`, no `tests/` dir, no test runner in `package.json`. For a 5.5k-LOC extension that talks to four external APIs and parses git output, this is the single biggest debt category.
-- **Cancellation token does not propagate** into HTTP calls. Users clicking "Cancel" only stops at coarse checkpoints; the in-flight `axios.post` to Gemini/OpenAI/Codestral/Ollama runs to completion. (`src/services/commitWorkflow.ts:35-43,148`)
-- **Unbounded fan-out** in `commitWorkflow` and `gitService`: `Promise.all` over every changed file spawns one `git blame` and one `git diff` subprocess per file with no concurrency cap. (`src/services/commitWorkflow.ts:139-142`, `src/services/gitService.ts:257-274`)
-- **Auto-commit silently runs `git add -A`** when there are no staged changes but there are untracked or deleted files, sweeping in files the user may not have wanted. (`src/services/gitService.ts:99-101`)
-- **Documentation drift**: `CHANGELOG.md` stops at 2.2.25 (2025-06-21); `package.json` is at 2.5.2. README still references `gemini-2.0-flash` models that no longer appear in the package.json enum. Default ollama model is `llama3.2` in package.json but `mistral` in `ConfigService.getOllamaModel()`'s fallback. Russian and English comments are interleaved throughout services with no apparent rule.
-- **Eight `npm audit` advisories** (all moderate, all transitive through `@vscode/vsce` / dependabot deps), all with `fixAvailable: true`. Worth a single sweep.
+All 47 findings worked through — 46 ✅ Done, 1 ❌ Won't do. The 14 second-order findings (F034–F047) shipped in 7 phases. What changed in the repeat-run sweep:
+
+- **F037 (✅ Done, P1)** — `OllamaService` now throws `ApiKeyInvalidError` on HTTP 401 in parity with the other three providers; the reprompt flow in `commitWorkflow.handleInvalidApiKey` now triggers for stale Ollama tokens. Regression-tested.
+- **F038 (✅ Done, P1)** — Replaced the compound `requiresApiKey(p) && (p !== 'ollama' || ...)` check with a single `ApiKeyManager.requiresKeyForCurrentConfig(provider)` call.
+- **F035 (✅ Done, P3)** — Deleted the 19 legacy `ConfigService.getXxx()` wrappers; migrated ~36 call sites to `ConfigService.get('section.key')`. Fixed a latent type-narrowing bug in `SettingValue<K>` (literal types where general types were needed) discovered during migration.
+- **F036 (✅ Done, P4)** — Added `commitSage.gitTimeout` setting (default 120s) separate from `commitSage.apiRequestTimeout`. `gitService.execGit` now reads `gitTimeout`. README + docs updated.
+- **F040 (✅ Done, P6)** — `customLanguageService.readTranslations` and `getCachedTemplate` are now async and use `fs.promises.readFile` with ENOENT handling.
+- **F043 (✅ Done, P6)** — `getChangedFiles` now returns `ChangedFile[]` carrying the porcelain status code; `analyzeChanges(repoPath, file, status?)` decodes it locally via the new exported `isDeletedStatus`/`isNewStatus` helpers, eliminating two `git status --porcelain` subprocesses per file.
+- **F034 (✅ Done, P5)** — Added `ConfigService.hasValidProjectConfig()` and routed `SettingsValidator.validateProjectConfig` through it. No more duplicated JSON.parse/path resolution.
+- **F039, F044, F045, F046, F041 (✅ Done, P2)** — Dead-code sweep: deleted `IAIService`/`IModelService`, `OpenAIService.fetchAvailableModels`/`ModelsResponse`, the dead `else if (legacyPath.isFile())` branch in `SettingsValidator`, the literal-type Gemini-model union (and the `ProjectConfig` strict leaf types), and wired `apiKeys.ts` to `process.env.AMPLITUDE_API_KEY`.
+- **F042 (✅ Done, P7)** — Added `BaseAIService.withRetryAndApiKeyGuard()` helper. OpenAI, Codestral, and Gemini's single-model branch all route through it. Gemini's auto-mode (`tryGenerateWithModels`) and Ollama (different 404/ECONNREFUSED semantics) stay separate by design.
+- **F047 (✅ Done, P7)** — Replaced the manual telemetry queue/retry/setInterval with the amplitude SDK's built-in batching (`flushQueueSize: 30`, `flushIntervalMillis: 30s`). `flush()` now calls `amplitude.flush()`. ~80 LOC removed.
 
 ## Architectural mental model
 
@@ -33,8 +35,11 @@ This basically lines up with the README, with two divergences worth flagging: th
 - ✅ **Done** — fix shipped to `main`.
 - ❌ **Won't do** — explicitly rejected by maintainer.
 - ⏭ **Open** — not yet addressed.
+- 🆕 **New** — surfaced in the repeat-run pass after the F001–F033 sweep landed.
 
-PRs that closed the audit: `dd5873d` (PR #1), `f20e44c` (PR #3), `bad0603` (PR #4), `0ca26e8` (PR #5), `224f42b` (PR #6), `4630e28` (PR #7), and the wrap-up commit that closes F023/F024/F030.
+PRs that closed the original audit: `dd5873d` (PR #1), `f20e44c` (PR #3), `bad0603` (PR #4), `0ca26e8` (PR #5), `224f42b` (PR #6), `4630e28` (PR #7), and the wrap-up commit `ed04c3a` that closes F023/F024/F030.
+
+Verification on repeat run — sample-checked the cited file:line for each "Done" finding and confirmed the fix is on `main`. Tooling cross-checks: `npm audit` reports 0 vulnerabilities (F020 ✅), `npm test` runs 65 tests across 7 files (F006 ✅), `tsc --noEmit` is clean (F019 ✅), `gitService.ts` is single-quoted throughout (F017 ✅).
 
 ## Findings
 
@@ -73,83 +78,102 @@ PRs that closed the audit: `dd5873d` (PR #1), `f20e44c` (PR #3), `bad0603` (PR #
 | F031 | ✅ Done (PR #7) | Architectural | `src/services/gitService.ts:294-364` | Low | M | Hand-rolled construction of `diff --git` headers / hunks for untracked and deleted files, including a manual blob-SHA1 calculation for untracked. Brittle and easy to break (`getDeletedDiff` doesn't compute a hash where `getUntrackedDiff` does, etc.). | Use `git diff --no-index /dev/null <file>` for untracked and `git diff -- <file>` for deleted; let git format the patch. |
 | F032 | ✅ Done (PR #5) | Doc drift | `docs/` | Low | S | Several documented file paths refer to a `.commitsage` *file* (legacy) but `.commitsage/config.json` is the actual on-disk layout post-migration. (`README.md:107,115,229,237`, `docs/custom-language.md` likely affected.) | Sweep `docs/` and the README to use the directory form. |
 | F033 | ✅ Done (PR #7) | Inconsistent abstraction | `src/services/baseAIService.ts:14-19` | Low | S | `extractAndValidateMessage` and `validateCommitMessage` exist as static methods on a class with no instance state; the class is used as a namespace. Used inconsistently (see F026). | Either keep the namespace pattern uniformly or switch to module-level functions. |
+| F034 | ✅ Done (repeat-run sweep) | Architectural / consistency | `src/services/settingsValidator.ts:17-62` vs `src/utils/configService.ts:54-75,166-230` | Low | S | `SettingsValidator.validateProjectConfig` re-implements file-existence checks, legacy-path resolution, and `JSON.parse` of `.commitsage`. The same logic lives in `ConfigService.migrateProjectConfig` + `parseAndValidateProjectConfig`. Two sources of truth: the validator can disagree with the loader on what counts as valid. | Have `SettingsValidator` ask `ConfigService.getProjectConfig()` (which already logs parse errors) — remove the duplicated parse + show the user-facing dialog only on failure. |
+| F035 | ✅ Done (repeat-run sweep) | Architectural decay | `src/utils/configService.ts:276 vs 320-386` | Medium | M | F016 introduced typed `get<K extends SettingKey>(key: K)` (line 276) backed by `SETTING_DEFAULTS`. The 18 legacy `getXxx()` wrappers (lines 320-386) were kept and the comment "Prefer this over the legacy getXxx wrappers when adding new code" institutionalises a dual API. `grep` shows 36 call sites using legacy wrappers, 1 using `get()`. | Pick one. Either delete the wrappers and migrate the 36 call sites mechanically, or delete `get()` and the schema. The current state is the worst of both. |
+| F036 | ✅ Done (repeat-run sweep) | Configuration / consistency | `src/utils/httpUtils.ts:21`, `src/services/gitService.ts:542-544` | Medium | S | `commitSage.apiRequestTimeout` (default 30s, `package.json:295`) is read from BOTH the axios timeout helper AND `execGit`'s spawn timeout. A slow `git push` over flaky network or a `git blame` on a multi-MB generated file is killed at 30s — the user must raise a setting named "API request timeout" to fix git timeouts. | Either rename to `requestTimeout` and document both behaviours, or split into `gitTimeout` / `apiTimeout`. The latter is cleaner since their natural defaults differ (git ops can legitimately take minutes). |
+| F037 | ✅ Done (repeat-run sweep) | Error handling / UX | `src/services/ollamaService.ts:73-79` vs `openaiService.ts:71-72`, `codestralService.ts:60-62`, `geminiService.ts:170-172` | High | S | All three other providers throw `ApiKeyInvalidError` on HTTP 401 BEFORE entering the retry handler, which lets `commitWorkflow.handleInvalidApiKey` (`commitWorkflow.ts:88-104`) drop the stored key and reprompt the user. Ollama instead handles 401 inside the retry-error mapper, returning `shouldRetry: false` — `ApiKeyInvalidError` is never thrown, so the auto-reprompt never fires. Users with a stale Ollama auth token see a generic error and have to manually run "Set Ollama Auth Token". | Add the same `if (error instanceof AxiosError && error.response?.status === 401) throw new ApiKeyInvalidError('Ollama')` guard to `OllamaService.generateCommitMessage`. Then delete the 401 case in the retry mapper. |
+| F038 | ✅ Done (repeat-run sweep) | Architectural / consistency | `src/services/commitWorkflow.ts:32-33` | Low | S | `ApiKeyManager.requiresApiKey(provider) && (provider !== 'ollama' || ConfigService.getOllamaUseAuthToken())` — `requiresApiKey` returns `true` for ollama unconditionally (it's in `API_KEY_CONFIGS`), so the compound check works around its own answer. Reads as "tell me if a key is required, except for ollama, where I'll override the answer." | Move the override into `ApiKeyManager` itself: `requiresKeyForCurrentConfig(provider)` that consults `ConfigService.getOllamaUseAuthToken()` for the ollama branch. Caller becomes a single condition. |
+| F039 | ✅ Done (repeat-run sweep) | Architectural decay | `src/models/types.ts:17-28`, `src/services/openaiService.ts:86-108` | Low | S | `IAIService` and `IModelService` interfaces are declared but no class `implements` them; `aiServiceFactory.ts:14-21` declares its own inline `AIServiceClass` shape instead. `OpenAIService.fetchAvailableModels` (and the `ModelsResponse` interface around it) are never referenced anywhere — `grep -rn fetchAvailableModels src tests` returns only the declaration. ~30 LOC of unreferenced surface. | Delete the two interfaces and `OpenAIService.fetchAvailableModels` + `ModelsResponse`. If the intent is to expose the OpenAI models API later, leave a one-line TODO instead of the dead method. |
+| F040 | ✅ Done (repeat-run sweep) | Performance | `src/services/customLanguageService.ts:38-51` | Medium | S | F028 fixed `saveCachedTemplate` to use `fs.promises.writeFile`, but `readTranslations` still calls `fs.readFileSync` and `fs.existsSync`. It's invoked from `getCachedTemplate`, which runs every prompt build when `commitLanguage = 'custom'` — the read happens before any other async work, blocking the event loop. | Switch to `fs.promises.readFile` + a try/catch (or `fs.promises.access` + read). Make `getCachedTemplate` async; propagate to `getTemplate` which is already async. |
+| F041 | ✅ Done (repeat-run sweep) | Dependency / build hygiene | `webpack.config.js:3,35`, `package.json:331` | Low | S | `dotenv-webpack` is required and instantiated, but `src/constants/apiKeys.ts` reads its key from a file that CI overwrites (`.github/workflows/release.yml`) — not from `process.env`. The plugin is a no-op in dev unless a contributor has a `.env`, and even then nothing reads `process.env.AMPLITUDE_API_KEY`. | Remove `dotenv-webpack` from `webpack.config.js` and from `devDependencies`. Or keep the plugin and have `apiKeys.ts` actually read `process.env.AMPLITUDE_API_KEY ?? ''` so the contributor-override workflow exists. Currently it's neither. |
+| F042 | ✅ Done (repeat-run sweep) | Architectural decay | `src/services/openaiService.ts:31-83`, `src/services/codestralService.ts:23-79`, `src/services/geminiService.ts:125-183` (single-model branch) | Low | M | All three providers share ~80% of the request scaffolding: token resolution → payload construction → `HttpUtils.createRequestConfig(headers, undefined, signal)` → `axios.post` → `extractAndValidateMessage` → `catch: 401 → throw ApiKeyInvalidError, else RetryUtils.handleGenerationError`. The duplication is exactly where F037's bug lives — Ollama drifted from the pattern. A common helper would have prevented it. | Add `BaseAIService.executeChatCompletion({name, url, payload, headers, signal, extractor})` that contains the try/catch. Each provider boils down to building the URL + payload + headers; the extractor stays per-provider. |
+| F043 | ✅ Done (repeat-run sweep) | Performance | `src/services/gitBlameAnalyzer.ts:74,81` | Medium | M | `analyzeChanges` runs four git subprocesses per file: `isFileDeleted` (status), `isNewFile` (status), `getGitBlame` (blame), `getDiff` (diff). The first two are redundant — `commitWorkflow.ts:155` already called `getChangedFiles` which parsed the porcelain status for every file. With concurrency 8 and 50 files, that's ~200 spawns where ~100 would do. | Thread the status code from `getChangedFiles` through to `analyzeChanges` (signature change), or attach the state to the file via a richer return type. Skip the `isFileDeleted`/`isNewFile` calls when the state is already known. |
+| F044 | ✅ Done (repeat-run sweep) | Type / contract debt | `src/utils/configService.ts:206-230`, `src/models/types.ts:36-68` | Low | M | `parseAndValidateProjectConfig` validates only that the input is an object and its top-level keys are objects. The `ProjectConfig` type advertises a much stricter shape (`commitFormat: 'conventional' \| 'angular' \| ...`). A `.commitsage/config.json` with `commit: { commitFormat: "nonsense" }` is silently accepted and surfaces as the wrong template. Same risk with the gemini model enum, language enum, etc. | Either downgrade `ProjectConfig`'s leaf types to `string`/`boolean`/etc to match what's actually validated, or add structural validation per leaf at parse time (a small hand-rolled validator beats pulling in zod for ~10 fields). |
+| F045 | ✅ Done (repeat-run sweep) | Doc / config drift | `src/models/types.ts:52` vs `package.json:240-248` | Low | S | The Gemini model enum in `ProjectConfig['gemini']['model']` literal-types is a hand-copy of `package.json`'s `commitSage.gemini.model.enum`. F011 closed the same drift on the README side; this third copy lives in TypeScript types. | Either drop the literal-type union (use `string`) or generate `package.json`'s enum from a single TS source. Given F011 chose "trust package.json", be consistent and drop the literal here. |
+| F046 | ✅ Done (repeat-run sweep) | Architectural / dead branch | `src/services/settingsValidator.ts:36-37` | Low | S | The `else` branch handling `legacyPath.isFile()` is dead in normal flow: `extension.ts:15` calls `ConfigService.initialize` which runs `migrateProjectConfig` (converts the legacy file to a directory) BEFORE `validateAllSettings` runs (`extension.ts:31`). The branch can only fire if the user creates a `.commitsage` flat file in the millisecond gap between activation and validation. | Delete the branch; if the legacy path is a file at validation time it's a programmer error and `getProjectConfig` will surface it. (Becomes moot if F034 lands.) |
+| F047 | ✅ Done (repeat-run sweep) | Performance / observability | `src/services/telemetryService.ts:130-167` | Low | M | `processEventQueue` processes exactly ONE event per call (`shift()` then early-return next time `isProcessing` is true). Under burst load (e.g. 20 `settings_changed` events fired in a configuration change), the per-`queueEvent` re-trigger keeps draining — but on a transient failure the failed event sits at the front for `retryDelay * retryCount` ms (up to 3s), and `isProcessing` stays true, so other newly-queued events sit until the retry resolves. Combined with the 100-event cap (line 117), a multi-second outage starts dropping events. | Make `processEventQueue` drain in a `while` loop (the way `flush()` already does), bounded by a max-events-per-tick to avoid pegging the loop. Or use the amplitude SDK's own batching by setting `flushQueueSize > 1` and letting it manage retries. |
 
-## Top 5 — if you fix nothing else, fix these
+## Top 5 — historical (all shipped)
 
-1. **F001 — `maxTokens` → `max_tokens` in OpenAI payload.**
-   Diff sketch:
+The original Top 5 (F001/F002/F004/F005/F006) shipped in the F001–F033 sweep; the repeat-run Top 5 (F037/F035/F036/F040/F043) shipped in the F034–F047 sweep. The proposals below are kept for diff-archaeology — current state is `main`.
+
+1. **F037 — Make Ollama 401 trigger the reprompt flow.**
    ```ts
-   // src/services/openaiService.ts:44-49
-   const payload = {
-       model,
-       messages: [{ role: "user", content: prompt }],
-       temperature: 0.7,
-   -   maxTokens: options?.maxTokens ?? 1024
-   +   max_tokens: options?.maxTokens ?? 1024
-   };
+   // src/services/ollamaService.ts — add before the retry handler dispatch
+   try {
+       // ...existing axios.post...
+   } catch (error) {
+   +   if (error instanceof AxiosError && error.response?.status === 401) {
+   +       throw new ApiKeyInvalidError('Ollama');
+   +   }
+       return RetryUtils.handleGenerationError(...);
+   }
    ```
-   Add a one-liner test that snapshots the request body. While there, audit the other providers: Codestral takes `max_tokens`, Ollama takes `options.num_predict`. F009 covers the parallel fix.
+   Then delete the 401 case in the `errorHandler` lambda (`ollamaService.ts:73-79`) since it's now unreachable. One test in `tests/providerPayloads.test.ts` to assert the throw on 401.
 
-2. **F004 — Thread `CancellationToken` into HTTP and git calls.**
-   Add `signal?: AbortSignal` to `GenerateOptions`, derive an `AbortController` from the token in `commitWorkflow.executeWithProgress`, and pass `signal` into every `axios.post`/`axios.get` and (for `execGit`) `process.kill('SIGTERM')` on `signal.aborted`. The current "check then act" pattern at three call sites is not real cancellation.
+2. **F035 — Pick one ConfigService API surface.** Either:
+   - **Mechanical migration**: replace each `ConfigService.getXxx()` call with `ConfigService.get('xxx.yyy')`, delete the wrappers (lines 320-386). 36 sites; the SETTING_DEFAULTS map already provides type safety.
+   - **Or simpler**: delete `get<K>()` and `SETTING_DEFAULTS`, keep the wrappers. Smaller diff, but you lose F015's contract that every setting has a default.
 
-3. **F005 — Stop sending the Gemini key in the URL.**
-   ```ts
-   // src/services/geminiService.ts (representative)
-   - const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
-   - const response = await axios.post<GeminiResponse>(apiUrl, payload, requestConfig);
-   + const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
-   + const response = await axios.post<GeminiResponse>(apiUrl, payload, {
-   +   ...requestConfig,
-   +   headers: { ...requestConfig.headers, 'x-goog-api-key': apiKey },
-   + });
-   ```
-   And in `errorUtils.sanitizeErrorForTelemetry`, redact `key=…`, `Bearer …`, and `Authorization:` patterns alongside file paths. This is one small file plus a couple of url-builders.
+   Either commits to one. The current dual-API state is what creates findings like F040 (where one path got fixed and the other didn't).
 
-4. **F002 — Make `createProjectConfig` write the directory layout.**
-   ```ts
-   // src/commands/createProjectConfig.ts
-   - const configPath = path.join(workspaceFolder.uri.fsPath, '.commitsage');
-   + const configDir = path.join(workspaceFolder.uri.fsPath, '.commitsage');
-   + const configPath = path.join(configDir, 'config.json');
-   + await fs.promises.mkdir(configDir, { recursive: true });
-   ```
-   And replace `gemini-1.5-flash` with `auto` (or any value from the `package.json` enum).
+3. **F036 — Stop using `apiRequestTimeout` for git subprocesses.**
+   Add a new setting `commitSage.gitTimeout` (default 120s, range -1 = infinite to N), and have `gitService.execGit` read it instead of `apiRequestTimeout`. Document in README that the `apiRequestTimeout` setting only applies to LLM calls. A `git push` timing out at 30s today is a real foot-gun.
 
-5. **F006 — Land a tiny test harness.**
-   `npm i -D vitest @vitest/coverage-v8`, add `"test": "vitest"`, ship a first wave that covers the pure functions at risk of silent regression: `unquoteGitPath`, `removeThinkTags`, `parseChangedLines`/`analyzeBlameInfo`, `BaseAIService.handleHttpError` for each status code, and a single mock-axios test per provider that asserts request shape (this would have caught F001 immediately). Don't aim for 100% coverage; aim for the parsing/transformation layer.
+4. **F040 — Async fs in `customLanguageService.readTranslations`.**
+   Trivial: `fs.readFileSync` → `fs.promises.readFile`, `fs.existsSync` → wrap the read in a try/catch on `ENOENT`. Make `readTranslations`, `getCachedTemplate`, `generateAndCacheTemplate` consistently async (most already are).
 
-## Quick wins (low effort × medium+ severity)
+5. **F043 — Skip redundant `git status` calls in blame analysis.**
+   `getChangedFiles` (`gitService.ts:412-450`) already parses the porcelain status code per file. Either:
+   - Return `Array<{path: string, status: 'M'|'A'|'D'|'R'|'??'}>` from `getChangedFiles` and pass through to `GitBlameAnalyzer.analyzeChanges(repoPath, file, status)`.
+   - Skip the `isFileDeleted`/`isNewFile` lookups when status is already known (deleted = 'D', new = '??' or 'A').
 
-- [ ] **F001** Rename `maxTokens` → `max_tokens` in `openaiService.ts:48`.
-- [ ] **F002** Have `createProjectConfig` create `.commitsage/config.json` directly; replace invalid `gemini-1.5-flash` default with `auto`.
-- [ ] **F003** Use exit code (already captured in `execGit`) as the only failure signal in `executeGitCommand`.
-- [ ] **F005** Move Gemini key from URL to `x-goog-api-key` header; extend `sanitizeErrorForTelemetry` to scrub URL keys and `Bearer …`.
-- [ ] **F008** In `commitChanges`, replace `git add -A` with `git add -- <files>` over the previously-detected change set.
-- [ ] **F010** Remove `CHANGELOG.md` (defer to GitHub Releases) or restart populating it.
-- [ ] **F011** Regenerate README's Gemini model list from `package.json` enum, or drop the list since `auto` is default.
-- [ ] **F012** Make `ConfigService.getOllamaModel` default match `package.json` (`llama3.2`).
-- [ ] **F019** Set `moduleResolution: "node16"` (or `"bundler"`); align ESLint `ecmaVersion: 2022`; remove `"DOM"` from `tsconfig` `lib`.
-- [ ] **F020** `npm audit fix` to clear the moderate advisories in dev deps.
-- [ ] **F021** Drop the `sk-` prefix check in `validateOpenAIApiKey`.
-- [ ] **F026** Use `BaseAIService.extractAndValidateMessage` in `OpenAIService.extractCommitMessage`; delete `OpenAIError`.
-- [ ] **F027** Delete the dead "Subproject commit"/"Entering" filter in `getChangedFiles`.
+   Halves the git-subprocess count on the blame path for large changesets.
+
+## Quick wins — all shipped
+
+- [x] **F035** Legacy `ConfigService.getXxx()` wrappers deleted; 36 call sites migrated to typed `get('section.key')`.
+- [x] **F036** Split `apiRequestTimeout` (axios) from new `gitTimeout` (git subprocess).
+- [x] **F037** `ApiKeyInvalidError` now thrown on Ollama 401.
+- [x] **F039** Deleted `IAIService`, `IModelService`, `OpenAIService.fetchAvailableModels`, `ModelsResponse`.
+- [x] **F040** `customLanguageService.readTranslations` now uses `fs.promises.readFile`.
+- [x] **F041** `apiKeys.ts` now reads `process.env.AMPLITUDE_API_KEY ?? ''`.
+- [x] **F045** Gemini model literal-union dropped (use `string`).
+- [x] **F046** Dead `else if` branch removed.
+
+## Status of the original quick-win list
+
+All resolved on `main`. The list moved into history:
+
+- ✅ F001 / F002 / F003 / F005 / F008 / F010 / F011 / F012 / F019 / F020 / F021 / F026 / F027 — all shipped.
 
 ## Things that look bad but are actually fine
 
-- **`AMPLITUDE_API_KEY = ''` in `src/constants/apiKeys.ts:1` looks like a hardcoded secret stub.** It's not. The file is gitignored (`.gitignore:13`), and `.github/workflows/release.yml:38-41` overwrites it with the secret at build time. The empty default is the correct local-dev fallback, and `telemetryService.ts:56-58` short-circuits on it. Leave alone.
-- **`webpack.config.js` includes `dotenv-webpack` even though `apiKeys.ts` isn't read from `process.env`.** Tempting to delete, but it's harmless dead-weight in dev builds, and removing it would break any local override-via-`.env` workflow contributors might have. The CI flow doesn't depend on it. Marginal call; leaving it alone is fine.
-- **`MAX_DIFF_LENGTH = 100000` (`aiService.ts:12`) seems arbitrary.** It is, but it's at roughly the right order of magnitude for current LLM context windows and the truncation is communicated to the model with `\n...(truncated)`. Tuning it without telemetry on actual diff-size distributions would be guessing. Leave until F006 lands and you can measure.
-- **`GeminiService.getAvailableModels` falls back to a hardcoded list when the models API fails (`geminiService.ts:57-62`).** This is duplication with `package.json`, but the fallback is "Gemini's models endpoint is down or the key is bad." A static fallback is better than blowing up. The duplication is real (F011 covers the README side) but the fallback list itself is pragmatic. Leave.
-- **`Promise.all` over `analyzeChanges` for changed files (F007 above).** Flagged as Medium not Low because for typical 1–10-file changesets this is fine, and the fan-out only bites at >50 files in a single commit. If you don't see large-changeset bug reports, this can stay.
-- **Russian-language comments throughout services (F018).** Stylistic only — flagged because mixed languages signal that the codebase has had multiple authors with different conventions and no agreed-on standard, but the comments themselves are mostly redundant ("Универсальный метод") and removing them would be cleaner than translating them.
-- **The `EnvironmentUtils.isWebExtension` / `getEnvironmentType` abstraction (`src/utils/environmentUtils.ts`) when this extension is not actually shipped as a web extension.** Only used for telemetry tagging. Cheap, harmless, leave it.
+Re-evaluated on the repeat run; the original calls still hold and one is upgraded to a finding.
+
+- **`AMPLITUDE_API_KEY = ''` in `src/constants/apiKeys.ts:1` looks like a hardcoded secret stub.** It's not. The file is gitignored, and `.github/workflows/release.yml` overwrites it with the secret at build time. The empty default is the correct local-dev fallback, and `telemetryService.ts:56-58` short-circuits on it. Leave alone.
+- **`MAX_DIFF_LENGTH = 100000` in `aiService.ts:12` is arbitrary.** Still arbitrary, still roughly right for current LLM context windows, and the truncation is communicated to the model with `\n...(truncated)`. Now that telemetry tags `truncated: boolean` and `diffSize: number` (`telemetryService.ts:19`), the data to tune this is being collected — revisit once there's enough volume.
+- **`GeminiService.getAvailableModels` hardcoded fallback list (`geminiService.ts:62-66`).** Still fine. The fallback fires when Gemini's models endpoint is down OR the key is bad; a static list is better than blowing up. The list has drifted slightly since the original audit (it covers 2.5.x and one 3.x preview, but not all the 3.x previews now in `package.json`); not worth chasing.
+- **`Promise.all` worry for blame analysis (originally F007).** Resolved — `mapLimit(8)` is now used everywhere. Re-flagged at a different layer as F043 (the SUBPROCESS COUNT per file is the new issue, not the parallelism).
+- **`EnvironmentUtils.isWebExtension` (`src/utils/environmentUtils.ts`) when this is a Node-target extension.** Still cheap and harmless; telemetry will always tag `desktop`. Leave.
+- **The hand-rolled `tests/__mocks__/vscode.ts` mock.** It will drift from the real `vscode` API surface as the extension grows, but the alternative (`@vscode/test-electron` or running tests in an actual extension host) is a much bigger lift than the current ~80-line mock. Leave until it actually breaks.
+
+**Upgraded to a finding on this pass:**
+
+- **`dotenv-webpack` was previously called "harmless dead-weight."** On second look it's not — `apiKeys.ts:1` reads from a literal, never from `process.env`, so the plugin can never inject anything. It's actually misleading documentation: it suggests `.env` overrides are supported when they aren't. See **F041**.
 
 ## Open questions for the maintainer
 
-- Is the lack of tests intentional (extension is small, manual QA covers it) or is it a "haven't gotten to it yet" thing? The right severity of F006 depends on this.
-- Was the legacy `.commitsage` flat-file format ever actually shipped to users in production, or was the migration code added speculatively? If no one is on the legacy path, the migration in `configService.ts:19-40` and the validation branch in `settingsValidator.ts:28-38` are dead and can be deleted.
-- Is the `custom` commit-language feature documented anywhere user-facing? It's referenced in `commit.customLanguageName` description in `package.json:171-172` but nowhere in the README. Hidden feature?
-- The `Auto Push` flow does `git push` with no remote/branch args (`gitService.ts:146`). Was there an intentional decision to always push the current branch to its tracking remote, or is multi-remote / detached-HEAD support a future thing?
-- The `keybindings` `when: scmProvider == git` (`package.json:120`) makes the Cmd+G/Ctrl+G shortcut only fire when the SCM view is focused, which contradicts the README's framing. Intentional (avoid stomping on Find-Next) or oversight?
-- `src/constants/apiKeys.ts` is gitignored *and* present in the working tree as `AMPLITUDE_API_KEY = ''`. Is the working-tree copy left there intentionally as a stub for local builds, or is it leftover from when the file was committed?
+Carrying forward (still unanswered) and adding repeat-run questions.
+
+Carried forward:
+- The `custom` commit-language feature is implemented (`customLanguageService`, prompt-time translation cache) but not documented in the README. Intentionally hidden, or a doc gap?
+- The `Auto Push` flow does `git push` with no remote/branch args (`gitService.ts:151`). Always push the current branch to its tracking remote — intended, or future work?
+- `src/constants/apiKeys.ts` is gitignored AND present in the working tree as `AMPLITUDE_API_KEY = ''`. Working-tree copy intentional as a local-build stub, or leftover?
+
+New on this pass:
+- **F035 ConfigService dual API**: was the typed `get<K>()` accessor intended to fully replace the legacy wrappers (and the migration just hasn't happened), or is the doc comment "prefer this over legacy wrappers when adding new code" the actual desired end state?
+- **F037 Ollama 401 reprompt**: is the divergence intentional (e.g. local Ollama servers usually don't auth, so a wrong token = misconfiguration not "bad credentials"), or just an oversight from before the openai/codestral 401 path was unified?
+- **F036 Single timeout setting**: is the conflated `apiRequestTimeout` semantics ("apply to everything") deliberate for simplicity, or a leftover from when only HTTP existed in the codebase? Both `git push` to a slow remote and a 50MB `git diff` can legitimately exceed 30s.
+- **F039 Dead model-listing API**: is `OpenAIService.fetchAvailableModels` planned for a future "auto-mode for OpenAI" feature (mirroring Gemini's auto-mode at `geminiService.ts:135-143`), or is it abandoned scaffolding?
+- The legacy `.commitsage` flat-file migration path (`configService.ts:54-75`, `settingsValidator.ts:36-37`) is still present. Is there telemetry on how many users still hit it, or was it added speculatively? If <1% it's deletable.

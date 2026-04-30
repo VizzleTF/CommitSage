@@ -293,14 +293,20 @@
         "commitSage.apiRequestTimeout": {
           "type": "number",
           "default": 30,
-          "description": "Timeout for API requests in seconds. Set to -1 for no timeout (infinite wait)",
+          "description": "Timeout for LLM provider HTTP requests (Gemini/OpenAI/Codestral/Ollama) in seconds. Set to -1 for no timeout (infinite wait)",
           "order": 18
+        },
+        "commitSage.gitTimeout": {
+          "type": "number",
+          "default": 120,
+          "description": "Timeout for `git` subprocesses (diff, blame, push, etc.) in seconds. Push over a slow remote or diff over a huge file may need more than the default. Set to -1 for no timeout",
+          "order": 19
         },
         "commitSage.telemetry.enabled": {
           "type": "boolean",
           "default": true,
           "description": "Enable telemetry for Commit Sage",
-          "order": 19
+          "order": 20
         }
       }
     }

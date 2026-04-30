@@ -18,8 +18,8 @@ const LANGUAGE_PROMPTS: Record<Exclude<CommitLanguage, 'custom'>, string> = {
 
 export class PromptService {
     static async generatePrompt(diff: string, blameAnalysis: string, progress: ProgressReporter): Promise<string> {
-        const useCustomInstructions = ConfigService.useCustomInstructions();
-        const customInstructions = ConfigService.getCustomInstructions();
+        const useCustomInstructions = ConfigService.get('commit.useCustomInstructions');
+        const customInstructions = ConfigService.get('commit.customInstructions');
 
         if (useCustomInstructions && customInstructions.trim()) {
             return `${customInstructions}
@@ -33,14 +33,14 @@ ${blameAnalysis}
 Please provide ONLY the commit message, without any additional text or explanations.`;
         }
 
-        const format = ConfigService.getCommitFormat() as CommitFormat;
-        const commitLanguage = ConfigService.getCommitLanguage();
+        const format = ConfigService.get('commit.commitFormat') as CommitFormat;
+        const commitLanguage = ConfigService.get('commit.commitLanguage');
 
         let template: string;
         let languagePrompt: string;
 
         if (commitLanguage === 'custom') {
-            const customLanguageName = ConfigService.getCustomLanguageName();
+            const customLanguageName = ConfigService.get('commit.customLanguageName');
             template = await CustomLanguageService.getTemplate(format, customLanguageName, progress);
             languagePrompt = customLanguageName.trim()
                 ? `Please write the commit message in ${customLanguageName}.`

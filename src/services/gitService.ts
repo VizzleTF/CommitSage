@@ -412,7 +412,7 @@ export class GitService {
   static async getChangedFiles(
     repoPath: string,
     onlyStaged: boolean = false,
-  ): Promise<string[]> {
+  ): Promise<ChangedFile[]> {
     try {
       const statusCommand = ['status', '--porcelain'];
       const output = await this.executeGitCommand(statusCommand, repoPath);
@@ -441,7 +441,7 @@ export class GitService {
           // Unquote paths that git quoted due to spaces or special characters
           filePath = unquoteGitPath(filePath);
 
-          return filePath;
+          return { path: filePath, status };
         });
     } catch (error) {
       Logger.error('Error getting changed files:', toError(error));
@@ -539,7 +539,7 @@ export class GitService {
     options: { signal?: AbortSignal; allowNonZeroExit?: boolean } = {},
   ): Promise<{ stdout: string; stderr: string; exitCode: number }> {
     return new Promise((resolve, reject) => {
-      const timeoutSeconds = ConfigService.getApiRequestTimeout();
+      const timeoutSeconds = ConfigService.get('gitTimeout');
       const timeoutMs =
         timeoutSeconds === -1 ? undefined : timeoutSeconds * 1000;
 
@@ -623,7 +623,7 @@ export class GitService {
           // Likely killed by the spawn `timeout` option
           reject(
             new Error(
-              `Git command timed out after ${timeoutSeconds}s: git ${args[0] ?? ''}`,
+              `Git command timed out after ${timeoutSeconds}s: git ${args[0] ?? ''}. Increase commitSage.gitTimeout if this is a slow operation.`,
             ),
           );
           return;
@@ -671,4 +671,26 @@ interface GitExtension {
   getAPI(version: 1): {
     repositories: vscode.SourceControl[];
   };
+}
+
+/** Result of `getChangedFiles`. `status` is the raw 2-char `git status --porcelain` code. */
+export interface ChangedFile {
+  path: string;
+  status: string;
+}
+
+/**
+ * Decode whether the porcelain status code corresponds to a deleted file.
+ * Matches the git status semantics: 'D ' (staged delete), ' D' (unstaged delete).
+ */
+export function isDeletedStatus(status: string): boolean {
+  return status === ' D' || status === 'D ';
+}
+
+/**
+ * Decode whether the porcelain status code corresponds to a new (untracked or just-added) file.
+ * Matches: '??' (untracked), 'A ' (staged add).
+ */
+export function isNewStatus(status: string): boolean {
+  return status === '??' || status === 'A ';
 }

@@ -1,5 +1,3 @@
-import type { CommitLanguage } from '../utils/constants';
-
 export interface CommitMessage {
     message: string;
     model: string;
@@ -14,33 +12,28 @@ export interface GenerateOptions {
     signal?: AbortSignal;
 }
 
-export interface IAIService {
-    generateCommitMessage(
-        prompt: string,
-        progress: ProgressReporter,
-        attempt?: number,
-        options?: GenerateOptions
-    ): Promise<CommitMessage>;
-}
-
-export interface IModelService extends IAIService {
-    fetchAvailableModels(baseUrl: string, apiKey: string): Promise<string[]>;
-}
-
 export interface ApiErrorResult {
     errorMessage: string;
     shouldRetry: boolean;
     statusCode?: number;
 }
 
+/**
+ * Project-level config shape mirrored from `package.json`'s
+ * `commitSage.*` settings. Leaf types are intentionally lax — the only
+ * enforcement at parse time is "every section is a plain object" (see
+ * `parseAndValidateProjectConfig`). Stricter validation is done by VS
+ * Code's settings schema for workspace/global config; keep this in sync
+ * with `package.json` `contributes.configuration.properties`.
+ */
 export interface ProjectConfig {
     provider?: {
-        type?: 'gemini' | 'codestral' | 'openai' | 'ollama';
+        type?: string;
     };
     commit?: {
-        commitLanguage?: CommitLanguage | 'custom';
+        commitLanguage?: string;
         customLanguageName?: string;
-        commitFormat?: 'conventional' | 'angular' | 'karma' | 'semantic' | 'emoji' | 'emojiKarma' | 'google' | 'atom';
+        commitFormat?: string;
         useCustomInstructions?: boolean;
         customInstructions?: string;
         onlyStagedChanges?: boolean;
@@ -49,10 +42,10 @@ export interface ProjectConfig {
         promptForRefs?: boolean;
     };
     gemini?: {
-        model?: 'gemini-2.5-pro' | 'gemini-2.5-flash' | 'gemini-2.5-flash-lite' | 'gemini-3-flash-preview' | 'gemini-3-pro-preview' | 'gemini-3.1-flash-lite-preview' | 'gemini-3.1-pro-preview';
+        model?: string;
     };
     codestral?: {
-        model?: 'codestral-2405' | 'codestral-latest';
+        model?: string;
     };
     openai?: {
         model?: string;

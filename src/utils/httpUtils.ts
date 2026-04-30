@@ -18,7 +18,7 @@ export class HttpUtils {
   }
 
   private static getConfiguredTimeout(): number | undefined {
-    const timeoutSeconds = ConfigService.getApiRequestTimeout();
+    const timeoutSeconds = ConfigService.get('apiRequestTimeout');
     if (timeoutSeconds === -1) {
       // axios treats undefined as "no timeout"
       return undefined;
