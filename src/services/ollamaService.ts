@@ -14,8 +14,6 @@ interface OllamaResponse {
     };
 }
 
-// AI сервис для работы с локальным Ollama API
-// Реализует интерфейс IAIService со статическими методами
 export class OllamaService {
     private static readonly defaultModel = 'llama3.2';
 
@@ -59,13 +57,12 @@ export class OllamaService {
             const response = await axios.post<OllamaResponse>(apiUrl, payload, requestConfig);
 
             Logger.log('Ollama API response received successfully');
-            progress.report({ message: "Processing generated message...", increment: 100 });
+            progress.report({ message: 'Processing generated message...', increment: 100 });
 
             const commitMessage = this.extractCommitMessage(response.data);
             Logger.log(`Commit message generated using ${model} model`);
             return { message: commitMessage, model };
         } catch (error) {
-            // Используем retry utils для retry логики
             return RetryUtils.handleGenerationError(
                 toError(error),
                 prompt,

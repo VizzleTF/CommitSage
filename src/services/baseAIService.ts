@@ -6,7 +6,7 @@ export class BaseAIService {
     static validateCommitMessage(message: string): string {
         const cleanMessage = message.trim();
         if (!cleanMessage) {
-            throw new Error("Generated commit message is empty.");
+            throw new Error('Generated commit message is empty.');
         }
         return cleanMessage;
     }

@@ -20,7 +20,7 @@ export class CustomLanguageService {
         return path.join(rootPath, '.commitsage', TRANSLATIONS_FILE);
     }
 
-    private static ensureCommitsageDirectory(): void {
+    private static async ensureCommitsageDirectory(): Promise<void> {
         const rootPath = ConfigService.getProjectRootPath();
         if (!rootPath) {
             return;
@@ -29,9 +29,7 @@ export class CustomLanguageService {
         const commitsagePath = path.join(rootPath, '.commitsage');
 
         try {
-            if (!fs.existsSync(commitsagePath)) {
-                fs.mkdirSync(commitsagePath, { recursive: true });
-            }
+            await fs.promises.mkdir(commitsagePath, { recursive: true });
         } catch (error) {
             Logger.error('Failed to create .commitsage directory:', toError(error));
         }
@@ -62,14 +60,18 @@ export class CustomLanguageService {
         return null;
     }
 
-    private static saveCachedTemplate(format: CommitFormat, customLanguageName: string, template: string): void {
+    private static async saveCachedTemplate(
+        format: CommitFormat,
+        customLanguageName: string,
+        template: string
+    ): Promise<void> {
         const filePath = this.getTranslationsPath();
         if (!filePath) {
             return;
         }
 
         try {
-            this.ensureCommitsageDirectory();
+            await this.ensureCommitsageDirectory();
 
             const translations = this.readTranslations();
             if (!translations[customLanguageName]) {
@@ -77,7 +79,11 @@ export class CustomLanguageService {
             }
             translations[customLanguageName][format] = template;
 
-            fs.writeFileSync(filePath, JSON.stringify(translations, null, 2), 'utf8');
+            await fs.promises.writeFile(
+                filePath,
+                JSON.stringify(translations, null, 2),
+                'utf8'
+            );
             Logger.log(`Saved translation for ${customLanguageName}/${format} to ${filePath}`);
         } catch (error) {
             Logger.error('Failed to save translation:', toError(error));
@@ -118,7 +124,7 @@ Rules:
         const result = await AIServiceFactory.generateCommitMessage(provider, translationPrompt, progress, undefined, { maxTokens: 4096 });
         const translatedTemplate = result.message.trim();
 
-        this.saveCachedTemplate(format, customLanguageName, translatedTemplate);
+        await this.saveCachedTemplate(format, customLanguageName, translatedTemplate);
         return translatedTemplate;
     }
 
