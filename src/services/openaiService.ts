@@ -2,7 +2,7 @@ import axios, { AxiosError } from 'axios';
 import { Logger } from '../utils/logger';
 import { ConfigService } from '../utils/configService';
 import { ProgressReporter, CommitMessage, GenerateOptions } from '../models/types';
-import { OpenAIError, ApiKeyInvalidError } from '../models/errors';
+import { ApiKeyInvalidError } from '../models/errors';
 import { BaseAIService } from './baseAIService';
 import { HttpUtils } from '../utils/httpUtils';
 import { RetryUtils } from '../utils/retryUtils';
@@ -24,8 +24,6 @@ interface ModelsResponse {
     }>;
 }
 
-// AI сервис для работы с OpenAI/совместимыми API
-// Реализует интерфейс IModelService со статическими методами (включая fetchAvailableModels)
 export class OpenAIService {
     private static readonly chatCompletionsPath = '/chat/completions';
     private static readonly modelsPath = '/models';
@@ -64,18 +62,16 @@ export class OpenAIService {
                 requestConfig
             );
 
-            progress.report({ message: "Processing generated message...", increment: 90 });
+            progress.report({ message: 'Processing generated message...', increment: 90 });
 
             const message = this.extractCommitMessage(response.data);
             Logger.log(`Commit message generated using ${model} model`);
             return { message, model };
         } catch (error) {
-            // Обработка специальных случаев для OpenAI
             if (error instanceof AxiosError && error.response?.status === 401) {
                 throw new ApiKeyInvalidError('OpenAI');
             }
 
-            // Используем retry utils для retry логики
             return RetryUtils.handleGenerationError(
                 toError(error),
                 prompt,
@@ -113,10 +109,7 @@ export class OpenAIService {
 
     private static extractCommitMessage(response: OpenAIResponse): string {
         const content = response.choices?.[0]?.message?.content;
-        if (!content) {
-            throw new OpenAIError('Unexpected response format from OpenAI API');
-        }
-        return BaseAIService.validateCommitMessage(content);
+        return BaseAIService.extractAndValidateMessage(content, 'OpenAI');
     }
 
 }

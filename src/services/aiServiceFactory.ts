@@ -4,9 +4,6 @@ import { OpenAIService } from './openaiService';
 import { CodestralService } from './codestralService';
 import { OllamaService } from './ollamaService';
 
-/**
- * Enum для всех доступных AI сервисов
- */
 export enum AIServiceType {
     GEMINI = 'gemini',
     OPENAI = 'openai',
@@ -14,9 +11,6 @@ export enum AIServiceType {
     OLLAMA = 'ollama'
 }
 
-/**
- * Тип для базовых AI сервисов (только generateCommitMessage)
- */
 type AIServiceClass = {
     generateCommitMessage(
         prompt: string,
@@ -26,9 +20,6 @@ type AIServiceClass = {
     ): Promise<CommitMessage>;
 };
 
-/**
- * Фабрика для создания и получения AI сервисов
- */
 export class AIServiceFactory {
     private static readonly services: Record<AIServiceType, AIServiceClass> = {
         [AIServiceType.GEMINI]: GeminiService,
@@ -45,9 +36,6 @@ export class AIServiceFactory {
         return service;
     }
 
-    /**
-     * Универсальный метод для генерации commit сообщения
-     */
     static async generateCommitMessage(
         type: AIServiceType,
         prompt: string,

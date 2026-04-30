@@ -230,13 +230,19 @@ export class TelemetryService {
     }
 
     static dispose(): void {
+        // Note: queued events are flushed in deactivate() via flush() before
+        // dispose() is called. We don't kick off another async drain here —
+        // anything queued between flush() and dispose() is intentionally lost
+        // rather than fired off as a fire-and-forget Promise that the runtime
+        // may or may not finish executing.
         if (this.flushInterval) {
             clearInterval(this.flushInterval);
         }
 
-        if (this.eventQueue.length > 0) {
-            Logger.log(`Attempting to send ${this.eventQueue.length} remaining telemetry events`);
-            void this.processEventQueue();
+        const dropped = this.eventQueue.length;
+        if (dropped > 0) {
+            Logger.warn(`Telemetry: dropping ${dropped} unflushed events on dispose`);
+            this.eventQueue = [];
         }
 
         this.disposables.forEach(d => void d.dispose());
