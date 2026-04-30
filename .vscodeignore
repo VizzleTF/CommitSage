@@ -44,7 +44,6 @@ node_modules/**
 # Documentation (except essential)
 CONTRIBUTING.md
 webpack-optimizations.md
-CHANGELOG.md
 release.sh
 test-gemini-api.sh
 package-lock.json

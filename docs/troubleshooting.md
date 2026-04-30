@@ -85,17 +85,17 @@ Common when using a corporate proxy or custom endpoint.
 
 ---
 
-## Project Configuration (`.commitsage`)
+## Project Configuration (`.commitsage/config.json`)
 
 ### Settings are not applied
 
-- Check that the file is in the **project root** (same directory as `.git`)
+- Check that the file is at `<project-root>/.commitsage/config.json` (same directory as `.git` for the `.commitsage` directory)
 - Validate the JSON syntax — VS Code will show a red squiggle on invalid JSON, and Commit Sage will show an error notification on save
-- Settings in `.commitsage` override VS Code settings; API keys are always read from VS Code's secure storage regardless
+- Settings in `.commitsage/config.json` override VS Code settings; API keys are always read from VS Code's secure storage regardless
 
 ### "Invalid JSON" notification on save
 
-Open the `.commitsage` file and look for:
+Open `.commitsage/config.json` and look for:
 - Trailing commas after the last item in an object or array
 - Missing quotes around string values
 - Mismatched braces

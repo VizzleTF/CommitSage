@@ -8,7 +8,7 @@ All settings are under the `commitSage.*` namespace in VS Code settings.
 
 Settings are resolved in the following order (higher priority wins):
 
-1. **Project settings** (`.commitsage` file) — highest priority
+1. **Project settings** (`.commitsage/config.json`) — highest priority
 2. **VS Code workspace settings** — medium priority
 3. **VS Code global (user) settings** — lowest priority
 
@@ -74,18 +74,16 @@ Settings are resolved in the following order (higher priority wins):
 
 ---
 
-## Project Configuration (`.commitsage`)
+## Project Configuration (`.commitsage/config.json`)
 
-CommitSage supports two layouts for project-level configuration:
+CommitSage stores per-project settings in `.commitsage/config.json`.
 
 | Layout | When used |
 |--------|-----------|
-| `.commitsage` (single JSON file) | Legacy; still supported |
-| `.commitsage/config.json` (directory) | Used when custom language cache is active |
+| `.commitsage/config.json` (directory) | **Current** layout. Created by the `Create Project Config` command and read on every activation |
+| `.commitsage` (single JSON file) | Legacy. Still loaded for backwards compatibility, and automatically migrated to `.commitsage/config.json` on next activation |
 
-Both are read automatically. If you use the [custom language](custom-language.md) feature, `.commitsage` is migrated to a directory transparently.
-
-**Create via Command Palette:** "Commit Sage: Create Project Configuration (.commitsage)"
+**Create via Command Palette:** "Commit Sage: Create Project Config (.commitsage)"
 
 ### Full Example
 
