@@ -26,35 +26,39 @@ describe('parseBlameOutput', () => {
         expect(result[0].email).toBe('alice@example.com');
         expect(result[0].timestamp).toBe(1700000000);
         expect(result[0].line).toBe('const foo = 1;');
+        expect(result[0].lineNumber).toBe(1);
         expect(result[0].commit).toBe(
             '0000000000000000000000000000000000000000'
         );
     });
 
-    it('parses multiple blame entries', () => {
+    it('parses multiple blame entries with their final-line numbers', () => {
         const blame = [
-            'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa 1 1 1',
+            'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa 5 5 1',
             'author Alice',
             'author-mail <alice@example.com>',
             'author-time 1700000000',
             'author-tz +0000',
             'summary one',
             'filename foo.ts',
-            '\tline one',
-            'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb 2 2 1',
+            '\tline at 5',
+            'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb 8 9 1',
             'author Bob',
             'author-mail <bob@example.com>',
             'author-time 1700000100',
             'author-tz +0000',
             'summary two',
             'filename foo.ts',
-            '\tline two',
+            '\tline at 9',
         ].join('\n');
 
         const result = parseBlameOutput(blame);
         expect(result).toHaveLength(2);
         expect(result[0].author).toBe('Alice');
+        expect(result[0].lineNumber).toBe(5);
         expect(result[1].author).toBe('Bob');
+        // F025: should reflect *final* line number (3rd field), not orig (2nd)
+        expect(result[1].lineNumber).toBe(9);
     });
 
     it('skips entries missing required fields', () => {
@@ -138,6 +142,7 @@ describe('analyzeBlameInfo', () => {
             date: '2023-01-01',
             timestamp: 1,
             line: 'a',
+            lineNumber: 1,
         },
         {
             commit: 'b',
@@ -146,6 +151,7 @@ describe('analyzeBlameInfo', () => {
             date: '2023-01-02',
             timestamp: 2,
             line: 'b',
+            lineNumber: 2,
         },
         {
             commit: 'c',
@@ -154,10 +160,11 @@ describe('analyzeBlameInfo', () => {
             date: '2023-01-03',
             timestamp: 3,
             line: 'c',
+            lineNumber: 3,
         },
     ];
 
-    it('counts changes per author', () => {
+    it('counts changes per author using actual line numbers', () => {
         const result = analyzeBlameInfo(blame, new Set([1, 3]));
         const alice = result.get('Alice <alice@example.com>');
         expect(alice?.count).toBe(2);
@@ -167,6 +174,27 @@ describe('analyzeBlameInfo', () => {
 
     it('returns empty map when no changed lines match', () => {
         expect(analyzeBlameInfo(blame, new Set([99])).size).toBe(0);
+    });
+
+    it('uses entry.lineNumber, not array index (F025 regression guard)', () => {
+        // Sparse blame: a single entry that lives at line 42 in the file.
+        // The old impl used `index + 1` and would have credited line 1.
+        const sparse: BlameInfo[] = [
+            {
+                commit: 'x',
+                author: 'Carol',
+                email: 'carol@example.com',
+                date: '2023-01-04',
+                timestamp: 4,
+                line: 'far line',
+                lineNumber: 42,
+            },
+        ];
+        const result = analyzeBlameInfo(sparse, new Set([42]));
+        const carol = result.get('Carol <carol@example.com>');
+        expect(carol?.lines).toEqual([42]);
+        // And: line 1 is NOT credited just because the entry sits at index 0
+        expect(analyzeBlameInfo(sparse, new Set([1])).size).toBe(0);
     });
 });
 

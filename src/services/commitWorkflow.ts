@@ -9,6 +9,9 @@ import { AIService } from './aiService';
 import { ApiKeyManager } from './apiKeyManager';
 import { UserCancelledError, ApiKeyInvalidError } from '../models/errors';
 import { toError, sanitizeErrorForTelemetry } from '../utils/errorUtils';
+import { mapLimit } from '../utils/concurrency';
+
+const BLAME_CONCURRENCY = 8;
 
 export class CommitWorkflow {
     static async generateAndSetCommitMessage(sourceControlRepository?: vscode.SourceControl): Promise<void> {
@@ -150,8 +153,10 @@ export class CommitWorkflow {
         }
 
         const changedFiles = await GitService.getChangedFiles(repoPath, useStagedChanges);
-        const blameAnalyses = await Promise.all(
-            changedFiles.map(file => GitBlameAnalyzer.analyzeChanges(repoPath, file))
+        const blameAnalyses = await mapLimit(
+            changedFiles,
+            BLAME_CONCURRENCY,
+            (file) => GitBlameAnalyzer.analyzeChanges(repoPath, file)
         );
         const blameAnalysis = blameAnalyses.filter(analysis => analysis).join('\n\n');
 

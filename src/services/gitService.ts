@@ -14,6 +14,9 @@ import { TelemetryService } from "./telemetryService";
 import { toError, sanitizeErrorForTelemetry } from "../utils/errorUtils";
 import { unquoteGitPath } from "../utils/gitPath";
 import { ConfigService } from "../utils/configService";
+import { mapLimit } from "../utils/concurrency";
+
+const GIT_FANOUT_CONCURRENCY = 8;
 
 const GIT_STATUS_CODES = {
   modified: "M",
@@ -252,21 +255,19 @@ export class GitService {
       .filter((file) => file.trim())
       .map(unquoteGitPath);
 
-    const results = await Promise.all(
-      files.map(async (file) => {
-        if (await this.isSubmodule(file, repoPath)) {
-          return null;
-        }
-        const fileDiff = await this.executeGitCommand(
-          [...diffArgs, "--", file],
-          repoPath,
-        );
-        if (!fileDiff.trim()) {
-          return null;
-        }
-        return prefix ? prefix + fileDiff : fileDiff;
-      })
-    );
+    const results = await mapLimit(files, GIT_FANOUT_CONCURRENCY, async (file) => {
+      if (await this.isSubmodule(file, repoPath)) {
+        return null;
+      }
+      const fileDiff = await this.executeGitCommand(
+        [...diffArgs, "--", file],
+        repoPath,
+      );
+      if (!fileDiff.trim()) {
+        return null;
+      }
+      return prefix ? prefix + fileDiff : fileDiff;
+    });
 
     return results.filter((d): d is string => d !== null);
   }
@@ -294,35 +295,37 @@ export class GitService {
       ["ls-files", "--others", "--exclude-standard"],
       repoPath,
     );
-    const untrackedDiff = await Promise.all(
-      untrackedFiles
-        .split("\n")
-        .filter((file) => file.trim())
-        .map(unquoteGitPath)
-        .map(async (file) => {
-          try {
-            const content = await fs.promises.readFile(
-              path.join(repoPath, file),
-              "utf-8",
-            );
+    const untrackedFileList = untrackedFiles
+      .split("\n")
+      .filter((file) => file.trim())
+      .map(unquoteGitPath);
+    const untrackedDiff = await mapLimit(
+      untrackedFileList,
+      GIT_FANOUT_CONCURRENCY,
+      async (file) => {
+        try {
+          const content = await fs.promises.readFile(
+            path.join(repoPath, file),
+            "utf-8",
+          );
 
-            if (content.includes("\0")) {
-              return `diff --git a/${file} b/${file}\nnew file mode 100644\nBinary file ${file}`;
-            }
-
-            const lines = content.split("\n");
-            const contentDiff = lines
-              .map((line: string) => `+${line}`)
-              .join("\n");
-            return `diff --git a/${file} b/${file}\nnew file mode 100644\nindex 0000000..${this.calculateFileHash(content)}\n--- /dev/null\n+++ b/${file}\n@@ -0,0 +1,${lines.length} @@\n${contentDiff}`;
-          } catch (error) {
-            Logger.error(
-              `Error reading new file ${file}:`,
-              toError(error),
-            );
-            return "";
+          if (content.includes("\0")) {
+            return `diff --git a/${file} b/${file}\nnew file mode 100644\nBinary file ${file}`;
           }
-        }),
+
+          const lines = content.split("\n");
+          const contentDiff = lines
+            .map((line: string) => `+${line}`)
+            .join("\n");
+          return `diff --git a/${file} b/${file}\nnew file mode 100644\nindex 0000000..${this.calculateFileHash(content)}\n--- /dev/null\n+++ b/${file}\n@@ -0,0 +1,${lines.length} @@\n${contentDiff}`;
+        } catch (error) {
+          Logger.error(
+            `Error reading new file ${file}:`,
+            toError(error),
+          );
+          return "";
+        }
+      },
     );
     const validDiffs = untrackedDiff.filter((diff) => diff.trim());
     return validDiffs.length > 0 ? "# New files:\n" + validDiffs.join("\n") : "";
@@ -333,29 +336,31 @@ export class GitService {
       ["ls-files", "--deleted"],
       repoPath,
     );
-    const deletedDiff = await Promise.all(
-      deletedFiles
-        .split("\n")
-        .filter((file) => file.trim())
-        .map(unquoteGitPath)
-        .map(async (file) => {
-          try {
-            const oldContent = await this.executeGitCommand(
-              ["show", `HEAD:${file}`],
-              repoPath,
-            );
-            const lines = oldContent.split("\n");
-            // Remove trailing empty line that git show adds
-            if (lines[lines.length - 1] === "") {
-              lines.pop();
-            }
-            const lineCount = lines.length;
-            const contentDiff = lines.map((line) => `-${line}`).join("\n");
-            return `diff --git a/${file} b/${file}\ndeleted file mode 100644\n--- a/${file}\n+++ /dev/null\n@@ -1,${lineCount} +0,0 @@\n${contentDiff}\n`;
-          } catch {
-            return "";
+    const deletedFileList = deletedFiles
+      .split("\n")
+      .filter((file) => file.trim())
+      .map(unquoteGitPath);
+    const deletedDiff = await mapLimit(
+      deletedFileList,
+      GIT_FANOUT_CONCURRENCY,
+      async (file) => {
+        try {
+          const oldContent = await this.executeGitCommand(
+            ["show", `HEAD:${file}`],
+            repoPath,
+          );
+          const lines = oldContent.split("\n");
+          // Remove trailing empty line that git show adds
+          if (lines[lines.length - 1] === "") {
+            lines.pop();
           }
-        }),
+          const lineCount = lines.length;
+          const contentDiff = lines.map((line) => `-${line}`).join("\n");
+          return `diff --git a/${file} b/${file}\ndeleted file mode 100644\n--- a/${file}\n+++ /dev/null\n@@ -1,${lineCount} +0,0 @@\n${contentDiff}\n`;
+        } catch {
+          return "";
+        }
+      },
     );
     const validDiffs = deletedDiff.filter((diff) => diff.trim());
     return validDiffs.length > 0 ? "# Deleted files:\n" + validDiffs.join("\n") : "";
