@@ -26,7 +26,7 @@ export class CodestralService {
         prompt: string,
         progress: ProgressReporter,
         attempt: number = 1,
-        _options?: GenerateOptions
+        options?: GenerateOptions
     ): Promise<CommitMessage> {
         try {
             const apiKey = await ApiKeyManager.getKey('codestral');
@@ -34,14 +34,18 @@ export class CodestralService {
 
             const payload = {
                 model: model,
-                messages: [{ role: "user", content: prompt }]
+                messages: [{ role: 'user', content: prompt }]
             };
 
             Logger.log(`Attempt ${attempt}: Sending request to Codestral API`);
             await RetryUtils.updateProgressForAttempt(progress, attempt);
 
             const headers = HttpUtils.createRequestHeaders(apiKey);
-            const requestConfig = HttpUtils.createRequestConfig(headers);
+            const requestConfig = HttpUtils.createRequestConfig(
+                headers,
+                undefined,
+                options?.signal
+            );
 
             const response = await axios.post<CodestralResponse>(this.apiUrl, payload, requestConfig);
 
@@ -63,7 +67,7 @@ export class CodestralService {
                 prompt,
                 progress,
                 attempt,
-                this.generateCommitMessage.bind(this),
+                (p, pr, a) => this.generateCommitMessage(p, pr, a, options),
                 (err: Error) => {
                     const result = BaseAIService.handleHttpError(err, 'Codestral API');
                     if (result.statusCode === 401) {

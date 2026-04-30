@@ -13,6 +13,7 @@ import {
 import { TelemetryService } from "./telemetryService";
 import { toError, sanitizeErrorForTelemetry } from "../utils/errorUtils";
 import { unquoteGitPath } from "../utils/gitPath";
+import { ConfigService } from "../utils/configService";
 
 const GIT_STATUS_CODES = {
   modified: "M",
@@ -531,25 +532,83 @@ export class GitService {
   public static async execGit(
     args: string[],
     cwd: string,
+    options: { signal?: AbortSignal } = {},
   ): Promise<{ stdout: string; stderr: string }> {
     return new Promise((resolve, reject) => {
-      const process = spawn("git", args, { cwd });
+      const timeoutSeconds = ConfigService.getApiRequestTimeout();
+      const timeoutMs =
+        timeoutSeconds === -1 ? undefined : timeoutSeconds * 1000;
+
+      const child = spawn("git", args, {
+        cwd,
+        env: {
+          ...process.env,
+          // eslint-disable-next-line @typescript-eslint/naming-convention
+          GIT_TERMINAL_PROMPT: "0",
+        },
+        timeout: timeoutMs,
+      });
       let stdout = "";
       let stderr = "";
+      let aborted = false;
 
-      process.stdout.on("data", (data: Buffer) => {
+      const onAbort = (): void => {
+        aborted = true;
+        child.kill("SIGTERM");
+        // Hard-kill if still alive after grace period
+        setTimeout(() => {
+          if (!child.killed) {
+            child.kill("SIGKILL");
+          }
+        }, 1500).unref?.();
+      };
+
+      if (options.signal) {
+        if (options.signal.aborted) {
+          onAbort();
+        } else {
+          options.signal.addEventListener("abort", onAbort, { once: true });
+        }
+      }
+
+      child.stdout.on("data", (data: Buffer) => {
         stdout += data.toString();
       });
 
-      process.stderr.on("data", (data: Buffer) => {
+      child.stderr.on("data", (data: Buffer) => {
         stderr += data.toString();
       });
 
-      process.on("close", (code: number) => {
+      child.on("error", (err: Error) => {
+        if (options.signal) {
+          options.signal.removeEventListener("abort", onAbort);
+        }
+        reject(err);
+      });
+
+      child.on("close", (code: number | null, signal: NodeJS.Signals | null) => {
+        if (options.signal) {
+          options.signal.removeEventListener("abort", onAbort);
+        }
+        if (aborted) {
+          reject(new Error("Git command cancelled"));
+          return;
+        }
+        if (signal === "SIGTERM" || signal === "SIGKILL") {
+          // Likely killed by the spawn `timeout` option
+          reject(
+            new Error(
+              `Git command timed out after ${timeoutSeconds}s: git ${args[0] ?? ""}`,
+            ),
+          );
+          return;
+        }
         if (code === 0) {
           resolve({ stdout, stderr });
         } else {
-          reject(new Error(`Git command failed with code ${code}: ${stderr}`));
+          reject(
+            new Error(`Git command failed with code ${code}: ${stderr}`),
+          );
         }
       });
     });

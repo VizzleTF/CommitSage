@@ -131,3 +131,67 @@ describe('GeminiService request', () => {
         expect(headers['x-goog-api-key']).toBe('test-key');
     });
 });
+
+describe('AbortSignal propagation (F004)', () => {
+    it('forwards options.signal into axios.post for OpenAI', async () => {
+        const { OpenAIService } = await import('../src/services/openaiService');
+        mockedPost.mockResolvedValueOnce({
+            data: { choices: [{ message: { content: 'ok' } }] },
+        });
+
+        const ctrl = new AbortController();
+        await OpenAIService.generateCommitMessage('hi', progress, 1, {
+            signal: ctrl.signal,
+        });
+
+        const [, , config] = mockedPost.mock.calls[0];
+        expect((config as { signal?: AbortSignal }).signal).toBe(ctrl.signal);
+    });
+
+    it('forwards options.signal into axios.post for Codestral', async () => {
+        const { CodestralService } = await import('../src/services/codestralService');
+        mockedPost.mockResolvedValueOnce({
+            data: { choices: [{ message: { content: 'ok' } }] },
+        });
+
+        const ctrl = new AbortController();
+        await CodestralService.generateCommitMessage('hi', progress, 1, {
+            signal: ctrl.signal,
+        });
+
+        const [, , config] = mockedPost.mock.calls[0];
+        expect((config as { signal?: AbortSignal }).signal).toBe(ctrl.signal);
+    });
+
+    it('forwards options.signal into axios.post for Ollama', async () => {
+        const { OllamaService } = await import('../src/services/ollamaService');
+        mockedPost.mockResolvedValueOnce({
+            data: { message: { content: 'ok' } },
+        });
+
+        const ctrl = new AbortController();
+        await OllamaService.generateCommitMessage('hi', progress, 1, {
+            signal: ctrl.signal,
+        });
+
+        const [, , config] = mockedPost.mock.calls[0];
+        expect((config as { signal?: AbortSignal }).signal).toBe(ctrl.signal);
+    });
+
+    it('forwards options.signal into axios.post for Gemini', async () => {
+        const { GeminiService } = await import('../src/services/geminiService');
+        mockedPost.mockResolvedValueOnce({
+            data: {
+                candidates: [{ content: { parts: [{ text: 'ok' }] } }],
+            },
+        });
+
+        const ctrl = new AbortController();
+        await GeminiService.generateCommitMessage('hi', progress, 1, {
+            signal: ctrl.signal,
+        });
+
+        const [, , config] = mockedPost.mock.calls[0];
+        expect((config as { signal?: AbortSignal }).signal).toBe(ctrl.signal);
+    });
+});

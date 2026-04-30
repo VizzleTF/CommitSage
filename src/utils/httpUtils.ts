@@ -38,10 +38,16 @@ export class HttpUtils {
   static createRequestConfig(
     headers: Record<string, string>,
     timeout?: number,
-  ): { headers: Record<string, string>; timeout: number | undefined } {
+    signal?: AbortSignal,
+  ): {
+    headers: Record<string, string>;
+    timeout: number | undefined;
+    signal?: AbortSignal;
+  } {
     return {
       headers,
       timeout: timeout !== undefined ? timeout : this.getConfiguredTimeout(),
+      signal,
     };
   }
 }
