@@ -10,8 +10,7 @@ const apiValidation = {
         rateLimit: 'Rate limit exceeded',
         invalidEndpoint: 'Invalid endpoint URL',
         validationFailed: (status: number) => `API validation failed: ${status}`,
-        customValidationFailed: (status: number) => `Custom API validation failed: ${status}`,
-        invalidOpenaiKey: 'Invalid OpenAI API key format. Key should start with "sk-"'
+        customValidationFailed: (status: number) => `Custom API validation failed: ${status}`
     }
 } as const;
 
@@ -20,9 +19,8 @@ export class ApiKeyValidator {
         if (!key) {
             return apiValidation.errorMessages.emptyKey;
         }
-        if (!key.startsWith('sk-')) {
-            return apiValidation.errorMessages.invalidOpenaiKey;
-        }
+        // Note: no `sk-` prefix check — OpenAI-compatible providers (Azure,
+        // OpenRouter, LocalAI, etc.) use different key formats.
         return null;
     }
 

@@ -106,7 +106,26 @@ export class ConfigService {
   }
 
   static getProjectRootPath(): string | undefined {
-    return vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+    const folders = vscode.workspace.workspaceFolders;
+    if (!folders || folders.length === 0) {
+      return undefined;
+    }
+    if (folders.length === 1) {
+      return folders[0].uri.fsPath;
+    }
+
+    // Multi-root workspace: prefer the folder containing the active editor.
+    const activeFile = vscode.window.activeTextEditor?.document.uri;
+    if (activeFile) {
+      const owning = vscode.workspace.getWorkspaceFolder(activeFile);
+      if (owning) {
+        return owning.uri.fsPath;
+      }
+    }
+
+    // Fallback: the first folder. Documented limitation for multi-root
+    // setups where no editor is active.
+    return folders[0].uri.fsPath;
   }
 
   private static getProjectConfig(): ProjectConfig | null {
@@ -114,13 +133,11 @@ export class ConfigService {
       return this.projectConfigCache;
     }
 
-    const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
-    if (!workspaceFolder) {
+    const rootPath = this.getProjectRootPath();
+    if (!rootPath) {
       this.projectConfigCache = {};
       return this.projectConfigCache;
     }
-
-    const rootPath = workspaceFolder.uri.fsPath;
     // Support both legacy `.commitsage` file and new `.commitsage/config.json` directory layout
     const legacyConfigPath = path.join(rootPath, ".commitsage");
     const dirConfigPath = path.join(rootPath, ".commitsage", "config.json");
@@ -314,7 +331,7 @@ export class ConfigService {
   }
 
   static getOllamaModel(): string {
-    return this.getConfig<string>("ollama", "model", "mistral");
+    return this.getConfig<string>("ollama", "model", "llama3.2");
   }
 
   static getOllamaUseAuthToken(): boolean {
