@@ -153,11 +153,12 @@ Settings are loaded in the following order (higher priority overrides lower):
 ## Usage
 
 1. Stage your changes in Git
-2. Press `Cmd+G` (Mac) / `Ctrl+G` (Windows/Linux)
+2. Open the Source Control view (Ctrl+Shift+G / Cmd+Shift+G), then press `Ctrl+G` (Windows/Linux) / `Cmd+G` (Mac) — the keybinding is scoped to the SCM view to avoid clashing with editor shortcuts
 3. Or click the Commit Sage icon in the Source Control view
-4. Wait for the AI to analyze changes and generate a message
-5. Review and edit the message if needed
-6. Commit as usual
+4. Or run "Commit Sage: Generate Commit Message" from the Command Palette (works from anywhere)
+5. Wait for the AI to analyze changes and generate a message
+6. Review and edit the message if needed
+7. Commit as usual
 
 ## Requirements
 
