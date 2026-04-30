@@ -15,6 +15,7 @@ export interface ProgressReporter {
  */
 export interface GenerateOptions {
     maxTokens?: number;
+    signal?: AbortSignal;
 }
 
 export interface IAIService {
