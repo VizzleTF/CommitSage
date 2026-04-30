@@ -3,7 +3,7 @@ import { Logger } from '../utils/logger';
 import { ConfigService } from '../utils/configService';
 import { ProgressReporter, CommitMessage, GenerateOptions } from '../models/types';
 import { ApiKeyInvalidError } from '../models/errors';
-import { BaseAIService } from './baseAIService';
+import { extractAndValidateMessage, handleHttpError } from './baseAIService';
 import { HttpUtils } from '../utils/httpUtils';
 import { RetryUtils } from '../utils/retryUtils';
 import { ApiKeyManager } from './apiKeyManager';
@@ -78,7 +78,7 @@ export class OpenAIService {
                 progress,
                 attempt,
                 (p, pr, a) => this.generateCommitMessage(p, pr, a, options),
-                (err: Error) => BaseAIService.handleHttpError(err, 'OpenAI API')
+                (err: Error) => handleHttpError(err, 'OpenAI API')
             );
         }
     }
@@ -109,7 +109,7 @@ export class OpenAIService {
 
     private static extractCommitMessage(response: OpenAIResponse): string {
         const content = response.choices?.[0]?.message?.content;
-        return BaseAIService.extractAndValidateMessage(content, 'OpenAI');
+        return extractAndValidateMessage(content, 'OpenAI');
     }
 
 }

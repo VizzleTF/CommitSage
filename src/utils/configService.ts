@@ -9,6 +9,41 @@ export type { CommitLanguage } from './constants';
 
 type CacheValue = string | boolean | number;
 
+/**
+ * Single source of truth for every commitSage.* setting we read.
+ * Adding a new setting:
+ *   1. Add an entry here with its default;
+ *   2. Read it via ConfigService.get('your.dotted.path').
+ * No new wrapper method is needed.
+ */
+/* eslint-disable @typescript-eslint/naming-convention */
+const SETTING_DEFAULTS = {
+    'gemini.model': 'auto',
+    'commit.commitLanguage': 'english',
+    'commit.customLanguageName': '',
+    'commit.commitFormat': 'conventional',
+    'commit.useCustomInstructions': false,
+    'commit.customInstructions': '',
+    'commit.promptForRefs': false,
+    'commit.onlyStagedChanges': false,
+    'commit.autoCommit': false,
+    'commit.autoPush': false,
+    'codestral.model': 'codestral-2405',
+    'provider.type': 'gemini',
+    'general.maxRetries': 3,
+    'ollama.baseUrl': 'http://localhost:11434',
+    'ollama.model': 'llama3.2',
+    'ollama.useAuthToken': false,
+    'openai.model': 'gpt-3.5-turbo',
+    'openai.baseUrl': 'https://api.openai.com/v1',
+    'apiRequestTimeout': 30,
+    'telemetry.enabled': true,
+} as const satisfies Record<string, CacheValue>;
+/* eslint-enable @typescript-eslint/naming-convention */
+
+type SettingKey = keyof typeof SETTING_DEFAULTS;
+type SettingValue<K extends SettingKey> = (typeof SETTING_DEFAULTS)[K];
+
 export class ConfigService {
   private static cache = new Map<string, CacheValue>();
   private static projectConfigCache: ProjectConfig | null = null;
@@ -145,13 +180,17 @@ export class ConfigService {
     try {
       if (fs.existsSync(dirConfigPath)) {
         const configContent = fs.readFileSync(dirConfigPath, 'utf8');
-        const config = JSON.parse(configContent) as ProjectConfig;
-        this.projectConfigCache = config;
+        this.projectConfigCache = this.parseAndValidateProjectConfig(
+          configContent,
+          '.commitsage/config.json',
+        );
         Logger.log('Loaded project configuration from .commitsage/config.json');
       } else if (fs.existsSync(legacyConfigPath) && fs.statSync(legacyConfigPath).isFile()) {
         const configContent = fs.readFileSync(legacyConfigPath, 'utf8');
-        const config = JSON.parse(configContent) as ProjectConfig;
-        this.projectConfigCache = config;
+        this.projectConfigCache = this.parseAndValidateProjectConfig(
+          configContent,
+          '.commitsage',
+        );
         Logger.log('Loaded project configuration from .commitsage file');
       } else {
         this.projectConfigCache = {};
@@ -164,6 +203,40 @@ export class ConfigService {
     return this.projectConfigCache;
   }
 
+  private static parseAndValidateProjectConfig(
+    raw: string,
+    source: string,
+  ): ProjectConfig {
+    const parsed = JSON.parse(raw) as unknown;
+    if (!this.isPlainObject(parsed)) {
+      Logger.warn(
+        `Project config at ${source} is not an object — ignoring.`,
+      );
+      return {};
+    }
+    // Drop top-level keys that are not plain objects (e.g. `commit: false`),
+    // since downstream code descends through them and would otherwise misread.
+    const validated: Record<string, unknown> = {};
+    for (const [key, value] of Object.entries(parsed)) {
+      if (this.isPlainObject(value)) {
+        validated[key] = value;
+      } else {
+        Logger.warn(
+          `Project config at ${source}: section "${key}" is not an object, skipping.`,
+        );
+      }
+    }
+    return validated as ProjectConfig;
+  }
+
+  private static isPlainObject(value: unknown): value is Record<string, unknown> {
+    return (
+      typeof value === 'object' &&
+      value !== null &&
+      !Array.isArray(value)
+    );
+  }
+
   private static getNestedProjectValue<T>(
     sections: string[],
     _defaultValue: T,
@@ -173,19 +246,39 @@ export class ConfigService {
       return undefined;
     }
 
-    let current: Record<string, unknown> = projectConfig as Record<
-      string,
-      unknown
-    >;
-    for (const section of sections) {
-      if (current && typeof current === 'object' && section in current) {
-        current = current[section] as Record<string, unknown>;
-      } else {
+    let current: unknown = projectConfig;
+    for (let i = 0; i < sections.length; i++) {
+      const section = sections[i];
+      const isLeaf = i === sections.length - 1;
+      if (!this.isPlainObject(current)) {
         return undefined;
       }
+      if (!(section in current)) {
+        return undefined;
+      }
+      const next = current[section];
+      // For non-leaf segments we expect an object to descend into; if a
+      // primitive sits where a section is expected, treat as missing rather
+      // than throwing.
+      if (!isLeaf && !this.isPlainObject(next)) {
+        return undefined;
+      }
+      current = next;
     }
 
     return current as T;
+  }
+
+  /**
+   * Typed accessor over SETTING_DEFAULTS. Prefer this over the legacy
+   * getXxx wrappers when adding new code.
+   */
+  static get<K extends SettingKey>(key: K): SettingValue<K> {
+    const defaultValue = SETTING_DEFAULTS[key] as CacheValue;
+    const dot = key.indexOf('.');
+    const section = dot >= 0 ? key.slice(0, dot) : '';
+    const leaf = dot >= 0 ? key.slice(dot + 1) : key;
+    return this.getConfig(section, leaf, defaultValue) as SettingValue<K>;
   }
 
   static getConfig<T extends CacheValue>(
@@ -224,36 +317,21 @@ export class ConfigService {
     }
   }
 
-  static getGeminiModel(): string {
-    return this.getConfig<string>('gemini', 'model', 'auto');
-  }
-
-  static getCommitLanguage(): string {
-    return this.getConfig<string>('commit', 'commitLanguage', 'english');
-  }
-
-  static getCustomLanguageName(): string {
-    return this.getConfig<string>('commit', 'customLanguageName', '');
-  }
-
-  static getCommitFormat(): string {
-    return this.getConfig<string>('commit', 'commitFormat', 'conventional');
-  }
-
-  static useCustomInstructions(): boolean {
-    return this.getConfig<boolean>('commit', 'useCustomInstructions', false);
-  }
-
-  static getCustomInstructions(): string {
-    return this.getConfig<string>('commit', 'customInstructions', '');
-  }
-
-  static getCodestralModel(): string {
-    return this.getConfig<string>('codestral', 'model', 'codestral-2405');
-  }
+  static getGeminiModel(): string { return this.get('gemini.model'); }
+  static getCommitLanguage(): string { return this.get('commit.commitLanguage'); }
+  static getCustomLanguageName(): string { return this.get('commit.customLanguageName'); }
+  static getCommitFormat(): string { return this.get('commit.commitFormat'); }
+  static useCustomInstructions(): boolean { return this.get('commit.useCustomInstructions'); }
+  static getCustomInstructions(): string { return this.get('commit.customInstructions'); }
+  static getCodestralModel(): string { return this.get('codestral.model'); }
+  static shouldPromptForRefs(): boolean { return this.get('commit.promptForRefs'); }
+  static getOnlyStagedChanges(): boolean { return this.get('commit.onlyStagedChanges'); }
+  static getMaxRetries(): number { return this.get('general.maxRetries'); }
+  static getAutoCommitEnabled(): boolean { return this.get('commit.autoCommit'); }
+  static getAutoPushEnabled(): boolean { return this.get('commit.autoPush'); }
 
   static getProvider(): string {
-    const provider = this.getConfig<string>('provider', 'type', 'gemini');
+    const provider = this.get('provider.type');
     if (!['gemini', 'openai', 'codestral', 'ollama'].includes(provider)) {
       Logger.warn(
         `Invalid provider type: ${provider}, falling back to gemini`,
@@ -261,26 +339,6 @@ export class ConfigService {
       return 'gemini';
     }
     return provider;
-  }
-
-  static shouldPromptForRefs(): boolean {
-    return this.getConfig<boolean>('commit', 'promptForRefs', false);
-  }
-
-  static getOnlyStagedChanges(): boolean {
-    return this.getConfig<boolean>('commit', 'onlyStagedChanges', false);
-  }
-
-  static getMaxRetries(): number {
-    return this.getConfig<number>('general', 'maxRetries', 3);
-  }
-
-  static getAutoCommitEnabled(): boolean {
-    return this.getConfig<boolean>('commit', 'autoCommit', false);
-  }
-
-  static getAutoPushEnabled(): boolean {
-    return this.getConfig<boolean>('commit', 'autoPush', false);
   }
 
   static clearCache(): void {
@@ -298,9 +356,7 @@ export class ConfigService {
     }
   }
 
-  static isTelemetryEnabled(): boolean {
-    return this.getConfig<boolean>('telemetry', 'enabled', true);
-  }
+  static isTelemetryEnabled(): boolean { return this.get('telemetry.enabled'); }
 
   private static validateAndNormalizeEndpoint(endpoint: string): string {
     if (!endpoint) {
@@ -322,35 +378,10 @@ export class ConfigService {
     return normalizedEndpoint;
   }
 
-  static getOllamaBaseUrl(): string {
-    return this.getConfig<string>(
-      'ollama',
-      'baseUrl',
-      'http://localhost:11434',
-    );
-  }
-
-  static getOllamaModel(): string {
-    return this.getConfig<string>('ollama', 'model', 'llama3.2');
-  }
-
-  static getOllamaUseAuthToken(): boolean {
-    return this.getConfig<boolean>('ollama', 'useAuthToken', false);
-  }
-
-  static getOpenAIModel(): string {
-    return this.getConfig<string>('openai', 'model', 'gpt-3.5-turbo');
-  }
-
-  static getOpenAIBaseUrl(): string {
-    return this.getConfig<string>(
-      'openai',
-      'baseUrl',
-      'https://api.openai.com/v1',
-    );
-  }
-
-  static getApiRequestTimeout(): number {
-    return this.getConfig<number>('', 'apiRequestTimeout', 30);
-  }
+  static getOllamaBaseUrl(): string { return this.get('ollama.baseUrl'); }
+  static getOllamaModel(): string { return this.get('ollama.model'); }
+  static getOllamaUseAuthToken(): boolean { return this.get('ollama.useAuthToken'); }
+  static getOpenAIModel(): string { return this.get('openai.model'); }
+  static getOpenAIBaseUrl(): string { return this.get('openai.baseUrl'); }
+  static getApiRequestTimeout(): number { return this.get('apiRequestTimeout'); }
 }

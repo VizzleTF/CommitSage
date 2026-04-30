@@ -2,7 +2,7 @@ import axios, { AxiosError } from 'axios';
 import { Logger } from '../utils/logger';
 import { CommitMessage, ProgressReporter, GenerateOptions } from '../models/types';
 import { ConfigService } from '../utils/configService';
-import { BaseAIService } from './baseAIService';
+import { extractAndValidateMessage, handleHttpError } from './baseAIService';
 import { HttpUtils } from '../utils/httpUtils';
 import { RetryUtils } from '../utils/retryUtils';
 import { toError } from '../utils/errorUtils';
@@ -84,7 +84,7 @@ export class OllamaService {
                             statusCode: 404
                         };
                     }
-                    const result = BaseAIService.handleHttpError(err, 'Ollama');
+                    const result = handleHttpError(err, 'Ollama');
                     if (result.shouldRetry && result.statusCode === 500) {
                         result.errorMessage = 'Server error. Please check if Ollama is running properly.';
                     }
@@ -99,7 +99,7 @@ export class OllamaService {
 
     private static extractCommitMessage(response: OllamaResponse): string {
         const content = response.message?.content;
-        return BaseAIService.extractAndValidateMessage(content, 'Ollama');
+        return extractAndValidateMessage(content, 'Ollama');
     }
 
 }
