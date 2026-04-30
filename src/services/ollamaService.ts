@@ -16,16 +16,14 @@ interface OllamaResponse {
 }
 
 export class OllamaService {
-    private static readonly defaultModel = 'llama3.2';
-
     static async generateCommitMessage(
         prompt: string,
         progress: ProgressReporter,
         attempt: number = 1,
         options?: GenerateOptions
     ): Promise<CommitMessage> {
-        const baseUrl = ConfigService.get('ollama.baseUrl') || 'http://localhost:11434';
-        const model = ConfigService.get('ollama.model') || this.defaultModel;
+        const baseUrl = ConfigService.get('ollama.baseUrl');
+        const model = ConfigService.get('ollama.model');
         const apiUrl = `${baseUrl}/api/chat`;
 
         const payload: Record<string, unknown> = {

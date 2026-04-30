@@ -57,3 +57,44 @@ describe('ConfigService.hasValidProjectConfig (F034)', () => {
         expect(result.error?.message).toMatch(/not a JSON object/);
     });
 });
+
+describe('ConfigService.onProjectConfigChange (F052)', () => {
+    it('fires registered listeners and stops firing after dispose', () => {
+        let count = 0;
+        const sub = ConfigService.onProjectConfigChange(() => {
+            count++;
+        });
+
+        // Reach into the private handler the watcher would invoke.
+        const handler = (
+            ConfigService as unknown as { handleProjectConfigChange: () => void }
+        ).handleProjectConfigChange.bind(ConfigService);
+
+        handler();
+        handler();
+        expect(count).toBe(2);
+
+        sub.dispose();
+        handler();
+        expect(count).toBe(2);
+    });
+
+    it('a throwing listener does not block subsequent listeners', () => {
+        let secondCount = 0;
+        const sub1 = ConfigService.onProjectConfigChange(() => {
+            throw new Error('boom');
+        });
+        const sub2 = ConfigService.onProjectConfigChange(() => {
+            secondCount++;
+        });
+
+        const handler = (
+            ConfigService as unknown as { handleProjectConfigChange: () => void }
+        ).handleProjectConfigChange.bind(ConfigService);
+        handler();
+        expect(secondCount).toBe(1);
+
+        sub1.dispose();
+        sub2.dispose();
+    });
+});

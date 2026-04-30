@@ -164,21 +164,22 @@ export class GitService {
     repoPath: string,
     onlyStagedChanges: boolean,
     knownHasStagedChanges?: boolean,
+    signal?: AbortSignal,
   ): Promise<string> {
     try {
-      const hasHead = await this.hasHead(repoPath);
-      const hasStagedChanges = knownHasStagedChanges ?? await this.hasChanges(repoPath, 'staged');
+      const hasHead = await this.hasHead(repoPath, signal);
+      const hasStagedChanges = knownHasStagedChanges ?? await this.hasChanges(repoPath, 'staged', signal);
       const hasUnstagedChanges =
-        !onlyStagedChanges && (await this.hasChanges(repoPath, 'unstaged'));
+        !onlyStagedChanges && (await this.hasChanges(repoPath, 'unstaged', signal));
       const hasUntrackedFiles =
         !onlyStagedChanges &&
         !hasStagedChanges &&
-        (await this.hasChanges(repoPath, 'untracked'));
+        (await this.hasChanges(repoPath, 'untracked', signal));
       const hasDeletedFiles =
         hasHead &&
         !onlyStagedChanges &&
         !hasStagedChanges &&
-        (await this.hasChanges(repoPath, 'deleted'));
+        (await this.hasChanges(repoPath, 'deleted', signal));
 
       if (
         !hasStagedChanges &&
@@ -192,30 +193,30 @@ export class GitService {
       const diffs: string[] = [];
 
       if (onlyStagedChanges && hasStagedChanges) {
-        const staged = await this.getStagedDiff(repoPath);
+        const staged = await this.getStagedDiff(repoPath, undefined, signal);
         diffs.push(...staged);
         return diffs.join('\n\n').trim();
       }
 
       if (hasStagedChanges) {
-        const staged = await this.getStagedDiff(repoPath, '# Staged changes:\n');
+        const staged = await this.getStagedDiff(repoPath, '# Staged changes:\n', signal);
         diffs.push(...staged);
       }
 
       if (hasUnstagedChanges) {
-        const unstaged = await this.getUnstagedDiff(repoPath);
+        const unstaged = await this.getUnstagedDiff(repoPath, signal);
         diffs.push(...unstaged);
       }
 
       if (hasUntrackedFiles) {
-        const untracked = await this.getUntrackedDiff(repoPath);
+        const untracked = await this.getUntrackedDiff(repoPath, signal);
         if (untracked) {
           diffs.push(untracked);
         }
       }
 
       if (hasDeletedFiles) {
-        const deleted = await this.getDeletedDiff(repoPath);
+        const deleted = await this.getDeletedDiff(repoPath, signal);
         if (deleted) {
           diffs.push(deleted);
         }
@@ -241,11 +242,12 @@ export class GitService {
     }
   }
 
-  private static async isSubmodule(file: string, repoPath: string): Promise<boolean> {
+  private static async isSubmodule(file: string, repoPath: string, signal?: AbortSignal): Promise<boolean> {
     try {
       const { stdout } = await this.execGit(
         ['ls-files', '--stage', '--', file],
         repoPath,
+        { signal },
       );
       return stdout.includes('160000');
     } catch {
@@ -257,52 +259,57 @@ export class GitService {
     repoPath: string,
     listArgs: string[],
     diffArgs: string[],
-    prefix?: string
+    prefix?: string,
+    signal?: AbortSignal,
   ): Promise<string[]> {
-    const files = (await this.executeGitCommand(listArgs, repoPath))
+    const files = (await this.executeGitCommand(listArgs, repoPath, signal))
       .split('\n')
       .filter((file) => file.trim())
       .map(unquoteGitPath);
 
     const results = await mapLimit(files, GIT_FANOUT_CONCURRENCY, async (file) => {
-      if (await this.isSubmodule(file, repoPath)) {
+      if (await this.isSubmodule(file, repoPath, signal)) {
         return null;
       }
       const fileDiff = await this.executeGitCommand(
         [...diffArgs, '--', file],
         repoPath,
+        signal,
       );
       if (!fileDiff.trim()) {
         return null;
       }
       return prefix ? prefix + fileDiff : fileDiff;
-    });
+    }, signal);
 
     return results.filter((d): d is string => d !== null);
   }
 
-  private static async getStagedDiff(repoPath: string, prefix?: string): Promise<string[]> {
+  private static async getStagedDiff(repoPath: string, prefix?: string, signal?: AbortSignal): Promise<string[]> {
     return this.getDiffForFiles(
       repoPath,
       ['diff', '--cached', '--name-only'],
       ['diff', '--cached'],
       prefix,
+      signal,
     );
   }
 
-  private static async getUnstagedDiff(repoPath: string): Promise<string[]> {
+  private static async getUnstagedDiff(repoPath: string, signal?: AbortSignal): Promise<string[]> {
     return this.getDiffForFiles(
       repoPath,
       ['diff', '--name-only'],
       ['diff'],
       '# Unstaged changes:\n',
+      signal,
     );
   }
 
-  private static async getUntrackedDiff(repoPath: string): Promise<string> {
+  private static async getUntrackedDiff(repoPath: string, signal?: AbortSignal): Promise<string> {
     const untrackedFiles = await this.executeGitCommand(
       ['ls-files', '--others', '--exclude-standard'],
       repoPath,
+      signal,
     );
     const untrackedFileList = untrackedFiles
       .split('\n')
@@ -321,7 +328,7 @@ export class GitService {
           const { stdout, exitCode } = await this.execGit(
             ['diff', '--no-index', '--', '/dev/null', file],
             repoPath,
-            { allowNonZeroExit: true },
+            { allowNonZeroExit: true, signal },
           );
           if (exitCode === 128) {
             return '';
@@ -332,15 +339,17 @@ export class GitService {
           return '';
         }
       },
+      signal,
     );
     const validDiffs = untrackedDiff.filter((diff) => diff.trim());
     return validDiffs.length > 0 ? '# New files:\n' + validDiffs.join('\n') : '';
   }
 
-  private static async getDeletedDiff(repoPath: string): Promise<string> {
+  private static async getDeletedDiff(repoPath: string, signal?: AbortSignal): Promise<string> {
     const deletedFiles = await this.executeGitCommand(
       ['ls-files', '--deleted'],
       repoPath,
+      signal,
     );
     const deletedFileList = deletedFiles
       .split('\n')
@@ -357,6 +366,7 @@ export class GitService {
           const fileDiff = await this.executeGitCommand(
             ['diff', '--', file],
             repoPath,
+            signal,
           );
           return fileDiff;
         } catch (error) {
@@ -364,14 +374,15 @@ export class GitService {
           return '';
         }
       },
+      signal,
     );
     const validDiffs = deletedDiff.filter((diff) => diff.trim());
     return validDiffs.length > 0 ? '# Deleted files:\n' + validDiffs.join('\n') : '';
   }
 
-  public static async hasHead(repoPath: string): Promise<boolean> {
+  public static async hasHead(repoPath: string, signal?: AbortSignal): Promise<boolean> {
     try {
-      await this.execGit(['rev-parse', 'HEAD'], repoPath);
+      await this.execGit(['rev-parse', 'HEAD'], repoPath, { signal });
       return true;
     } catch {
       return false;
@@ -381,6 +392,7 @@ export class GitService {
   static async hasChanges(
     repoPath: string,
     type: 'staged' | 'unstaged' | 'untracked' | 'deleted',
+    signal?: AbortSignal,
   ): Promise<boolean> {
     try {
       let command: string[];
@@ -401,7 +413,7 @@ export class GitService {
           throw new Error(`Invalid change type: ${type}`);
       }
 
-      const output = await this.executeGitCommand(command, repoPath);
+      const output = await this.executeGitCommand(command, repoPath, signal);
       return output.trim().length > 0;
     } catch (error) {
       Logger.error(`Error checking for ${type} changes:`, toError(error));
@@ -412,10 +424,11 @@ export class GitService {
   static async getChangedFiles(
     repoPath: string,
     onlyStaged: boolean = false,
+    signal?: AbortSignal,
   ): Promise<ChangedFile[]> {
     try {
       const statusCommand = ['status', '--porcelain'];
-      const output = await this.executeGitCommand(statusCommand, repoPath);
+      const output = await this.executeGitCommand(statusCommand, repoPath, signal);
 
       return output
         .split('\n')
@@ -452,8 +465,9 @@ export class GitService {
   private static async executeGitCommand(
     args: string[],
     cwd: string,
+    signal?: AbortSignal,
   ): Promise<string> {
-    const { stdout } = await this.execGit(args, cwd);
+    const { stdout } = await this.execGit(args, cwd, { signal });
     return stdout;
   }
 
@@ -640,31 +654,6 @@ export class GitService {
     });
   }
 
-  public static async isNewFile(
-    filePath: string,
-    repoPath: string,
-  ): Promise<boolean> {
-    const normalizedPath = path.normalize(filePath.replace(/^\/+/, ''));
-    const { stdout } = await this.execGit(
-      ['status', '--porcelain', '--', normalizedPath],
-      repoPath,
-    );
-    const status = stdout.slice(0, 2);
-    return status === '??' || status === 'A ';
-  }
-
-  public static async isFileDeleted(
-    filePath: string,
-    repoPath: string,
-  ): Promise<boolean> {
-    const normalizedPath = path.normalize(filePath.replace(/^\/+/, ''));
-    const { stdout } = await this.execGit(
-      ['status', '--porcelain', '--', normalizedPath],
-      repoPath,
-    );
-    const status = stdout.slice(0, 2);
-    return status === ' D' || status === 'D ';
-  }
 }
 
 interface GitExtension {
@@ -674,7 +663,7 @@ interface GitExtension {
 }
 
 /** Result of `getChangedFiles`. `status` is the raw 2-char `git status --porcelain` code. */
-export interface ChangedFile {
+interface ChangedFile {
   path: string;
   status: string;
 }

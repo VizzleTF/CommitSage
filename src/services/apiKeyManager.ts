@@ -41,17 +41,13 @@ export class ApiKeyManager {
         this.secretStorage = secretStorage;
     }
 
-    static requiresApiKey(provider: string): boolean {
-        return provider in API_KEY_CONFIGS;
-    }
-
     /**
-     * Whether the current configuration requires an API key/auth token. Same
-     * as `requiresApiKey`, but for ollama also consults `ollama.useAuthToken`
-     * since auth is opt-in for self-hosted Ollama.
+     * Whether the current configuration requires an API key/auth token.
+     * For ollama also consults `ollama.useAuthToken` since auth is opt-in
+     * for self-hosted Ollama.
      */
     static requiresKeyForCurrentConfig(provider: string): boolean {
-        if (!this.requiresApiKey(provider)) {
+        if (!(provider in API_KEY_CONFIGS)) {
             return false;
         }
         if (provider === 'ollama') {

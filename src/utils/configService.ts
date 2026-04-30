@@ -5,8 +5,6 @@ import { Logger } from './logger';
 import { ProjectConfig } from '../models/types';
 import { toError } from './errorUtils';
 
-export type { CommitLanguage } from './constants';
-
 type CacheValue = string | boolean | number;
 
 /**
@@ -17,7 +15,7 @@ type CacheValue = string | boolean | number;
  * No new wrapper method is needed.
  */
 /* eslint-disable @typescript-eslint/naming-convention */
-const SETTING_DEFAULTS = {
+export const SETTING_DEFAULTS = {
     'gemini.model': 'auto',
     'commit.commitLanguage': 'english',
     'commit.customLanguageName': '',
@@ -28,9 +26,8 @@ const SETTING_DEFAULTS = {
     'commit.onlyStagedChanges': false,
     'commit.autoCommit': false,
     'commit.autoPush': false,
-    'codestral.model': 'codestral-2405',
+    'codestral.model': 'codestral-latest',
     'provider.type': 'gemini',
-    'general.maxRetries': 3,
     'ollama.baseUrl': 'http://localhost:11434',
     'ollama.model': 'llama3.2',
     'ollama.useAuthToken': false,
@@ -59,6 +56,26 @@ export class ConfigService {
   private static projectConfigFileWatcher: vscode.FileSystemWatcher | null =
     null;
   private static disposables: vscode.Disposable[] = [];
+  private static projectConfigChangeListeners: Array<() => void> = [];
+
+  /**
+   * Subscribe to project-config file change/create/delete events. Used by
+   * SettingsValidator to re-validate when the user edits .commitsage mid-session
+   * (otherwise an invalid edit silently reverts settings to defaults — F052).
+   * Decoupled via callback to avoid a circular import between ConfigService and
+   * SettingsValidator.
+   */
+  static onProjectConfigChange(listener: () => void): vscode.Disposable {
+    this.projectConfigChangeListeners.push(listener);
+    return {
+      dispose: () => {
+        const idx = this.projectConfigChangeListeners.indexOf(listener);
+        if (idx >= 0) {
+          this.projectConfigChangeListeners.splice(idx, 1);
+        }
+      },
+    };
+  }
 
   private static migrateProjectConfig(): void {
     const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
@@ -128,19 +145,26 @@ export class ConfigService {
     this.projectConfigFileWatcher =
       vscode.workspace.createFileSystemWatcher(pattern);
 
-    this.projectConfigFileWatcher.onDidCreate(() => {
-      this.invalidateProjectConfig();
-    });
-
-    this.projectConfigFileWatcher.onDidChange(() => {
-      this.invalidateProjectConfig();
-    });
-
-    this.projectConfigFileWatcher.onDidDelete(() => {
-      this.invalidateProjectConfig();
-    });
+    const onChange = (): void => this.handleProjectConfigChange();
+    this.projectConfigFileWatcher.onDidCreate(onChange);
+    this.projectConfigFileWatcher.onDidChange(onChange);
+    this.projectConfigFileWatcher.onDidDelete(onChange);
 
     this.disposables.push(this.projectConfigFileWatcher);
+  }
+
+  private static handleProjectConfigChange(): void {
+    this.invalidateProjectConfig();
+    for (const listener of this.projectConfigChangeListeners) {
+      try {
+        listener();
+      } catch (error) {
+        Logger.error(
+          'Project config change listener threw:',
+          toError(error),
+        );
+      }
+    }
   }
 
   private static invalidateProjectConfig(): void {
@@ -286,7 +310,6 @@ export class ConfigService {
 
   private static getNestedProjectValue<T>(
     sections: string[],
-    _defaultValue: T,
   ): T | undefined {
     const projectConfig = this.getProjectConfig();
     if (!projectConfig) {
@@ -317,8 +340,17 @@ export class ConfigService {
   }
 
   /**
-   * Typed accessor over SETTING_DEFAULTS. Prefer this over the legacy
-   * getXxx wrappers when adding new code.
+   * Every contributed setting key, prefixed with `commitSage.`. Used by
+   * `TelemetryService` to attribute `settings_changed` events without
+   * maintaining a hand-rolled list that drifts from `SETTING_DEFAULTS`.
+   */
+  static readonly knownConfigurationKeys: readonly string[] = (
+    Object.keys(SETTING_DEFAULTS) as SettingKey[]
+  ).map((k) => `commitSage.${k}`);
+
+  /**
+   * Typed accessor over `SETTING_DEFAULTS`. Adding a new setting:
+   * extend `SETTING_DEFAULTS` and read it via `ConfigService.get('section.key')`.
    */
   static get<K extends SettingKey>(key: K): SettingValue<K> {
     const defaultValue = SETTING_DEFAULTS[key] as CacheValue;
@@ -338,7 +370,6 @@ export class ConfigService {
       if (!this.cache.has(configKey)) {
         const projectValue = this.getNestedProjectValue<T>(
           section ? [section, key] : [key],
-          defaultValue,
         );
 
         if (projectValue !== undefined) {

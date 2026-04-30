@@ -12,8 +12,10 @@ import { AxiosError } from 'axios';
  * delegate to `RetryUtils.handleGenerationError` for retry/backoff
  * with `handleHttpError` as the mapper.
  *
- * Lives on `baseAIService` so all four providers route their 401
- * response through the same gate — F037 surfaced when Ollama drifted.
+ * Used by OpenAI, Codestral, and Gemini's single-model branch. Ollama
+ * duplicates the 401 throw outside this helper because its 404/500
+ * mapping is structurally different (no `WWW-Authenticate` semantics on
+ * a self-hosted server).
  */
 export async function withRetryAndApiKeyGuard(
     name: string,

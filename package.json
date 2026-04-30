@@ -168,7 +168,7 @@
         "commitSage.commit.customLanguageName": {
           "type": "string",
           "default": "",
-          "description": "Language name to use when 'custom' is selected as the commit language (e.g. 'Ukrainian', 'Italian', 'Arabic'). The format template will be translated to this language via LLM and cached in .commitsage/language.json",
+          "description": "Language name to use when 'custom' is selected as the commit language (e.g. 'Ukrainian', 'Italian', 'Arabic'). The format template will be translated to this language via LLM and cached in .commitsage/translations.json",
           "order": 3
         },
         "commitSage.commit.commitFormat": {
@@ -339,7 +339,6 @@
     "eslint-import-resolver-typescript": "^4.4.4",
     "eslint-plugin-import-x": "^4.16.2",
     "eslint-plugin-unused-imports": "^4.4.1",
-    "terser-webpack-plugin": "^5.5.0",
     "ts-loader": "^9.5.7",
     "typescript": "^6.0.3",
     "typescript-eslint": "^8.59.0",

@@ -138,23 +138,24 @@ export class CommitWorkflow {
 
         const repoPath = sourceControlRepository.rootUri.fsPath;
         const onlyStagedSetting = ConfigService.get('commit.onlyStagedChanges');
-        const hasStagedChanges = await GitService.hasChanges(repoPath, 'staged');
+        const hasStagedChanges = await GitService.hasChanges(repoPath, 'staged', signal);
         const useStagedChanges = onlyStagedSetting || hasStagedChanges;
 
         if (token.isCancellationRequested) {
             throw new UserCancelledError();
         }
 
-        const diff = await GitService.getDiff(repoPath, useStagedChanges, hasStagedChanges);
+        const diff = await GitService.getDiff(repoPath, useStagedChanges, hasStagedChanges, signal);
         if (!diff) {
             throw new Error('No changes to commit');
         }
 
-        const changedFiles = await GitService.getChangedFiles(repoPath, useStagedChanges);
+        const changedFiles = await GitService.getChangedFiles(repoPath, useStagedChanges, signal);
         const blameAnalyses = await mapLimit(
             changedFiles,
             BLAME_CONCURRENCY,
-            (file) => GitBlameAnalyzer.analyzeChanges(repoPath, file.path, file.status)
+            (file) => GitBlameAnalyzer.analyzeChanges(repoPath, file.path, file.status, signal),
+            signal,
         );
         const blameAnalysis = blameAnalyses.filter(analysis => analysis).join('\n\n');
 

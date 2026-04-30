@@ -10,7 +10,7 @@ import { SUPPORTED_LANGUAGES } from '../utils/constants';
 import type { CommitLanguage } from '../utils/constants';
 import { Logger } from '../utils/logger';
 
-export type CommitTemplate = Record<Exclude<CommitLanguage, 'custom'>, string>;
+type CommitTemplate = Record<Exclude<CommitLanguage, 'custom'>, string>;
 
 export type CommitFormat = 'conventional' | 'angular' | 'karma' | 'semantic' | 'emoji' | 'emojiKarma' | 'google' | 'atom';
 

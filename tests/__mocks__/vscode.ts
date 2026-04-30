@@ -27,6 +27,16 @@ export const workspace = {
     getConfiguration: () => ({
         get: <T>(_key: string, defaultValue?: T): T | undefined => defaultValue,
         update: async () => undefined,
+        // Production code reads ConfigService.get -> getConfiguration().inspect()
+        // for layered settings. Returning undefined here lets the SETTING_DEFAULTS
+        // fallback run — which is what unit tests want by default. Tests that need
+        // a specific workspace/global value should mock ConfigService directly.
+        inspect: <T>(_key: string): {
+            key: string;
+            defaultValue?: T;
+            workspaceValue?: T;
+            globalValue?: T;
+        } | undefined => undefined,
     }),
     onDidChangeConfiguration: () => ({ dispose: () => undefined }),
     createFileSystemWatcher: () => ({

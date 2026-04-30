@@ -13,7 +13,7 @@
     "promptForRefs": false
   },
   "gemini": {
-    "model": "gemini-1.5-flash"
+    "model": "auto"
   },
   "codestral": {
     "model": "codestral-latest"
