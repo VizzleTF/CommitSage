@@ -28,16 +28,10 @@ export class Logger {
     }
 
     static async showError(message: string, ...actions: string[]): Promise<string | undefined> {
-        const selection = await vscode.window.showErrorMessage(
+        return await vscode.window.showErrorMessage(
             `Commit Sage: ${message}`,
             ...actions
         );
-
-        if (selection === 'Show Details') {
-            this.show();
-        }
-
-        return selection;
     }
 
     static async showWarning(message: string, ...actions: string[]): Promise<string | undefined> {
@@ -52,10 +46,6 @@ export class Logger {
             `Commit Sage: ${message}`,
             ...actions
         );
-    }
-
-    static show(): void {
-        this.outputChannel?.show();
     }
 
     static dispose(): void {

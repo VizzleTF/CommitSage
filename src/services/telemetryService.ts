@@ -4,12 +4,11 @@ import { Logger } from '../utils/logger';
 import { ConfigService } from '../utils/configService';
 import { AMPLITUDE_API_KEY } from '../constants/apiKeys';
 import { EventOptions } from '@amplitude/analytics-types';
-import { EnvironmentUtils } from '../utils/environmentUtils';
 
 const FLUSH_QUEUE_SIZE = 30;
 const FLUSH_INTERVAL_MS = 30_000;
 
-export type TelemetryEvent =
+type TelemetryEvent =
     | { name: 'extension_activated' }
     | { name: 'extension_deactivated' }
     | { name: 'message_generation_started'; diffSize: number; fileCount: number; truncated: boolean; provider: string }
@@ -25,7 +24,6 @@ interface TelemetryEventProperties {
     vsCodeVersion: string;
     extensionVersion: string | undefined;
     platform: string;
-    environment: string;
     [key: string]: unknown;
 }
 
@@ -83,8 +81,7 @@ export class TelemetryService {
         const properties: TelemetryEventProperties = {
             vsCodeVersion: vscode.version,
             extensionVersion: this.extensionVersion,
-            platform: EnvironmentUtils.getPlatform(),
-            environment: EnvironmentUtils.getEnvironmentType(),
+            platform: process.platform,
             ...eventProps
         };
 
@@ -120,20 +117,13 @@ export class TelemetryService {
             amplitude.setOptOut(!this.enabled);
         }
 
-        const knownKeys = [
-            'commitSage.provider.type',
-            'commitSage.commit.commitLanguage',
-            'commitSage.commit.commitFormat',
-            'commitSage.commit.onlyStagedChanges',
-            'commitSage.commit.autoCommit',
-            'commitSage.commit.autoPush',
-            'commitSage.telemetry.enabled',
-            'commitSage.gemini.model',
-            'commitSage.openai.model',
-            'commitSage.ollama.model',
-            'commitSage.codestral.model',
-        ];
-        const changedKey = knownKeys.find(k => event.affectsConfiguration(k)) ?? 'commitSage';
+        // Derive the candidate keys from SETTING_DEFAULTS so adding a new
+        // setting requires only one edit (the schema). Falls back to the
+        // catch-all 'commitSage' attribution if no specific key matches.
+        const changedKey =
+            ConfigService.knownConfigurationKeys.find(k =>
+                event.affectsConfiguration(k),
+            ) ?? 'commitSage';
         this.sendEvent({ name: 'settings_changed', setting: changedKey.replace('commitSage.', '') });
     }
 

@@ -135,7 +135,7 @@ CommitSage stores per-project settings in `.commitsage/config.json`.
 }
 ```
 
-On first use, this generates `.commitsage/language.json` with the translated template. See [custom-language.md](custom-language.md) for details.
+On first use, this generates `.commitsage/translations.json` with the translated template. See [custom-language.md](custom-language.md) for details.
 
 ### Partial Override Example
 

@@ -5,7 +5,6 @@ import { errorMessages } from '../utils/constants';
 import { GitService, isDeletedStatus, isNewStatus } from './gitService';
 import { toError } from '../utils/errorUtils';
 import {
-  BlameInfo,
   analyzeBlameInfo,
   formatAnalysis,
   parseBlameOutput,
@@ -13,86 +12,49 @@ import {
 } from './gitBlameParser';
 
 export class GitBlameAnalyzer {
-  private static async getGitBlame(
-    filePath: string,
-    repoPath: string,
-  ): Promise<BlameInfo[]> {
-    try {
-      const absoluteFilePath = path.resolve(repoPath, filePath);
-
-      if (!fs.existsSync(absoluteFilePath)) {
-        throw new Error(`${errorMessages.fileNotFound}: ${absoluteFilePath}`);
-      }
-
-      if (!(await GitService.hasHead(repoPath))) {
-        throw new Error(errorMessages.noCommitsYet);
-      }
-
-      if (await GitService.isNewFile(filePath, repoPath)) {
-        throw new Error(errorMessages.fileNotCommitted);
-      }
-
-      const blameOutput = await this.executeGitBlame(filePath, repoPath);
-      return parseBlameOutput(blameOutput);
-    } catch (error) {
-      Logger.error('Error getting blame info:', toError(error));
-      throw error;
-    }
-  }
-
-  private static async executeGitBlame(
-    filePath: string,
-    repoPath: string,
-  ): Promise<string> {
-    const { stdout } = await GitService.execGit(
-      ['blame', '--line-porcelain', '--', filePath],
-      repoPath,
-    );
-    return stdout;
-  }
-
-  private static async getDiff(
-    repoPath: string,
-    filePath: string,
-  ): Promise<string> {
-    const { stdout } = await GitService.execGit(
-      ['diff', '--unified=0', '--', filePath],
-      repoPath,
-    );
-    return stdout;
-  }
-
   static async analyzeChanges(
     repoPath: string,
     filePath: string,
-    knownStatus?: string,
+    knownStatus: string,
+    signal?: AbortSignal,
   ): Promise<string> {
     try {
       const normalizedPath = path.normalize(filePath.replace(/^\/+/, ''));
 
-      // Decide deleted/new status. If the caller already has the porcelain
-      // status code from `getChangedFiles`, decode it locally — saves one
-      // (or two) `git status --porcelain` subprocess invocations per file.
-      // Otherwise fall back to asking git directly.
-      const isDeleted = knownStatus !== undefined
-        ? isDeletedStatus(knownStatus)
-        : await GitService.isFileDeleted(normalizedPath, repoPath);
-      if (isDeleted) {
+      if (isDeletedStatus(knownStatus)) {
         Logger.log(`Skipping blame analysis for deleted file: ${normalizedPath}`);
         return `Deleted file: ${normalizedPath}`;
       }
 
-      const isNew = knownStatus !== undefined
-        ? isNewStatus(knownStatus)
-        : await GitService.isNewFile(normalizedPath, repoPath);
-      if (isNew) {
+      if (isNewStatus(knownStatus)) {
         Logger.log(`Skipping blame analysis for new file: ${normalizedPath}`);
         return `New file: ${normalizedPath}`;
       }
 
-      // For existing files, we need to get blame info
-      const blame = await this.getGitBlame(normalizedPath, repoPath);
-      const diff = await this.getDiff(repoPath, normalizedPath);
+      // Defensive checks for the modified-file path. `analyzeChanges` is the
+      // sole entry-point now, so they live here rather than inside the
+      // (former) getGitBlame helper which used to redo the porcelain status
+      // lookup. Existence + `hasHead` cover the cases blame can legitimately
+      // fail on without an opaque git error.
+      const absoluteFilePath = path.resolve(repoPath, normalizedPath);
+      if (!fs.existsSync(absoluteFilePath)) {
+        throw new Error(`${errorMessages.fileNotFound}: ${absoluteFilePath}`);
+      }
+      if (!(await GitService.hasHead(repoPath, signal))) {
+        throw new Error(errorMessages.noCommitsYet);
+      }
+
+      const { stdout: blameOutput } = await GitService.execGit(
+        ['blame', '--line-porcelain', '--', normalizedPath],
+        repoPath,
+        { signal },
+      );
+      const blame = parseBlameOutput(blameOutput);
+      const { stdout: diff } = await GitService.execGit(
+        ['diff', '--unified=0', '--', normalizedPath],
+        repoPath,
+        { signal },
+      );
       const changedLines = parseChangedLines(diff);
       const authorChanges = analyzeBlameInfo(blame, changedLines);
       return formatAnalysis(authorChanges);
@@ -101,5 +63,4 @@ export class GitBlameAnalyzer {
       throw error;
     }
   }
-
 }

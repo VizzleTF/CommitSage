@@ -18,7 +18,6 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         await TelemetryService.initialize(context);
 
         Logger.log('Validating Git extension');
-        await GitService.validateGitExtension();
         await GitService.initialize();
     } catch (error) {
         Logger.error('Failed during initialization:', toError(error));
@@ -29,6 +28,14 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     registerCommands(context);
 
     void SettingsValidator.validateAllSettings();
+    // Re-validate the project config whenever .commitsage/config.json is
+    // created/changed/deleted, otherwise an invalid mid-session edit silently
+    // reverts every project-level setting to defaults with no UI feedback.
+    context.subscriptions.push(
+        ConfigService.onProjectConfigChange(() => {
+            void SettingsValidator.validateProjectConfig();
+        }),
+    );
     TelemetryService.sendEvent({ name: 'extension_activated' });
     Logger.log('Extension activated successfully');
 }

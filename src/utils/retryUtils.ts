@@ -1,6 +1,7 @@
 import { Logger } from './logger';
-import { ConfigService } from './configService';
 import { CommitMessage, ProgressReporter, ApiErrorResult } from '../models/types';
+
+const MAX_RETRIES = 3;
 
 export class RetryUtils {
     static readonly DEFAULT_MAX_RETRY_BACKOFF = 10000;
@@ -11,7 +12,7 @@ export class RetryUtils {
     ): Promise<void> {
         const progressMessage = attempt === 1
             ? 'Generating commit message...'
-            : `Retry attempt ${attempt}/${ConfigService.get('general.maxRetries')}...`;
+            : `Retry attempt ${attempt}/${MAX_RETRIES}...`;
         progress.report({ message: progressMessage, increment: 10 });
     }
 
@@ -35,7 +36,7 @@ export class RetryUtils {
         Logger.error(`Generation attempt ${attempt} failed:`, error);
         const { errorMessage, shouldRetry } = errorHandler(error);
 
-        if (shouldRetry && attempt < ConfigService.get('general.maxRetries')) {
+        if (shouldRetry && attempt < MAX_RETRIES) {
             const delayMs = this.calculateRetryDelay(attempt);
             Logger.log(`Retrying in ${delayMs / 1000} seconds...`);
             progress.report({
