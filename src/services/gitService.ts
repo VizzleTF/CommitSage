@@ -16,6 +16,12 @@ import { mapLimit } from '../utils/concurrency';
 
 const GIT_FANOUT_CONCURRENCY = 8;
 
+// Hard cap on stdout/stderr accumulation per `git` invocation. The diff is
+// later truncated to MAX_DIFF_LENGTH (100k) by aiService.ts; this cap is the
+// *upstream* guard so a runaway generated file never lets the buffer balloon
+// to hundreds of MB before truncation.
+const GIT_OUTPUT_BUFFER_CAP = 200_000;
+
 const GIT_STATUS_CODES = {
   modified: 'M',
   added: 'A',
@@ -225,8 +231,13 @@ export class GitService {
       if (error instanceof NoChangesDetectedError) {
         throw error;
       }
-      Logger.error('Error getting diff:', toError(error));
-      throw new Error(`Failed to get diff: ${(toError(error)).message}`, { cause: error });
+      const original = toError(error);
+      Logger.error('Error getting diff:', original);
+      // Re-throw with the prefix prepended but preserve the original
+      // constructor name and stack so telemetry buckets stay meaningful
+      // (callers read `error.constructor.name` for `errorType`).
+      original.message = `Failed to get diff: ${original.message}`;
+      throw original;
     }
   }
 
@@ -564,11 +575,22 @@ export class GitService {
         }
       }
 
+      let bufferOverflowed = false;
       child.stdout.on('data', (data: Buffer) => {
+        if (stdout.length >= GIT_OUTPUT_BUFFER_CAP) {
+          if (!bufferOverflowed) {
+            bufferOverflowed = true;
+            child.kill('SIGTERM');
+          }
+          return;
+        }
         stdout += data.toString();
       });
 
       child.stderr.on('data', (data: Buffer) => {
+        if (stderr.length >= GIT_OUTPUT_BUFFER_CAP) {
+          return;
+        }
         stderr += data.toString();
       });
 
@@ -588,6 +610,16 @@ export class GitService {
           return;
         }
         if (signal === 'SIGTERM' || signal === 'SIGKILL') {
+          if (bufferOverflowed) {
+            // Truncate to the cap and proceed; downstream truncation
+            // (MAX_DIFF_LENGTH in aiService.ts) handles the rest.
+            resolve({
+              stdout: stdout.slice(0, GIT_OUTPUT_BUFFER_CAP),
+              stderr,
+              exitCode: -1,
+            });
+            return;
+          }
           // Likely killed by the spawn `timeout` option
           reject(
             new Error(
