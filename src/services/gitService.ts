@@ -1,7 +1,5 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
-import * as fs from 'fs';
-import { createHash } from 'crypto';
 import { spawn } from 'child_process';
 import { Logger } from '../utils/logger';
 import {
@@ -299,30 +297,27 @@ export class GitService {
       .split('\n')
       .filter((file) => file.trim())
       .map(unquoteGitPath);
+
     const untrackedDiff = await mapLimit(
       untrackedFileList,
       GIT_FANOUT_CONCURRENCY,
       async (file) => {
         try {
-          const content = await fs.promises.readFile(
-            path.join(repoPath, file),
-            'utf-8',
+          // `git diff --no-index` always exits with 1 when the two inputs
+          // differ (and 0 when they are identical), so we pass
+          // allowNonZeroExit and use exitCode === 128 (or process error)
+          // as the "real" failure signal.
+          const { stdout, exitCode } = await this.execGit(
+            ['diff', '--no-index', '--', '/dev/null', file],
+            repoPath,
+            { allowNonZeroExit: true },
           );
-
-          if (content.includes('\0')) {
-            return `diff --git a/${file} b/${file}\nnew file mode 100644\nBinary file ${file}`;
+          if (exitCode === 128) {
+            return '';
           }
-
-          const lines = content.split('\n');
-          const contentDiff = lines
-            .map((line: string) => `+${line}`)
-            .join('\n');
-          return `diff --git a/${file} b/${file}\nnew file mode 100644\nindex 0000000..${this.calculateFileHash(content)}\n--- /dev/null\n+++ b/${file}\n@@ -0,0 +1,${lines.length} @@\n${contentDiff}`;
+          return stdout;
         } catch (error) {
-          Logger.error(
-            `Error reading new file ${file}:`,
-            toError(error),
-          );
+          Logger.error(`Error diffing untracked file ${file}:`, toError(error));
           return '';
         }
       },
@@ -340,24 +335,21 @@ export class GitService {
       .split('\n')
       .filter((file) => file.trim())
       .map(unquoteGitPath);
+
     const deletedDiff = await mapLimit(
       deletedFileList,
       GIT_FANOUT_CONCURRENCY,
       async (file) => {
         try {
-          const oldContent = await this.executeGitCommand(
-            ['show', `HEAD:${file}`],
+          // git diff -- <file> on a deleted file (in the working tree) emits
+          // a proper unified diff against HEAD. No manual header construction.
+          const fileDiff = await this.executeGitCommand(
+            ['diff', '--', file],
             repoPath,
           );
-          const lines = oldContent.split('\n');
-          // Remove trailing empty line that git show adds
-          if (lines[lines.length - 1] === '') {
-            lines.pop();
-          }
-          const lineCount = lines.length;
-          const contentDiff = lines.map((line) => `-${line}`).join('\n');
-          return `diff --git a/${file} b/${file}\ndeleted file mode 100644\n--- a/${file}\n+++ /dev/null\n@@ -1,${lineCount} +0,0 @@\n${contentDiff}\n`;
-        } catch {
+          return fileDiff;
+        } catch (error) {
+          Logger.error(`Error diffing deleted file ${file}:`, toError(error));
           return '';
         }
       },
@@ -533,8 +525,8 @@ export class GitService {
   public static async execGit(
     args: string[],
     cwd: string,
-    options: { signal?: AbortSignal } = {},
-  ): Promise<{ stdout: string; stderr: string }> {
+    options: { signal?: AbortSignal; allowNonZeroExit?: boolean } = {},
+  ): Promise<{ stdout: string; stderr: string; exitCode: number }> {
     return new Promise((resolve, reject) => {
       const timeoutSeconds = ConfigService.getApiRequestTimeout();
       const timeoutMs =
@@ -604,8 +596,9 @@ export class GitService {
           );
           return;
         }
-        if (code === 0) {
-          resolve({ stdout, stderr });
+        const exitCode = code ?? -1;
+        if (code === 0 || options.allowNonZeroExit) {
+          resolve({ stdout, stderr, exitCode });
         } else {
           reject(
             new Error(`Git command failed with code ${code}: ${stderr}`),
@@ -639,16 +632,6 @@ export class GitService {
     );
     const status = stdout.slice(0, 2);
     return status === ' D' || status === 'D ';
-  }
-
-  private static calculateFileHash(content: string): string {
-    const buffer = Buffer.from(content);
-    const header = `blob ${buffer.byteLength}\0`;
-    return createHash('sha1')
-      .update(header)
-      .update(buffer)
-      .digest('hex')
-      .substring(0, 7);
   }
 }
 

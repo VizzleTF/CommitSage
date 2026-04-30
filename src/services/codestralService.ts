@@ -3,7 +3,7 @@ import { Logger } from '../utils/logger';
 import { CommitMessage, ProgressReporter, GenerateOptions } from '../models/types';
 import { ConfigService } from '../utils/configService';
 import { ApiKeyInvalidError } from '../models/errors';
-import { BaseAIService } from './baseAIService';
+import { extractAndValidateMessage, handleHttpError } from './baseAIService';
 import { HttpUtils } from '../utils/httpUtils';
 import { RetryUtils } from '../utils/retryUtils';
 import { ApiKeyManager } from './apiKeyManager';
@@ -68,7 +68,7 @@ export class CodestralService {
                 attempt,
                 (p, pr, a) => this.generateCommitMessage(p, pr, a, options),
                 (err: Error) => {
-                    const result = BaseAIService.handleHttpError(err, 'Codestral API');
+                    const result = handleHttpError(err, 'Codestral API');
                     if (result.statusCode === 401) {
                         result.errorMessage = 'Invalid API key. Please check your Codestral API key.';
                     }
@@ -80,7 +80,7 @@ export class CodestralService {
 
     private static extractCommitMessage(response: CodestralResponse): string {
         const content = response.choices?.[0]?.message?.content;
-        return BaseAIService.extractAndValidateMessage(content, 'Codestral');
+        return extractAndValidateMessage(content, 'Codestral');
     }
 
 }
