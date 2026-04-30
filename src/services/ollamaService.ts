@@ -29,13 +29,17 @@ export class OllamaService {
         const model = ConfigService.getOllamaModel() || this.defaultModel;
         const apiUrl = `${baseUrl}/api/chat`;
 
-        const payload = {
+        const payload: Record<string, unknown> = {
             model: model,
             messages: [
                 { role: 'user', content: prompt }
             ],
             stream: false
         };
+        if (options?.maxTokens !== undefined) {
+            // eslint-disable-next-line @typescript-eslint/naming-convention
+            payload['options'] = { num_predict: options.maxTokens };
+        }
 
         try {
             Logger.log(`Attempt ${attempt}: Sending request to Ollama API`);

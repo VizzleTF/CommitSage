@@ -89,6 +89,24 @@ describe('CodestralService payload', () => {
             model: 'codestral-latest',
             messages: [{ role: 'user', content: 'hello' }],
         });
+        // No maxTokens passed → no max_tokens in payload (default behaviour)
+        expect(payload).not.toHaveProperty('max_tokens');
+    });
+
+    it('forwards maxTokens as max_tokens (snake_case) when provided', async () => {
+        const { CodestralService } = await import('../src/services/codestralService');
+
+        mockedPost.mockResolvedValueOnce({
+            data: { choices: [{ message: { content: 'ok' } }] },
+        });
+
+        await CodestralService.generateCommitMessage('hi', progress, 1, {
+            maxTokens: 4096,
+        });
+        const [, payload] = mockedPost.mock.calls[0];
+        // F009 regression guard
+        expect(payload).toMatchObject({ max_tokens: 4096 });
+        expect(payload).not.toHaveProperty('maxTokens');
     });
 });
 
@@ -106,6 +124,23 @@ describe('OllamaService payload', () => {
         expect(payload).toMatchObject({
             model: 'llama3.2',
             stream: false,
+        });
+        expect(payload).not.toHaveProperty('options');
+    });
+
+    it('forwards maxTokens as options.num_predict when provided (F009)', async () => {
+        const { OllamaService } = await import('../src/services/ollamaService');
+
+        mockedPost.mockResolvedValueOnce({
+            data: { message: { content: 'ok' } },
+        });
+
+        await OllamaService.generateCommitMessage('hi', progress, 1, {
+            maxTokens: 4096,
+        });
+        const [, payload] = mockedPost.mock.calls[0];
+        expect(payload).toMatchObject({
+            options: { num_predict: 4096 },
         });
     });
 });
