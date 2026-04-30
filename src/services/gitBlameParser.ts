@@ -5,6 +5,8 @@ export interface BlameInfo {
     date: string;
     timestamp: number;
     line: string;
+    /** Line number in the final (current) version of the file, 1-indexed. */
+    lineNumber: number;
 }
 
 export function parseBlameOutput(blameOutput: string): BlameInfo[] {
@@ -27,13 +29,19 @@ export function parseBlameOutput(blameOutput: string): BlameInfo[] {
                 currentBlame.email &&
                 currentBlame.date &&
                 currentBlame.timestamp &&
-                currentBlame.line
+                currentBlame.line &&
+                currentBlame.lineNumber !== undefined
             ) {
                 blameInfos.push(currentBlame as BlameInfo);
             }
             currentBlame = {};
-        } else if (line.match(/^[0-9a-f]{40}/)) {
-            currentBlame.commit = line.split(' ')[0];
+        } else {
+            // Header line of a blame entry:  <40-hex-sha> <orig> <final> [count]
+            const match = line.match(/^([0-9a-f]{40}) \d+ (\d+)(?: \d+)?$/);
+            if (match) {
+                currentBlame.commit = match[1];
+                currentBlame.lineNumber = parseInt(match[2], 10);
+            }
         }
     }
 
@@ -66,15 +74,15 @@ export function analyzeBlameInfo(
 ): Map<string, { count: number; lines: number[] }> {
     const authorChanges = new Map<string, { count: number; lines: number[] }>();
 
-    blame.forEach((info, index) => {
-        if (changedLines.has(index + 1)) {
+    for (const info of blame) {
+        if (changedLines.has(info.lineNumber)) {
             const key = `${info.author} <${info.email}>`;
             const current = authorChanges.get(key) || { count: 0, lines: [] };
             current.count++;
-            current.lines.push(index + 1);
+            current.lines.push(info.lineNumber);
             authorChanges.set(key, current);
         }
-    });
+    }
 
     return authorChanges;
 }

@@ -32,10 +32,13 @@ export class CodestralService {
             const apiKey = await ApiKeyManager.getKey('codestral');
             const model = ConfigService.getCodestralModel();
 
-            const payload = {
+            const payload: Record<string, unknown> = {
                 model: model,
                 messages: [{ role: 'user', content: prompt }]
             };
+            if (options?.maxTokens !== undefined) {
+                payload['max_tokens'] = options.maxTokens;
+            }
 
             Logger.log(`Attempt ${attempt}: Sending request to Codestral API`);
             await RetryUtils.updateProgressForAttempt(progress, attempt);
