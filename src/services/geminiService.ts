@@ -3,7 +3,7 @@ import { Logger } from '../utils/logger';
 import { ConfigService } from '../utils/configService';
 import { ProgressReporter, CommitMessage, GenerateOptions } from '../models/types';
 import { ApiKeyInvalidError } from '../models/errors';
-import { BaseAIService } from './baseAIService';
+import { extractAndValidateMessage, handleHttpError } from './baseAIService';
 import { HttpUtils } from '../utils/httpUtils';
 import { RetryUtils } from '../utils/retryUtils';
 import { ApiKeyManager } from './apiKeyManager';
@@ -177,14 +177,14 @@ export class GeminiService {
                 progress,
                 attempt,
                 (p, pr, a) => this.generateCommitMessage(p, pr, a, options),
-                (err: Error) => BaseAIService.handleHttpError(err, 'Gemini API')
+                (err: Error) => handleHttpError(err, 'Gemini API')
             );
         }
     }
 
     private static extractCommitMessage(response: GeminiResponse): string {
         const content = response.candidates?.[0]?.content?.parts?.[0]?.text;
-        return BaseAIService.extractAndValidateMessage(content, 'Gemini');
+        return extractAndValidateMessage(content, 'Gemini');
     }
 
 }
