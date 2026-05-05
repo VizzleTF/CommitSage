@@ -101,11 +101,16 @@ The settings panel renders markdown when you use `markdownDescription` instead o
 
 ---
 
-### 6. Native `fetch` instead of axios (defer)
+### 6. Native `fetch` instead of axios ✅ DONE
 
-Node 20 (shipped by VSCode 1.93) has stable `fetch` + `AbortController`. Dropping axios would save ~500KB in the bundle.
+**Was**: axios in 4 providers + `httpUtils.createRequestConfig` + `AxiosError` checks in `baseAIService.handleHttpError`.
 
-**But**: `httpUtils.ts` and `withRetryAndApiKeyGuard` are built around the `AxiosError` shape (`error.response.status`, `error.code === 'ECONNREFUSED'`, etc.), and four provider services depend on that shape. The migration touches 6 files and reworks the error mapper. **Real simplification**, but a bigger lift than the others.
+**Now**: `HttpUtils.postJson` / `HttpUtils.getJson` over native `fetch`, with `AbortSignal.timeout()` + `AbortSignal.any()` to combine the configured timeout with the caller's CancellationToken-derived signal. Two domain errors `HttpError(status, data)` and `NetworkError(message, cause)` replace the axios-specific shape — `handleHttpError` switches on `instanceof HttpError` and `instanceof NetworkError`.
+
+**Verified**:
+- Bundle drops from 533 KB → 300 KB (≈44% smaller, axios was 233 KB).
+- Typecheck, lint, vitest (95/95) all clean.
+- Test mocks updated: `tests/providerPayloads.test.ts` now mocks `HttpUtils.postJson` (cleaner than mocking axios). `tests/baseAIService.test.ts` switched to `HttpError`/`NetworkError`.
 
 ---
 

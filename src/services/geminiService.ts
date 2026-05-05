@@ -1,10 +1,9 @@
-import axios, { AxiosError } from 'axios';
 import { Logger } from '../utils/logger';
 import { ConfigService } from '../utils/configService';
 import { ProgressReporter, CommitMessage, GenerateOptions } from '../models/types';
 import { ApiKeyInvalidError } from '../models/errors';
 import { extractAndValidateMessage, withRetryAndApiKeyGuard } from './baseAIService';
-import { HttpUtils } from '../utils/httpUtils';
+import { HttpError, HttpUtils } from '../utils/httpUtils';
 import { RetryUtils } from '../utils/retryUtils';
 import { ApiKeyManager } from './apiKeyManager';
 import { toError } from '../utils/errorUtils';
@@ -39,16 +38,15 @@ const GEMINI_GENERATION_CONFIG = {
 export class GeminiService {
     private static async getAvailableModels(apiKey: string, signal?: AbortSignal): Promise<string[]> {
         try {
-            const apiUrl = 'https://generativelanguage.googleapis.com/v1/models';
-            const requestConfig = HttpUtils.createRequestConfig(
-                { 'x-goog-api-key': apiKey },
-                undefined,
-                signal
+            const data = await HttpUtils.getJson<GeminiModelsResponse>(
+                'https://generativelanguage.googleapis.com/v1/models',
+                {
+                    headers: { 'x-goog-api-key': apiKey },
+                    signal,
+                }
             );
 
-            const response = await axios.get<GeminiModelsResponse>(apiUrl, requestConfig);
-
-            const models = response.data.models
+            const models = data.models
                 .filter((model: GeminiModel) =>
                     model.supportedGenerationMethods?.includes('generateContent')
                 )
@@ -92,22 +90,19 @@ export class GeminiService {
                         : GEMINI_GENERATION_CONFIG
                 };
 
-                const requestConfig = HttpUtils.createRequestConfig(
-                    { 'content-type': 'application/json', 'x-goog-api-key': apiKey },
-                    undefined,
-                    options?.signal
-                );
+                const data = await HttpUtils.postJson<GeminiResponse>(apiUrl, payload, {
+                    headers: { 'content-type': 'application/json', 'x-goog-api-key': apiKey },
+                    signal: options?.signal,
+                });
 
-                const response = await axios.post<GeminiResponse>(apiUrl, payload, requestConfig);
-
-                const message = this.extractCommitMessage(response.data);
+                const message = this.extractCommitMessage(data);
                 Logger.log(`Commit message successfully generated using ${model} model (auto mode)`);
 
                 progress.report({ message: 'Processing generated message...', increment: 100 });
                 return { message, model };
 
             } catch (error) {
-                const status = error instanceof AxiosError ? error.response?.status : undefined;
+                const status = error instanceof HttpError ? error.status : undefined;
                 const errorMsg = error instanceof Error ? error.message : String(error);
                 errors.push({ model, error: errorMsg, status });
                 Logger.log(`Model ${model} failed: ${errorMsg}`);
@@ -162,17 +157,14 @@ export class GeminiService {
 
                 await RetryUtils.updateProgressForAttempt(progress, attempt);
 
-                const requestConfig = HttpUtils.createRequestConfig(
-                    { 'content-type': 'application/json', 'x-goog-api-key': apiKey },
-                    undefined,
-                    options?.signal
-                );
-
-                const response = await axios.post<GeminiResponse>(apiUrl, payload, requestConfig);
+                const data = await HttpUtils.postJson<GeminiResponse>(apiUrl, payload, {
+                    headers: { 'content-type': 'application/json', 'x-goog-api-key': apiKey },
+                    signal: options?.signal,
+                });
                 progress.report({ message: 'Processing generated message...', increment: 90 });
 
                 const message = extractAndValidateMessage(
-                    response.data.candidates?.[0]?.content?.parts?.[0]?.text,
+                    data.candidates?.[0]?.content?.parts?.[0]?.text,
                     'Gemini'
                 );
                 Logger.log(`Commit message generated using ${configuredModel} model`);
