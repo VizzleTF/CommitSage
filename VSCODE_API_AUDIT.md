@@ -135,9 +135,19 @@ Translators can now contribute by adding `bundle.l10n.{lang}.json` and `package.
 
 ---
 
-### 9. Walkthroughs contribution (skip — UX feature, not simplification)
+### 9. Walkthroughs contribution ✅ DONE
 
-A `walkthroughs` contribution gives new users an onboarding flow (set API key → pick provider → try generating). Useful but *additive*, not a simplification. Out of scope for this audit.
+**Was**: no onboarding — new users had to read the README to discover providers, the keybinding, and where API keys go.
+
+**Now**: a `walkthroughs` contribution registers a "Get started with Commit Sage" flow with three auto-completing steps:
+
+1. **Pick an AI provider** — completes on `onSettingChanged:commitSage.provider.type`.
+2. **Provide credentials** — completes on `onCommand:` for any of the four `setApiKey`/`setAuthToken` commands.
+3. **Generate your first commit message** — completes on `onCommand:commitsage.generateCommitMessage`.
+
+Each step links to the relevant settings page or command via `command:` URIs and renders rich instructions from `walkthroughs/*.md`. Titles and descriptions are pulled from `package.nls.json`, so translators get them for free alongside command titles.
+
+This is *additive* (a UX feature, not a simplification) — included after explicit user request.
 
 ---
 

@@ -62,4 +62,5 @@ package-lock.json
 !example.gif
 !dist/**
 !l10n/**
-!package.nls*.json 
+!package.nls*.json
+!walkthroughs/** 

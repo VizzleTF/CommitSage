@@ -9,5 +9,13 @@
   "command.removeCodestralApiKey.title": "Remove Codestral API Key",
   "command.setOllamaAuthToken.title": "Set Ollama Auth Token",
   "command.removeOllamaAuthToken.title": "Remove Ollama Auth Token",
-  "command.createProjectConfig.title": "Create Project Config (.commitsage)"
+  "command.createProjectConfig.title": "Create Project Config (.commitsage)",
+  "walkthrough.title": "Get started with Commit Sage",
+  "walkthrough.description": "Pick a provider, set your API key, and generate your first AI-written commit message.",
+  "walkthrough.step.pickProvider.title": "Pick an AI provider",
+  "walkthrough.step.pickProvider.description": "Choose between Gemini, OpenAI, Codestral, or self-hosted Ollama.\n[Open Settings](command:workbench.action.openSettings?%22commitSage.provider.type%22)",
+  "walkthrough.step.setApiKey.title": "Provide credentials",
+  "walkthrough.step.setApiKey.description": "API keys are stored in VS Code SecretStorage. Run a Set … API Key command from the Palette.\n[Set Gemini API Key](command:commitsage.setApiKey)",
+  "walkthrough.step.generate.title": "Generate your first commit message",
+  "walkthrough.step.generate.description": "Stage some changes, then click the Commit Sage icon in the SCM header — or run the command directly.\n[Generate Commit Message](command:commitsage.generateCommitMessage)"
 }

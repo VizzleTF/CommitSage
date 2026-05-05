@@ -135,6 +135,45 @@
         "when": "scmProvider == git"
       }
     ],
+    "walkthroughs": [
+      {
+        "id": "commitsage.gettingStarted",
+        "title": "%walkthrough.title%",
+        "description": "%walkthrough.description%",
+        "steps": [
+          {
+            "id": "pickProvider",
+            "title": "%walkthrough.step.pickProvider.title%",
+            "description": "%walkthrough.step.pickProvider.description%",
+            "media": { "markdown": "walkthroughs/pick-provider.md" },
+            "completionEvents": [
+              "onSettingChanged:commitSage.provider.type"
+            ]
+          },
+          {
+            "id": "setApiKey",
+            "title": "%walkthrough.step.setApiKey.title%",
+            "description": "%walkthrough.step.setApiKey.description%",
+            "media": { "markdown": "walkthroughs/set-api-key.md" },
+            "completionEvents": [
+              "onCommand:commitsage.setApiKey",
+              "onCommand:commitsage.setOpenAIApiKey",
+              "onCommand:commitsage.setCodestralApiKey",
+              "onCommand:commitsage.setOllamaAuthToken"
+            ]
+          },
+          {
+            "id": "generate",
+            "title": "%walkthrough.step.generate.title%",
+            "description": "%walkthrough.step.generate.description%",
+            "media": { "markdown": "walkthroughs/generate.md" },
+            "completionEvents": [
+              "onCommand:commitsage.generateCommitMessage"
+            ]
+          }
+        ]
+      }
+    ],
     "configuration": {
       "title": "Commit Sage",
       "properties": {
