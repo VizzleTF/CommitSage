@@ -21,7 +21,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         await GitService.initialize();
     } catch (error) {
         Logger.error('Failed during initialization:', toError(error));
-        void Logger.showError(`Initialization failed: ${toError(error).message}`);
+        void Logger.showError(vscode.l10n.t('Initialization failed: {0}', toError(error).message));
         return;
     }
 

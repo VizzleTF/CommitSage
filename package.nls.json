@@ -1,0 +1,13 @@
+{
+  "command.category": "Commit Sage",
+  "command.generateCommitMessage.title": "Generate Commit Message",
+  "command.setApiKey.title": "Set Gemini API Key",
+  "command.setOpenAIApiKey.title": "Set OpenAI API Key",
+  "command.setCodestralApiKey.title": "Set Codestral API Key",
+  "command.removeApiKey.title": "Remove Gemini API Key",
+  "command.removeOpenAIApiKey.title": "Remove OpenAI API Key",
+  "command.removeCodestralApiKey.title": "Remove Codestral API Key",
+  "command.setOllamaAuthToken.title": "Set Ollama Auth Token",
+  "command.removeOllamaAuthToken.title": "Remove Ollama Auth Token",
+  "command.createProjectConfig.title": "Create Project Config (.commitsage)"
+}

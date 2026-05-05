@@ -71,7 +71,7 @@ export class ApiKeyManager {
 
             if (!key) {
                 key = await vscode.window.showInputBox({
-                    prompt: `Enter your ${config.displayName} API Key`,
+                    prompt: vscode.l10n.t('Enter your {0} API Key', config.displayName),
                     ignoreFocusOut: true,
                     password: true,
                     validateInput: config.validator,
@@ -114,7 +114,7 @@ export class ApiKeyManager {
                 `Failed to validate and set ${config.displayName} API key:`,
                 toError(error)
             );
-            await Logger.showError(`Failed to set API key: ${(toError(error)).message}`);
+            await Logger.showError(vscode.l10n.t('Failed to set API key: {0}', toError(error).message));
             throw error;
         }
     }

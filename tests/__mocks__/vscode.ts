@@ -89,6 +89,18 @@ export class Uri {
 
 export const ProgressLocation = { Notification: 15 };
 
+export const l10n = {
+    t: (message: string, ...args: Array<string | number | boolean>): string => {
+        if (args.length === 0) {
+            return message;
+        }
+        // Index-based templating: replace {0}, {1}, … with positional args.
+        return message.replace(/\{(\d+)\}/g, (_, idx) => String(args[Number(idx)] ?? ''));
+    },
+    bundle: undefined as unknown,
+    uri: undefined as unknown,
+};
+
 export class EventEmitter<T> {
     public event = (_listener: (e: T) => unknown) => ({ dispose: () => undefined });
     fire(_e: T) { /* no-op */ }
@@ -104,4 +116,5 @@ export default {
     Uri,
     ProgressLocation,
     EventEmitter,
+    l10n,
 };

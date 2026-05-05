@@ -8,7 +8,7 @@ export async function createProjectConfig(): Promise<void> {
     try {
         const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
         if (!workspaceFolder) {
-            await Logger.showError('No workspace folder found. Please open a project first.');
+            await Logger.showError(vscode.l10n.t('No workspace folder found. Please open a project first.'));
             return;
         }
 
@@ -19,19 +19,22 @@ export async function createProjectConfig(): Promise<void> {
         const configExists = fs.existsSync(configPath);
 
         if (legacyExists || configExists) {
+            const openExisting = vscode.l10n.t('Open Existing');
+            const overwrite = vscode.l10n.t('Overwrite');
+            const cancel = vscode.l10n.t('Cancel');
             const selection = await Logger.showWarning(
-                'A .commitsage configuration already exists in this project.',
-                'Open Existing',
-                'Overwrite',
-                'Cancel'
+                vscode.l10n.t('A .commitsage configuration already exists in this project.'),
+                openExisting,
+                overwrite,
+                cancel
             );
 
-            if (selection === 'Open Existing') {
+            if (selection === openExisting) {
                 const target = legacyExists ? configDir : configPath;
                 const uri = vscode.Uri.file(target);
                 void vscode.window.showTextDocument(uri);
                 return;
-            } else if (selection !== 'Overwrite') {
+            } else if (selection !== overwrite) {
                 return;
             }
 
@@ -89,6 +92,6 @@ export async function createProjectConfig(): Promise<void> {
 
     } catch (error) {
         Logger.error('Error creating .commitsage/config.json file:', toError(error));
-        await Logger.showError(`Failed to create .commitsage/config.json: ${toError(error).message}`);
+        await Logger.showError(vscode.l10n.t('Failed to create .commitsage/config.json: {0}', toError(error).message));
     }
 }

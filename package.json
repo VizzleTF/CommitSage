@@ -32,6 +32,7 @@
   "icon": "icon.png",
   "main": "./dist/extension.js",
   "sideEffects": false,
+  "l10n": "./l10n",
   "capabilities": {
     "virtualWorkspaces": {
       "supported": false,
@@ -50,8 +51,8 @@
     "commands": [
       {
         "command": "commitsage.generateCommitMessage",
-        "title": "Generate Commit Message",
-        "category": "Commit Sage",
+        "title": "%command.generateCommitMessage.title%",
+        "category": "%command.category%",
         "icon": {
           "light": "./icons/button-light.svg",
           "dark": "./icons/button-dark.svg"
@@ -59,48 +60,48 @@
       },
       {
         "command": "commitsage.setApiKey",
-        "title": "Set Gemini API Key",
-        "category": "Commit Sage"
+        "title": "%command.setApiKey.title%",
+        "category": "%command.category%"
       },
       {
         "command": "commitsage.setOpenAIApiKey",
-        "title": "Set OpenAI API Key",
-        "category": "Commit Sage"
+        "title": "%command.setOpenAIApiKey.title%",
+        "category": "%command.category%"
       },
       {
         "command": "commitsage.setCodestralApiKey",
-        "title": "Set Codestral API Key",
-        "category": "Commit Sage"
+        "title": "%command.setCodestralApiKey.title%",
+        "category": "%command.category%"
       },
       {
         "command": "commitsage.removeApiKey",
-        "title": "Remove Gemini API Key",
-        "category": "Commit Sage"
+        "title": "%command.removeApiKey.title%",
+        "category": "%command.category%"
       },
       {
         "command": "commitsage.removeOpenAIApiKey",
-        "title": "Remove OpenAI API Key",
-        "category": "Commit Sage"
+        "title": "%command.removeOpenAIApiKey.title%",
+        "category": "%command.category%"
       },
       {
         "command": "commitsage.removeCodestralApiKey",
-        "title": "Remove Codestral API Key",
-        "category": "Commit Sage"
+        "title": "%command.removeCodestralApiKey.title%",
+        "category": "%command.category%"
       },
       {
         "command": "commitsage.setOllamaAuthToken",
-        "title": "Set Ollama Auth Token",
-        "category": "Commit Sage"
+        "title": "%command.setOllamaAuthToken.title%",
+        "category": "%command.category%"
       },
       {
         "command": "commitsage.removeOllamaAuthToken",
-        "title": "Remove Ollama Auth Token",
-        "category": "Commit Sage"
+        "title": "%command.removeOllamaAuthToken.title%",
+        "category": "%command.category%"
       },
       {
         "command": "commitsage.createProjectConfig",
-        "title": "Create Project Config (.commitsage)",
-        "category": "Commit Sage"
+        "title": "%command.createProjectConfig.title%",
+        "category": "%command.category%"
       }
     ],
     "menus": {
