@@ -57,11 +57,17 @@ Detailed guides for common contribution tasks are available in the `docs/` direc
 - [Adding a new language](docs/adding-languages.md)
 - [Adding a new commit format](docs/adding-formats.md)
 - [Adding a new AI provider](docs/adding-providers.md)
+- [Testing](docs/testing.md)
 
 ## Testing
 
 - Test your changes in VS Code by pressing F5 to launch the Extension Development Host
 - Verify the extension compiles without errors (`npm run compile`)
+- Run the automated test suites:
+  - `npm run test:unit` — fast vitest suite (~1s)
+  - `npm run test:e2e` — full E2E in headless VS Code (~5s after first download)
+  - `npm test` — both
+- See [docs/testing.md](docs/testing.md) for E2E architecture, the mock LLM server, and how to add new E2E tests
 
 ## Documentation
 

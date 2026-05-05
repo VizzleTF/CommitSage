@@ -178,6 +178,7 @@ Detailed guides are available in the [`docs/`](docs/) directory:
 - [Adding a Provider](docs/adding-providers.md) — contributor guide
 - [Adding a Language](docs/adding-languages.md) — contributor guide
 - [Adding a Format](docs/adding-formats.md) — contributor guide
+- [Testing](docs/testing.md) — running unit + E2E tests, mock LLM, adding new tests
 
 ## Privacy & Security
 

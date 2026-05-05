@@ -2,6 +2,7 @@ out
 dist
 node_modules
 .vscode-test/
+tests/e2e/out/
 *.vsix
 CommitSage-*
 .DS_Store

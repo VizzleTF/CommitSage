@@ -145,7 +145,9 @@
             "id": "pickProvider",
             "title": "%walkthrough.step.pickProvider.title%",
             "description": "%walkthrough.step.pickProvider.description%",
-            "media": { "markdown": "walkthroughs/pick-provider.md" },
+            "media": {
+              "markdown": "walkthroughs/pick-provider.md"
+            },
             "completionEvents": [
               "onSettingChanged:commitSage.provider.type"
             ]
@@ -154,7 +156,9 @@
             "id": "setApiKey",
             "title": "%walkthrough.step.setApiKey.title%",
             "description": "%walkthrough.step.setApiKey.description%",
-            "media": { "markdown": "walkthroughs/set-api-key.md" },
+            "media": {
+              "markdown": "walkthroughs/set-api-key.md"
+            },
             "completionEvents": [
               "onCommand:commitsage.setApiKey",
               "onCommand:commitsage.setOpenAIApiKey",
@@ -166,7 +170,9 @@
             "id": "generate",
             "title": "%walkthrough.step.generate.title%",
             "description": "%walkthrough.step.generate.description%",
-            "media": { "markdown": "walkthroughs/generate.md" },
+            "media": {
+              "markdown": "walkthroughs/generate.md"
+            },
             "completionEvents": [
               "onCommand:commitsage.generateCommitMessage"
             ]
@@ -378,15 +384,22 @@
     "lint": "eslint src/**/*.ts",
     "lint:fix": "eslint src/**/*.ts --fix",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run",
-    "test:watch": "vitest"
+    "test": "npm run test:unit && npm run test:e2e",
+    "test:unit": "vitest run",
+    "test:unit:watch": "vitest",
+    "pretest:e2e": "tsc -p tests/e2e/tsconfig.e2e.json && npm run compile",
+    "test:e2e": "vscode-test"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
+    "@types/mocha": "^10.0.10",
     "@types/node": "^25.6.0",
+    "@types/sinon": "^21.0.1",
     "@types/vscode": "^1.93.0",
     "@typescript-eslint/eslint-plugin": "^8.59.1",
     "@typescript-eslint/parser": "^8.59.1",
+    "@vscode/test-cli": "^0.0.12",
+    "@vscode/test-electron": "^2.5.2",
     "@vscode/vsce": "^3.9.1",
     "dotenv": "^17.4.2",
     "esbuild": "^0.28.0",
@@ -394,6 +407,9 @@
     "eslint-import-resolver-typescript": "^4.4.4",
     "eslint-plugin-import-x": "^4.16.2",
     "eslint-plugin-unused-imports": "^4.4.1",
+    "glob": "^13.0.6",
+    "mocha": "^11.7.5",
+    "sinon": "^21.1.2",
     "typescript": "^6.0.3",
     "typescript-eslint": "^8.59.1",
     "vitest": "^4.1.5"
