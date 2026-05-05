@@ -23,7 +23,7 @@
 .commitsage.example text eol=lf
 tsconfig.json text eol=lf
 eslint.config.mjs text eol=lf
-webpack.config.js text eol=lf
+esbuild.js text eol=lf
 
 # Binary files
 *.png binary

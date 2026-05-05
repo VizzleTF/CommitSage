@@ -9,11 +9,12 @@ docs/**
 .claude/**
 .commitsage/**
 TECH_DEBT_AUDIT.md
+VSCODE_API_AUDIT.md
 
 # Configuration files
 .gitignore
 .yarnrc
-webpack.config.js
+esbuild.js
 .eslintrc.json
 tsconfig.json
 eslint.config.mjs
@@ -43,7 +44,6 @@ node_modules/**
 
 # Documentation (except essential)
 CONTRIBUTING.md
-webpack-optimizations.md
 release.sh
 test-gemini-api.sh
 package-lock.json

@@ -41,7 +41,7 @@ jobs:
           echo "export const AMPLITUDE_API_KEY = '${{ secrets.AMPLITUDE_API_KEY }}';" > src/constants/apiKeys.ts
 
       - name: Package Extension
-        # `vsce package` runs `vscode:prepublish` (webpack production)
+        # `vsce package` runs `vscode:prepublish` (esbuild production)
         # automatically — no separate build step needed.
         run: npm run package
 

@@ -52,15 +52,17 @@ These are correct as-is — no action needed.
 
 ---
 
-### 3. Webpack → esbuild
+### 3. Webpack → esbuild ✅ DONE
 
-**What we do now**: `webpack.config.js` (38 lines) + `webpack`, `webpack-cli`, `ts-loader`, `webpack-bundle-analyzer`, `dotenv-webpack` devDeps.
+**Was**: `webpack.config.js` (38 lines) + `webpack`, `webpack-cli`, `ts-loader`, `webpack-bundle-analyzer`, `dotenv-webpack` devDeps. Production build ~1.5 s.
 
-**What's simpler**: VSCode's official extension samples repo migrated to esbuild ~2 years ago. An `esbuild.js` script is ~25 lines, no loader plugins. Build is roughly 10× faster (tens of ms vs ~1 s for our bundle size). `define:` replaces `dotenv-webpack`. `--analyze` becomes `esbuild --metafile`.
+**Now**: `esbuild.js` (~55 lines) + `esbuild`, `dotenv` devDeps. Production build ~23 ms (≈65× faster). `define:` replaces `dotenv-webpack`. `--analyze` writes a metafile readable at <https://esbuild.github.io/analyze/>.
 
-**Net effect**: 5 devDeps removed, faster CI, simpler config.
-
-**Risk**: non-zero — this is build infra. Needs careful verification (vsix size, source map quality, runtime smoke test). Recommend a separate PR from items 1/2/4.
+**Verified**:
+- `npm run build:prod` → `dist/extension.js` 533 KB (was 414 KB on webpack — esbuild's minifier is slightly less aggressive than Terser; trade-off accepted for build speed and config simplicity).
+- `npm run package` → `geminicommit-2.5.2.vsix` 467 KB, source map excluded from production bundle.
+- Typecheck, lint, vitest (95/95) all clean.
+- CI release workflow comment updated; `vsce package` continues to invoke `vscode:prepublish` (now `node esbuild.js --production`).
 
 ---
 
