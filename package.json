@@ -176,7 +176,7 @@
             "Custom language — specify the language name in the 'Custom Language Name' setting below"
           ],
           "default": "english",
-          "description": "Language for generated commit messages. Some commit formats may have limited support for non-English languages",
+          "markdownDescription": "Language for generated commit messages. Some commit formats may have limited support for non-English languages — pick `custom` and set `#commitSage.commit.customLanguageName#` for any language not listed.",
           "order": 2
         },
         "commitSage.commit.customLanguageName": {
@@ -208,7 +208,7 @@
             "type(scope): subject\n\nbody\n\nfooter"
           ],
           "default": "conventional",
-          "description": "Format style for commit messages. All formats support English, some may have limited support for other languages",
+          "markdownDescription": "Format style for commit messages. All formats support English; some may have limited support for other languages.",
           "order": 4
         },
         "commitSage.commit.useCustomInstructions": {
@@ -227,7 +227,7 @@
         "commitSage.commit.onlyStagedChanges": {
           "type": "boolean",
           "default": false,
-          "description": "Generate commit message only for staged changes. When disabled: commits staged changes if present, otherwise commits all tracked changes",
+          "markdownDescription": "Generate commit message only for staged changes.\n\n- **Disabled (default):** commits staged changes if present, otherwise commits all tracked changes.\n- **Enabled:** ignores unstaged work entirely.",
           "order": 7
         },
         "commitSage.commit.autoCommit": {
@@ -261,7 +261,7 @@
             "gemini-2.5-flash-lite"
           ],
           "default": "auto",
-          "description": "Select Gemini model for commit message generation. Use 'auto' to automatically try all available models until success. Only used when Gemini provider is selected",
+          "markdownDescription": "Select Gemini model for commit message generation. Use `auto` to automatically try all available models until success. Only used when Gemini provider is selected.",
           "order": 11
         },
         "commitSage.codestral.model": {
