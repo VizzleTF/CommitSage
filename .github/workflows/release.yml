@@ -40,6 +40,21 @@ jobs:
           mkdir -p src/constants
           echo "export const AMPLITUDE_API_KEY = '${{ secrets.AMPLITUDE_API_KEY }}';" > src/constants/apiKeys.ts
 
+      - name: Run unit tests (vitest)
+        run: npm run test:unit
+
+      - name: Compile E2E tests
+        run: npx tsc -p tests/e2e/tsconfig.e2e.json
+
+      - name: Cache VS Code download
+        uses: actions/cache@v4
+        with:
+          path: .vscode-test
+          key: vscode-test-${{ runner.os }}-stable
+
+      - name: Run E2E tests (xvfb)
+        run: xvfb-run -a npm run test:e2e
+
       - name: Package Extension
         # `vsce package` runs `vscode:prepublish` (esbuild production)
         # automatically — no separate build step needed.
