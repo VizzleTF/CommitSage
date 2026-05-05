@@ -35,6 +35,40 @@ const GEMINI_GENERATION_CONFIG = {
     maxOutputTokens: 1024
 } as const;
 
+// Quality tiers for Gemini auto-mode fallback. Lower = preferred.
+// pro > flash > flash-lite. Unknown / non-flash families fall into the flash
+// tier so newer experimental models still beat flash-lite.
+function geminiQualityTier(name: string): number {
+    if (name.includes('pro')) {
+        return 0;
+    }
+    if (name.includes('flash-lite')) {
+        return 2;
+    }
+    return 1;
+}
+
+// Extract the leading numeric version (e.g. "gemini-2.5-flash" -> 2.5,
+// "gemini-3-flash-preview" -> 3). Newer versions sort first within a tier.
+function geminiVersionScore(name: string): number {
+    const match = name.match(/gemini-(\d+(?:\.\d+)?)/);
+    return match ? parseFloat(match[1]) : 0;
+}
+
+function sortGeminiModelsByQuality(models: string[]): string[] {
+    return [...models].sort((a, b) => {
+        const tierDiff = geminiQualityTier(a) - geminiQualityTier(b);
+        if (tierDiff !== 0) {
+            return tierDiff;
+        }
+        const versionDiff = geminiVersionScore(b) - geminiVersionScore(a);
+        if (versionDiff !== 0) {
+            return versionDiff;
+        }
+        return a.localeCompare(b);
+    });
+}
+
 export class GeminiService {
     private static async getAvailableModels(apiKey: string, signal?: AbortSignal): Promise<string[]> {
         try {
@@ -52,16 +86,17 @@ export class GeminiService {
                 )
                 .map((model: GeminiModel) => model.name.replace('models/', ''));
 
-            Logger.log(`Found ${models.length} available Gemini models: ${models.join(', ')}`);
-            return models;
+            const sorted = sortGeminiModelsByQuality(models);
+            Logger.log(`Found ${sorted.length} available Gemini models (sorted by quality): ${sorted.join(', ')}`);
+            return sorted;
         } catch (error) {
             Logger.error('Failed to fetch available Gemini models:', toError(error));
-            return [
-                'gemini-2.5-flash',
+            return sortGeminiModelsByQuality([
                 'gemini-2.5-pro',
-                'gemini-2.5-flash-lite',
-                'gemini-3-flash-preview'
-            ];
+                'gemini-2.5-flash',
+                'gemini-3-flash-preview',
+                'gemini-2.5-flash-lite'
+            ]);
         }
     }
 

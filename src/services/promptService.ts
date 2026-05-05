@@ -4,6 +4,13 @@ import { CustomLanguageService } from './customLanguageService';
 import type { CommitLanguage } from '../utils/constants';
 import type { ProgressReporter } from '../models/types';
 
+const STRICT_FORMAT_REMINDER = `STRICT OUTPUT RULES — these override any tendency to be verbose, even on large diffs:
+- Output ONLY the commit message. No preamble, no explanation, no closing remark.
+- No markdown bold (**text**), no headings, no code fences.
+- First (subject) line MUST stay within the format's character limit (typically 50).
+- Body bullets MUST start with "- ", each ≤ 50 chars, max 5 bullets total.
+- Do not list every changed file; summarise.`;
+
 const LANGUAGE_PROMPTS: Record<Exclude<CommitLanguage, 'custom'>, string> = {
     english: 'Please write the commit message in English.',
     russian: 'Пожалуйста, напиши сообщение коммита на русском языке.',
@@ -29,6 +36,8 @@ ${diff}
 
 Git blame analysis:
 ${blameAnalysis}
+
+${STRICT_FORMAT_REMINDER}
 
 Please provide ONLY the commit message, without any additional text or explanations.`;
         }
@@ -60,6 +69,8 @@ ${diff}
 
 Git blame analysis:
 ${blameAnalysis}
+
+${STRICT_FORMAT_REMINDER}
 
 Please provide ONLY the commit message, without any additional text or explanations.`;
     }

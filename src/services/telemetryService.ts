@@ -49,7 +49,16 @@ class AmplitudeTelemetrySender implements vscode.TelemetrySender {
     }
 
     sendErrorData(error: Error, data?: Record<string, unknown>): void {
-        this.sendEventData('extension_error', { ...data, message: error.message, stack: error.stack });
+        // Called by `TelemetryLogger.logError(error, data)`. Forward as-is so
+        // `error.message` / `error.stack` arrive in Amplitude alongside any
+        // caller-supplied properties (including `name` if the caller wants
+        // a specific event name; otherwise default to 'extension_error').
+        const eventName = typeof data?.name === 'string' ? data.name : 'extension_error';
+        this.sendEventData(eventName, {
+            ...data,
+            errorMessage: error.message,
+            errorStack: error.stack,
+        });
     }
 }
 

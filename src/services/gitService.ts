@@ -13,6 +13,7 @@ import { toError, sanitizeErrorForTelemetry } from '../utils/errorUtils';
 import { unquoteGitPath } from '../utils/gitPath';
 import { ConfigService } from '../utils/configService';
 import { mapLimit } from '../utils/concurrency';
+import { buildGitEnv } from '../utils/gitEnv';
 
 const GIT_FANOUT_CONCURRENCY = 8;
 
@@ -559,11 +560,7 @@ export class GitService {
 
       const child = spawn('git', args, {
         cwd,
-        env: {
-          ...process.env,
-          // eslint-disable-next-line @typescript-eslint/naming-convention
-          GIT_TERMINAL_PROMPT: '0',
-        },
+        env: buildGitEnv(),
         timeout: timeoutMs,
       });
       let stdout = '';

@@ -11,7 +11,7 @@ export class SettingsValidator {
     }
 
     static async validateProjectConfig(): Promise<void> {
-        const result = ConfigService.hasValidProjectConfig();
+        const result = await ConfigService.hasValidProjectConfig();
         if (result.valid) {
             if (result.configPath) {
                 Logger.log('Project configuration (.commitsage/config.json) validated successfully');

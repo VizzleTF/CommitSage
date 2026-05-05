@@ -14,12 +14,18 @@
   "engines": {
     "vscode": "^1.93.0"
   },
+  "extensionKind": [
+    "workspace"
+  ],
+  "activationEvents": [
+    "onCommand:commitsage.generateCommitMessage"
+  ],
   "categories": [
     "Machine Learning",
     "Programming Languages",
     "AI"
   ],
-  "tags": [
+  "keywords": [
     "Machine Learning",
     "Programming Languages",
     "AI Assistant",
@@ -31,7 +37,6 @@
   ],
   "icon": "icon.png",
   "main": "./dist/extension.js",
-  "sideEffects": false,
   "l10n": "./l10n",
   "capabilities": {
     "virtualWorkspaces": {

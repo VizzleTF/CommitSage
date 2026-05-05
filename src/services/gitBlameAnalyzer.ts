@@ -1,5 +1,5 @@
 import * as path from 'path';
-import * as fs from 'fs';
+import * as fs from 'fs/promises';
 import { Logger } from '../utils/logger';
 import { errorMessages } from '../utils/constants';
 import { GitService, isDeletedStatus, isNewStatus } from './gitService';
@@ -37,7 +37,9 @@ export class GitBlameAnalyzer {
       // lookup. Existence + `hasHead` cover the cases blame can legitimately
       // fail on without an opaque git error.
       const absoluteFilePath = path.resolve(repoPath, normalizedPath);
-      if (!fs.existsSync(absoluteFilePath)) {
+      try {
+        await fs.access(absoluteFilePath);
+      } catch {
         throw new Error(`${errorMessages.fileNotFound}: ${absoluteFilePath}`);
       }
       if (!(await GitService.hasHead(repoPath, signal))) {

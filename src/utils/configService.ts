@@ -1,9 +1,17 @@
 import * as vscode from 'vscode';
-import * as fs from 'fs';
+import * as fs from 'fs/promises';
 import * as path from 'path';
 import { Logger } from './logger';
 import { ProjectConfig } from '../models/types';
 import { toError } from './errorUtils';
+
+async function statOrUndefined(p: string): Promise<import('fs').Stats | undefined> {
+  try {
+    return await fs.stat(p);
+  } catch {
+    return undefined;
+  }
+}
 
 type CacheValue = string | boolean | number;
 
@@ -77,7 +85,7 @@ export class ConfigService {
     };
   }
 
-  private static migrateProjectConfig(): void {
+  private static async migrateProjectConfig(): Promise<void> {
     const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
     if (!workspaceFolder) {
       return;
@@ -86,13 +94,14 @@ export class ConfigService {
     const legacyPath = path.join(workspaceFolder.uri.fsPath, '.commitsage');
 
     try {
-      if (fs.existsSync(legacyPath) && fs.statSync(legacyPath).isFile()) {
-        const content = fs.readFileSync(legacyPath, 'utf8');
+      const stats = await statOrUndefined(legacyPath);
+      if (stats?.isFile()) {
+        const content = await fs.readFile(legacyPath, 'utf8');
         // Validate JSON before migrating to avoid writing broken config
         JSON.parse(content);
-        fs.unlinkSync(legacyPath);
-        fs.mkdirSync(legacyPath, { recursive: true });
-        fs.writeFileSync(path.join(legacyPath, 'config.json'), content, 'utf8');
+        await fs.unlink(legacyPath);
+        await fs.mkdir(legacyPath, { recursive: true });
+        await fs.writeFile(path.join(legacyPath, 'config.json'), content, 'utf8');
         Logger.log('Migrated .commitsage file to .commitsage/config.json');
       }
     } catch (error) {
@@ -101,7 +110,8 @@ export class ConfigService {
   }
 
   static async initialize(context: vscode.ExtensionContext): Promise<void> {
-    this.migrateProjectConfig();
+    await this.migrateProjectConfig();
+    await this.loadProjectConfig();
 
     const configListener = vscode.workspace.onDidChangeConfiguration(
       (event) => {
@@ -155,6 +165,11 @@ export class ConfigService {
 
   private static handleProjectConfigChange(): void {
     this.invalidateProjectConfig();
+    // Async reload kicked off but not awaited — sync `ConfigService.get(...)`
+    // calls between the file change and the reload will see defaults until
+    // the cache repopulates. Async listeners (e.g. SettingsValidator) re-read
+    // FS themselves and don't depend on this cache.
+    void this.loadProjectConfig();
     for (const listener of this.projectConfigChangeListeners) {
       try {
         listener();
@@ -203,21 +218,21 @@ export class ConfigService {
    * the parse here. Returns `{ valid: true }` when there is no project
    * config to validate (treated as "no problem").
    */
-  static hasValidProjectConfig(): {
+  static async hasValidProjectConfig(): Promise<{
     valid: boolean;
     error?: Error;
     configPath?: string;
-  } {
+  }> {
     const rootPath = this.getProjectRootPath();
     if (!rootPath) {
       return { valid: true };
     }
     const configPath = path.join(rootPath, '.commitsage', 'config.json');
-    if (!fs.existsSync(configPath)) {
+    if ((await statOrUndefined(configPath)) === undefined) {
       return { valid: true };
     }
     try {
-      const raw = fs.readFileSync(configPath, 'utf8');
+      const raw = await fs.readFile(configPath, 'utf8');
       const parsed = JSON.parse(raw) as unknown;
       if (!this.isPlainObject(parsed)) {
         return {
@@ -234,44 +249,52 @@ export class ConfigService {
     }
   }
 
-  private static getProjectConfig(): ProjectConfig | null {
-    if (this.projectConfigCache !== null) {
-      return this.projectConfigCache;
-    }
-
+  /**
+   * Load project config from disk into the in-memory cache. Called from
+   * `initialize` (awaited) and from `handleProjectConfigChange`
+   * (fire-and-forget). Synchronous `getConfig`/`get` callers read the
+   * resulting cache without further FS access.
+   */
+  private static async loadProjectConfig(): Promise<void> {
     const rootPath = this.getProjectRootPath();
     if (!rootPath) {
       this.projectConfigCache = {};
-      return this.projectConfigCache;
+      return;
     }
     // Support both legacy `.commitsage` file and new `.commitsage/config.json` directory layout
     const legacyConfigPath = path.join(rootPath, '.commitsage');
     const dirConfigPath = path.join(rootPath, '.commitsage', 'config.json');
 
     try {
-      if (fs.existsSync(dirConfigPath)) {
-        const configContent = fs.readFileSync(dirConfigPath, 'utf8');
+      const dirStats = await statOrUndefined(dirConfigPath);
+      if (dirStats !== undefined) {
+        const configContent = await fs.readFile(dirConfigPath, 'utf8');
         this.projectConfigCache = this.parseAndValidateProjectConfig(
           configContent,
           '.commitsage/config.json',
         );
         Logger.log('Loaded project configuration from .commitsage/config.json');
-      } else if (fs.existsSync(legacyConfigPath) && fs.statSync(legacyConfigPath).isFile()) {
-        const configContent = fs.readFileSync(legacyConfigPath, 'utf8');
+        return;
+      }
+      const legacyStats = await statOrUndefined(legacyConfigPath);
+      if (legacyStats?.isFile()) {
+        const configContent = await fs.readFile(legacyConfigPath, 'utf8');
         this.projectConfigCache = this.parseAndValidateProjectConfig(
           configContent,
           '.commitsage',
         );
         Logger.log('Loaded project configuration from .commitsage file');
-      } else {
-        this.projectConfigCache = {};
+        return;
       }
+      this.projectConfigCache = {};
     } catch (error) {
       Logger.error('Error reading .commitsage config:', toError(error));
       this.projectConfigCache = {};
     }
+  }
 
-    return this.projectConfigCache;
+  private static getProjectConfig(): ProjectConfig {
+    return this.projectConfigCache ?? {};
   }
 
   private static parseAndValidateProjectConfig(
@@ -287,15 +310,31 @@ export class ConfigService {
     }
     // Drop top-level keys that are not plain objects (e.g. `commit: false`),
     // since downstream code descends through them and would otherwise misread.
-    const validated: Record<string, unknown> = {};
-    for (const [key, value] of Object.entries(parsed)) {
-      if (this.isPlainObject(value)) {
-        validated[key] = value;
-      } else {
+    const validated: Record<string, Record<string, unknown>> = {};
+    for (const [section, value] of Object.entries(parsed)) {
+      if (!this.isPlainObject(value)) {
         Logger.warn(
-          `Project config at ${source}: section "${key}" is not an object, skipping.`,
+          `Project config at ${source}: section "${section}" is not an object, skipping.`,
         );
+        continue;
       }
+      // Per-leaf type check against SETTING_DEFAULTS. Keys not present in
+      // the schema pass through unchanged (forward-compat for new settings
+      // landed in newer extension versions). Wrong-type values are dropped
+      // with a warning so users get feedback instead of silent fallback.
+      const validatedSection: Record<string, unknown> = {};
+      for (const [leaf, leafValue] of Object.entries(value)) {
+        const fullKey = `${section}.${leaf}` as keyof typeof SETTING_DEFAULTS;
+        const expected = SETTING_DEFAULTS[fullKey];
+        if (expected === undefined || typeof leafValue === typeof expected) {
+          validatedSection[leaf] = leafValue;
+        } else {
+          Logger.warn(
+            `Project config at ${source}: "${fullKey}" expected ${typeof expected}, got ${typeof leafValue} — skipping.`,
+          );
+        }
+      }
+      validated[section] = validatedSection;
     }
     return validated as ProjectConfig;
   }
@@ -311,12 +350,7 @@ export class ConfigService {
   private static getNestedProjectValue<T>(
     sections: string[],
   ): T | undefined {
-    const projectConfig = this.getProjectConfig();
-    if (!projectConfig) {
-      return undefined;
-    }
-
-    let current: unknown = projectConfig;
+    let current: unknown = this.getProjectConfig();
     for (let i = 0; i < sections.length; i++) {
       const section = sections[i];
       const isLeaf = i === sections.length - 1;

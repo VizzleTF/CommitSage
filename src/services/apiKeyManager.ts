@@ -36,9 +36,22 @@ const API_KEY_CONFIGS: Record<string, ApiKeyConfig> = {
 
 export class ApiKeyManager {
     private static secretStorage: vscode.SecretStorage;
+    private static knownSecretKeys: Set<string> = new Set(
+        Object.values(API_KEY_CONFIGS).map(c => c.secretKey),
+    );
 
-    static initialize(secretStorage: vscode.SecretStorage): void {
+    static initialize(secretStorage: vscode.SecretStorage, context: vscode.ExtensionContext): void {
         this.secretStorage = secretStorage;
+        // SecretStorage is shared across windows and (in Remote scenarios)
+        // across host/client. Without this listener a second window or remote
+        // host would keep using the stale key after a rotation.
+        context.subscriptions.push(
+            secretStorage.onDidChange(e => {
+                if (this.knownSecretKeys.has(e.key)) {
+                    Logger.log(`API key updated externally: ${e.key}`);
+                }
+            }),
+        );
     }
 
     /**

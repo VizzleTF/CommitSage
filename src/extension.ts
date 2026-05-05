@@ -13,7 +13,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 
     try {
         await ConfigService.initialize(context);
-        ApiKeyManager.initialize(context.secrets);
+        ApiKeyManager.initialize(context.secrets, context);
         Logger.initialize();
         await TelemetryService.initialize(context);
 

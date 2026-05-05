@@ -18,6 +18,26 @@ const production = process.argv.includes('--production');
 const watch = process.argv.includes('--watch');
 const analyze = process.argv.includes('--analyze');
 
+// Mirrors the problem-matcher format from
+// https://code.visualstudio.com/api/working-with-extensions/bundling-extension
+// so `npm run watch` errors land in VS Code's Problems pane.
+const esbuildProblemMatcherPlugin = {
+    name: 'esbuild-problem-matcher',
+    setup(build) {
+        build.onStart(() => {
+            console.log('[watch] build started');
+        });
+        build.onEnd((result) => {
+            result.errors.forEach(({ text, location }) => {
+                console.error(`✘ [ERROR] ${text}`);
+                if (location == null) return;
+                console.error(`    ${location.file}:${location.line}:${location.column}:`);
+            });
+            console.log('[watch] build finished');
+        });
+    },
+};
+
 const buildOptions = {
     entryPoints: ['src/extension.ts'],
     bundle: true,
@@ -31,8 +51,7 @@ const buildOptions = {
     minify: production,
     logLevel: 'info',
     metafile: analyze,
-    // Replace at parse time. Note: only specific `process.env.X` reads are
-    // rewritten — `...process.env` spreads (gitService.ts) stay live.
+    plugins: [esbuildProblemMatcherPlugin],
     define: {
         'process.env.AMPLITUDE_API_KEY': JSON.stringify(process.env.AMPLITUDE_API_KEY ?? ''),
     },

@@ -1,8 +1,16 @@
 import * as vscode from 'vscode';
-import * as fs from 'fs';
+import * as fs from 'fs/promises';
 import * as path from 'path';
 import { Logger } from '../utils/logger';
 import { toError } from '../utils/errorUtils';
+
+async function statOrUndefined(p: string): Promise<import('fs').Stats | undefined> {
+    try {
+        return await fs.stat(p);
+    } catch {
+        return undefined;
+    }
+}
 
 export async function createProjectConfig(): Promise<void> {
     try {
@@ -14,9 +22,9 @@ export async function createProjectConfig(): Promise<void> {
 
         const configDir = path.join(workspaceFolder.uri.fsPath, '.commitsage');
         const configPath = path.join(configDir, 'config.json');
-        const legacyExists =
-            fs.existsSync(configDir) && fs.statSync(configDir).isFile();
-        const configExists = fs.existsSync(configPath);
+        const dirStats = await statOrUndefined(configDir);
+        const legacyExists = dirStats?.isFile() ?? false;
+        const configExists = (await statOrUndefined(configPath)) !== undefined;
 
         if (legacyExists || configExists) {
             const openExisting = vscode.l10n.t('Open Existing');
@@ -39,7 +47,7 @@ export async function createProjectConfig(): Promise<void> {
             }
 
             if (legacyExists) {
-                fs.unlinkSync(configDir);
+                await fs.unlink(configDir);
             }
         }
 
@@ -76,8 +84,8 @@ export async function createProjectConfig(): Promise<void> {
             }
         };
 
-        await fs.promises.mkdir(configDir, { recursive: true });
-        await fs.promises.writeFile(
+        await fs.mkdir(configDir, { recursive: true });
+        await fs.writeFile(
             configPath,
             JSON.stringify(templateConfig, null, 2),
             'utf8'
