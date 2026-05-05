@@ -10,7 +10,7 @@ permissions:
 jobs:
   test:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
 
@@ -28,6 +28,21 @@ jobs:
 
       - name: Compile
         run: npm run compile
+
+      - name: Run unit tests (vitest)
+        run: npm run test:unit
+
+      - name: Compile E2E tests
+        run: npx tsc -p tests/e2e/tsconfig.e2e.json
+
+      - name: Cache VS Code download
+        uses: actions/cache@v4
+        with:
+          path: .vscode-test
+          key: vscode-test-${{ runner.os }}-stable
+
+      - name: Run E2E tests (xvfb)
+        run: xvfb-run -a npm run test:e2e
 
       - name: Package
         run: npm run package

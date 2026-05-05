@@ -1,0 +1,18 @@
+{
+    "compilerOptions": {
+        "module": "commonjs",
+        "moduleResolution": "node10",
+        "ignoreDeprecations": "6.0",
+        "target": "ES2022",
+        "lib": ["ES2022"],
+        "rootDir": ".",
+        "outDir": "out",
+        "sourceMap": true,
+        "strict": true,
+        "esModuleInterop": true,
+        "skipLibCheck": true,
+        "types": ["mocha", "node", "vscode"]
+    },
+    "include": ["**/*.ts"],
+    "exclude": ["out", "node_modules"]
+}

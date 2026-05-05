@@ -1,9 +1,11 @@
 # Development files
 .vscode/**
 .vscode-test/**
+.vscode-test.mjs
 src/**
 out/**
 test/**
+tests/**
 docs/**
 .github/**
 .claude/**
