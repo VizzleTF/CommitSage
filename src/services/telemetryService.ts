@@ -27,9 +27,35 @@ interface TelemetryEventProperties {
     [key: string]: unknown;
 }
 
+/**
+ * Bridges VSCode's TelemetryLogger to Amplitude. The logger handles VSCode's
+ * native telemetry gating (`isTelemetryEnabled`, per-extension toggle, PII
+ * sanitization, telemetry output channel mirroring); this sender just forwards
+ * the cleaned event payload to Amplitude's batched track API.
+ */
+class AmplitudeTelemetrySender implements vscode.TelemetrySender {
+    sendEventData(eventName: string, data?: Record<string, unknown>): void {
+        /* eslint-disable @typescript-eslint/naming-convention */
+        const options: EventOptions = {
+            device_id: vscode.env.machineId,
+            time: Date.now(),
+        };
+        /* eslint-enable @typescript-eslint/naming-convention */
+
+        void amplitude.track(eventName, data ?? {}, options).promise.catch((err: unknown) => {
+            const e = err instanceof Error ? err : new Error(String(err));
+            Logger.error('Failed to send telemetry:', e);
+        });
+    }
+
+    sendErrorData(error: Error, data?: Record<string, unknown>): void {
+        this.sendEventData('extension_error', { ...data, message: error.message, stack: error.stack });
+    }
+}
+
 export class TelemetryService {
     private static disposables: vscode.Disposable[] = [];
-    private static enabled: boolean = true;
+    private static logger: vscode.TelemetryLogger | null = null;
     private static initialized: boolean = false;
     private static extensionVersion: string | undefined;
 
@@ -42,37 +68,48 @@ export class TelemetryService {
                 return;
             }
 
-            this.enabled = vscode.env.isTelemetryEnabled && ConfigService.get('telemetry.enabled');
             this.extensionVersion = context.extension.packageJSON.version as string | undefined;
 
-            // Let the SDK handle batching, retries, and the periodic flush.
-            // We just call `track()` and `flush()` on shutdown.
+            // Amplitude SDK handles batching/retry/periodic flush. We `track()`
+            // and `flush()` on shutdown.
             amplitude.init(AMPLITUDE_API_KEY, {
                 serverZone: 'EU',
                 flushQueueSize: FLUSH_QUEUE_SIZE,
                 flushIntervalMillis: FLUSH_INTERVAL_MS,
-                optOut: !this.enabled
+                // optOut is driven by the TelemetryLogger gate — see
+                // syncOptOut() below for the extension-level toggle.
+                optOut: !this.computeEnabled(),
             });
 
-            this.initialized = true;
-            Logger.log('Amplitude service initialized successfully');
+            // VSCode's TelemetryLogger natively respects `isTelemetryEnabled`
+            // and the user's per-extension toggle, mirrors events into the
+            // telemetry output channel for transparency, and sanitizes PII.
+            this.logger = vscode.env.createTelemetryLogger(new AmplitudeTelemetrySender());
 
+            this.initialized = true;
+            Logger.log('Telemetry service initialized');
+
+            // Our `commitSage.telemetry.enabled` extension-level toggle still
+            // needs to drive Amplitude's optOut — VSCode's logger gates send
+            // calls but does not propagate to the underlying SDK.
             this.disposables.push(
-                vscode.env.onDidChangeTelemetryEnabled(this.handleTelemetryStateChange.bind(this)),
-                vscode.workspace.onDidChangeConfiguration(this.handleConfigChange.bind(this))
+                vscode.workspace.onDidChangeConfiguration(this.handleConfigChange.bind(this)),
             );
 
             context.subscriptions.push(...this.disposables);
-            Logger.log('Telemetry service initialized');
         } catch (error) {
             const err = error instanceof Error ? error : new Error(String(error));
-            Logger.error('Failed to initialize Amplitude:', err);
+            Logger.error('Failed to initialize telemetry:', err);
             this.initialized = false;
         }
     }
 
+    private static computeEnabled(): boolean {
+        return vscode.env.isTelemetryEnabled && ConfigService.get('telemetry.enabled');
+    }
+
     static sendEvent(event: TelemetryEvent): void {
-        if (!this.enabled || !this.initialized) {
+        if (!this.initialized || !this.logger) {
             return;
         }
 
@@ -82,29 +119,10 @@ export class TelemetryService {
             vsCodeVersion: vscode.version,
             extensionVersion: this.extensionVersion,
             platform: process.platform,
-            ...eventProps
+            ...eventProps,
         };
 
-        /* eslint-disable @typescript-eslint/naming-convention */
-        const options: EventOptions = {
-            device_id: vscode.env.machineId,
-            time: Date.now()
-        };
-        /* eslint-enable @typescript-eslint/naming-convention */
-
-        // Fire-and-forget. The SDK batches up to FLUSH_QUEUE_SIZE events
-        // or flushes every FLUSH_INTERVAL_MS, whichever comes first, and
-        // handles retries internally.
-        void amplitude.track(name, properties, options).promise.catch((err: unknown) => {
-            const e = err instanceof Error ? err : new Error(String(err));
-            Logger.error('Failed to send telemetry:', e);
-        });
-    }
-
-    private static handleTelemetryStateChange(enabled: boolean): void {
-        this.enabled = enabled && ConfigService.get('telemetry.enabled');
-        amplitude.setOptOut(!this.enabled);
-        Logger.log(`Telemetry enabled state changed to: ${this.enabled}`);
+        this.logger.logUsage(name, properties);
     }
 
     private static handleConfigChange(event: vscode.ConfigurationChangeEvent): void {
@@ -113,8 +131,7 @@ export class TelemetryService {
         }
 
         if (event.affectsConfiguration('commitSage.telemetry.enabled')) {
-            this.enabled = vscode.env.isTelemetryEnabled && ConfigService.get('telemetry.enabled');
-            amplitude.setOptOut(!this.enabled);
+            amplitude.setOptOut(!this.computeEnabled());
         }
 
         // Derive the candidate keys from SETTING_DEFAULTS so adding a new
@@ -141,6 +158,9 @@ export class TelemetryService {
 
     static dispose(): void {
         this.disposables.forEach(d => void d.dispose());
+        this.disposables = [];
+        this.logger?.dispose();
+        this.logger = null;
         this.initialized = false;
         Logger.log('Telemetry service disposed');
     }

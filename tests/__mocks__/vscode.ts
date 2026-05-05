@@ -8,10 +8,18 @@ const noopOutput = {
     append: () => undefined,
     show: () => undefined,
     dispose: () => undefined,
+    // LogOutputChannel surface (when createOutputChannel is called with { log: true }).
+    trace: () => undefined,
+    debug: () => undefined,
+    info: () => undefined,
+    warn: () => undefined,
+    error: () => undefined,
+    logLevel: 0,
+    onDidChangeLogLevel: () => ({ dispose: () => undefined }),
 };
 
 export const window = {
-    createOutputChannel: () => noopOutput,
+    createOutputChannel: (_name: string, _options?: unknown) => noopOutput,
     showErrorMessage: async () => undefined,
     showWarningMessage: async () => undefined,
     showInformationMessage: async () => undefined,
@@ -52,6 +60,16 @@ export const env = {
     sessionId: 'test-session',
     language: 'en',
     appName: 'vscode-test',
+    isTelemetryEnabled: true,
+    onDidChangeTelemetryEnabled: () => ({ dispose: () => undefined }),
+    createTelemetryLogger: (_sender: unknown, _options?: unknown) => ({
+        logUsage: () => undefined,
+        logError: () => undefined,
+        dispose: () => undefined,
+        onDidChangeEnableStates: () => ({ dispose: () => undefined }),
+        isUsageEnabled: true,
+        isErrorsEnabled: true,
+    }),
 };
 
 export const extensions = {
