@@ -18,7 +18,7 @@ export function registerCommands(context: vscode.ExtensionContext): void {
         context.subscriptions.push(...disposables);
     } catch (error) {
         Logger.error('Failed to register commands:', toError(error));
-        void Logger.showError('Failed to register commands');
+        void Logger.showError(vscode.l10n.t('Failed to register commands'));
         throw error;
     }
 }

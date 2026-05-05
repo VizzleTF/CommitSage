@@ -494,13 +494,13 @@ export class GitService {
     const repoOptions = repos.map((repo) => ({
       label: repo.rootUri
         ? path.basename(repo.rootUri.fsPath)
-        : 'Unknown repository',
+        : vscode.l10n.t('Unknown repository'),
       description: repo.rootUri ? repo.rootUri.fsPath : undefined,
       repository: repo,
     }));
 
     const selected = await vscode.window.showQuickPick(repoOptions, {
-      placeHolder: 'Select the repository to generate commit message',
+      placeHolder: vscode.l10n.t('Select the repository to generate commit message'),
     });
 
     if (!selected) {

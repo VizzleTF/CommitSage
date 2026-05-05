@@ -17,28 +17,28 @@ export function registerSetApiKeyCommands(_context: vscode.ExtensionContext): vs
         vscode.commands.registerCommand('commitsage.removeApiKey', async () => {
             try {
                 await ApiKeyManager.removeKey('gemini');
-                await Logger.showInfo('Gemini API key has been removed');
+                await Logger.showInfo(vscode.l10n.t('Gemini API key has been removed'));
             } catch (error) {
                 Logger.error('Error removing Gemini API key:', toError(error));
-                await Logger.showError(`Failed to remove API key: ${(toError(error)).message}`);
+                await Logger.showError(vscode.l10n.t('Failed to remove API key: {0}', toError(error).message));
             }
         }),
         vscode.commands.registerCommand('commitsage.removeOpenAIApiKey', async () => {
             try {
                 await ApiKeyManager.removeKey('openai');
-                await Logger.showInfo('OpenAI API key has been removed');
+                await Logger.showInfo(vscode.l10n.t('OpenAI API key has been removed'));
             } catch (error) {
                 Logger.error('Error removing OpenAI API key:', toError(error));
-                await Logger.showError(`Failed to remove API key: ${(toError(error)).message}`);
+                await Logger.showError(vscode.l10n.t('Failed to remove API key: {0}', toError(error).message));
             }
         }),
         vscode.commands.registerCommand('commitsage.removeCodestralApiKey', async () => {
             try {
                 await ApiKeyManager.removeKey('codestral');
-                await Logger.showInfo('Codestral API key has been removed');
+                await Logger.showInfo(vscode.l10n.t('Codestral API key has been removed'));
             } catch (error) {
                 Logger.error('Error removing Codestral API key:', toError(error));
-                await Logger.showError(`Failed to remove API key: ${(toError(error)).message}`);
+                await Logger.showError(vscode.l10n.t('Failed to remove API key: {0}', toError(error).message));
             }
         }),
         vscode.commands.registerCommand('commitsage.setOllamaAuthToken', () =>
@@ -47,10 +47,10 @@ export function registerSetApiKeyCommands(_context: vscode.ExtensionContext): vs
         vscode.commands.registerCommand('commitsage.removeOllamaAuthToken', async () => {
             try {
                 await ApiKeyManager.removeKey('ollama');
-                await Logger.showInfo('Ollama auth token has been removed');
+                await Logger.showInfo(vscode.l10n.t('Ollama auth token has been removed'));
             } catch (error) {
                 Logger.error('Error removing Ollama auth token:', toError(error));
-                await Logger.showError(`Failed to remove auth token: ${(toError(error)).message}`);
+                await Logger.showError(vscode.l10n.t('Failed to remove auth token: {0}', toError(error).message));
             }
         })
     ];

@@ -60,4 +60,6 @@ package-lock.json
 !LICENSE
 !icon.png
 !example.gif
-!dist/** 
+!dist/**
+!l10n/**
+!package.nls*.json 

@@ -120,9 +120,18 @@ Only matters for virtual-workspace support, which we explicitly don't claim (see
 
 ---
 
-### 8. `vscode.l10n` localization (skip)
+### 8. `vscode.l10n` localization scaffolding ✅ DONE
 
-We have a "language" config that translates the *output* (commit messages) via the LLM. The extension's own UI strings ("API key removed", "No changes detected", etc.) are English-only. Adding `vscode.l10n` would require a `bundle.l10n.json` and translations for ~40 strings — meaningful work, low ROI for this user base. Defer until requested.
+**Was**: hard-coded English strings throughout; no manifest declaration; command titles literal in `package.json`.
+
+**Now**:
+- `package.json` declares `"l10n": "./l10n"`.
+- `package.nls.json` holds English fallbacks for command titles + category; `package.json` references them via `%key%` placeholders.
+- `l10n/bundle.l10n.json` exists (empty) — the runtime bundle for `vscode.l10n.t()`. Translations live alongside it as `bundle.l10n.{lang}.json`.
+- All user-facing runtime strings wrapped with `vscode.l10n.t(...)`: notifications, withProgress titles, QuickPick placeholders, InputBox prompts, action button labels.
+- Test mock provides an index-templating `l10n.t` shim.
+
+Translators can now contribute by adding `bundle.l10n.{lang}.json` and `package.nls.{lang}.json` files without touching code. The prompt-output language config (`commitSage.commit.commitLanguage`) is unchanged — that's the LLM-driven translation of generated commit messages, orthogonal to UI localization.
 
 ---
 

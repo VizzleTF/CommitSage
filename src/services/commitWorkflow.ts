@@ -85,7 +85,7 @@ export class CommitWorkflow {
 
     private static async handleInvalidApiKey(provider: string, sourceControlRepository?: vscode.SourceControl): Promise<void> {
         await Logger.showError(
-            'Invalid or expired API key. Please enter a new one.',
+            vscode.l10n.t('Invalid or expired API key. Please enter a new one.'),
         );
 
         try {
@@ -113,7 +113,7 @@ export class CommitWorkflow {
         await vscode.window.withProgress(
             {
                 location: vscode.ProgressLocation.Notification,
-                title: 'CommitSage',
+                title: vscode.l10n.t('Commit Sage'),
                 cancellable: true
             },
             action
@@ -126,7 +126,7 @@ export class CommitWorkflow {
         token: vscode.CancellationToken,
         signal: AbortSignal
     ): Promise<CommitMessage> {
-        progress.report({ message: 'Analyzing changes...', increment: 10 });
+        progress.report({ message: vscode.l10n.t('Analyzing changes…'), increment: 10 });
 
         if (token.isCancellationRequested) {
             throw new UserCancelledError();
@@ -180,7 +180,7 @@ export class CommitWorkflow {
 
     private static async handleError(error: Error): Promise<void> {
         Logger.error('Error in CommitWorkflow:', error);
-        await vscode.window.showErrorMessage(`CommitSage: ${error.message}`);
+        await vscode.window.showErrorMessage(vscode.l10n.t('Commit Sage: {0}', error.message));
     }
 
     private static async handleAutoCommit(repository: vscode.SourceControl): Promise<void> {
