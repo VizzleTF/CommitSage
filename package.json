@@ -32,6 +32,20 @@
   "icon": "icon.png",
   "main": "./dist/extension.js",
   "sideEffects": false,
+  "capabilities": {
+    "virtualWorkspaces": {
+      "supported": false,
+      "description": "Commit Sage requires a local git repository to read diffs and create commits."
+    },
+    "untrustedWorkspaces": {
+      "supported": "limited",
+      "description": "Commit Sage generates commit messages from diffs in any workspace, but auto-commit and auto-push are disabled in untrusted workspaces.",
+      "restrictedConfigurations": [
+        "commitSage.commit.autoCommit",
+        "commitSage.commit.autoPush"
+      ]
+    }
+  },
   "contributes": {
     "commands": [
       {
@@ -168,7 +182,7 @@
         "commitSage.commit.customLanguageName": {
           "type": "string",
           "default": "",
-          "description": "Language name to use when 'custom' is selected as the commit language (e.g. 'Ukrainian', 'Italian', 'Arabic'). The format template will be translated to this language via LLM and cached in .commitsage/translations.json",
+          "markdownDescription": "Language name to use when `custom` is selected as the commit language (e.g. *Ukrainian*, *Italian*, *Arabic*). The format template will be translated via LLM and cached in `.commitsage/translations.json`.",
           "order": 3
         },
         "commitSage.commit.commitFormat": {
@@ -200,13 +214,13 @@
         "commitSage.commit.useCustomInstructions": {
           "type": "boolean",
           "default": false,
-          "description": "Use custom instructions for commit message generation. When enabled, customInstructions must not be empty",
+          "markdownDescription": "Use custom instructions for commit message generation. **When enabled, `#commitSage.commit.customInstructions#` must not be empty.**",
           "order": 5
         },
         "commitSage.commit.customInstructions": {
           "type": "string",
           "default": "",
-          "description": "Custom instructions for commit message generation. Required when useCustomInstructions is enabled",
+          "markdownDescription": "Custom instructions for commit message generation. Required when `#commitSage.commit.useCustomInstructions#` is enabled.",
           "editPresentation": "multilineText",
           "order": 6
         },
@@ -219,19 +233,19 @@
         "commitSage.commit.autoCommit": {
           "type": "boolean",
           "default": false,
-          "description": "Automatically commit changes after generating the message. Consider disabling promptForRefs when using this feature",
+          "markdownDescription": "Automatically commit changes after generating the message. Consider disabling `#commitSage.commit.promptForRefs#` when using this feature.",
           "order": 8
         },
         "commitSage.commit.autoPush": {
           "type": "boolean",
           "default": false,
-          "description": "Automatically push changes after committing. Requires Auto Commit to be enabled. Will be ignored if Auto Commit is disabled",
+          "markdownDescription": "Automatically push changes after committing. **Requires `#commitSage.commit.autoCommit#` to be enabled — ignored otherwise.**",
           "order": 9
         },
         "commitSage.commit.promptForRefs": {
           "type": "boolean",
           "default": false,
-          "description": "Prompt for entering refs (e.g., issue numbers) when generating commit messages. Note: This may interrupt automatic commit flow if Auto Commit is enabled",
+          "markdownDescription": "Prompt for entering refs (e.g., issue numbers) when generating commit messages. **Note:** this may interrupt automatic flow if `#commitSage.commit.autoCommit#` is enabled.",
           "order": 10
         },
         "commitSage.gemini.model": {
@@ -269,13 +283,13 @@
         "commitSage.openai.baseUrl": {
           "type": "string",
           "default": "https://api.openai.com/v1",
-          "description": "Base URL for OpenAI API. Change only if using Azure OpenAI or a custom endpoint",
+          "markdownDescription": "Base URL for OpenAI API. Change only if using Azure OpenAI or a custom endpoint. Default: <https://api.openai.com/v1>",
           "order": 14
         },
         "commitSage.ollama.baseUrl": {
           "type": "string",
           "default": "http://localhost:11434",
-          "description": "Base URL for Ollama API. Only used when Ollama provider is selected",
+          "markdownDescription": "Base URL for Ollama API. Only used when Ollama provider is selected. Default: <http://localhost:11434>",
           "order": 15
         },
         "commitSage.ollama.model": {
@@ -293,13 +307,13 @@
         "commitSage.apiRequestTimeout": {
           "type": "number",
           "default": 30,
-          "description": "Timeout for LLM provider HTTP requests (Gemini/OpenAI/Codestral/Ollama) in seconds. Set to -1 for no timeout (infinite wait)",
+          "markdownDescription": "Timeout for LLM provider HTTP requests (Gemini/OpenAI/Codestral/Ollama) in seconds. **Set to `-1` for no timeout (infinite wait).**",
           "order": 18
         },
         "commitSage.gitTimeout": {
           "type": "number",
           "default": 120,
-          "description": "Timeout for `git` subprocesses (diff, blame, push, etc.) in seconds. Push over a slow remote or diff over a huge file may need more than the default. Set to -1 for no timeout",
+          "markdownDescription": "Timeout for `git` subprocesses (diff, blame, push, etc.) in seconds. Push over a slow remote or diff over a huge file may need more than the default. **Set to `-1` for no timeout.**",
           "order": 19
         },
         "commitSage.telemetry.enabled": {
@@ -331,8 +345,8 @@
     "@eslint/js": "^10.0.1",
     "@types/node": "^25.6.0",
     "@types/vscode": "^1.93.0",
-    "@typescript-eslint/eslint-plugin": "^8.59.0",
-    "@typescript-eslint/parser": "^8.59.0",
+    "@typescript-eslint/eslint-plugin": "^8.59.1",
+    "@typescript-eslint/parser": "^8.59.1",
     "@vscode/vsce": "^3.9.1",
     "dotenv-webpack": "^9.0.0",
     "eslint": "^10.2.1",
@@ -341,14 +355,14 @@
     "eslint-plugin-unused-imports": "^4.4.1",
     "ts-loader": "^9.5.7",
     "typescript": "^6.0.3",
-    "typescript-eslint": "^8.59.0",
+    "typescript-eslint": "^8.59.1",
     "vitest": "^4.1.5",
     "webpack": "^5.106.2",
     "webpack-bundle-analyzer": "^5.3.0",
     "webpack-cli": "^7.0.2"
   },
   "dependencies": {
-    "@amplitude/analytics-node": "^1.5.56",
+    "@amplitude/analytics-node": "^1.5.57",
     "@amplitude/analytics-types": "^2.11.1",
     "axios": "^1.15.2"
   }
