@@ -22,6 +22,15 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Stub API key constant
+        # src/constants/apiKeys.ts is gitignored and generated only by the
+        # release pipeline. Lint resolves it via import-x; without a stub
+        # `import-x/no-unresolved` fails. The value here is a placeholder
+        # that never reaches a real network — tests use a mock LLM server.
+        run: |
+          mkdir -p src/constants
+          echo "export const AMPLITUDE_API_KEY = 'e2e-test-stub';" > src/constants/apiKeys.ts
+
       - name: Lint
         run: npx eslint 'src/**/*.ts'
 
