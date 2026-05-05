@@ -1,4 +1,3 @@
-import axios from 'axios';
 import { Logger } from '../utils/logger';
 import { ConfigService } from '../utils/configService';
 import type { ProgressReporter, CommitMessage, GenerateOptions } from '../models/types';
@@ -45,23 +44,19 @@ export class OpenAIService {
 
                 await RetryUtils.updateProgressForAttempt(progress, attempt);
 
-                const headers = HttpUtils.createRequestHeaders(apiKey);
-                const requestConfig = HttpUtils.createRequestConfig(
-                    headers,
-                    undefined,
-                    options?.signal
-                );
-
-                const response = await axios.post<OpenAIResponse>(
+                const data = await HttpUtils.postJson<OpenAIResponse>(
                     `${baseUrl}${this.chatCompletionsPath}`,
                     payload,
-                    requestConfig
+                    {
+                        headers: HttpUtils.createRequestHeaders(apiKey),
+                        signal: options?.signal,
+                    }
                 );
 
                 progress.report({ message: 'Processing generated message...', increment: 90 });
 
                 const message = extractAndValidateMessage(
-                    response.data.choices?.[0]?.message?.content,
+                    data.choices?.[0]?.message?.content,
                     'OpenAI'
                 );
                 Logger.log(`Commit message generated using ${model} model`);

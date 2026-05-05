@@ -1,4 +1,3 @@
-import axios from 'axios';
 import { Logger } from '../utils/logger';
 import { CommitMessage, ProgressReporter, GenerateOptions } from '../models/types';
 import { ConfigService } from '../utils/configService';
@@ -45,20 +44,20 @@ export class CodestralService {
                 Logger.log(`Attempt ${attempt}: Sending request to Codestral API`);
                 await RetryUtils.updateProgressForAttempt(progress, attempt);
 
-                const headers = HttpUtils.createRequestHeaders(apiKey);
-                const requestConfig = HttpUtils.createRequestConfig(
-                    headers,
-                    undefined,
-                    options?.signal
+                const data = await HttpUtils.postJson<CodestralResponse>(
+                    this.apiUrl,
+                    payload,
+                    {
+                        headers: HttpUtils.createRequestHeaders(apiKey),
+                        signal: options?.signal,
+                    }
                 );
-
-                const response = await axios.post<CodestralResponse>(this.apiUrl, payload, requestConfig);
 
                 Logger.log('Codestral API response received successfully');
                 progress.report({ message: 'Processing generated message...', increment: 90 });
 
                 const message = extractAndValidateMessage(
-                    response.data.choices?.[0]?.message?.content,
+                    data.choices?.[0]?.message?.content,
                     'Codestral'
                 );
                 Logger.log(`Commit message generated using ${model} model`);
