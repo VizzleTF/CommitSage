@@ -74,6 +74,7 @@ export class CommitWorkflow {
                 name: 'message_generation_failed',
                 ...sanitizeErrorForTelemetry(err),
                 provider: ConfigService.getProvider(),
+                model: ConfigService.getModel(),
             });
             await this.handleError(err);
         }

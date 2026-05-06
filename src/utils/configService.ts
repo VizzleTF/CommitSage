@@ -440,6 +440,28 @@ export class ConfigService {
     return provider;
   }
 
+  /**
+   * Configured model for the active provider (e.g. `gemini-2.5-flash`,
+   * `gpt-3.5-turbo`, `llama3.2`, `codestral-latest`). Reads `<provider>.model`
+   * from settings — for `gemini` this can be the literal `'auto'`, which
+   * resolves to the actual model only inside `geminiService`. The resolved
+   * model is reported by `message_generation_completed.model`; this helper
+   * is for events that fire before resolution (`started`, `failed`).
+   */
+  static getModel(): string {
+    switch (this.getProvider()) {
+      case 'gemini':
+        return this.get('gemini.model');
+      case 'openai':
+        return this.get('openai.model');
+      case 'codestral':
+        return this.get('codestral.model');
+      case 'ollama':
+        return this.get('ollama.model');
+    }
+    return 'unknown';
+  }
+
   static clearCache(): void {
     this.cache.clear();
   }

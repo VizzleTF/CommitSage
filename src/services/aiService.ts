@@ -1,12 +1,10 @@
 import { ConfigService } from '../utils/configService';
-import { Logger } from '../utils/logger';
 import { CommitMessage, ProgressReporter } from '../models/types';
 import { PromptService } from './promptService';
 import { TelemetryService } from './telemetryService';
 import { errorMessages } from '../utils/constants';
 import { removeThinkTags } from '../utils/textProcessing';
 import { AIServiceFactory, AIServiceType } from './aiServiceFactory';
-import { toError, sanitizeErrorForTelemetry } from '../utils/errorUtils';
 
 // ~100k chars covers most diffs while staying within safe LLM API context window limits
 const MAX_DIFF_LENGTH = 100000;
@@ -29,6 +27,7 @@ export class AIService {
         }
 
         const provider = ConfigService.getProvider();
+        const model = ConfigService.getModel();
         const language = ConfigService.get('commit.commitLanguage');
         const diffSize = diff.length;
         const truncated = diffSize > MAX_DIFF_LENGTH;
@@ -39,6 +38,7 @@ export class AIService {
             fileCount: context.fileCount ?? 0,
             truncated,
             provider,
+            model,
         });
 
         const startTime = Date.now();
@@ -47,37 +47,26 @@ export class AIService {
 
         progress.report({ message: 'Generating commit message...', increment: 50 });
 
-        try {
-            const serviceType = provider as AIServiceType;
-            const result = await AIServiceFactory.generateCommitMessage(
-                serviceType,
-                prompt,
-                progress,
-                undefined,
-                { signal: context.signal }
-            );
+        const serviceType = provider as AIServiceType;
+        const result = await AIServiceFactory.generateCommitMessage(
+            serviceType,
+            prompt,
+            progress,
+            undefined,
+            { signal: context.signal }
+        );
 
-            // Post-process the commit message to remove think tags
-            result.message = removeThinkTags(result.message);
+        result.message = removeThinkTags(result.message);
 
-            TelemetryService.sendEvent({
-                name: 'message_generation_completed',
-                provider,
-                model: result.model,
-                durationMs: Date.now() - startTime,
-                language,
-                onlyStagedChanges: context.onlyStagedChanges ?? false,
-            });
-            return result;
-        } catch (error) {
-            Logger.error('Failed to generate commit message:', toError(error));
-            TelemetryService.sendEvent({
-                name: 'message_generation_failed',
-                provider,
-                ...sanitizeErrorForTelemetry(toError(error)),
-            });
-            throw error;
-        }
+        TelemetryService.sendEvent({
+            name: 'message_generation_completed',
+            provider,
+            model: result.model,
+            durationMs: Date.now() - startTime,
+            language,
+            onlyStagedChanges: context.onlyStagedChanges ?? false,
+        });
+        return result;
     }
 
     private static truncateDiff(diff: string): string {

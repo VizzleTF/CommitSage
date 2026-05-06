@@ -11,9 +11,9 @@ const FLUSH_INTERVAL_MS = 30_000;
 type TelemetryEvent =
     | { name: 'extension_activated' }
     | { name: 'extension_deactivated' }
-    | { name: 'message_generation_started'; diffSize: number; fileCount: number; truncated: boolean; provider: string }
+    | { name: 'message_generation_started'; diffSize: number; fileCount: number; truncated: boolean; provider: string; model: string }
     | { name: 'message_generation_completed'; provider: string; model: string; durationMs: number; language: string; onlyStagedChanges: boolean }
-    | { name: 'message_generation_failed'; provider: string; error: string; errorType: string }
+    | { name: 'message_generation_failed'; provider: string; model: string; error: string; errorType: string }
     | { name: 'commit_completed'; hasStaged: boolean; hasUntracked: boolean; hasDeleted: boolean; messageLength: number }
     | { name: 'commit_failed'; error: string; errorType: string }
     | { name: 'settings_changed'; setting: string }
