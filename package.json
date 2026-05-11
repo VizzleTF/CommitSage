@@ -416,7 +416,7 @@
     "mocha": "^11.7.5",
     "sinon": "^22.0.0",
     "typescript": "^6.0.3",
-    "typescript-eslint": "^8.59.1",
+    "typescript-eslint": "^8.59.2",
     "vitest": "^4.1.6"
   },
   "dependencies": {
