@@ -420,7 +420,7 @@
     "vitest": "^4.1.6"
   },
   "dependencies": {
-    "@amplitude/analytics-node": "^1.5.57",
+    "@amplitude/analytics-node": "^1.5.58",
     "@amplitude/analytics-types": "^2.11.1"
   }
 }
