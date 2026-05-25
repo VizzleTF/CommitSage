@@ -413,7 +413,7 @@
     "eslint-plugin-import-x": "^4.16.2",
     "eslint-plugin-unused-imports": "^4.4.1",
     "glob": "^13.0.6",
-    "mocha": "^11.7.5",
+    "mocha": "^11.7.6",
     "sinon": "^22.0.0",
     "typescript": "^6.0.3",
     "typescript-eslint": "^8.59.4",
