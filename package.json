@@ -2,7 +2,7 @@
   "name": "geminicommit",
   "displayName": "Commit Sage",
   "description": "Free AI commit messages using Gemini, OpenRouter, Groq, Claude, DeepSeek, xAI, Ollama, or any OpenAI-compatible LLM",
-  "version": "3.0.2",
+  "version": "3.0.3",
   "publisher": "VizzleTF",
   "repository": {
     "type": "git",
@@ -602,7 +602,7 @@
   },
   "overrides": {
     "serialize-javascript": "^7.0.5",
-    "brace-expansion": "^5.0.6",
+    "brace-expansion": "^2.0.2",
     "diff": "^8.0.3"
   }
 }
