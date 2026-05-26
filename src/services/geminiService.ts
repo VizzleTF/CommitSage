@@ -2,7 +2,7 @@ import { Logger } from '../utils/logger';
 import { ConfigService } from '../utils/configService';
 import { ProgressReporter, CommitMessage, GenerateOptions } from '../models/types';
 import { ApiKeyInvalidError } from '../models/errors';
-import { extractAndValidateMessage, withRetryAndApiKeyGuard } from './baseAIService';
+import { extractAndValidateMessage, getConfiguredTemperature, withRetryAndApiKeyGuard } from './baseAIService';
 import { HttpError, HttpUtils } from '../utils/httpUtils';
 import { RetryUtils } from '../utils/retryUtils';
 import { ApiKeyManager } from './apiKeyManager';
@@ -28,12 +28,22 @@ interface GeminiModelsResponse {
     models: GeminiModel[];
 }
 
-const GEMINI_GENERATION_CONFIG = {
-    temperature: 0.7,
+const GEMINI_GENERATION_CONFIG_BASE = {
     topK: 40,
     topP: 0.95,
     maxOutputTokens: 1024
 } as const;
+
+function buildGeminiGenerationConfig(options?: GenerateOptions): Record<string, unknown> {
+    const cfg: Record<string, unknown> = {
+        ...GEMINI_GENERATION_CONFIG_BASE,
+        temperature: getConfiguredTemperature(),
+    };
+    if (options?.maxTokens) {
+        cfg.maxOutputTokens = options.maxTokens;
+    }
+    return cfg;
+}
 
 // Quality tiers for Gemini auto-mode fallback. Lower = preferred.
 // pro > flash > flash-lite. Unknown / non-flash families fall into the flash
@@ -120,9 +130,7 @@ export class GeminiService {
 
                 const payload = {
                     contents: [{ parts: [{ text: prompt }] }],
-                    generationConfig: options?.maxTokens
-                        ? { ...GEMINI_GENERATION_CONFIG, maxOutputTokens: options.maxTokens }
-                        : GEMINI_GENERATION_CONFIG
+                    generationConfig: buildGeminiGenerationConfig(options)
                 };
 
                 const data = await HttpUtils.postJson<GeminiResponse>(apiUrl, payload, {
@@ -185,9 +193,7 @@ export class GeminiService {
 
                 const payload = {
                     contents: [{ parts: [{ text: prompt }] }],
-                    generationConfig: options?.maxTokens
-                        ? { ...GEMINI_GENERATION_CONFIG, maxOutputTokens: options.maxTokens }
-                        : GEMINI_GENERATION_CONFIG
+                    generationConfig: buildGeminiGenerationConfig(options)
                 };
 
                 await RetryUtils.updateProgressForAttempt(progress, attempt);

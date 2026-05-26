@@ -3,12 +3,24 @@ import { GeminiService } from './geminiService';
 import { OpenAIService } from './openaiService';
 import { CodestralService } from './codestralService';
 import { OllamaService } from './ollamaService';
+import { GroqService } from './groqService';
+import { OpenRouterService } from './openRouterService';
+import { AnthropicService } from './anthropicService';
+import { DeepSeekService } from './deepSeekService';
+import { XaiService } from './xaiService';
+import { CustomOpenAIService } from './customOpenAIService';
 
 export enum AIServiceType {
     GEMINI = 'gemini',
     OPENAI = 'openai',
     CODESTRAL = 'codestral',
-    OLLAMA = 'ollama'
+    OLLAMA = 'ollama',
+    OPENROUTER = 'openrouter',
+    GROQ = 'groq',
+    ANTHROPIC = 'anthropic',
+    DEEPSEEK = 'deepseek',
+    XAI = 'xai',
+    CUSTOM = 'custom'
 }
 
 type AIServiceClass = {
@@ -25,7 +37,13 @@ export class AIServiceFactory {
         [AIServiceType.GEMINI]: GeminiService,
         [AIServiceType.OPENAI]: OpenAIService,
         [AIServiceType.CODESTRAL]: CodestralService,
-        [AIServiceType.OLLAMA]: OllamaService
+        [AIServiceType.OLLAMA]: OllamaService,
+        [AIServiceType.OPENROUTER]: OpenRouterService,
+        [AIServiceType.GROQ]: GroqService,
+        [AIServiceType.ANTHROPIC]: AnthropicService,
+        [AIServiceType.DEEPSEEK]: DeepSeekService,
+        [AIServiceType.XAI]: XaiService,
+        [AIServiceType.CUSTOM]: CustomOpenAIService
     };
 
     private static getService(type: AIServiceType): AIServiceClass {

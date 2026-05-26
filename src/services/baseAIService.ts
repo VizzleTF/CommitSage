@@ -4,6 +4,21 @@ import { ApiKeyInvalidError } from '../models/errors';
 import { RetryUtils } from '../utils/retryUtils';
 import { toError } from '../utils/errorUtils';
 import { HttpError, NetworkError } from '../utils/httpUtils';
+import { ConfigService } from '../utils/configService';
+
+/**
+ * Shared LLM sampling temperature (`general.temperature`, default 0.7).
+ * Clamped to [0, 2] — most providers reject values outside this range,
+ * and a project config can't legitimately need otherwise. Defaults to
+ * 0.7 if the setting is unreadable or out of type.
+ */
+export function getConfiguredTemperature(): number {
+    const raw = ConfigService.get('general.temperature');
+    if (typeof raw !== 'number' || !Number.isFinite(raw)) {
+        return 0.7;
+    }
+    return Math.max(0, Math.min(2, raw));
+}
 
 /**
  * Wraps the per-attempt body of an HTTP-LLM provider with the shared
@@ -28,7 +43,7 @@ export async function withRetryAndApiKeyGuard(
     try {
         return await fn();
     } catch (error) {
-        if (error instanceof HttpError && error.status === 401) {
+        if (error instanceof HttpError && isInvalidApiKeyError(error)) {
             throw new ApiKeyInvalidError(name);
         }
         return RetryUtils.handleGenerationError(
@@ -40,6 +55,32 @@ export async function withRetryAndApiKeyGuard(
             (err: Error) => handleHttpError(err, `${name} API`)
         );
     }
+}
+
+/**
+ * Detect "invalid API key" across providers that don't all use HTTP 401.
+ * - OpenAI/Anthropic/Groq/Codestral/OpenRouter/DeepSeek/Ollama → 401
+ * - **xAI** → **400** with body `{"code":"Client specified an invalid argument",
+ *   "error":"Incorrect API key provided: ..."}` — non-standard, but observed in
+ *   production. Match on the message string rather than only the status.
+ */
+export function isInvalidApiKeyError(error: HttpError): boolean {
+    if (error.status === 401) {
+        return true;
+    }
+    if (error.status === 400) {
+        const data = error.data;
+        const message =
+            typeof data === 'string'
+                ? data
+                : (data as { error?: string | { message?: string } } | undefined)?.error;
+        const messageText =
+            typeof message === 'string'
+                ? message
+                : message?.message ?? JSON.stringify(data);
+        return /incorrect api key|invalid api key|api key.*(?:invalid|expired|revoked)/i.test(messageText ?? '');
+    }
+    return false;
 }
 
 export function validateCommitMessage(message: string): string {
@@ -63,8 +104,17 @@ export function extractAndValidateMessage(
 export function handleHttpError(error: Error, serviceName: string): ApiErrorResult {
     if (error instanceof HttpError) {
         const status = error.status;
-        const data = error.data as { error?: { message?: string } } | string | undefined;
-        const errorMessage = typeof data === 'object' ? data?.error?.message : undefined;
+        // Provider error bodies are inconsistent: some use `{error: {message}}`,
+        // some `{error: "..."}` (a string), some bare strings. Normalize.
+        const data = error.data as
+            | { error?: string | { message?: string }; code?: string }
+            | string
+            | undefined;
+        const rawError = typeof data === 'object' ? data?.error : undefined;
+        const errorMessage =
+            typeof rawError === 'string'
+                ? rawError
+                : rawError?.message;
 
         switch (status) {
             case 401:
@@ -79,6 +129,25 @@ export function handleHttpError(error: Error, serviceName: string): ApiErrorResu
                     shouldRetry: false,
                     statusCode: status,
                 };
+            case 403: {
+                // xAI returns 403 when a team has no credits/licenses yet,
+                // with `error: "Your newly created team doesn't have any
+                // credits or licenses yet. ..."`. Surface that text directly
+                // so users see the purchase URL instead of a generic 403.
+                const text = errorMessage ?? (typeof data === 'string' ? data : '');
+                if (/credits or licenses/i.test(text)) {
+                    return {
+                        errorMessage: text,
+                        shouldRetry: false,
+                        statusCode: status,
+                    };
+                }
+                return {
+                    errorMessage: text || errorMessages.authenticationError,
+                    shouldRetry: false,
+                    statusCode: status,
+                };
+            }
             case 429:
                 return {
                     errorMessage: errorMessages.rateLimitExceeded,

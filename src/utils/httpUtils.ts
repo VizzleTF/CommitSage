@@ -40,18 +40,31 @@ interface RequestOptions {
   timeoutMs?: number;
 }
 
+/**
+ * How a provider expects its API key to be transmitted.
+ * - `bearer` — `Authorization: Bearer <key>` (OpenAI, Groq, OpenRouter, DeepSeek, xAI, Codestral, Ollama auth)
+ * - `x-api-key` — `x-api-key: <key>` (Anthropic)
+ * - `none` — no auth header, even if `apiKey` is provided (custom self-hosted)
+ */
+export type AuthStyle = 'bearer' | 'x-api-key' | 'none';
+
 export class HttpUtils {
   static createRequestHeaders(
     apiKey?: string,
     additionalHeaders?: Record<string, string>,
+    authStyle: AuthStyle = 'bearer',
   ): Record<string, string> {
     const headers: Record<string, string> = {
       'content-type': 'application/json',
       ...additionalHeaders,
     };
 
-    if (apiKey) {
-      headers['Authorization'] = `Bearer ${apiKey}`;
+    if (apiKey && authStyle !== 'none') {
+      if (authStyle === 'x-api-key') {
+        headers['x-api-key'] = apiKey;
+      } else {
+        headers['Authorization'] = `Bearer ${apiKey}`;
+      }
     }
 
     return headers;

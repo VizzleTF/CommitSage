@@ -32,6 +32,36 @@ const API_KEY_CONFIGS: Record<string, ApiKeyConfig> = {
         displayName: 'Ollama',
         validator: ApiKeyValidator.validateOllamaAuthToken,
     },
+    openrouter: {
+        secretKey: 'commitsage.openrouterApiKey',
+        displayName: 'OpenRouter',
+        validator: ApiKeyValidator.validateOpenRouterApiKey,
+    },
+    groq: {
+        secretKey: 'commitsage.groqApiKey',
+        displayName: 'Groq',
+        validator: ApiKeyValidator.validateGroqApiKey,
+    },
+    anthropic: {
+        secretKey: 'commitsage.anthropicApiKey',
+        displayName: 'Anthropic',
+        validator: ApiKeyValidator.validateAnthropicApiKey,
+    },
+    deepseek: {
+        secretKey: 'commitsage.deepseekApiKey',
+        displayName: 'DeepSeek',
+        validator: ApiKeyValidator.validateDeepSeekApiKey,
+    },
+    xai: {
+        secretKey: 'commitsage.xaiApiKey',
+        displayName: 'xAI',
+        validator: ApiKeyValidator.validateXaiApiKey,
+    },
+    custom: {
+        secretKey: 'commitsage.customApiKey',
+        displayName: 'Custom',
+        validator: ApiKeyValidator.validateCustomApiKey,
+    },
 };
 
 export class ApiKeyManager {
@@ -65,6 +95,9 @@ export class ApiKeyManager {
         }
         if (provider === 'ollama') {
             return ConfigService.get('ollama.useAuthToken');
+        }
+        if (provider === 'custom') {
+            return ConfigService.get('custom.useApiKey');
         }
         return true;
     }

@@ -3,20 +3,20 @@ import type { ProgressReporter, CommitMessage, GenerateOptions } from '../models
 import { ApiKeyManager } from './apiKeyManager';
 import { generateViaOpenAICompatible } from './openAICompatibleService';
 
-export class OpenAIService {
+export class GroqService {
     static async generateCommitMessage(
         prompt: string,
         progress: ProgressReporter,
         attempt: number = 1,
         options?: GenerateOptions,
     ): Promise<CommitMessage> {
-        const apiKey = await ApiKeyManager.getKey('openai');
+        const apiKey = await ApiKeyManager.getKey('groq');
         return generateViaOpenAICompatible(
             {
-                providerLabel: 'OpenAI',
-                baseUrl: ConfigService.get('openai.baseUrl'),
+                providerLabel: 'Groq',
+                baseUrl: 'https://api.groq.com/openai/v1',
                 apiKey,
-                model: ConfigService.get('openai.model'),
+                model: ConfigService.get('groq.model'),
             },
             prompt,
             progress,

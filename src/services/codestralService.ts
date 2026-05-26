@@ -1,7 +1,7 @@
 import { Logger } from '../utils/logger';
 import { CommitMessage, ProgressReporter, GenerateOptions } from '../models/types';
 import { ConfigService } from '../utils/configService';
-import { extractAndValidateMessage, withRetryAndApiKeyGuard } from './baseAIService';
+import { extractAndValidateMessage, getConfiguredTemperature, withRetryAndApiKeyGuard } from './baseAIService';
 import { HttpUtils } from '../utils/httpUtils';
 import { RetryUtils } from '../utils/retryUtils';
 import { ApiKeyManager } from './apiKeyManager';
@@ -35,7 +35,8 @@ export class CodestralService {
 
                 const payload: Record<string, unknown> = {
                     model: model,
-                    messages: [{ role: 'user', content: prompt }]
+                    messages: [{ role: 'user', content: prompt }],
+                    temperature: getConfiguredTemperature()
                 };
                 if (options?.maxTokens !== undefined) {
                     payload['max_tokens'] = options.maxTokens;

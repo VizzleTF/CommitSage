@@ -3,10 +3,16 @@
 <img alt="Visual Studio Marketplace Version" src="https://img.shields.io/visual-studio-marketplace/v/VizzleTF.geminicommit"> <img alt="Visual Studio Marketplace Last Updated" src="https://img.shields.io/visual-studio-marketplace/last-updated/VizzleTF.geminicommit"> <img alt="Visual Studio Marketplace Installs" src="https://img.shields.io/visual-studio-marketplace/i/VizzleTF.geminicommit"> <img alt="Visual Studio Marketplace Rating" src="https://img.shields.io/visual-studio-marketplace/stars/VizzleTF.geminicommit"> [![Ask DeepWiki](deepwiki.png)](https://deepwiki.com/VizzleTF/CommitSage)
 
 Commit Sage is a VSCode extension that automatically generates commit messages using various AI providers:
-- Gemini (default, requires API key, free)
-- OpenAI (requires API key or compatible provider)
-- Codestral (requires API key, free)
-- Ollama (local, free)
+- **Gemini** (default, requires API key, free tier)
+- **OpenRouter** (300+ models behind one key, free-tier models available)
+- **Groq** (fast inference, generous free tier)
+- **Anthropic Claude** (requires API key)
+- **OpenAI** (requires API key)
+- **DeepSeek** (works without VPN in restricted regions)
+- **xAI Grok** (requires API key)
+- **Codestral** (requires API key, free tier)
+- **Ollama** (local, free, no key)
+- **Custom OpenAI-compatible** — LM Studio, vLLM, llama.cpp, LocalAI, Together AI, Fireworks, any self-hosted endpoint
 
 ![Commit Sage in action](example.gif)
 
@@ -23,39 +29,52 @@ Commit Sage is a VSCode extension that automatically generates commit messages u
 
 ## Configuration
 
-Get your API key:
-   - For Gemini: Get it from [Google AI Studio](https://makersuite.google.com/app/apikey)
-   - For Codestral: [Mistral AI Console](https://console.mistral.ai/codestral)
-   - For custom endpoint: Use your OpenAI API key or other compatible service
+The fastest way is the **Commit Sage sidebar** (Activity Bar icon): pick a provider, paste an API key, and the model dropdown is populated live from each provider's `/models` endpoint.
+
+Where to get keys:
+- **Gemini** — [Google AI Studio](https://makersuite.google.com/app/apikey)
+- **OpenRouter** — [openrouter.ai/keys](https://openrouter.ai/keys) (one key → 300+ models)
+- **Groq** — [console.groq.com/keys](https://console.groq.com/keys)
+- **Anthropic** — [console.anthropic.com/settings/keys](https://console.anthropic.com/settings/keys)
+- **OpenAI** — [platform.openai.com/api-keys](https://platform.openai.com/api-keys)
+- **DeepSeek** — [platform.deepseek.com/api_keys](https://platform.deepseek.com/api_keys)
+- **xAI** — [console.x.ai](https://console.x.ai/)
+- **Codestral** — [Mistral AI Console](https://console.mistral.ai/codestral)
+- **Ollama** — no key needed (local)
+- **Custom** — depends on your endpoint; key is optional
 
 ### AI Provider Settings
 
 - **Provider Selection** (`commitSage.provider.type`):
-  - Choose between: `gemini`, `openai`, `codestral`, `ollama`
+  - Choose between: `gemini`, `openrouter`, `groq`, `anthropic`, `openai`, `deepseek`, `xai`, `codestral`, `ollama`, `custom`
   - Default: `gemini`
 
-- **Gemini Settings**:
-  - Model (`commitSage.gemini.model`):
-    - Default: `auto` (recommended) — see [Auto Mode](#auto-mode) below.
-    - Explicit options are also available; the canonical list lives in `package.json` (`commitSage.gemini.model.enum`) and is updated as Google ships new models.
-  - **Auto Mode** (`auto`):
-    - Automatically fetches the list of available Gemini models from the API
-    - Tries each model sequentially until one succeeds
-    - Useful when you don't want to manually update model names or when specific models are unavailable
-    - Provides maximum reliability by automatically switching to working models
+- **Gemini** — Model (`commitSage.gemini.model`): default `auto` (recommended). Auto mode fetches the live model list from the API and tries each sequentially until one succeeds — robust to model deprecations.
 
-- **OpenAI Settings**:
-  - Model (`commitSage.openai.model`): Default `gpt-3.5-turbo`
-  - Base URL (`commitSage.openai.baseUrl`): For custom endpoints/Azure
+- **OpenRouter** — Model (`commitSage.openrouter.model`): default `meta-llama/llama-3.3-70b-instruct:free`. Toggle `commitSage.openrouter.preferFreeModels` to filter the model picker to free models only (default `true`).
 
-- **Codestral Settings**:
-  - Model (`commitSage.codestral.model`):
-    - Options: `codestral-2405`, `codestral-latest`
-    - Default: `codestral-latest`
+- **Groq** — Model (`commitSage.groq.model`): default `llama-3.3-70b-versatile`. Free tier covers ~14 400 RPD on `llama-3.1-8b-instant`.
 
-- **Ollama Settings**:
-  - Base URL (`commitSage.ollama.baseUrl`): Default `http://localhost:11434`
-  - Model (`commitSage.ollama.model`): Default `llama3.2`
+- **Anthropic** — Model (`commitSage.anthropic.model`): default `claude-sonnet-4-5-20250929`. Anthropic has no public `/models` endpoint, so the dropdown is a curated static list — see [docs/providers.md](docs/providers.md) for current options.
+
+- **OpenAI** — Model (`commitSage.openai.model`) + Base URL (`commitSage.openai.baseUrl`, change only for Azure or another OpenAI-compatible deployment).
+
+- **DeepSeek** — Model (`commitSage.deepseek.model`): default `deepseek-chat`.
+
+- **xAI** — Model (`commitSage.xai.model`): default `grok-2-1212`.
+
+- **Codestral** — Model (`commitSage.codestral.model`): default `codestral-latest`.
+
+- **Ollama**:
+  - Base URL (`commitSage.ollama.baseUrl`): default `http://localhost:11434`
+  - Model (`commitSage.ollama.model`): default `llama3.2`
+  - Auth token (`commitSage.ollama.useAuthToken`): off by default; enable for hosted Ollama instances behind auth.
+
+- **Custom OpenAI-compatible**:
+  - Base URL (`commitSage.custom.baseUrl`): e.g. `http://localhost:1234/v1` (LM Studio), `http://localhost:8000/v1` (vLLM), `https://api.together.xyz/v1`
+  - Model (`commitSage.custom.model`): free-form ID your endpoint exposes
+  - Send API key (`commitSage.custom.useApiKey`): off by default; enable for endpoints that require auth
+  - Path (`commitSage.custom.chatCompletionsPath`): default `/chat/completions`
 
 ### Commit Settings
 
@@ -164,8 +183,8 @@ Settings are loaded in the following order (higher priority overrides lower):
 
 - VSCode 1.93.0 or higher
 - Git installed and configured
-- Internet connection (except for Ollama)
-- API key for OpenAI/Codestral (if using those providers)
+- Internet connection (except for Ollama and self-hosted Custom endpoints)
+- API key for the selected cloud provider (none for Ollama, optional for Custom)
 
 ## Documentation
 
@@ -201,19 +220,35 @@ For troubleshooting common problems, see [docs/troubleshooting.md](docs/troubles
 
 # Commit Sage (на русском)
 
-Commit Sage - расширение VSCode для автоматической генерации сообщений коммитов с использованием Gemini AI от Google, Codestral API или OpenAI API (OpenAI, Ollama, LocalAI и другие).
+Commit Sage — расширение VSCode для автоматической генерации commit-сообщений через AI-провайдеров: Gemini, OpenRouter, Groq, Anthropic Claude, OpenAI, DeepSeek, xAI Grok, Codestral, локальный Ollama или любой OpenAI-совместимый endpoint (LM Studio, vLLM, llama.cpp, Together, Fireworks).
+
+Для пользователей из РФ без VPN рабочие варианты: **DeepSeek**, **Ollama** локально, **Custom** (свой self-hosted endpoint).
 
 ## Установка
 
 1. Установите из [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=VizzleTF.commitsage)
-2. Получите API ключ:
-   - Для Gemini: [Google AI Studio](https://makersuite.google.com/app/apikey)
-   - Для Codestral: [Mistral AI Console](https://console.mistral.ai/codestral)
-   - Для других: Используйте ключ от OpenAI или другого совместимого сервиса
-3. Настройте ключ в VS Code:
-   - Откройте палитру команд (Ctrl+Shift+P / Cmd+Shift+P)
-   - Введите "Commit Sage: Set Gemini API Key", "Commit Sage: Set Codestral API Key" или "Commit Sage: Set Custom API Key"
-   - Введите ваш API ключ
+2. Откройте sidebar **Commit Sage** (иконка в Activity Bar) — там выбор провайдера, ввод ключа и live-список моделей в одном окне
+3. Альтернатива через палитру команд:
+   - `Commit Sage: Set Gemini API Key`
+   - `Commit Sage: Set OpenRouter API Key`
+   - `Commit Sage: Set Groq API Key`
+   - `Commit Sage: Set Anthropic API Key`
+   - `Commit Sage: Set DeepSeek API Key`
+   - `Commit Sage: Set xAI API Key`
+   - `Commit Sage: Set OpenAI API Key`
+   - `Commit Sage: Set Codestral API Key`
+   - `Commit Sage: Set Ollama Auth Token`
+   - `Commit Sage: Set Custom API Key`
+
+Где получить ключи:
+- Gemini → [Google AI Studio](https://makersuite.google.com/app/apikey)
+- OpenRouter → [openrouter.ai/keys](https://openrouter.ai/keys)
+- Groq → [console.groq.com/keys](https://console.groq.com/keys)
+- Anthropic → [console.anthropic.com/settings/keys](https://console.anthropic.com/settings/keys)
+- OpenAI → [platform.openai.com/api-keys](https://platform.openai.com/api-keys)
+- DeepSeek → [platform.deepseek.com/api_keys](https://platform.deepseek.com/api_keys)
+- xAI → [console.x.ai](https://console.x.ai/)
+- Codestral → [console.mistral.ai/codestral](https://console.mistral.ai/codestral)
 
 ## Использование
 

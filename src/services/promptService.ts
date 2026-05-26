@@ -11,6 +11,14 @@ const STRICT_FORMAT_REMINDER = `STRICT OUTPUT RULES — these override any tende
 - Body bullets MUST start with "- ", each ≤ 50 chars, max 5 bullets total.
 - Do not list every changed file; summarise.`;
 
+// The `detailed` format intentionally violates several of the strict rules
+// (multi-line subject, longer bullets, listing changed files). Use a softer
+// reminder that still suppresses preamble/explanation.
+const DETAILED_FORMAT_REMINDER = `STRICT OUTPUT RULES:
+- Output ONLY the commit message. No preamble, no explanation, no closing remark.
+- No markdown bold (**text**), no headings, no code fences.
+- Follow the Summary/Details/Effects template exactly.`;
+
 const LANGUAGE_PROMPTS: Record<Exclude<CommitLanguage, 'custom'>, string> = {
     english: 'Please write the commit message in English.',
     russian: 'Пожалуйста, напиши сообщение коммита на русском языке.',
@@ -60,6 +68,8 @@ Please provide ONLY the commit message, without any additional text or explanati
             languagePrompt = LANGUAGE_PROMPTS[lang] ?? LANGUAGE_PROMPTS.english;
         }
 
+        const reminder = format === 'detailed' ? DETAILED_FORMAT_REMINDER : STRICT_FORMAT_REMINDER;
+
         return `${template}
 
 ${languagePrompt}
@@ -70,7 +80,7 @@ ${diff}
 Git blame analysis:
 ${blameAnalysis}
 
-${STRICT_FORMAT_REMINDER}
+${reminder}
 
 Please provide ONLY the commit message, without any additional text or explanations.`;
     }

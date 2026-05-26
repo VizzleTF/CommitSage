@@ -6,13 +6,14 @@ import { emojiTemplate } from './formats/emoji';
 import { emojiKarmaTemplate } from './formats/emojiKarma';
 import { googleTemplate } from './formats/google';
 import { atomTemplate } from './formats/atom';
+import { detailedTemplate } from './formats/detailed';
 import { SUPPORTED_LANGUAGES } from '../utils/constants';
 import type { CommitLanguage } from '../utils/constants';
 import { Logger } from '../utils/logger';
 
 type CommitTemplate = Record<Exclude<CommitLanguage, 'custom'>, string>;
 
-export type CommitFormat = 'conventional' | 'angular' | 'karma' | 'semantic' | 'emoji' | 'emojiKarma' | 'google' | 'atom';
+export type CommitFormat = 'conventional' | 'angular' | 'karma' | 'semantic' | 'emoji' | 'emojiKarma' | 'google' | 'atom' | 'detailed';
 
 const templates: Record<CommitFormat, CommitTemplate> = {
     conventional: conventionalTemplate,
@@ -22,7 +23,8 @@ const templates: Record<CommitFormat, CommitTemplate> = {
     emoji: emojiTemplate,
     emojiKarma: emojiKarmaTemplate,
     google: googleTemplate,
-    atom: atomTemplate
+    atom: atomTemplate,
+    detailed: detailedTemplate
 } as const;
 
 const isValidFormat = (format: string): format is CommitFormat =>

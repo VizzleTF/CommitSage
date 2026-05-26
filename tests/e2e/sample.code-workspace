@@ -9,7 +9,7 @@
         "git.autoRepositoryDetection": false,
         "git.openRepositoryInParentFolders": "never",
         "commitSage.provider.type": "openai",
-        "commitSage.openai.baseUrl": "http://127.0.0.1:62402/v1",
+        "commitSage.openai.baseUrl": "http://127.0.0.1:59139/v1",
         "commitSage.telemetry.enabled": false,
         "commitSage.commit.autoCommit": true,
         "commitSage.commit.autoPush": true,

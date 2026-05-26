@@ -6,8 +6,11 @@ import { errorMessages } from '../utils/constants';
 import { removeThinkTags } from '../utils/textProcessing';
 import { AIServiceFactory, AIServiceType } from './aiServiceFactory';
 
-// ~100k chars covers most diffs while staying within safe LLM API context window limits
-const MAX_DIFF_LENGTH = 100000;
+// Fallback if `general.maxDiffSize` is unreadable. ~100k chars covers most
+// diffs while staying within safe LLM API context window limits for major
+// providers. Tighter caps (e.g. ~20k chars) are needed for low-TPM free
+// tiers like Groq free — see the setting's description for guidance.
+const DEFAULT_MAX_DIFF_LENGTH = 100000;
 
 interface GenerateContext {
     fileCount?: number;
@@ -29,8 +32,9 @@ export class AIService {
         const provider = ConfigService.getProvider();
         const model = ConfigService.getModel();
         const language = ConfigService.get('commit.commitLanguage');
+        const maxDiffLength = this.resolveMaxDiffLength();
         const diffSize = diff.length;
-        const truncated = diffSize > MAX_DIFF_LENGTH;
+        const truncated = diffSize > maxDiffLength;
 
         TelemetryService.sendEvent({
             name: 'message_generation_started',
@@ -42,7 +46,7 @@ export class AIService {
         });
 
         const startTime = Date.now();
-        const truncatedDiff = this.truncateDiff(diff);
+        const truncatedDiff = this.truncateDiff(diff, maxDiffLength);
         const prompt = await PromptService.generatePrompt(truncatedDiff, blameAnalysis, progress);
 
         progress.report({ message: 'Generating commit message...', increment: 50 });
@@ -69,9 +73,27 @@ export class AIService {
         return result;
     }
 
-    private static truncateDiff(diff: string): string {
-        return diff.length > MAX_DIFF_LENGTH
-            ? `${diff.substring(0, MAX_DIFF_LENGTH)}\n...(truncated)`
+    private static truncateDiff(diff: string, maxDiffLength: number): string {
+        return diff.length > maxDiffLength
+            ? `${diff.substring(0, maxDiffLength)}\n...(truncated)`
             : diff;
+    }
+
+    /**
+     * Read `general.maxDiffSize` and clamp to a sane range. `-1` disables
+     * truncation (sends the whole diff regardless of size — only useful with
+     * very-long-context models). Anything else is clamped to [1000, 1_000_000]
+     * so a hand-edited project config can't either send an empty prompt or
+     * overflow JSON.stringify.
+     */
+    private static resolveMaxDiffLength(): number {
+        const raw = ConfigService.get('general.maxDiffSize');
+        if (raw === -1) {
+            return Number.POSITIVE_INFINITY;
+        }
+        if (typeof raw !== 'number' || !Number.isFinite(raw) || raw <= 0) {
+            return DEFAULT_MAX_DIFF_LENGTH;
+        }
+        return Math.max(1000, Math.min(1_000_000, raw));
     }
 }

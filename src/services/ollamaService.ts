@@ -2,7 +2,7 @@ import { Logger } from '../utils/logger';
 import { CommitMessage, ProgressReporter, GenerateOptions } from '../models/types';
 import { ConfigService } from '../utils/configService';
 import { ApiKeyInvalidError } from '../models/errors';
-import { extractAndValidateMessage, handleHttpError } from './baseAIService';
+import { extractAndValidateMessage, getConfiguredTemperature, handleHttpError } from './baseAIService';
 import { HttpError, HttpUtils, NetworkError } from '../utils/httpUtils';
 import { RetryUtils } from '../utils/retryUtils';
 import { toError } from '../utils/errorUtils';
@@ -32,10 +32,19 @@ export class OllamaService {
             ],
             stream: false
         };
-        if (options?.maxTokens !== undefined) {
-            // eslint-disable-next-line @typescript-eslint/naming-convention
-            payload['options'] = { num_predict: options.maxTokens };
+        // Ollama nests sampling parameters under `options`. We always send
+        // `temperature`; `num_ctx` and `num_predict` are conditional so
+        // Ollama keeps its own per-model defaults when the user hasn't
+        // overridden them.
+        const ollamaOptions: Record<string, unknown> = { temperature: getConfiguredTemperature() };
+        const numCtx = ConfigService.get('ollama.numCtx');
+        if (typeof numCtx === 'number' && numCtx > 0) {
+            ollamaOptions['num_ctx'] = numCtx;
         }
+        if (options?.maxTokens !== undefined) {
+            ollamaOptions['num_predict'] = options.maxTokens;
+        }
+        payload['options'] = ollamaOptions;
 
         try {
             Logger.log(`Attempt ${attempt}: Sending request to Ollama API`);

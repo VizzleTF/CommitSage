@@ -54,6 +54,34 @@ export interface ProjectConfig {
     ollama?: {
         baseUrl?: string;
         model?: string;
+        useAuthToken?: boolean;
+        numCtx?: number;
+    };
+    openrouter?: {
+        model?: string;
+        preferFreeModels?: boolean;
+    };
+    groq?: {
+        model?: string;
+    };
+    anthropic?: {
+        model?: string;
+    };
+    deepseek?: {
+        model?: string;
+    };
+    xai?: {
+        model?: string;
+    };
+    custom?: {
+        baseUrl?: string;
+        model?: string;
+        useApiKey?: boolean;
+        chatCompletionsPath?: string;
+    };
+    general?: {
+        maxDiffSize?: number;
+        temperature?: number;
     };
     telemetry?: {
         enabled?: boolean;

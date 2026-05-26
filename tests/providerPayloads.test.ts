@@ -32,6 +32,18 @@ const SETTINGS: Record<string, string | number | boolean> = {
     'ollama.model': 'llama3.2',
     'ollama.baseUrl': 'http://localhost:11434',
     'gemini.model': 'gemini-2.5-flash',
+    'openrouter.model': 'meta-llama/llama-3.3-70b-instruct:free',
+    'openrouter.preferFreeModels': false,
+    'groq.model': 'llama-3.3-70b-versatile',
+    'anthropic.model': 'claude-sonnet-4-5-20250929',
+    'deepseek.model': 'deepseek-chat',
+    'xai.model': 'grok-3-mini',
+    'custom.baseUrl': 'http://localhost:1234/v1',
+    'custom.model': 'qwen2.5-coder',
+    'custom.useApiKey': false,
+    'custom.chatCompletionsPath': '/chat/completions',
+    'general.temperature': 0.7,
+    'ollama.numCtx': 0,
     'apiRequestTimeout': 30,
     'general.maxRetries': 3,
 };
@@ -131,7 +143,7 @@ describe('CodestralService payload', () => {
 });
 
 describe('OllamaService payload', () => {
-    it('targets /api/chat with stream=false', async () => {
+    it('targets /api/chat with stream=false and default temperature in options', async () => {
         const { OllamaService } = await import('../src/services/ollamaService');
 
         mockedPostJson.mockResolvedValueOnce({
@@ -144,8 +156,12 @@ describe('OllamaService payload', () => {
         expect(payload).toMatchObject({
             model: 'llama3.2',
             stream: false,
+            options: { temperature: 0.7 },
         });
-        expect(payload).not.toHaveProperty('options');
+        // num_ctx omitted when general default (0)
+        expect((payload as { options: Record<string, unknown> }).options).not.toHaveProperty('num_ctx');
+        // num_predict omitted when no maxTokens passed
+        expect((payload as { options: Record<string, unknown> }).options).not.toHaveProperty('num_predict');
     });
 
     it('forwards maxTokens as options.num_predict when provided (F009)', async () => {
@@ -160,8 +176,25 @@ describe('OllamaService payload', () => {
         });
         const [, payload] = mockedPostJson.mock.calls[0];
         expect(payload).toMatchObject({
-            options: { num_predict: 4096 },
+            options: { num_predict: 4096, temperature: 0.7 },
         });
+    });
+
+    it('forwards ollama.numCtx as options.num_ctx when > 0', async () => {
+        SETTINGS['ollama.numCtx'] = 16384;
+        const { OllamaService } = await import('../src/services/ollamaService');
+
+        mockedPostJson.mockResolvedValueOnce({
+            message: { content: 'ok' },
+        });
+
+        await OllamaService.generateCommitMessage('hi', progress, 1);
+        const [, payload] = mockedPostJson.mock.calls[0];
+        expect(payload).toMatchObject({
+            options: { num_ctx: 16384, temperature: 0.7 },
+        });
+
+        SETTINGS['ollama.numCtx'] = 0;
     });
 
     it('throws ApiKeyInvalidError on HTTP 401 (F037)', async () => {
@@ -256,5 +289,208 @@ describe('AbortSignal propagation (F004)', () => {
 
         const [, , opts] = mockedPostJson.mock.calls[0];
         expect((opts as { signal?: AbortSignal }).signal).toBe(ctrl.signal);
+    });
+});
+
+describe('GroqService payload', () => {
+    it('targets Groq chat completions URL with Bearer auth', async () => {
+        const { GroqService } = await import('../src/services/groqService');
+
+        mockedPostJson.mockResolvedValueOnce({
+            choices: [{ message: { content: 'feat: ok' } }],
+        });
+
+        await GroqService.generateCommitMessage('hello', progress, 1);
+
+        const [url, payload, opts] = mockedPostJson.mock.calls[0];
+        expect(url).toBe('https://api.groq.com/openai/v1/chat/completions');
+        expect(payload).toMatchObject({
+            model: 'llama-3.3-70b-versatile',
+            messages: [{ role: 'user', content: 'hello' }],
+            max_tokens: 1024,
+        });
+        const headers = (opts as { headers: Record<string, string> }).headers;
+        expect(headers['Authorization']).toBe('Bearer test-key');
+    });
+});
+
+describe('OpenRouterService payload', () => {
+    it('targets OpenRouter URL with attribution headers and Bearer auth', async () => {
+        const { OpenRouterService } = await import('../src/services/openRouterService');
+
+        mockedPostJson.mockResolvedValueOnce({
+            choices: [{ message: { content: 'feat: ok' } }],
+        });
+
+        await OpenRouterService.generateCommitMessage('hello', progress, 1);
+
+        const [url, payload, opts] = mockedPostJson.mock.calls[0];
+        expect(url).toBe('https://openrouter.ai/api/v1/chat/completions');
+        expect(payload).toMatchObject({
+            model: 'meta-llama/llama-3.3-70b-instruct:free',
+        });
+        const headers = (opts as { headers: Record<string, string> }).headers;
+        expect(headers['Authorization']).toBe('Bearer test-key');
+        expect(headers['HTTP-Referer']).toBe('https://github.com/VizzleTF/CommitSage');
+        expect(headers['X-Title']).toBe('Commit Sage');
+    });
+});
+
+describe('DeepSeekService payload', () => {
+    it('targets DeepSeek chat completions URL', async () => {
+        const { DeepSeekService } = await import('../src/services/deepSeekService');
+
+        mockedPostJson.mockResolvedValueOnce({
+            choices: [{ message: { content: 'feat: ok' } }],
+        });
+
+        await DeepSeekService.generateCommitMessage('hello', progress, 1);
+
+        const [url, payload] = mockedPostJson.mock.calls[0];
+        expect(url).toBe('https://api.deepseek.com/chat/completions');
+        expect(payload).toMatchObject({ model: 'deepseek-chat' });
+    });
+});
+
+describe('XaiService payload', () => {
+    it('targets xAI chat completions URL', async () => {
+        const { XaiService } = await import('../src/services/xaiService');
+
+        mockedPostJson.mockResolvedValueOnce({
+            choices: [{ message: { content: 'feat: ok' } }],
+        });
+
+        await XaiService.generateCommitMessage('hello', progress, 1);
+
+        const [url, payload] = mockedPostJson.mock.calls[0];
+        expect(url).toBe('https://api.x.ai/v1/chat/completions');
+        expect(payload).toMatchObject({ model: 'grok-3-mini' });
+    });
+});
+
+describe('fetchXaiModels fallback', () => {
+    it('falls back to static list on HTTP 403 (team without credits)', async () => {
+        const { fetchXaiModels } = await import('../src/services/modelLists');
+        const { HttpError } = await import('../src/utils/httpUtils');
+
+        mockedGetJson.mockRejectedValueOnce(
+            new HttpError(403, { error: "Your newly created team doesn't have any credits or licenses yet." }),
+        );
+
+        const models = await fetchXaiModels('test-key');
+        expect(models.length).toBeGreaterThan(0);
+        expect(models).toContain('grok-3-mini');
+    });
+
+    it('returns live list when /v1/models succeeds', async () => {
+        const { fetchXaiModels } = await import('../src/services/modelLists');
+
+        mockedGetJson.mockResolvedValueOnce({
+            data: [{ id: 'grok-future-1' }, { id: 'grok-future-2' }],
+        });
+
+        const models = await fetchXaiModels('test-key');
+        expect(models).toEqual(['grok-future-1', 'grok-future-2']);
+    });
+});
+
+describe('AnthropicService payload', () => {
+    it('targets /v1/messages with x-api-key, anthropic-version, no Authorization', async () => {
+        const { AnthropicService } = await import('../src/services/anthropicService');
+
+        mockedPostJson.mockResolvedValueOnce({
+            content: [{ type: 'text', text: 'feat: ok' }],
+        });
+
+        await AnthropicService.generateCommitMessage('hello', progress, 1);
+
+        const [url, payload, opts] = mockedPostJson.mock.calls[0];
+        expect(url).toBe('https://api.anthropic.com/v1/messages');
+        expect(payload).toMatchObject({
+            model: 'claude-sonnet-4-5-20250929',
+            max_tokens: 1024,
+            messages: [{ role: 'user', content: 'hello' }],
+        });
+        const headers = (opts as { headers: Record<string, string> }).headers;
+        expect(headers['x-api-key']).toBe('test-key');
+        expect(headers['anthropic-version']).toBe('2023-06-01');
+        expect(headers['Authorization']).toBeUndefined();
+    });
+
+    it('extracts text from content[0].text', async () => {
+        const { AnthropicService } = await import('../src/services/anthropicService');
+
+        mockedPostJson.mockResolvedValueOnce({
+            content: [{ type: 'text', text: 'fix: bug squashed' }],
+        });
+
+        const result = await AnthropicService.generateCommitMessage('hi', progress, 1);
+        expect(result.message).toBe('fix: bug squashed');
+        expect(result.model).toBe('claude-sonnet-4-5-20250929');
+    });
+
+    it('throws ApiKeyInvalidError on HTTP 401', async () => {
+        const { AnthropicService } = await import('../src/services/anthropicService');
+        const { ApiKeyInvalidError } = await import('../src/models/errors');
+        const { HttpError } = await import('../src/utils/httpUtils');
+
+        mockedPostJson.mockRejectedValueOnce(new HttpError(401, {}));
+
+        await expect(
+            AnthropicService.generateCommitMessage('hi', progress, 1)
+        ).rejects.toBeInstanceOf(ApiKeyInvalidError);
+    });
+});
+
+describe('CustomOpenAIService payload', () => {
+    it('omits Authorization header when custom.useApiKey is false', async () => {
+        SETTINGS['custom.useApiKey'] = false;
+        const { CustomOpenAIService } = await import('../src/services/customOpenAIService');
+
+        mockedPostJson.mockResolvedValueOnce({
+            choices: [{ message: { content: 'feat: ok' } }],
+        });
+
+        await CustomOpenAIService.generateCommitMessage('hello', progress, 1);
+
+        const [url, payload, opts] = mockedPostJson.mock.calls[0];
+        expect(url).toBe('http://localhost:1234/v1/chat/completions');
+        expect(payload).toMatchObject({ model: 'qwen2.5-coder' });
+        const headers = (opts as { headers: Record<string, string> }).headers;
+        expect(headers['Authorization']).toBeUndefined();
+    });
+
+    it('sends Bearer auth when custom.useApiKey is true', async () => {
+        SETTINGS['custom.useApiKey'] = true;
+        const { CustomOpenAIService } = await import('../src/services/customOpenAIService');
+
+        mockedPostJson.mockResolvedValueOnce({
+            choices: [{ message: { content: 'feat: ok' } }],
+        });
+
+        await CustomOpenAIService.generateCommitMessage('hello', progress, 1);
+
+        const [, , opts] = mockedPostJson.mock.calls[0];
+        const headers = (opts as { headers: Record<string, string> }).headers;
+        expect(headers['Authorization']).toBe('Bearer test-key');
+
+        // restore for subsequent tests
+        SETTINGS['custom.useApiKey'] = false;
+    });
+
+    it('honors custom.chatCompletionsPath override', async () => {
+        SETTINGS['custom.chatCompletionsPath'] = '/v1/completions';
+        const { CustomOpenAIService } = await import('../src/services/customOpenAIService');
+
+        mockedPostJson.mockResolvedValueOnce({
+            choices: [{ message: { content: 'ok' } }],
+        });
+
+        await CustomOpenAIService.generateCommitMessage('hi', progress, 1);
+
+        const [url] = mockedPostJson.mock.calls[0];
+        expect(url).toBe('http://localhost:1234/v1/v1/completions');
+
+        SETTINGS['custom.chatCompletionsPath'] = '/chat/completions';
     });
 });

@@ -12,6 +12,7 @@ docs/**
 .commitsage/**
 TECH_DEBT_AUDIT.md
 VSCODE_API_AUDIT.md
+new providers.md
 
 # Configuration files
 .gitignore

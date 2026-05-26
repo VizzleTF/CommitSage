@@ -41,6 +41,19 @@ export const SETTING_DEFAULTS = {
     'ollama.useAuthToken': false,
     'openai.model': 'gpt-3.5-turbo',
     'openai.baseUrl': 'https://api.openai.com/v1',
+    'openrouter.model': 'meta-llama/llama-3.3-70b-instruct:free',
+    'openrouter.preferFreeModels': false,
+    'groq.model': 'llama-3.3-70b-versatile',
+    'anthropic.model': 'claude-sonnet-4-5-20250929',
+    'deepseek.model': 'deepseek-chat',
+    'xai.model': 'grok-3-mini',
+    'custom.baseUrl': 'http://localhost:1234/v1',
+    'custom.model': '',
+    'custom.useApiKey': false,
+    'custom.chatCompletionsPath': '/chat/completions',
+    'general.maxDiffSize': 100000,
+    'general.temperature': 0.7,
+    'ollama.numCtx': 0,
     'apiRequestTimeout': 30,
     'gitTimeout': 120,
     'telemetry.enabled': true,
@@ -431,7 +444,11 @@ export class ConfigService {
 
   static getProvider(): string {
     const provider = this.get('provider.type');
-    if (!['gemini', 'openai', 'codestral', 'ollama'].includes(provider)) {
+    if (
+      !['gemini', 'openai', 'codestral', 'ollama', 'openrouter', 'groq', 'anthropic', 'deepseek', 'xai', 'custom'].includes(
+        provider,
+      )
+    ) {
       Logger.warn(
         `Invalid provider type: ${provider}, falling back to gemini`,
       );
@@ -458,6 +475,18 @@ export class ConfigService {
         return this.get('codestral.model');
       case 'ollama':
         return this.get('ollama.model');
+      case 'openrouter':
+        return this.get('openrouter.model');
+      case 'groq':
+        return this.get('groq.model');
+      case 'anthropic':
+        return this.get('anthropic.model');
+      case 'deepseek':
+        return this.get('deepseek.model');
+      case 'xai':
+        return this.get('xai.model');
+      case 'custom':
+        return this.get('custom.model');
     }
     return 'unknown';
   }
