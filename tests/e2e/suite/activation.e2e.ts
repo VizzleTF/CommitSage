@@ -13,6 +13,11 @@ const EXPECTED_COMMANDS = [
     'commitsage.setOllamaAuthToken',
     'commitsage.removeOllamaAuthToken',
     'commitsage.createProjectConfig',
+    'commitsage.selectGeminiModel',
+];
+
+const EXPECTED_VIEW_COMMANDS = [
+    'commitsage.settings.focus',
 ];
 
 describe('Activation', () => {
@@ -30,6 +35,13 @@ describe('Activation', () => {
         const registered = new Set(await vscode.commands.getCommands(true));
         for (const cmd of EXPECTED_COMMANDS) {
             assert.ok(registered.has(cmd), `command ${cmd} is not registered`);
+        }
+    });
+
+    it('webview view is contributed', async () => {
+        const registered = new Set(await vscode.commands.getCommands(true));
+        for (const cmd of EXPECTED_VIEW_COMMANDS) {
+            assert.ok(registered.has(cmd), `view focus command ${cmd} is not registered`);
         }
     });
 

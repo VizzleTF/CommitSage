@@ -10,6 +10,8 @@
   "command.setOllamaAuthToken.title": "Set Ollama Auth Token",
   "command.removeOllamaAuthToken.title": "Remove Ollama Auth Token",
   "command.createProjectConfig.title": "Create Project Config (.commitsage)",
+  "command.selectGeminiModel.title": "Select Gemini Model",
+  "view.settings.title": "Settings",
   "walkthrough.title": "Get started with Commit Sage",
   "walkthrough.description": "Pick a provider, set your API key, and generate your first AI-written commit message.",
   "walkthrough.step.pickProvider.title": "Pick an AI provider",

@@ -70,7 +70,7 @@ function sortGeminiModelsByQuality(models: string[]): string[] {
 }
 
 export class GeminiService {
-    private static async getAvailableModels(apiKey: string, signal?: AbortSignal): Promise<string[]> {
+    static async getAvailableModels(apiKey: string, signal?: AbortSignal): Promise<string[]> {
         try {
             const data = await HttpUtils.getJson<GeminiModelsResponse>(
                 'https://generativelanguage.googleapis.com/v1/models',

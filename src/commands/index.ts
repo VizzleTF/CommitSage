@@ -2,6 +2,7 @@ import * as vscode from 'vscode';
 import { registerGenerateCommitMessageCommand } from './generateCommitMessage';
 import { registerSetApiKeyCommands } from './setApiKeys';
 import { createProjectConfig } from './createProjectConfig';
+import { registerSelectGeminiModelCommand } from './selectGeminiModel';
 import { Logger } from '../utils/logger';
 import { toError } from '../utils/errorUtils';
 
@@ -12,6 +13,7 @@ export function registerCommands(context: vscode.ExtensionContext): void {
         const disposables = [
             registerGenerateCommitMessageCommand(context),
             ...registerSetApiKeyCommands(context),
+            registerSelectGeminiModelCommand(context),
             vscode.commands.registerCommand('commitsage.createProjectConfig', createProjectConfig)
         ];
 

@@ -38,7 +38,7 @@ const esbuildProblemMatcherPlugin = {
     },
 };
 
-const buildOptions = {
+const extensionBuildOptions = {
     entryPoints: ['src/extension.ts'],
     bundle: true,
     outfile: 'dist/extension.js',
@@ -57,10 +57,30 @@ const buildOptions = {
     },
 };
 
+// Webview script ships to the browser-like webview frame; it must NOT pull in
+// the Node `vscode` module. The webview talks to the extension only via
+// `acquireVsCodeApi()` provided at runtime by the host.
+const webviewBuildOptions = {
+    entryPoints: ['src/views/webview/main.ts'],
+    bundle: true,
+    outfile: 'dist/webview/main.js',
+    platform: 'browser',
+    format: 'iife',
+    target: 'es2020',
+    sourcemap: !production,
+    sourcesContent: false,
+    minify: production,
+    logLevel: 'info',
+    plugins: [esbuildProblemMatcherPlugin],
+};
+
 async function main() {
     if (watch) {
-        const ctx = await esbuild.context(buildOptions);
-        await ctx.watch();
+        const [extCtx, webCtx] = await Promise.all([
+            esbuild.context(extensionBuildOptions),
+            esbuild.context(webviewBuildOptions),
+        ]);
+        await Promise.all([extCtx.watch(), webCtx.watch()]);
         console.log('[esbuild] watching for changes…');
         return;
     }
@@ -68,17 +88,24 @@ async function main() {
     // Production builds emit no sourcemap; remove any leftover `.map` from a
     // prior dev build so it doesn't get bundled into the vsix.
     if (production) {
-        const stale = path.join('dist', 'extension.js.map');
-        if (fs.existsSync(stale)) {
-            fs.unlinkSync(stale);
+        for (const stale of [
+            path.join('dist', 'extension.js.map'),
+            path.join('dist', 'webview', 'main.js.map'),
+        ]) {
+            if (fs.existsSync(stale)) {
+                fs.unlinkSync(stale);
+            }
         }
     }
 
-    const result = await esbuild.build(buildOptions);
+    const [extResult] = await Promise.all([
+        esbuild.build(extensionBuildOptions),
+        esbuild.build(webviewBuildOptions),
+    ]);
 
-    if (analyze && result.metafile) {
+    if (analyze && extResult.metafile) {
         const metaPath = path.join('dist', 'meta.json');
-        fs.writeFileSync(metaPath, JSON.stringify(result.metafile));
+        fs.writeFileSync(metaPath, JSON.stringify(extResult.metafile));
         console.log(`[esbuild] metafile written to ${metaPath}`);
         console.log('[esbuild] analyze at https://esbuild.github.io/analyze/');
     }

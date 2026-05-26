@@ -107,8 +107,31 @@
         "command": "commitsage.createProjectConfig",
         "title": "%command.createProjectConfig.title%",
         "category": "%command.category%"
+      },
+      {
+        "command": "commitsage.selectGeminiModel",
+        "title": "%command.selectGeminiModel.title%",
+        "category": "%command.category%"
       }
     ],
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "commitsage",
+          "title": "Commit Sage",
+          "icon": "icons/sidebar.svg"
+        }
+      ]
+    },
+    "views": {
+      "commitsage": [
+        {
+          "type": "webview",
+          "id": "commitsage.settings",
+          "name": "%view.settings.title%"
+        }
+      ]
+    },
     "menus": {
       "scm/title": [
         {
@@ -246,7 +269,8 @@
             "emoji",
             "emojiKarma",
             "google",
-            "atom"
+            "atom",
+            "custom"
           ],
           "enumDescriptions": [
             "type(scope): description\n\nbody\n\nfooter",
@@ -256,10 +280,11 @@
             ":emoji: message",
             ":emoji: type(scope): message",
             "Type: Description\n\nBody\n\nFooter",
-            "type(scope): subject\n\nbody\n\nfooter"
+            "type(scope): subject\n\nbody\n\nfooter",
+            "Use the text in 'Custom Instructions' verbatim instead of a built-in template."
           ],
           "default": "conventional",
-          "markdownDescription": "Format style for commit messages. All formats support English; some may have limited support for other languages.",
+          "markdownDescription": "Format style for commit messages. Pick `custom` to use the free-form text from `#commitSage.commit.customInstructions#` as the entire prompt template (auto-enables `#commitSage.commit.useCustomInstructions#` when selected via the [Commit Sage sidebar](command:commitsage.settings.focus)).",
           "order": 4
         },
         "commitSage.commit.useCustomInstructions": {
@@ -301,34 +326,20 @@
         },
         "commitSage.gemini.model": {
           "type": "string",
-          "enum": [
-            "auto",
-            "gemini-3.1-flash-lite-preview",
-            "gemini-3-flash-preview",
-            "gemini-3-pro-preview",
-            "gemini-3.1-pro-preview",
-            "gemini-2.5-pro",
-            "gemini-2.5-flash",
-            "gemini-2.5-flash-lite"
-          ],
           "default": "auto",
-          "markdownDescription": "Select Gemini model for commit message generation. Use `auto` to automatically try all available models until success. Only used when Gemini provider is selected.",
+          "markdownDescription": "Gemini model for commit message generation. The canonical UI is the [Commit Sage sidebar](command:commitsage.settings.focus): it fetches Google's live model list and updates this setting on selection. Use `auto` to try all available models and prefer the best quality. Only used when Gemini provider is selected.",
           "order": 11
         },
         "commitSage.codestral.model": {
           "type": "string",
-          "enum": [
-            "codestral-2405",
-            "codestral-latest"
-          ],
           "default": "codestral-latest",
-          "description": "Select Codestral model for commit message generation. Only used when Codestral provider is selected",
+          "markdownDescription": "Codestral model for commit message generation. The canonical UI is the [Commit Sage sidebar](command:commitsage.settings.focus) — it fetches Mistral's live model list and updates this setting on selection. Only used when Codestral provider is selected.",
           "order": 12
         },
         "commitSage.openai.model": {
           "type": "string",
           "default": "gpt-3.5-turbo",
-          "description": "Select OpenAI model for commit message generation. Only used when OpenAI provider is selected",
+          "markdownDescription": "OpenAI model for commit message generation. The canonical UI is the [Commit Sage sidebar](command:commitsage.settings.focus) — it fetches OpenAI's live model list (filtered to chat-capable families) and updates this setting on selection. Only used when OpenAI provider is selected.",
           "order": 13
         },
         "commitSage.openai.baseUrl": {
@@ -346,7 +357,7 @@
         "commitSage.ollama.model": {
           "type": "string",
           "default": "llama3.2",
-          "description": "Model name for Ollama. Make sure the model is installed locally. Only used when Ollama provider is selected",
+          "markdownDescription": "Ollama model name. The canonical UI is the [Commit Sage sidebar](command:commitsage.settings.focus) — it fetches the live list from `/api/tags`. Make sure the model is installed locally. Only used when Ollama provider is selected.",
           "order": 16
         },
         "commitSage.ollama.useAuthToken": {

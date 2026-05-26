@@ -7,6 +7,8 @@ import { TelemetryService } from './services/telemetryService';
 import { registerCommands } from './commands';
 import { ApiKeyManager } from './services/apiKeyManager';
 import { toError } from './utils/errorUtils';
+import { validateGeminiModelOnStartup } from './services/geminiModelValidator';
+import { SettingsWebviewProvider } from './views/settingsWebviewProvider';
 
 export async function activate(context: vscode.ExtensionContext): Promise<void> {
     Logger.log('Starting extension activation');
@@ -27,6 +29,13 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 
     registerCommands(context);
 
+    context.subscriptions.push(
+        vscode.window.registerWebviewViewProvider(
+            SettingsWebviewProvider.viewId,
+            new SettingsWebviewProvider(context),
+        ),
+    );
+
     void SettingsValidator.validateAllSettings();
     // Re-validate the project config whenever .commitsage/config.json is
     // created/changed/deleted, otherwise an invalid mid-session edit silently
@@ -38,6 +47,8 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     );
     TelemetryService.sendEvent({ name: 'extension_activated' });
     Logger.log('Extension activated successfully');
+
+    void validateGeminiModelOnStartup();
 }
 
 export async function deactivate(): Promise<void> {
