@@ -1,8 +1,8 @@
 {
   "name": "geminicommit",
   "displayName": "Commit Sage",
-  "description": "Free AI commit messages using Gemini, Codestral, Ollama, or custom LLM",
-  "version": "2.6.0",
+  "description": "Free AI commit messages using Gemini, OpenRouter, Groq, Claude, DeepSeek, xAI, Ollama, or any OpenAI-compatible LLM",
+  "version": "3.0.0",
   "publisher": "VizzleTF",
   "repository": {
     "type": "git",
@@ -104,6 +104,66 @@
         "category": "%command.category%"
       },
       {
+        "command": "commitsage.setOpenRouterApiKey",
+        "title": "%command.setOpenRouterApiKey.title%",
+        "category": "%command.category%"
+      },
+      {
+        "command": "commitsage.removeOpenRouterApiKey",
+        "title": "%command.removeOpenRouterApiKey.title%",
+        "category": "%command.category%"
+      },
+      {
+        "command": "commitsage.setGroqApiKey",
+        "title": "%command.setGroqApiKey.title%",
+        "category": "%command.category%"
+      },
+      {
+        "command": "commitsage.removeGroqApiKey",
+        "title": "%command.removeGroqApiKey.title%",
+        "category": "%command.category%"
+      },
+      {
+        "command": "commitsage.setAnthropicApiKey",
+        "title": "%command.setAnthropicApiKey.title%",
+        "category": "%command.category%"
+      },
+      {
+        "command": "commitsage.removeAnthropicApiKey",
+        "title": "%command.removeAnthropicApiKey.title%",
+        "category": "%command.category%"
+      },
+      {
+        "command": "commitsage.setDeepSeekApiKey",
+        "title": "%command.setDeepSeekApiKey.title%",
+        "category": "%command.category%"
+      },
+      {
+        "command": "commitsage.removeDeepSeekApiKey",
+        "title": "%command.removeDeepSeekApiKey.title%",
+        "category": "%command.category%"
+      },
+      {
+        "command": "commitsage.setXaiApiKey",
+        "title": "%command.setXaiApiKey.title%",
+        "category": "%command.category%"
+      },
+      {
+        "command": "commitsage.removeXaiApiKey",
+        "title": "%command.removeXaiApiKey.title%",
+        "category": "%command.category%"
+      },
+      {
+        "command": "commitsage.setCustomApiKey",
+        "title": "%command.setCustomApiKey.title%",
+        "category": "%command.category%"
+      },
+      {
+        "command": "commitsage.removeCustomApiKey",
+        "title": "%command.removeCustomApiKey.title%",
+        "category": "%command.category%"
+      },
+      {
         "command": "commitsage.createProjectConfig",
         "title": "%command.createProjectConfig.title%",
         "category": "%command.category%"
@@ -191,7 +251,13 @@
               "onCommand:commitsage.setApiKey",
               "onCommand:commitsage.setOpenAIApiKey",
               "onCommand:commitsage.setCodestralApiKey",
-              "onCommand:commitsage.setOllamaAuthToken"
+              "onCommand:commitsage.setOllamaAuthToken",
+              "onCommand:commitsage.setOpenRouterApiKey",
+              "onCommand:commitsage.setGroqApiKey",
+              "onCommand:commitsage.setAnthropicApiKey",
+              "onCommand:commitsage.setDeepSeekApiKey",
+              "onCommand:commitsage.setXaiApiKey",
+              "onCommand:commitsage.setCustomApiKey"
             ]
           },
           {
@@ -217,7 +283,25 @@
             "gemini",
             "codestral",
             "openai",
-            "ollama"
+            "ollama",
+            "openrouter",
+            "groq",
+            "anthropic",
+            "deepseek",
+            "xai",
+            "custom"
+          ],
+          "enumDescriptions": [
+            "Google Gemini (free tier via AI Studio)",
+            "Mistral Codestral (free tier)",
+            "OpenAI GPT models",
+            "Ollama (local, self-hosted)",
+            "OpenRouter (300+ models via single API key, includes free models)",
+            "Groq (fast inference, generous free tier)",
+            "Anthropic Claude",
+            "DeepSeek (works without VPN in restricted regions)",
+            "xAI Grok",
+            "Custom OpenAI-compatible endpoint (LM Studio, vLLM, llama.cpp, Together, Fireworks, etc.)"
           ],
           "default": "gemini",
           "description": "Select the AI provider for commit message generation",
@@ -270,6 +354,7 @@
             "emojiKarma",
             "google",
             "atom",
+            "detailed",
             "custom"
           ],
           "enumDescriptions": [
@@ -281,6 +366,7 @@
             ":emoji: type(scope): message",
             "Type: Description\n\nBody\n\nFooter",
             "type(scope): subject\n\nbody\n\nfooter",
+            "Summary: ...\n\nDetails:\n- ...\n\nEffects:\n- ...",
             "Use the text in 'Custom Instructions' verbatim instead of a built-in template."
           ],
           "default": "conventional",
@@ -366,23 +452,103 @@
           "description": "Enable authentication token for Ollama API. Enable this if your Ollama instance requires an auth token",
           "order": 17
         },
+        "commitSage.ollama.numCtx": {
+          "type": "number",
+          "default": 0,
+          "markdownDescription": "Context window length passed to Ollama as `options.num_ctx`. **`0` (default) leaves the per-model Ollama default in place** — set explicitly only if your model's default is too small for your diffs (e.g. `8192`, `16384`, `32768`). Larger values use more RAM/VRAM.",
+          "order": 17
+        },
+        "commitSage.openrouter.model": {
+          "type": "string",
+          "default": "meta-llama/llama-3.3-70b-instruct:free",
+          "markdownDescription": "OpenRouter model ID (e.g. `meta-llama/llama-3.3-70b-instruct:free`, `anthropic/claude-haiku-4-5`, `deepseek/deepseek-chat`). The canonical UI is the [Commit Sage sidebar](command:commitsage.settings.focus) — it fetches OpenRouter's live model list. Only used when OpenRouter provider is selected.",
+          "order": 30
+        },
+        "commitSage.openrouter.preferFreeModels": {
+          "type": "boolean",
+          "default": false,
+          "markdownDescription": "Filter the OpenRouter model picker to free models only (models with `:free` suffix or zero pricing). Default: show all 300+ models (free + paid). Enable to narrow the picker to free-tier only.",
+          "order": 31
+        },
+        "commitSage.groq.model": {
+          "type": "string",
+          "default": "llama-3.3-70b-versatile",
+          "markdownDescription": "Groq model ID (e.g. `llama-3.3-70b-versatile`, `llama-3.1-8b-instant`, `mixtral-8x7b-32768`). The canonical UI is the [Commit Sage sidebar](command:commitsage.settings.focus) — it fetches Groq's live model list. Only used when Groq provider is selected.",
+          "order": 32
+        },
+        "commitSage.anthropic.model": {
+          "type": "string",
+          "default": "claude-sonnet-4-5-20250929",
+          "markdownDescription": "Anthropic model ID (e.g. `claude-sonnet-4-5-20250929`, `claude-haiku-4-5-20251001`, `claude-opus-4-1-20250805`). See <https://docs.anthropic.com/en/docs/about-claude/models> for the current list. Only used when Anthropic provider is selected.",
+          "order": 33
+        },
+        "commitSage.deepseek.model": {
+          "type": "string",
+          "default": "deepseek-chat",
+          "markdownDescription": "DeepSeek model ID (e.g. `deepseek-chat`, `deepseek-reasoner`). The canonical UI is the [Commit Sage sidebar](command:commitsage.settings.focus) — it fetches DeepSeek's live model list. Only used when DeepSeek provider is selected.",
+          "order": 34
+        },
+        "commitSage.xai.model": {
+          "type": "string",
+          "default": "grok-3-mini",
+          "markdownDescription": "xAI Grok model ID (e.g. `grok-3-mini`, `grok-3`, `grok-4-fast`, `grok-4-1-fast`, `grok-code-fast-1`). The canonical UI is the [Commit Sage sidebar](command:commitsage.settings.focus) — it falls back to a static list if `/v1/models` is blocked (e.g. on fresh xAI accounts without credits). Only used when xAI provider is selected.",
+          "order": 35
+        },
+        "commitSage.custom.baseUrl": {
+          "type": "string",
+          "default": "http://localhost:1234/v1",
+          "markdownDescription": "Base URL of any OpenAI-compatible `chat/completions` endpoint. Examples: `http://localhost:1234/v1` (LM Studio), `http://localhost:8000/v1` (vLLM), `http://localhost:8080/v1` (llama.cpp server), `http://localhost:8080/v1` (LocalAI), `https://api.together.xyz/v1` (Together AI), `https://api.fireworks.ai/inference/v1` (Fireworks). Only used when Custom provider is selected.",
+          "order": 36
+        },
+        "commitSage.custom.model": {
+          "type": "string",
+          "default": "",
+          "markdownDescription": "Model ID to send to the Custom endpoint. Free-form — depends on what your self-hosted server exposes (e.g. `qwen2.5-coder:7b`, `meta-llama/Llama-3.3-70B-Instruct-Turbo`). Only used when Custom provider is selected.",
+          "order": 37
+        },
+        "commitSage.custom.useApiKey": {
+          "type": "boolean",
+          "default": false,
+          "markdownDescription": "Send an API key to the Custom endpoint. Disable for self-hosted servers that don't require auth (LM Studio, llama.cpp server default). When enabled, set the key via the `Commit Sage: Set Custom API Key` command.",
+          "order": 38
+        },
+        "commitSage.custom.chatCompletionsPath": {
+          "type": "string",
+          "default": "/chat/completions",
+          "markdownDescription": "Path appended to `#commitSage.custom.baseUrl#` for chat completion requests. Default is `/chat/completions` — change only if your server uses a non-standard path.",
+          "order": 39
+        },
+        "commitSage.general.temperature": {
+          "type": "number",
+          "default": 0.7,
+          "minimum": 0,
+          "maximum": 2,
+          "markdownDescription": "LLM sampling temperature applied to all providers. Lower (e.g. `0.2`) = more deterministic / repeatable commit messages; higher (e.g. `1.0`) = more varied wording. Range `[0, 2]`. For Ollama it's threaded into `options.temperature`; for Gemini into `generationConfig.temperature`; for OpenAI-compatible providers (OpenAI/Groq/OpenRouter/DeepSeek/xAI/Codestral/Custom) and Anthropic — into the top-level `temperature` field.",
+          "order": 18
+        },
+        "commitSage.general.maxDiffSize": {
+          "type": "number",
+          "default": 100000,
+          "markdownDescription": "Maximum diff size in characters sent to the LLM. Larger diffs are truncated with a `...(truncated)` marker. **Set to `-1` to disable truncation (sends the entire diff — only safe with long-context models).** Clamped to the range `[1000, 1000000]`.\n\n**Tighten this for low-TPM free tiers:**\n- **Groq free tier (6000 TPM)** — set to ~`20000` (~5000 tokens for the diff + room for prompt/response).\n- **OpenRouter free (20 RPM / 50 RPD)** — `40000` typically fine.\n- **Gemini / Anthropic / DeepSeek paid** — default `100000` is fine.\n\nRule of thumb: 1 token ≈ 4 chars, so `100000` chars ≈ 25000 tokens.",
+          "order": 19
+        },
         "commitSage.apiRequestTimeout": {
           "type": "number",
           "default": 30,
           "markdownDescription": "Timeout for LLM provider HTTP requests (Gemini/OpenAI/Codestral/Ollama) in seconds. **Set to `-1` for no timeout (infinite wait).**",
-          "order": 18
+          "order": 20
         },
         "commitSage.gitTimeout": {
           "type": "number",
           "default": 120,
           "markdownDescription": "Timeout for `git` subprocesses (diff, blame, push, etc.) in seconds. Push over a slow remote or diff over a huge file may need more than the default. **Set to `-1` for no timeout.**",
-          "order": 19
+          "order": 21
         },
         "commitSage.telemetry.enabled": {
           "type": "boolean",
           "default": true,
           "description": "Enable telemetry for Commit Sage",
-          "order": 20
+          "order": 22
         }
       }
     }
@@ -397,8 +563,8 @@
     "package": "vsce package",
     "package:notsc": "npm run vscode:prepublish:tsc && vsce package",
     "package:analyze": "npm run build:analyze && vsce package",
-    "lint": "eslint src/**/*.ts",
-    "lint:fix": "eslint src/**/*.ts --fix",
+    "lint": "eslint 'src/**/*.ts'",
+    "lint:fix": "eslint 'src/**/*.ts' --fix",
     "typecheck": "tsc --noEmit",
     "test": "npm run test:unit && npm run test:e2e",
     "test:unit": "vitest run",
