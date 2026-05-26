@@ -578,8 +578,8 @@
     "@types/node": "^25.9.1",
     "@types/sinon": "^21.0.1",
     "@types/vscode": "^1.93.0",
-    "@typescript-eslint/eslint-plugin": "^8.59.4",
-    "@typescript-eslint/parser": "^8.59.4",
+    "@typescript-eslint/eslint-plugin": "^8.60.0",
+    "@typescript-eslint/parser": "^8.60.0",
     "@vscode/test-cli": "^0.0.12",
     "@vscode/test-electron": "^2.5.2",
     "@vscode/vsce": "^3.9.1",
@@ -593,11 +593,16 @@
     "mocha": "^11.7.6",
     "sinon": "^22.0.0",
     "typescript": "^6.0.3",
-    "typescript-eslint": "^8.59.4",
+    "typescript-eslint": "^8.60.0",
     "vitest": "^4.1.7"
   },
   "dependencies": {
     "@amplitude/analytics-node": "^1.5.58",
     "@amplitude/analytics-types": "^2.11.1"
+  },
+  "overrides": {
+    "serialize-javascript": "^7.0.5",
+    "brace-expansion": "^5.0.6",
+    "diff": "^8.0.3"
   }
 }
