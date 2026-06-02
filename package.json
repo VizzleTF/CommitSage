@@ -594,7 +594,7 @@
     "sinon": "^22.0.0",
     "typescript": "^6.0.3",
     "typescript-eslint": "^8.60.0",
-    "vitest": "^4.1.7"
+    "vitest": "^4.1.8"
   },
   "dependencies": {
     "@amplitude/analytics-node": "^1.5.58",
