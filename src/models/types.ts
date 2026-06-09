@@ -40,6 +40,11 @@ export interface ProjectConfig {
         autoCommit?: boolean;
         autoPush?: boolean;
         promptForRefs?: boolean;
+        commitlint?: {
+            enabled?: boolean;
+            maxRetries?: number;
+            rulesPath?: string;
+        };
     };
     gemini?: {
         model?: string;
@@ -86,4 +91,25 @@ export interface ProjectConfig {
     telemetry?: {
         enabled?: boolean;
     };
+}
+
+// CommitLint types
+export interface CommitLintRules {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  [key: string]: any;
+}
+
+export interface CommitLintConfig {
+  rules: CommitLintRules;
+  extends?: string | string[];
+}
+
+export interface CommitLintError {
+  message: string;
+  level?: number;
+}
+
+export interface CommitLintResult {
+  valid: boolean;
+  errors: string[];
 }
