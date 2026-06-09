@@ -65,6 +65,9 @@ interface InitData {
         autoPushNeedsCommit: string;
         untrusted: string;
         customInstructions: string;
+        commitlintEnabled: string;
+        commitlintMaxRetries: string;
+        commitlintRulesPath: string;
         enableCustom: string;
         customInstructionsPh: string;
         advanced: string;
@@ -104,6 +107,9 @@ interface ViewState {
         autoPush: boolean;
         useCustomInstructions: boolean;
         customInstructions: string;
+        commitlintEnabled: boolean;
+        commitlintMaxRetries: number;
+        commitlintRulesPath: string;
     };
     advanced: {
         apiRequestTimeout: number;
@@ -769,6 +775,32 @@ function renderCommitSection(state: ViewState): HTMLElement {
         state.commit.onlyStagedChanges,
         v => setSetting(KEYS.onlyStagedChanges, v),
     ));
+
+    body.appendChild(makeCheckbox(
+        'commitlint-enabled',
+        L.commitlintEnabled,
+        state.commit.commitlintEnabled,
+        v => setSetting(KEYS.commitlintEnabled, v),
+    ));
+
+    if (state.commit.commitlintEnabled) {
+        body.appendChild(fieldLabel(L.commitlintMaxRetries));
+        body.appendChild(makeNumberInput(
+            'commitlint-max-retries',
+            state.commit.commitlintMaxRetries,
+            v => setSetting(KEYS.commitlintMaxRetries, v),
+        ));
+        body.appendChild(fieldLabel(L.commitlintRulesPath));
+        body.appendChild(makeTextInput(
+            'commitlint-rules-path',
+            state.commit.commitlintRulesPath,
+            v => setSetting(KEYS.commitlintRulesPath, v),
+            './config',
+        ));
+        body.appendChild(el('div', { class: 'hint' }, [
+            'Folder containing the commitlint config file. Relative to the repo root, or absolute.',
+        ]));
+    }
 
     return section('commit', L.commit, true, body);
 }
