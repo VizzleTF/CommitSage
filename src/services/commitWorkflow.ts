@@ -164,7 +164,7 @@ export class CommitWorkflow {
             throw new UserCancelledError();
         }
 
-        const commitMessage = await AIService.generateCommitMessage(diff, blameAnalysis, progress, {
+        const commitMessage = await AIService.generateCommitMessage(repoPath, diff, blameAnalysis, progress, {
             fileCount: changedFiles.length,
             onlyStagedChanges: useStagedChanges,
             signal,
