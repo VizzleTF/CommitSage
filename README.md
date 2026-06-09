@@ -106,6 +106,23 @@ Where to get keys:
   - Prompts for issue/PR references
   - Default: `false`
 
+### Commitlint Integration
+
+- **Enable** (`commitSage.commit.commitlint.enabled`):
+  - Reads the project's commitlint config and uses its rules as the prompt template.
+  - After generation, validates the message with `@commitlint/lint` and retries if it fails (up to `maxRetries` times).
+  - Falls back to conventional rules if no commitlint config is found.
+  - Default: `false`
+
+- **Max Retries** (`commitSage.commit.commitlint.maxRetries`):
+  - Maximum number of validation + refinement cycles when `enabled` is on.
+  - Range: 1–10. Default: `3`
+
+- **Rules Path** (`commitSage.commit.commitlint.rulesPath`):
+  - Custom path to the commitlint config file (e.g. `./config/commitlint.config.js`).
+  - By default, Commit Sage looks for `commitlint.config.{js,json}` in the repository root.
+  - Default: `.`
+
 ### Custom Instructions
 
 - **Enable** (`commitSage.commit.useCustomInstructions`):
