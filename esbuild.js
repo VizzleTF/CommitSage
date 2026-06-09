@@ -45,7 +45,7 @@ const extensionBuildOptions = {
     platform: 'node',
     format: 'cjs',
     target: 'node20',
-    external: ['vscode'],
+    external: ['vscode', '@commitlint/load', '@commitlint/lint'],
     sourcemap: !production,
     sourcesContent: false,
     minify: production,
