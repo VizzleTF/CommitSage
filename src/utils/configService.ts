@@ -409,6 +409,17 @@ export class ConfigService {
     return this.getConfig(section, leaf, defaultValue) as SettingValue<K>;
   }
 
+  /**
+   * True when `.commitsage/config.json` pins this key, i.e. user/workspace
+   * settings for it are ignored. Lets UI mark dead controls instead of
+   * silently reverting them. Key uses the same dotted form as `get`.
+   */
+  static isProjectOverridden(key: string): boolean {
+    const dot = key.indexOf('.');
+    const sections = dot >= 0 ? [key.slice(0, dot), key.slice(dot + 1)] : [key];
+    return this.getNestedProjectValue(sections) !== undefined;
+  }
+
   static getConfig<T extends CacheValue>(
     section: string,
     key: string,

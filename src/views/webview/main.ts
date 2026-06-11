@@ -88,6 +88,7 @@ interface InitData {
 
 interface ViewState {
     trusted: boolean;
+    projectOverrides: string[];
     provider: Provider;
     models: Record<Provider, ModelSlot>;
     selected: Record<Provider, string>;
@@ -733,6 +734,12 @@ function renderCommitSection(state: ViewState): HTMLElement {
             setSetting(KEYS.useCustomInstructions, v === 'custom');
         },
     ));
+
+    if (state.projectOverrides.includes('commitFormat')) {
+        body.appendChild(el('div', { class: 'hint' }, [
+            'Pinned by .commitsage/config.json in this repo — changes here have no effect until that file is updated.',
+        ]));
+    }
 
     if (state.commit.format === 'custom') {
         body.appendChild(fieldLabel(L.customInstructions));

@@ -110,6 +110,8 @@ interface ModelSlot {
 
 interface ViewState {
     trusted: boolean;
+    /** KEYS names pinned by .commitsage/config.json — their controls are inert. */
+    projectOverrides: string[];
     provider: Provider;
     models: Record<Provider, ModelSlot>;
     selected: Record<Provider, string>;
@@ -442,6 +444,8 @@ export class SettingsWebviewProvider implements vscode.WebviewViewProvider {
 
         return {
             trusted: vscode.workspace.isTrusted,
+            projectOverrides: (Object.keys(SETTING_KEYS) as (keyof typeof SETTING_KEYS)[])
+                .filter(name => ConfigService.isProjectOverridden(SETTING_KEYS[name].replace(/^commitSage\./, ''))),
             provider: ConfigService.get('provider.type') as Provider,
             models: this.models,
             selected: {
