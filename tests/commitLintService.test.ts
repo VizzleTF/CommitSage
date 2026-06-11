@@ -1,51 +1,29 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
 
-// Mock lazy-loaded commitlint packages before importing the service.
-// CommitLintService uses `await import(...)` internally; vi.mock intercepts those.
-vi.mock('@commitlint/load', () => ({ default: vi.fn() }));
-vi.mock('@commitlint/lint', () => ({ default: vi.fn() }));
-
 import { CommitLintService } from '../src/services/commitLintService';
 
-function clearModuleCache(): void {
-    // CommitLintService caches the lazy-imported modules in static fields.
-    // Reset them between tests so each test controls its own mock behaviour.
-    (CommitLintService as unknown as Record<string, unknown>).commitLintLoadModule = null;
-    (CommitLintService as unknown as Record<string, unknown>).commitLintLintModule = null;
-}
+let tmpDir: string;
 
-// Convenience: build a mock `load` function that returns a resolved config.
-function makeLoad(rules: Record<string, unknown> = {}, parserPreset?: unknown) {
-    return vi.fn().mockResolvedValue({ rules, parserPreset });
-}
+beforeEach(() => {
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'commitsage-cl-'));
+});
 
-// Convenience: build a mock `lint` function that returns a given report.
-function makeLint(valid: boolean, errors: Array<{ message: string }> = []) {
-    return vi.fn().mockResolvedValue({ valid, errors });
-}
+afterEach(() => {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+});
 
 // ─── hasConfig ───────────────────────────────────────────────────────────────
 
 describe('CommitLintService.hasConfig', () => {
-    let tmpDir: string;
-
-    beforeEach(() => {
-        tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'commitsage-cl-'));
-    });
-
-    afterEach(() => {
-        fs.rmSync(tmpDir, { recursive: true, force: true });
-    });
-
     it('returns false when no config file exists', () => {
         expect(CommitLintService.hasConfig(tmpDir)).toBe(false);
     });
 
     it('returns true for commitlint.config.js', () => {
-        fs.writeFileSync(path.join(tmpDir, 'commitlint.config.js'), 'module.exports = {}');
+        fs.writeFileSync(path.join(tmpDir, 'commitlint.config.js'), 'module.exports = { rules: {} }');
         expect(CommitLintService.hasConfig(tmpDir)).toBe(true);
     });
 
@@ -60,7 +38,7 @@ describe('CommitLintService.hasConfig', () => {
     });
 
     it('returns true for .commitlintrc.yml', () => {
-        fs.writeFileSync(path.join(tmpDir, '.commitlintrc.yml'), 'extends: []');
+        fs.writeFileSync(path.join(tmpDir, '.commitlintrc.yml'), 'rules: {}');
         expect(CommitLintService.hasConfig(tmpDir)).toBe(true);
     });
 });
@@ -68,169 +46,204 @@ describe('CommitLintService.hasConfig', () => {
 // ─── extractRules ────────────────────────────────────────────────────────────
 
 describe('CommitLintService.extractRules', () => {
-    const REPO = '/fake/repo';
-
-    beforeEach(clearModuleCache);
-
-    it('returns default rules when @commitlint/load throws (no config found)', async () => {
-        const { default: load } = await import('@commitlint/load');
-        vi.mocked(load).mockRejectedValueOnce(new Error('No config'));
-
-        const result = await CommitLintService.extractRules(REPO);
+    it('returns default rules when no config file exists', () => {
+        const result = CommitLintService.extractRules(tmpDir);
         expect(result).toContain('Conventional Commits');
     });
 
-    it('returns default rules when config has no rules', async () => {
-        const { default: load } = await import('@commitlint/load');
-        vi.mocked(load).mockImplementation(makeLoad({}));
-
-        const result = await CommitLintService.extractRules(REPO);
+    it('returns default rules when config has no rules', () => {
+        fs.writeFileSync(path.join(tmpDir, '.commitlintrc.json'), JSON.stringify({ rules: {} }));
+        const result = CommitLintService.extractRules(tmpDir);
         expect(result).toContain('Conventional Commits');
     });
 
-    it('extracts type-enum from resolved config (handles extends)', async () => {
-        const { default: load } = await import('@commitlint/load');
-        vi.mocked(load).mockImplementation(makeLoad({
-            'type-enum': [2, 'always', ['feat', 'fix', 'chore', 'docs']],
+    it('extracts type-enum from JSON config', () => {
+        fs.writeFileSync(path.join(tmpDir, '.commitlintrc.json'), JSON.stringify({
+            rules: { 'type-enum': [2, 'always', ['feat', 'fix', 'chore', 'docs']] },
         }));
-
-        const result = await CommitLintService.extractRules(REPO);
+        const result = CommitLintService.extractRules(tmpDir);
         expect(result).toContain('feat, fix, chore, docs');
     });
 
-    it('extracts subject-max-length', async () => {
-        const { default: load } = await import('@commitlint/load');
-        vi.mocked(load).mockImplementation(makeLoad({
-            'subject-max-length': [2, 'always', 72],
+    it('extracts subject-max-length from JSON config', () => {
+        fs.writeFileSync(path.join(tmpDir, '.commitlintrc.json'), JSON.stringify({
+            rules: { 'subject-max-length': [2, 'always', 72] },
         }));
-
-        const result = await CommitLintService.extractRules(REPO);
+        const result = CommitLintService.extractRules(tmpDir);
         expect(result).toContain('72 characters');
     });
 
-    it('extracts body-max-line-length', async () => {
-        const { default: load } = await import('@commitlint/load');
-        vi.mocked(load).mockImplementation(makeLoad({
-            'body-max-line-length': [2, 'always', 100],
+    it('extracts body-max-line-length from JSON config', () => {
+        fs.writeFileSync(path.join(tmpDir, '.commitlintrc.json'), JSON.stringify({
+            rules: { 'body-max-line-length': [2, 'always', 100] },
         }));
-
-        const result = await CommitLintService.extractRules(REPO);
+        const result = CommitLintService.extractRules(tmpDir);
         expect(result).toContain('100 characters');
     });
 
-    it('extracts subject-case as array', async () => {
-        const { default: load } = await import('@commitlint/load');
-        vi.mocked(load).mockImplementation(makeLoad({
-            'subject-case': [2, 'always', ['lower-case', 'sentence-case']],
+    it('extracts subject-case as array from JSON config', () => {
+        fs.writeFileSync(path.join(tmpDir, '.commitlintrc.json'), JSON.stringify({
+            rules: { 'subject-case': [2, 'always', ['lower-case', 'sentence-case']] },
         }));
-
-        const result = await CommitLintService.extractRules(REPO);
-        expect(result).toContain('lower-case, sentence-case');
+        const result = CommitLintService.extractRules(tmpDir);
+        expect(result).toContain('lowercase');
+        expect(result).toContain('Sentence case');
     });
 
-    it('notes when scope is required', async () => {
-        const { default: load } = await import('@commitlint/load');
-        vi.mocked(load).mockImplementation(makeLoad({
-            'scope-empty': [2, 'never'],
+    it('notes when scope is required', () => {
+        fs.writeFileSync(path.join(tmpDir, '.commitlintrc.json'), JSON.stringify({
+            rules: { 'scope-empty': [2, 'never'] },
         }));
-
-        const result = await CommitLintService.extractRules(REPO);
+        const result = CommitLintService.extractRules(tmpDir);
         expect(result).toContain('Scope is required');
     });
 
-    it('passes rulesPath as cwd to @commitlint/load', async () => {
-        const { default: load } = await import('@commitlint/load');
-        const mockLoad = makeLoad({ 'type-enum': [2, 'always', ['feat']] });
-        vi.mocked(load).mockImplementation(mockLoad);
-
-        await CommitLintService.extractRules(REPO, 'config');
-        expect(mockLoad).toHaveBeenCalledWith({ cwd: path.join(REPO, 'config') });
+    it('applies @commitlint/config-conventional preset via extends', () => {
+        fs.writeFileSync(path.join(tmpDir, '.commitlintrc.json'), JSON.stringify({
+            extends: ['@commitlint/config-conventional'],
+        }));
+        const result = CommitLintService.extractRules(tmpDir);
+        expect(result).toContain('feat');
+        expect(result).toContain('fix');
     });
 
-    it('resolves absolute rulesPath directly', async () => {
-        const { default: load } = await import('@commitlint/load');
-        const mockLoad = makeLoad({ 'type-enum': [2, 'always', ['feat']] });
-        vi.mocked(load).mockImplementation(mockLoad);
+    it('respects rulesPath pointing to a specific file', () => {
+        const subDir = path.join(tmpDir, 'config');
+        fs.mkdirSync(subDir);
+        fs.writeFileSync(path.join(subDir, '.commitlintrc.json'), JSON.stringify({
+            rules: { 'type-enum': [2, 'always', ['feat', 'custom']] },
+        }));
+        const result = CommitLintService.extractRules(tmpDir, 'config/.commitlintrc.json');
+        expect(result).toContain('custom');
+    });
 
-        await CommitLintService.extractRules(REPO, '/absolute/path');
-        expect(mockLoad).toHaveBeenCalledWith({ cwd: '/absolute/path' });
+    it('respects absolute rulesPath', () => {
+        const configPath = path.join(tmpDir, '.commitlintrc.json');
+        fs.writeFileSync(configPath, JSON.stringify({
+            rules: { 'type-enum': [2, 'always', ['feat', 'absolute']] },
+        }));
+        const result = CommitLintService.extractRules('/some/other/repo', configPath);
+        expect(result).toContain('absolute');
+    });
+
+    it('parses .commitlintrc.yml with flow-sequence rules', () => {
+        fs.writeFileSync(path.join(tmpDir, '.commitlintrc.yml'), [
+            'rules:',
+            '  type-enum: [2, always, [feat, fix, docs]]',
+            '  header-max-length: [2, always, 80]',
+        ].join('\n'));
+        const result = CommitLintService.extractRules(tmpDir);
+        expect(result).toContain('feat');
+        expect(result).toContain('80 characters');
+    });
+
+    it('parses .commitlintrc.yaml with extends preset', () => {
+        fs.writeFileSync(path.join(tmpDir, '.commitlintrc.yaml'), [
+            'extends:',
+            '  - "@commitlint/config-conventional"',
+        ].join('\n'));
+        const result = CommitLintService.extractRules(tmpDir);
+        expect(result).toContain('feat');
+        expect(result).toContain('fix');
+    });
+
+    it('parses .commitlintrc (no extension) as JSON', () => {
+        fs.writeFileSync(path.join(tmpDir, '.commitlintrc'), JSON.stringify({
+            rules: { 'type-enum': [2, 'always', ['feat', 'hotfix']] },
+        }));
+        const result = CommitLintService.extractRules(tmpDir);
+        expect(result).toContain('hotfix');
+    });
+
+    it('parses commitlint.config.js (CommonJS)', () => {
+        fs.writeFileSync(path.join(tmpDir, 'commitlint.config.js'), [
+            "module.exports = {",
+            "  rules: {",
+            "    'type-enum': [2, 'always', ['feat', 'fix', 'cjs-type']],",
+            "    'header-max-length': [2, 'always', 60],",
+            "  }",
+            "};",
+        ].join('\n'));
+        const result = CommitLintService.extractRules(tmpDir);
+        expect(result).toContain('cjs-type');
+        expect(result).toContain('60 characters');
+    });
+
+    it('parses .commitlintrc.cjs (CommonJS)', () => {
+        fs.writeFileSync(path.join(tmpDir, '.commitlintrc.cjs'), [
+            "module.exports = {",
+            "  rules: { 'type-enum': [2, 'always', ['feat', 'cjs-rc-type']] }",
+            "};",
+        ].join('\n'));
+        const result = CommitLintService.extractRules(tmpDir);
+        expect(result).toContain('cjs-rc-type');
     });
 });
 
 // ─── validate ────────────────────────────────────────────────────────────────
 
 describe('CommitLintService.validate', () => {
-    let tmpDir: string;
-
-    beforeEach(() => {
-        clearModuleCache();
-        tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'commitsage-cl-'));
-    });
-
-    afterEach(() => {
-        fs.rmSync(tmpDir, { recursive: true, force: true });
-        vi.restoreAllMocks();
-    });
-
-    it('returns valid:true when no config file exists in repo', async () => {
-        const result = await CommitLintService.validate('feat: something', tmpDir);
+    it('returns valid:true when no config file exists in repo', () => {
+        const result = CommitLintService.validate('feat: something', tmpDir);
         expect(result).toEqual({ valid: true, errors: [] });
     });
 
-    it('returns valid:true when lint passes', async () => {
-        fs.writeFileSync(path.join(tmpDir, 'commitlint.config.js'), '');
-
-        const { default: load } = await import('@commitlint/load');
-        const { default: lint } = await import('@commitlint/lint');
-        vi.mocked(load).mockImplementation(makeLoad({ 'type-enum': [2, 'always', ['feat']] }));
-        vi.mocked(lint).mockImplementation(makeLint(true));
-
-        const result = await CommitLintService.validate('feat: add thing', tmpDir);
+    it('returns valid:true when message passes type-enum rule', () => {
+        fs.writeFileSync(path.join(tmpDir, '.commitlintrc.json'), JSON.stringify({
+            rules: { 'type-enum': [2, 'always', ['feat', 'fix']] },
+        }));
+        const result = CommitLintService.validate('feat: add thing', tmpDir);
         expect(result.valid).toBe(true);
         expect(result.errors).toHaveLength(0);
     });
 
-    it('returns errors when lint fails', async () => {
-        fs.writeFileSync(path.join(tmpDir, '.commitlintrc.json'), '{}');
-
-        const { default: load } = await import('@commitlint/load');
-        const { default: lint } = await import('@commitlint/lint');
-        vi.mocked(load).mockImplementation(makeLoad({ 'type-enum': [2, 'always', ['feat', 'fix']] }));
-        vi.mocked(lint).mockImplementation(makeLint(false, [
-            { message: 'type must be one of [feat, fix]' },
-        ]));
-
-        const result = await CommitLintService.validate('wip: something', tmpDir);
+    it('returns errors when type is not in type-enum', () => {
+        fs.writeFileSync(path.join(tmpDir, '.commitlintrc.json'), JSON.stringify({
+            rules: { 'type-enum': [2, 'always', ['feat', 'fix']] },
+        }));
+        const result = CommitLintService.validate('wip: something', tmpDir);
         expect(result.valid).toBe(false);
         expect(result.errors).toContain('type must be one of [feat, fix]');
     });
 
-    it('degrades gracefully when @commitlint/load throws', async () => {
-        fs.writeFileSync(path.join(tmpDir, 'commitlint.config.js'), '');
+    it('returns errors when header exceeds max length', () => {
+        fs.writeFileSync(path.join(tmpDir, '.commitlintrc.json'), JSON.stringify({
+            rules: { 'header-max-length': [2, 'always', 20] },
+        }));
+        const result = CommitLintService.validate('feat: this is way too long for the limit', tmpDir);
+        expect(result.valid).toBe(false);
+        expect(result.errors[0]).toContain('header must not be longer than 20');
+    });
 
-        const { default: load } = await import('@commitlint/load');
-        vi.mocked(load).mockRejectedValueOnce(new Error('load crashed'));
+    it('returns errors when subject ends with full-stop', () => {
+        fs.writeFileSync(path.join(tmpDir, '.commitlintrc.json'), JSON.stringify({
+            rules: { 'subject-full-stop': [2, 'never', '.'] },
+        }));
+        const result = CommitLintService.validate('feat: add thing.', tmpDir);
+        expect(result.valid).toBe(false);
+        expect(result.errors[0]).toContain('subject may not end with "."');
+    });
 
-        const result = await CommitLintService.validate('feat: ok', tmpDir);
+    it('returns valid:true when config has no rules (empty rules object)', () => {
+        fs.writeFileSync(path.join(tmpDir, '.commitlintrc.json'), JSON.stringify({ rules: {} }));
+        const result = CommitLintService.validate('wip: anything goes', tmpDir);
+        expect(result.valid).toBe(true);
+    });
+
+    it('degrades gracefully when config file is malformed JSON', () => {
+        fs.writeFileSync(path.join(tmpDir, '.commitlintrc.json'), '{ bad json }');
+        const result = CommitLintService.validate('feat: ok', tmpDir);
         expect(result).toEqual({ valid: true, errors: [] });
     });
 
-    it('passes parserOpts from preset to lint', async () => {
-        fs.writeFileSync(path.join(tmpDir, '.commitlintrc.json'), '{}');
+    it('validates against @commitlint/config-conventional preset', () => {
+        fs.writeFileSync(path.join(tmpDir, '.commitlintrc.json'), JSON.stringify({
+            extends: ['@commitlint/config-conventional'],
+        }));
+        const invalid = CommitLintService.validate('WIP: something', tmpDir);
+        expect(invalid.valid).toBe(false);
 
-        const parserOpts = { headerPattern: /^(\w+): (.+)$/ };
-        const { default: load } = await import('@commitlint/load');
-        const { default: lint } = await import('@commitlint/lint');
-        const mockLoad = makeLoad({}, { parserOpts });
-        const mockLint = makeLint(true);
-        vi.mocked(load).mockImplementation(mockLoad);
-        vi.mocked(lint).mockImplementation(mockLint);
-
-        await CommitLintService.validate('feat: thing', tmpDir);
-        expect(mockLint).toHaveBeenCalledWith(
-            'feat: thing',
-            {},
-            { parserOpts },
-        );
+        const valid = CommitLintService.validate('feat: add new feature', tmpDir);
+        expect(valid.valid).toBe(true);
     });
 });
