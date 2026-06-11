@@ -105,10 +105,14 @@ Please provide ONLY the commit message, without any additional text or explanati
         return this.buildPrompt(template, languagePrompt, diff, blameAnalysis, reminder);
     }
 
-    static async generateRefinementPrompt(originalMessage: string, errors: string[], progress: ProgressReporter): Promise<string> {
+    static async generateRefinementPrompt(repoPath: string, originalMessage: string, errors: string[], progress: ProgressReporter): Promise<string> {
         const format = ConfigService.get('commit.commitFormat') as CommitFormat;
 
         const { languagePrompt } = await this.resolveLanguagePrompt(format, progress);
+
+        // Full rule set included so the model doesn't fix one rule while breaking another
+        const rulesPath = ConfigService.get('commit.commitlint.rulesPath');
+        const rules = CommitLintService.extractRules(repoPath, rulesPath);
 
         return `The following commit message failed commitlint validation:
 
@@ -117,7 +121,9 @@ ${originalMessage}
 Validation errors:
 ${errors.map(e => `- ${e}`).join('\n')}
 
-Rewrite the commit message fixing all the errors above.
+${rules}
+
+Rewrite the commit message fixing all the errors above while keeping every rule satisfied.
 ${languagePrompt}
 
 ${STRICT_FORMAT_REMINDER}

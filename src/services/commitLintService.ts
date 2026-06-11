@@ -72,7 +72,17 @@ class CommitLintService {
   private static readonly configFiles = CONFIG_FILES;
 
   static hasConfig(repoPath: string): boolean {
-    return this.configFiles.some(file => fs.existsSync(path.join(repoPath, file)));
+    return this.packageJsonHasConfig(repoPath)
+      || this.configFiles.some(file => fs.existsSync(path.join(repoPath, file)));
+  }
+
+  private static packageJsonHasConfig(repoPath: string): boolean {
+    try {
+      const raw = fs.readFileSync(path.join(repoPath, 'package.json'), 'utf8');
+      return (JSON.parse(raw) as { commitlint?: unknown }).commitlint !== undefined;
+    } catch {
+      return false;
+    }
   }
 
   private static resolveConfigPath(repoPath: string, rulesPath?: string): string | null {
@@ -83,6 +93,10 @@ class CommitLintService {
       } catch {
         return null;
       }
+    }
+    // package.json first to match cosmiconfig's search order
+    if (this.packageJsonHasConfig(repoPath)) {
+      return path.join(repoPath, 'package.json');
     }
     for (const file of this.configFiles) {
       const abs = path.join(repoPath, file);
@@ -120,6 +134,54 @@ class CommitLintService {
       Logger.log(`CommitLint: validation error: ${error instanceof Error ? error.message : String(error)}`);
       return { valid: true, errors: [] };
     }
+  }
+
+  /**
+   * Applies mechanical fixes for rule violations that don't need an LLM round-trip:
+   * type/scope casing, trailing full stop, missing blank line before the body.
+   * Returns the message unchanged when nothing is fixable.
+   */
+  static autoFix(message: string, repoPath: string, rulesPath?: string): string {
+    try {
+      const configPath = this.resolveConfigPath(repoPath, rulesPath);
+      if (!configPath) { return message; }
+      return this.applyAutoFixes(message, this.loadConfig(configPath));
+    } catch (error) {
+      Logger.log(`CommitLint: autofix error: ${error instanceof Error ? error.message : String(error)}`);
+      return message;
+    }
+  }
+
+  private static applyAutoFixes(message: string, rules: CommitLintRules): string {
+    const lines = message.split('\n');
+    let header = lines[0] ?? '';
+
+    if (rules['type-case']?.[0] === 2 && rules['type-case']?.[1] === 'always') {
+      const c = rules['type-case'][2];
+      if (c === 'lower-case') { header = header.replace(/^[a-zA-Z0-9_-]+/, m => m.toLowerCase()); }
+      else if (c === 'upper-case') { header = header.replace(/^[a-zA-Z0-9_-]+/, m => m.toUpperCase()); }
+    }
+
+    if (rules['scope-case']?.[0] === 2 && rules['scope-case']?.[1] === 'always') {
+      const c = rules['scope-case'][2];
+      if (c === 'lower-case') {
+        header = header.replace(/^([a-zA-Z0-9_-]+)\(([^)]*)\)/, (_, t: string, s: string) => `${t}(${s.toLowerCase()})`);
+      }
+    }
+
+    if (rules['subject-full-stop']?.[0] === 2 && rules['subject-full-stop']?.[1] === 'never') {
+      const stop = (rules['subject-full-stop'][2] as string) ?? '.';
+      while (header.endsWith(stop)) { header = header.slice(0, -stop.length).trimEnd(); }
+    }
+
+    lines[0] = header;
+
+    if (rules['body-leading-blank']?.[0] === 2 && rules['body-leading-blank']?.[1] === 'always'
+        && lines.length > 1 && lines[1].trim() !== '') {
+      lines.splice(1, 0, '');
+    }
+
+    return lines.join('\n');
   }
 
   // ── Config parsing ───────────────────────────────────────────────────────
@@ -189,6 +251,11 @@ class CommitLintService {
   private static loadConfig(configPath: string): CommitLintRules {
     const ext = path.extname(configPath).toLowerCase();
     try {
+      if (path.basename(configPath) === 'package.json') {
+        const pkg = JSON.parse(fs.readFileSync(configPath, 'utf8')) as { commitlint?: CommitLintConfig };
+        return pkg.commitlint ? this.mergePresets(pkg.commitlint) : {};
+      }
+
       if (ext === '.mjs' || ext === '.ts') {
         Logger.warn(`CommitLint: ${path.basename(configPath)} is not supported (ESM/TypeScript) — use a JSON or YAML config instead`);
         return {};

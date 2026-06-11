@@ -72,7 +72,17 @@ export class AIService {
 
             while (attempt < maxRetries) {
                 const rulesPath = ConfigService.get('commit.commitlint.rulesPath');
-                const { valid, errors } = CommitLintService.validate(result.message, repoPath, rulesPath);
+                let { valid, errors } = CommitLintService.validate(result.message, repoPath, rulesPath);
+
+                if (!valid) {
+                    // Mechanical violations (casing, trailing period, blank line)
+                    // are fixed in code to save an LLM round-trip.
+                    const fixed = CommitLintService.autoFix(result.message, repoPath, rulesPath);
+                    if (fixed !== result.message) {
+                        result.message = fixed;
+                        ({ valid, errors } = CommitLintService.validate(fixed, repoPath, rulesPath));
+                    }
+                }
 
                 if (valid) {
                     break;
@@ -86,7 +96,7 @@ export class AIService {
 
                 progress.report({ message: `CommitLint validation failed, refining… (${attempt}/${maxRetries})`, increment: 10 });
 
-                const refinementPrompt = await PromptService.generateRefinementPrompt(result.message, errors, progress);
+                const refinementPrompt = await PromptService.generateRefinementPrompt(repoPath, result.message, errors, progress);
                 const refined = await AIServiceFactory.generateCommitMessage(
                     serviceType,
                     refinementPrompt,

@@ -314,3 +314,98 @@ describe('CommitLintService footer parsing', () => {
         expect(result.errors[0]).toContain('body must not be longer than 20');
     });
 });
+
+// ─── package.json config ─────────────────────────────────────────────────────
+
+describe('CommitLintService package.json config', () => {
+    it('discovers the commitlint field in package.json', () => {
+        fs.writeFileSync(path.join(tmpDir, 'package.json'), JSON.stringify({
+            name: 'x',
+            commitlint: { rules: { 'type-enum': [2, 'always', ['feat', 'pkg-json']] } },
+        }));
+        expect(CommitLintService.hasConfig(tmpDir)).toBe(true);
+        expect(CommitLintService.extractRules(tmpDir)).toContain('pkg-json');
+    });
+
+    it('validates against rules from package.json', () => {
+        fs.writeFileSync(path.join(tmpDir, 'package.json'), JSON.stringify({
+            commitlint: { rules: { 'type-enum': [2, 'always', ['feat']] } },
+        }));
+        expect(CommitLintService.validate('fix: nope', tmpDir).valid).toBe(false);
+        expect(CommitLintService.validate('feat: yep', tmpDir).valid).toBe(true);
+    });
+
+    it('ignores package.json without a commitlint field', () => {
+        fs.writeFileSync(path.join(tmpDir, 'package.json'), JSON.stringify({ name: 'x' }));
+        expect(CommitLintService.hasConfig(tmpDir)).toBe(false);
+        expect(CommitLintService.extractRules(tmpDir)).toContain('Conventional Commits');
+    });
+
+    it('prefers package.json over rc files (cosmiconfig order)', () => {
+        fs.writeFileSync(path.join(tmpDir, 'package.json'), JSON.stringify({
+            commitlint: { rules: { 'type-enum': [2, 'always', ['from-pkg']] } },
+        }));
+        fs.writeFileSync(path.join(tmpDir, '.commitlintrc.json'), JSON.stringify({
+            rules: { 'type-enum': [2, 'always', ['from-rc']] },
+        }));
+        expect(CommitLintService.extractRules(tmpDir)).toContain('from-pkg');
+    });
+});
+
+// ─── autoFix ─────────────────────────────────────────────────────────────────
+
+describe('CommitLintService.autoFix', () => {
+    it('lowercases the type when type-case demands lower-case', () => {
+        fs.writeFileSync(path.join(tmpDir, '.commitlintrc.json'), JSON.stringify({
+            rules: { 'type-case': [2, 'always', 'lower-case'] },
+        }));
+        expect(CommitLintService.autoFix('Feat: add thing', tmpDir)).toBe('feat: add thing');
+    });
+
+    it('lowercases the scope when scope-case demands lower-case', () => {
+        fs.writeFileSync(path.join(tmpDir, '.commitlintrc.json'), JSON.stringify({
+            rules: { 'scope-case': [2, 'always', 'lower-case'] },
+        }));
+        expect(CommitLintService.autoFix('feat(API): add thing', tmpDir)).toBe('feat(api): add thing');
+    });
+
+    it('strips a trailing full stop when subject-full-stop is never', () => {
+        fs.writeFileSync(path.join(tmpDir, '.commitlintrc.json'), JSON.stringify({
+            rules: { 'subject-full-stop': [2, 'never', '.'] },
+        }));
+        expect(CommitLintService.autoFix('feat: add thing.', tmpDir)).toBe('feat: add thing');
+    });
+
+    it('inserts a blank line before the body when body-leading-blank is always', () => {
+        fs.writeFileSync(path.join(tmpDir, '.commitlintrc.json'), JSON.stringify({
+            rules: { 'body-leading-blank': [2, 'always'] },
+        }));
+        expect(CommitLintService.autoFix('feat: add thing\nbody here', tmpDir))
+            .toBe('feat: add thing\n\nbody here');
+    });
+
+    it('applies multiple fixes at once and the result passes validation', () => {
+        fs.writeFileSync(path.join(tmpDir, '.commitlintrc.json'), JSON.stringify({
+            rules: {
+                'type-case': [2, 'always', 'lower-case'],
+                'subject-full-stop': [2, 'never', '.'],
+                'body-leading-blank': [2, 'always'],
+            },
+        }));
+        const fixed = CommitLintService.autoFix('Feat: add thing.\nbody here', tmpDir);
+        expect(fixed).toBe('feat: add thing\n\nbody here');
+        expect(CommitLintService.validate(fixed, tmpDir).valid).toBe(true);
+    });
+
+    it('returns the message unchanged when nothing is fixable', () => {
+        fs.writeFileSync(path.join(tmpDir, '.commitlintrc.json'), JSON.stringify({
+            rules: { 'header-max-length': [2, 'always', 10] },
+        }));
+        const msg = 'feat: this header is definitely way too long';
+        expect(CommitLintService.autoFix(msg, tmpDir)).toBe(msg);
+    });
+
+    it('returns the message unchanged when no config exists', () => {
+        expect(CommitLintService.autoFix('Whatever: text.', tmpDir)).toBe('Whatever: text.');
+    });
+});
