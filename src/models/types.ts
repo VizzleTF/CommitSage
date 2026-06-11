@@ -113,3 +113,12 @@ export interface CommitLintResult {
   valid: boolean;
   errors: string[];
 }
+
+export interface ParsedCommit {
+  header: string;
+  type: string;
+  scope: string | null;
+  subject: string;
+  body: string;
+  footer: string;
+}
