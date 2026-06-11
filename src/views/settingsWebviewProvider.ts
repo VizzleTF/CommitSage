@@ -98,6 +98,9 @@ const SETTING_KEYS = {
     apiRequestTimeout: 'commitSage.apiRequestTimeout',
     gitTimeout: 'commitSage.gitTimeout',
     telemetryEnabled: 'commitSage.telemetry.enabled',
+    commitlintEnabled: 'commitSage.commit.commitlint.enabled',
+    commitlintMaxRetries: 'commitSage.commit.commitlint.maxRetries',
+    commitlintRulesPath: 'commitSage.commit.commitlint.rulesPath',
 } as const;
 
 interface ModelSlot {
@@ -126,6 +129,9 @@ interface ViewState {
         autoPush: boolean;
         useCustomInstructions: boolean;
         customInstructions: string;
+        commitlintEnabled: boolean;
+        commitlintMaxRetries: number;
+        commitlintRulesPath: string;
     };
     advanced: {
         apiRequestTimeout: number;
@@ -488,6 +494,9 @@ export class SettingsWebviewProvider implements vscode.WebviewViewProvider {
                 autoPush: ConfigService.get('commit.autoPush'),
                 useCustomInstructions: ConfigService.get('commit.useCustomInstructions'),
                 customInstructions: ConfigService.get('commit.customInstructions'),
+                commitlintEnabled: ConfigService.get('commit.commitlint.enabled'),
+                commitlintMaxRetries: ConfigService.get('commit.commitlint.maxRetries'),
+                commitlintRulesPath: ConfigService.get('commit.commitlint.rulesPath'),
             },
             advanced: {
                 apiRequestTimeout: ConfigService.get('apiRequestTimeout'),
@@ -698,6 +707,9 @@ export class SettingsWebviewProvider implements vscode.WebviewViewProvider {
                 autoPushNeedsCommit: vscode.l10n.t('Requires auto-commit'),
                 untrusted: vscode.l10n.t('Disabled in untrusted workspaces'),
                 customInstructions: vscode.l10n.t('Custom instructions'),
+                commitlintEnabled: vscode.l10n.t('Enable commitlint'),
+                commitlintMaxRetries: vscode.l10n.t('Max commitlint retries'),
+                commitlintRulesPath: vscode.l10n.t('Commitlint rules path'),
                 enableCustom: vscode.l10n.t('Enable custom instructions'),
                 customInstructionsPh: vscode.l10n.t('Free-form text appended to the prompt — e.g. ticket-tag conventions.'),
                 advanced: vscode.l10n.t('Advanced'),

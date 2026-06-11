@@ -5,6 +5,8 @@ import { TelemetryService } from './telemetryService';
 import { errorMessages } from '../utils/constants';
 import { removeThinkTags } from '../utils/textProcessing';
 import { AIServiceFactory, AIServiceType } from './aiServiceFactory';
+import { CommitLintService } from './commitLintService';
+import { Logger } from '../utils/logger';
 
 // Fallback if `general.maxDiffSize` is unreadable. ~100k chars covers most
 // diffs while staying within safe LLM API context window limits for major
@@ -20,6 +22,7 @@ interface GenerateContext {
 
 export class AIService {
     static async generateCommitMessage(
+        repoPath: string,
         diff: string,
         blameAnalysis: string,
         progress: ProgressReporter,
@@ -47,12 +50,12 @@ export class AIService {
 
         const startTime = Date.now();
         const truncatedDiff = this.truncateDiff(diff, maxDiffLength);
-        const prompt = await PromptService.generatePrompt(truncatedDiff, blameAnalysis, progress);
+        const prompt = await PromptService.generatePrompt(repoPath, truncatedDiff, blameAnalysis, progress);
 
         progress.report({ message: 'Generating commit message...', increment: 50 });
 
         const serviceType = provider as AIServiceType;
-        const result = await AIServiceFactory.generateCommitMessage(
+        let result = await AIServiceFactory.generateCommitMessage(
             serviceType,
             prompt,
             progress,
@@ -61,6 +64,40 @@ export class AIService {
         );
 
         result.message = removeThinkTags(result.message);
+
+        const commitlintEnabled = ConfigService.get('commit.commitlint.enabled');
+        if (commitlintEnabled) {
+            const maxRetries = ConfigService.get('commit.commitlint.maxRetries');
+            let attempt = 0;
+
+            while (attempt < maxRetries) {
+                const rulesPath = ConfigService.get('commit.commitlint.rulesPath');
+                const { valid, errors } = CommitLintService.validate(result.message, repoPath, rulesPath);
+
+                if (valid) {
+                    break;
+                }
+
+                attempt++;
+                if (attempt >= maxRetries) {
+                    Logger.warn(`CommitLint: max retries (${maxRetries}) reached, using message as-is`);
+                    break;
+                }
+
+                progress.report({ message: `CommitLint validation failed, refining… (${attempt}/${maxRetries})`, increment: 10 });
+
+                const refinementPrompt = await PromptService.generateRefinementPrompt(result.message, errors, progress);
+                const refined = await AIServiceFactory.generateCommitMessage(
+                    serviceType,
+                    refinementPrompt,
+                    progress,
+                    undefined,
+                    { signal: context.signal }
+                );
+
+                result = { ...refined, message: removeThinkTags(refined.message) };
+            }
+        }
 
         TelemetryService.sendEvent({
             name: 'message_generation_completed',
