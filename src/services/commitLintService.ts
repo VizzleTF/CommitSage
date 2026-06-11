@@ -17,6 +17,12 @@ const CONFIG_FILES = [
   'commitlint.config.cjs',
   '.commitlintrc.yml',
   '.commitlintrc.yaml',
+  // ESM / TypeScript variants — discovered so the user gets a clear warning
+  // instead of a silent fallback to defaults. Not executed.
+  'commitlint.config.mjs',
+  '.commitlintrc.mjs',
+  'commitlint.config.ts',
+  '.commitlintrc.ts',
 ] as const;
 
 const KNOWN_PRESETS: Record<string, CommitLintRules> = {
@@ -125,7 +131,11 @@ class CommitLintService {
 
     const merged: CommitLintRules = {};
     for (const name of presetNames) {
-      if (KNOWN_PRESETS[name]) { Object.assign(merged, KNOWN_PRESETS[name]); }
+      if (KNOWN_PRESETS[name]) {
+        Object.assign(merged, KNOWN_PRESETS[name]);
+      } else {
+        Logger.warn(`CommitLint: unknown preset "${name}" — only config-conventional and config-angular are built-in; its rules are ignored`);
+      }
     }
     Object.assign(merged, config.rules ?? {});
     return merged;
@@ -179,13 +189,27 @@ class CommitLintService {
   private static loadConfig(configPath: string): CommitLintRules {
     const ext = path.extname(configPath).toLowerCase();
     try {
+      if (ext === '.mjs' || ext === '.ts') {
+        Logger.warn(`CommitLint: ${path.basename(configPath)} is not supported (ESM/TypeScript) — use a JSON or YAML config instead`);
+        return {};
+      }
+
       if (ext === '.js' || ext === '.cjs') {
         if (!vscode.workspace.isTrusted) {
           Logger.warn(`CommitLint: skipping JS config in untrusted workspace: ${configPath}`);
           return {};
         }
         const req = createRequire(configPath);
-        const mod = req(configPath) as CommitLintConfig & { default?: CommitLintConfig };
+        let mod: CommitLintConfig & { default?: CommitLintConfig };
+        try {
+          mod = req(configPath) as CommitLintConfig & { default?: CommitLintConfig };
+        } catch (e: unknown) {
+          if (e instanceof Error && (e as NodeJS.ErrnoException).code === 'ERR_REQUIRE_ESM') {
+            Logger.warn(`CommitLint: ${path.basename(configPath)} uses ES module syntax — use a JSON or YAML config instead`);
+            return {};
+          }
+          throw e;
+        }
         return this.mergePresets(mod?.default ?? mod);
       }
 
@@ -301,25 +325,49 @@ class CommitLintService {
     return lines.length > 1 ? lines.join('\n') : COMMIT_RULES_DEFAULT;
   }
 
+  private static isTrailerLine(line: string): boolean {
+    return /^(?:BREAKING[ -]CHANGE: |[A-Za-z][A-Za-z0-9-]*(?:: | #))/.test(line);
+  }
+
   private static parseCommitMessage(message: string): ParsedCommit {
     const lines = message.split('\n');
     const header = lines[0] ?? '';
 
-    let bodyStart = -1;
-    let footerStart = -1;
+    // Collect indices of blank lines (skip line 0 which is the header)
+    const blankIndices: number[] = [];
     for (let i = 1; i < lines.length; i++) {
-      if (lines[i].trim() === '') {
-        if (bodyStart === -1) { bodyStart = i + 1; }
-        else if (footerStart === -1) { footerStart = i + 1; }
+      if (lines[i].trim() === '') { blankIndices.push(i); }
+    }
+
+    let bodyLines: string[] = [];
+    let footerLines: string[] = [];
+
+    if (blankIndices.length > 0) {
+      const firstBlank = blankIndices[0];
+
+      let footerBlankIdx = -1;
+      for (let b = blankIndices.length - 1; b >= 0; b--) {
+        const sectionStart = blankIndices[b] + 1;
+        const sectionLines = lines.slice(sectionStart).filter(l => l.trim() !== '');
+        if (sectionLines.length > 0 && sectionLines.every(l => this.isTrailerLine(l))) {
+          footerBlankIdx = blankIndices[b];
+        } else {
+          break;
+        }
+      }
+
+      if (footerBlankIdx > firstBlank) {
+        bodyLines  = lines.slice(firstBlank + 1, footerBlankIdx);
+        footerLines = lines.slice(footerBlankIdx + 1);
+      } else if (footerBlankIdx === firstBlank) {
+        footerLines = lines.slice(firstBlank + 1);
+      } else {
+        bodyLines = lines.slice(firstBlank + 1);
       }
     }
 
-    const body = bodyStart > 0
-      ? lines.slice(bodyStart, footerStart > 0 ? footerStart - 1 : undefined).join('\n').trim()
-      : '';
-    const footer = footerStart > 0
-      ? lines.slice(footerStart).join('\n').trim()
-      : '';
+    const body   = bodyLines.join('\n').trim();
+    const footer = footerLines.join('\n').trim();
 
     const headerMatch = header.match(/^([a-zA-Z0-9_-]+)(?:\(([^)]*)\))?!?:\s*(.*)$/);
 
@@ -439,7 +487,7 @@ class CommitLintService {
 
         // body
         case 'body-leading-blank':
-          if (condition === 'always' && body && msgLines[1] !== '') {
+          if (condition === 'always' && msgLines.length > 1 && msgLines[1].trim() !== '') {
             errors.push('body must have a leading blank line');
           }
           break;

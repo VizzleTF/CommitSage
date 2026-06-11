@@ -389,7 +389,7 @@
         "commitSage.commit.commitlint.enabled": {
           "type": "boolean",
           "default": false,
-          "markdownDescription": "Read the project's commitlint config and use its rules as the prompt template. After generation, validate the message against those rules and retry if it fails (up to `#commitSage.commit.commitlint.maxRetries#` times). Falls back to conventional rules if no commitlint config is found.",
+          "markdownDescription": "Read the project's commitlint config and use its rules as the prompt template. After generation, validate the message against those rules and retry if it fails (up to `#commitSage.commit.commitlint.maxRetries#` times). Falls back to conventional rules if no commitlint config is found.\n\n**Note:** when enabled, the `#commitSage.commit.commitFormat#` setting is ignored — the prompt is built from the commitlint rules instead.",
           "order": 9
         },
         "commitSage.commit.commitlint.maxRetries": {

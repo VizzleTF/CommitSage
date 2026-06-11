@@ -112,6 +112,7 @@ Where to get keys:
   - Reads the project's commitlint config and uses its rules as the prompt template.
   - After generation, validates the message with its own static validator and retries if it fails (up to `maxRetries` times).
   - Falls back to conventional rules if no commitlint config is found.
+  - **Note:** when enabled, the `commitFormat` setting (emoji, detailed, etc.) is overridden — the prompt is built entirely from the commitlint rules.
   - Default: `false`
 
 - **Max Retries** (`commitSage.commit.commitlint.maxRetries`):
@@ -120,8 +121,9 @@ Where to get keys:
 
 - **Rules Path** (`commitSage.commit.commitlint.rulesPath`):
   - Custom path to the commitlint config file (e.g. `./config/commitlint.config.js`).
-  - By default, Commit Sage looks for `commitlint.config.{js,json}` in the repository root.
-  - Default: `.`
+  - Leave empty to auto-discover `commitlint.config.{js,cjs,json,yml,yaml}` in the repository root.
+  - Supported formats: JSON, YAML, CommonJS (`.js`/`.cjs`). ESM (`.mjs`) and TypeScript configs are not supported — use JSON or YAML.
+  - Default: (empty — auto-discover)
 
 ### Custom Instructions
 

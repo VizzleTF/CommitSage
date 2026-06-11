@@ -255,4 +255,62 @@ describe('CommitLintService.validate', () => {
         const valid = CommitLintService.validate('feat: add new feature', tmpDir);
         expect(valid.valid).toBe(true);
     });
+
+    it('catches body-leading-blank when content follows header without blank line', () => {
+        fs.writeFileSync(path.join(tmpDir, '.commitlintrc.json'), JSON.stringify({
+            rules: { 'body-leading-blank': [2, 'always'] },
+        }));
+        const result = CommitLintService.validate('feat: add thing\nNo blank line before body', tmpDir);
+        expect(result.valid).toBe(false);
+        expect(result.errors[0]).toContain('leading blank line');
+    });
+
+    it('body-leading-blank passes when blank line separates header from body', () => {
+        fs.writeFileSync(path.join(tmpDir, '.commitlintrc.json'), JSON.stringify({
+            rules: { 'body-leading-blank': [2, 'always'] },
+        }));
+        const result = CommitLintService.validate('feat: add thing\n\nProper body here', tmpDir);
+        expect(result.valid).toBe(true);
+    });
+});
+
+// ─── footer parsing ──────────────────────────────────────────────────────────
+
+describe('CommitLintService footer parsing', () => {
+    beforeEach(() => {
+        fs.writeFileSync(path.join(tmpDir, '.commitlintrc.json'), JSON.stringify({
+            rules: { 'footer-max-length': [2, 'always', 200] },
+        }));
+    });
+
+    it('does not treat a second body paragraph as footer', () => {
+        // Multi-paragraph body with no trailers — footer should be empty
+        const msg = 'feat: add thing\n\nParagraph one.\n\nParagraph two.';
+        const result = CommitLintService.validate(msg, tmpDir);
+        expect(result.valid).toBe(true);
+    });
+
+    it('detects BREAKING CHANGE as footer when preceded by blank line', () => {
+        const msg = 'feat: add thing\n\nBody text.\n\nBREAKING CHANGE: removes old API';
+        // body-max-length test: body should be "Body text.", not include the trailer
+        fs.writeFileSync(path.join(tmpDir, '.commitlintrc.json'), JSON.stringify({
+            rules: { 'body-max-length': [2, 'always', 20] },
+        }));
+        const result = CommitLintService.validate(msg, tmpDir);
+        // "Body text." is 10 chars — passes if footer is correctly separated
+        expect(result.valid).toBe(true);
+    });
+
+    it('separates multi-paragraph body from git trailers', () => {
+        // If second paragraph was mistakenly treated as footer, body-max-length
+        // would only see "Paragraph one." and pass even with a tight limit.
+        // With correct parsing both paragraphs count toward body length.
+        fs.writeFileSync(path.join(tmpDir, '.commitlintrc.json'), JSON.stringify({
+            rules: { 'body-max-length': [2, 'always', 20] },
+        }));
+        const msg = 'feat: add thing\n\nParagraph one.\n\nParagraph two that is long.';
+        const result = CommitLintService.validate(msg, tmpDir);
+        expect(result.valid).toBe(false);
+        expect(result.errors[0]).toContain('body must not be longer than 20');
+    });
 });
