@@ -96,7 +96,7 @@ Please provide ONLY the commit message, without any additional text or explanati
 
         if (ConfigService.get('commit.commitlint.enabled')) {
             const rulesPath = ConfigService.get('commit.commitlint.rulesPath');
-            const rules = await CommitLintService.extractRules(repoPath, rulesPath);
+            const rules = CommitLintService.extractRules(repoPath, rulesPath);
             return this.buildPrompt(rules, languagePrompt, diff, blameAnalysis, STRICT_FORMAT_REMINDER);
         }
 
