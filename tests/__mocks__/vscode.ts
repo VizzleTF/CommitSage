@@ -32,6 +32,7 @@ export const window = {
 
 export const workspace = {
     workspaceFolders: undefined as unknown,
+    isTrusted: true,
     getConfiguration: () => ({
         get: <T>(_key: string, defaultValue?: T): T | undefined => defaultValue,
         update: async () => undefined,

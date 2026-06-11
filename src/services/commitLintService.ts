@@ -2,6 +2,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import { createRequire } from 'module';
+import * as vscode from 'vscode';
 
 import { Logger } from '../utils/logger';
 
@@ -69,9 +70,13 @@ class CommitLintService {
   }
 
   private static resolveConfigPath(repoPath: string, rulesPath?: string): string | null {
-    if (rulesPath) {
+    if (rulesPath && rulesPath !== '.') {
       const abs = path.isAbsolute(rulesPath) ? rulesPath : path.join(repoPath, rulesPath);
-      return fs.existsSync(abs) ? abs : null;
+      try {
+        return fs.statSync(abs).isFile() ? abs : null;
+      } catch {
+        return null;
+      }
     }
     for (const file of this.configFiles) {
       const abs = path.join(repoPath, file);
@@ -175,6 +180,10 @@ class CommitLintService {
     const ext = path.extname(configPath).toLowerCase();
     try {
       if (ext === '.js' || ext === '.cjs') {
+        if (!vscode.workspace.isTrusted) {
+          Logger.warn(`CommitLint: skipping JS config in untrusted workspace: ${configPath}`);
+          return {};
+        }
         const req = createRequire(configPath);
         const mod = req(configPath) as CommitLintConfig & { default?: CommitLintConfig };
         return this.mergePresets(mod?.default ?? mod);

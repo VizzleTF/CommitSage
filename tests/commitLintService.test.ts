@@ -107,6 +107,15 @@ describe('CommitLintService.extractRules', () => {
         expect(result).toContain('fix');
     });
 
+    it('auto-discovers config when rulesPath is "." (the old default value)', () => {
+        fs.writeFileSync(path.join(tmpDir, '.commitlintrc.json'), JSON.stringify({
+            rules: { 'type-enum': [2, 'always', ['feat', 'fix', 'dot-default']] },
+        }));
+        // "." resolves to the repo root directory — must trigger auto-discovery, not EISDIR
+        const result = CommitLintService.extractRules(tmpDir, '.');
+        expect(result).toContain('dot-default');
+    });
+
     it('respects rulesPath pointing to a specific file', () => {
         const subDir = path.join(tmpDir, 'config');
         fs.mkdirSync(subDir);
