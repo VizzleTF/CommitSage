@@ -72,7 +72,7 @@ export class AIService {
 
             while (attempt < maxRetries) {
                 const rulesPath = ConfigService.get('commit.commitlint.rulesPath');
-                const { valid, errors } = await CommitLintService.validate(result.message, repoPath, rulesPath);
+                const { valid, errors } = CommitLintService.validate(result.message, repoPath, rulesPath);
 
                 if (valid) {
                     break;
