@@ -110,7 +110,7 @@ Where to get keys:
 
 - **Enable** (`commitSage.commit.commitlint.enabled`):
   - Reads the project's commitlint config and uses its rules as the prompt template.
-  - After generation, validates the message with `@commitlint/lint` and retries if it fails (up to `maxRetries` times).
+  - After generation, validates the message with its own static validator and retries if it fails (up to `maxRetries` times).
   - Falls back to conventional rules if no commitlint config is found.
   - Default: `false`
 

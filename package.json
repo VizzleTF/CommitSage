@@ -402,8 +402,8 @@
         },
         "commitSage.commit.commitlint.rulesPath": {
           "type": "string",
-          "default": ".",
-          "markdownDescription": "Custom path to the commitlint rules file (e.g. `./config/commitlint.config.js`). By default, Commit Sage looks for `commitlint.config.{js,json}` in the repository root.",
+          "default": "",
+          "markdownDescription": "Custom path to the commitlint rules file (e.g. `./config/commitlint.config.js`). Leave empty to auto-discover `commitlint.config.{js,cjs,json,yml,yaml}` in the repository root.",
           "order": 11
         },
         "commitSage.commit.onlyStagedChanges": {
