@@ -389,7 +389,7 @@
         "commitSage.commit.commitlint.enabled": {
           "type": "boolean",
           "default": false,
-          "markdownDescription": "Read the project's commitlint config and use its rules as the prompt template. After generation, validate the message with `@commitlint/lint` and retry if it fails (up to `#commitSage.commit.commitlint.maxRetries#` times). Falls back to conventional rules if no commitlint config is found.",
+          "markdownDescription": "Read the project's commitlint config and use its rules as the prompt template. After generation, validate the message against those rules and retry if it fails (up to `#commitSage.commit.commitlint.maxRetries#` times). Falls back to conventional rules if no commitlint config is found.",
           "order": 9
         },
         "commitSage.commit.commitlint.maxRetries": {
@@ -618,9 +618,7 @@
   },
   "dependencies": {
     "@amplitude/analytics-node": "^1.5.59",
-    "@amplitude/analytics-types": "^2.11.1",
-    "@commitlint/lint": "^21.0.2",
-    "@commitlint/load": "^21.0.2"
+    "@amplitude/analytics-types": "^2.11.1"
   },
   "overrides": {
     "serialize-javascript": "^7.0.5",
