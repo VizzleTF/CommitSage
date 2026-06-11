@@ -615,6 +615,10 @@ export class SettingsWebviewProvider implements vscode.WebviewViewProvider {
                 color: var(--vscode-descriptionForeground);
                 margin-top: 4px;
             }
+            .hint.pinned {
+                color: var(--vscode-editorWarning-foreground, var(--vscode-notificationsWarningIcon-foreground, #cca700));
+                font-weight: 600;
+            }
             .error {
                 font-size: 11px;
                 color: var(--vscode-errorForeground);

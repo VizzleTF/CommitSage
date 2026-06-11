@@ -167,13 +167,25 @@ function fieldLabel(text: string): HTMLLabelElement {
     return el('label', { class: 'field' }, [text]);
 }
 
+/** True when the setting is pinned by .commitsage/config.json and the control is inert. */
+function isPinned(state: ViewState, keyName: string): boolean {
+    return state.projectOverrides.includes(keyName);
+}
+
+function pinnedHint(): HTMLDivElement {
+    return el('div', { class: 'hint pinned' }, [
+        'Pinned by .commitsage/config.json in this repo — change it there.',
+    ]) as HTMLDivElement;
+}
+
 function makeSelect(
     id: string,
     options: Array<{ value: string; label: string }>,
     current: string,
     onChange: (value: string) => void,
+    opts: { disabled?: boolean } = {},
 ): HTMLSelectElement {
-    const select = el('select', { id }) as HTMLSelectElement;
+    const select = el('select', { id, disabled: opts.disabled }) as HTMLSelectElement;
     for (const o of options) {
         const opt = el('option', { value: o.value }, [o.label]);
         select.appendChild(opt);
@@ -309,6 +321,7 @@ function makeCombobox(
     current: string,
     onChange: (value: string) => void,
     placeholder?: string,
+    opts: { disabled?: boolean } = {},
 ): HTMLDivElement {
     const wrap = el('div', { class: 'combo' }) as HTMLDivElement;
     const input = el('input', {
@@ -316,6 +329,7 @@ function makeCombobox(
         id,
         autocomplete: 'off',
         spellcheck: 'false',
+        disabled: opts.disabled,
         placeholder: current || placeholder || '',
     }) as HTMLInputElement;
     input.value = current;
@@ -565,6 +579,7 @@ const SETTING_KEY_BY_PROVIDER: Record<Provider, string> = {
 };
 
 function renderProviderPick(state: ViewState): HTMLElement {
+    const providerPinned = isPinned(state, 'provider');
     return el('section', { class: 'provider-pick' }, [
         fieldLabel(L.provider),
         makeSelect(
@@ -572,7 +587,9 @@ function renderProviderPick(state: ViewState): HTMLElement {
             init.providers.map(p => ({ value: p, label: L.providerLabels[p] })),
             state.provider,
             v => setSetting(KEYS.provider, v),
+            { disabled: providerPinned },
         ),
+        providerPinned ? pinnedHint() : undefined,
     ]);
 }
 
@@ -637,12 +654,14 @@ function renderModelAuthSection(state: ViewState): HTMLElement {
     }
     modelOptions.push(...slot.list);
 
+    const modelPinned = isPinned(state, settingKeyName);
     const modelCombobox = makeCombobox(
         'model',
         modelOptions,
         currentValue,
         v => setSetting(currentKey, v),
         L.modelPlaceholder,
+        { disabled: modelPinned },
     );
 
     if (!NO_REFRESH_PROVIDERS.has(p)) {
@@ -656,6 +675,8 @@ function renderModelAuthSection(state: ViewState): HTMLElement {
     } else {
         body.appendChild(modelCombobox);
     }
+
+    if (modelPinned) { body.appendChild(pinnedHint()); }
 
     body.appendChild(el('div', { class: 'hint' }, [`${L.liveFrom} ${L.liveSource[p]}`]));
 
@@ -721,6 +742,7 @@ function renderApiKeyButtons(state: ViewState, p: Provider): HTMLDivElement {
 function renderCommitSection(state: ViewState): HTMLElement {
     const body = el('div');
 
+    const formatPinned = isPinned(state, 'commitFormat');
     body.appendChild(fieldLabel(L.format));
     body.appendChild(makeSelect(
         'format',
@@ -733,13 +755,9 @@ function renderCommitSection(state: ViewState): HTMLElement {
             // have to toggle two checkboxes.
             setSetting(KEYS.useCustomInstructions, v === 'custom');
         },
+        { disabled: formatPinned },
     ));
-
-    if (state.projectOverrides.includes('commitFormat')) {
-        body.appendChild(el('div', { class: 'hint' }, [
-            'Pinned by .commitsage/config.json in this repo — changes here have no effect until that file is updated.',
-        ]));
-    }
+    if (formatPinned) { body.appendChild(pinnedHint()); }
 
     if (state.commit.format === 'custom') {
         body.appendChild(fieldLabel(L.customInstructions));
@@ -751,13 +769,16 @@ function renderCommitSection(state: ViewState): HTMLElement {
         body.appendChild(el('div', { class: 'hint' }, [L.customInstructionsPh]));
     }
 
+    const languagePinned = isPinned(state, 'commitLanguage');
     body.appendChild(fieldLabel(L.language));
     body.appendChild(makeSelect(
         'language',
         init.languages.map(l => ({ value: l, label: l })),
         state.commit.language,
         v => setSetting(KEYS.commitLanguage, v),
+        { disabled: languagePinned },
     ));
+    if (languagePinned) { body.appendChild(pinnedHint()); }
 
     if (state.commit.language === 'custom') {
         body.appendChild(fieldLabel(L.customLanguage));
