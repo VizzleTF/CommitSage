@@ -65,7 +65,7 @@ export class AIService {
 
         result.message = removeThinkTags(result.message);
 
-        const commitlintEnabled = ConfigService.get('commit.commitlint.enabled');
+        const commitlintEnabled = ConfigService.get('commit.commitFormat') === 'commitlint';
         if (commitlintEnabled) {
             const maxRetries = ConfigService.get('commit.commitlint.maxRetries');
             let attempt = 0;

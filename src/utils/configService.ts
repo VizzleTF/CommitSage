@@ -57,7 +57,6 @@ export const SETTING_DEFAULTS = {
     'apiRequestTimeout': 30,
     'gitTimeout': 120,
     'telemetry.enabled': true,
-    'commit.commitlint.enabled': false,
     'commit.commitlint.maxRetries': 3,
     'commit.commitlint.rulesPath': '',
 } as const satisfies Record<string, CacheValue>;

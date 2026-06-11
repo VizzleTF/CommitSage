@@ -355,6 +355,7 @@
             "google",
             "atom",
             "detailed",
+            "commitlint",
             "custom"
           ],
           "enumDescriptions": [
@@ -367,10 +368,11 @@
             "Type: Description\n\nBody\n\nFooter",
             "type(scope): subject\n\nbody\n\nfooter",
             "Summary: ...\n\nDetails:\n- ...\n\nEffects:\n- ...",
+            "Build the prompt from the project's commitlint config and validate the result against it (auto-fix + refinement retries).",
             "Use the text in 'Custom Instructions' verbatim instead of a built-in template."
           ],
           "default": "conventional",
-          "markdownDescription": "Format style for commit messages. Pick `custom` to use the free-form text from `#commitSage.commit.customInstructions#` as the entire prompt template (auto-enables `#commitSage.commit.useCustomInstructions#` when selected via the [Commit Sage sidebar](command:commitsage.settings.focus)).",
+          "markdownDescription": "Format style for commit messages. Pick `commitlint` to drive the format from the project's commitlint config (`.commitlintrc.*`, `commitlint.config.*` or the `commitlint` field in `package.json`). Pick `custom` to use the free-form text from `#commitSage.commit.customInstructions#` as the entire prompt template (auto-enables `#commitSage.commit.useCustomInstructions#` when selected via the [Commit Sage sidebar](command:commitsage.settings.focus)).",
           "order": 4
         },
         "commitSage.commit.useCustomInstructions": {
@@ -386,18 +388,12 @@
           "editPresentation": "multilineText",
           "order": 6
         },
-        "commitSage.commit.commitlint.enabled": {
-          "type": "boolean",
-          "default": false,
-          "markdownDescription": "Read the project's commitlint config and use its rules as the prompt template. After generation, validate the message against those rules and retry if it fails (up to `#commitSage.commit.commitlint.maxRetries#` times). Falls back to conventional rules if no commitlint config is found.\n\n**Note:** when enabled, the `#commitSage.commit.commitFormat#` setting is ignored — the prompt is built from the commitlint rules instead.",
-          "order": 9
-        },
         "commitSage.commit.commitlint.maxRetries": {
           "type": "number",
           "default": 3,
           "minimum": 1,
           "maximum": 10,
-          "markdownDescription": "Maximum number of validation+refinement cycles when `#commitSage.commit.commitlint.enabled#` is on.",
+          "markdownDescription": "Maximum number of validation+refinement cycles when `#commitSage.commit.commitFormat#` is set to `commitlint`.",
           "order": 10
         },
         "commitSage.commit.commitlint.rulesPath": {

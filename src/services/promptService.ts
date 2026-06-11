@@ -90,15 +90,20 @@ ${STRICT_FORMAT_REMINDER}
 Please provide ONLY the commit message, without any additional text or explanations.`;
         }
 
-        const format = ConfigService.get('commit.commitFormat') as CommitFormat;
+        const formatSetting = ConfigService.get('commit.commitFormat');
 
-        const { template, languagePrompt } = await this.resolveLanguagePrompt(format, progress);
-
-        if (ConfigService.get('commit.commitlint.enabled')) {
+        if (formatSetting === 'commitlint') {
+            // No built-in template for this format — the prompt is the extracted
+            // rule set; 'conventional' only anchors the language resolution.
+            const { languagePrompt } = await this.resolveLanguagePrompt('conventional', progress);
             const rulesPath = ConfigService.get('commit.commitlint.rulesPath');
             const rules = CommitLintService.extractRules(repoPath, rulesPath);
             return this.buildPrompt(rules, languagePrompt, diff, blameAnalysis, STRICT_FORMAT_REMINDER);
         }
+
+        const format = formatSetting as CommitFormat;
+
+        const { template, languagePrompt } = await this.resolveLanguagePrompt(format, progress);
 
         const reminder = format === 'detailed' ? DETAILED_FORMAT_REMINDER : STRICT_FORMAT_REMINDER;
 
@@ -106,9 +111,9 @@ Please provide ONLY the commit message, without any additional text or explanati
     }
 
     static async generateRefinementPrompt(repoPath: string, originalMessage: string, errors: string[], progress: ProgressReporter): Promise<string> {
-        const format = ConfigService.get('commit.commitFormat') as CommitFormat;
-
-        const { languagePrompt } = await this.resolveLanguagePrompt(format, progress);
+        // Only reached when commitFormat is 'commitlint', which has no template
+        // of its own — 'conventional' anchors the language resolution.
+        const { languagePrompt } = await this.resolveLanguagePrompt('conventional', progress);
 
         // Full rule set included so the model doesn't fix one rule while breaking another
         const rulesPath = ConfigService.get('commit.commitlint.rulesPath');

@@ -48,7 +48,7 @@ const LANGUAGES = [
 ] as const;
 const FORMATS = [
     'conventional', 'angular', 'karma', 'semantic',
-    'emoji', 'emojiKarma', 'google', 'atom', 'detailed', 'custom',
+    'emoji', 'emojiKarma', 'google', 'atom', 'detailed', 'commitlint', 'custom',
 ] as const;
 
 const SECRET_KEYS: Record<Provider, string> = {
@@ -98,7 +98,6 @@ const SETTING_KEYS = {
     apiRequestTimeout: 'commitSage.apiRequestTimeout',
     gitTimeout: 'commitSage.gitTimeout',
     telemetryEnabled: 'commitSage.telemetry.enabled',
-    commitlintEnabled: 'commitSage.commit.commitlint.enabled',
     commitlintMaxRetries: 'commitSage.commit.commitlint.maxRetries',
     commitlintRulesPath: 'commitSage.commit.commitlint.rulesPath',
 } as const;
@@ -129,7 +128,6 @@ interface ViewState {
         autoPush: boolean;
         useCustomInstructions: boolean;
         customInstructions: string;
-        commitlintEnabled: boolean;
         commitlintMaxRetries: number;
         commitlintRulesPath: string;
     };
@@ -494,7 +492,6 @@ export class SettingsWebviewProvider implements vscode.WebviewViewProvider {
                 autoPush: ConfigService.get('commit.autoPush'),
                 useCustomInstructions: ConfigService.get('commit.useCustomInstructions'),
                 customInstructions: ConfigService.get('commit.customInstructions'),
-                commitlintEnabled: ConfigService.get('commit.commitlint.enabled'),
                 commitlintMaxRetries: ConfigService.get('commit.commitlint.maxRetries'),
                 commitlintRulesPath: ConfigService.get('commit.commitlint.rulesPath'),
             },
@@ -707,7 +704,6 @@ export class SettingsWebviewProvider implements vscode.WebviewViewProvider {
                 autoPushNeedsCommit: vscode.l10n.t('Requires auto-commit'),
                 untrusted: vscode.l10n.t('Disabled in untrusted workspaces'),
                 customInstructions: vscode.l10n.t('Custom instructions'),
-                commitlintEnabled: vscode.l10n.t('Enable commitlint'),
                 commitlintMaxRetries: vscode.l10n.t('Max commitlint retries'),
                 commitlintRulesPath: vscode.l10n.t('Commitlint rules path'),
                 enableCustom: vscode.l10n.t('Enable custom instructions'),

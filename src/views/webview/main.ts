@@ -65,7 +65,6 @@ interface InitData {
         autoPushNeedsCommit: string;
         untrusted: string;
         customInstructions: string;
-        commitlintEnabled: string;
         commitlintMaxRetries: string;
         commitlintRulesPath: string;
         enableCustom: string;
@@ -107,7 +106,6 @@ interface ViewState {
         autoPush: boolean;
         useCustomInstructions: boolean;
         customInstructions: string;
-        commitlintEnabled: boolean;
         commitlintMaxRetries: number;
         commitlintRulesPath: string;
     };
@@ -776,14 +774,7 @@ function renderCommitSection(state: ViewState): HTMLElement {
         v => setSetting(KEYS.onlyStagedChanges, v),
     ));
 
-    body.appendChild(makeCheckbox(
-        'commitlint-enabled',
-        L.commitlintEnabled,
-        state.commit.commitlintEnabled,
-        v => setSetting(KEYS.commitlintEnabled, v),
-    ));
-
-    if (state.commit.commitlintEnabled) {
+    if (state.commit.format === 'commitlint') {
         body.appendChild(fieldLabel(L.commitlintMaxRetries));
         body.appendChild(makeNumberInput(
             'commitlint-max-retries',

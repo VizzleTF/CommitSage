@@ -108,16 +108,14 @@ Where to get keys:
 
 ### Commitlint Integration
 
-- **Enable** (`commitSage.commit.commitlint.enabled`):
+- **Enable**: set `commitSage.commit.commitFormat` to `commitlint`.
   - Reads the project's commitlint config and uses its rules as the prompt template.
   - After generation, validates the message with its own static validator and retries if it fails (up to `maxRetries` times).
   - Mechanical violations (type/scope casing, trailing full stop, missing blank line before the body) are fixed in code without an extra LLM request.
   - Falls back to conventional rules if no commitlint config is found.
-  - **Note:** when enabled, the `commitFormat` setting (emoji, detailed, etc.) is overridden — the prompt is built entirely from the commitlint rules.
-  - Default: `false`
 
 - **Max Retries** (`commitSage.commit.commitlint.maxRetries`):
-  - Maximum number of validation + refinement cycles when `enabled` is on.
+  - Maximum number of validation + refinement cycles.
   - Range: 1–10. Default: `3`
 
 - **Rules Path** (`commitSage.commit.commitlint.rulesPath`):
