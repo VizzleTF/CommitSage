@@ -6,7 +6,9 @@ import { Logger } from '../utils/logger';
 
 import { CommitLintResult, CommitLintRules } from '../models/types';
 
-const RUN_TIMEOUT_MS = 10_000;
+// Generous: on Windows-mounted filesystems (WSL /mnt/*) a single CLI run can
+// take 5-10s because cosmiconfig's config search is I/O bound there.
+const RUN_TIMEOUT_MS = 30_000;
 
 interface CliRunResult {
   exitCode: number | null;
