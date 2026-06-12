@@ -110,9 +110,14 @@ Where to get keys:
 
 - **Enable**: set `commitSage.commit.commitFormat` to `commitlint`.
   - Reads the project's commitlint config and uses its rules as the prompt template.
-  - After generation, validates the message with its own static validator and retries if it fails (up to `maxRetries` times).
+  - After generation, validates the message and retries if it fails (up to `maxRetries` times).
   - Mechanical violations (type/scope casing, trailing full stop, missing blank line before the body) are fixed in code without an extra LLM request.
   - Falls back to conventional rules if no commitlint config is found.
+
+- **Engine** (`commitSage.commit.commitlint.engine`):
+  - `auto` (default): when the repo has commitlint installed and the workspace is trusted, validation runs the **project's own commitlint CLI** in a child process — exact parity with your CI: shareable presets (gitmoji, jira, lerna-scopes, …), `extends` chains, plugins and custom `parserPreset` all work, on any commitlint version.
+  - `project`: always use the project CLI; warns and falls back to builtin when it's unavailable.
+  - `builtin`: always use the bundled static validator (no project code is executed). It covers conventional/angular presets, local `extends`, JSON/YAML/CJS/`package.json` configs and ~35 rules.
 
 - **Max Retries** (`commitSage.commit.commitlint.maxRetries`):
   - Maximum number of validation + refinement cycles.

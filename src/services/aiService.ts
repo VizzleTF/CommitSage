@@ -5,7 +5,7 @@ import { TelemetryService } from './telemetryService';
 import { errorMessages } from '../utils/constants';
 import { removeThinkTags } from '../utils/textProcessing';
 import { AIServiceFactory, AIServiceType } from './aiServiceFactory';
-import { CommitLintService } from './commitLintService';
+import { CommitLintService, CommitLintEngine } from './commitLintService';
 import { Logger } from '../utils/logger';
 
 // Fallback if `general.maxDiffSize` is unreadable. ~100k chars covers most
@@ -72,7 +72,11 @@ export class AIService {
 
             while (attempt < maxRetries) {
                 const rulesPath = ConfigService.get('commit.commitlint.rulesPath');
-                let { valid, errors } = CommitLintService.validate(result.message, repoPath, rulesPath);
+                const lintOpts = {
+                    engine: ConfigService.get('commit.commitlint.engine') as CommitLintEngine,
+                    signal: context.signal,
+                };
+                let { valid, errors } = await CommitLintService.validate(result.message, repoPath, rulesPath, lintOpts);
 
                 if (!valid) {
                     // Mechanical violations (casing, trailing period, blank line)
@@ -80,7 +84,7 @@ export class AIService {
                     const fixed = CommitLintService.autoFix(result.message, repoPath, rulesPath);
                     if (fixed !== result.message) {
                         result.message = fixed;
-                        ({ valid, errors } = CommitLintService.validate(fixed, repoPath, rulesPath));
+                        ({ valid, errors } = await CommitLintService.validate(fixed, repoPath, rulesPath, lintOpts));
                     }
                 }
 

@@ -1,6 +1,6 @@
 import { CommitFormat, getTemplate } from '../templates';
 import { ConfigService } from '../utils/configService';
-import { CommitLintService } from './commitLintService';
+import { CommitLintService, CommitLintEngine } from './commitLintService';
 import { CustomLanguageService } from './customLanguageService';
 import type { CommitLanguage } from '../utils/constants';
 import type { ProgressReporter } from '../models/types';
@@ -97,7 +97,8 @@ Please provide ONLY the commit message, without any additional text or explanati
             // rule set; 'conventional' only anchors the language resolution.
             const { languagePrompt } = await this.resolveLanguagePrompt('conventional', progress);
             const rulesPath = ConfigService.get('commit.commitlint.rulesPath');
-            const rules = CommitLintService.extractRules(repoPath, rulesPath);
+            const engine = ConfigService.get('commit.commitlint.engine') as CommitLintEngine;
+            const rules = await CommitLintService.extractRules(repoPath, rulesPath, { engine });
             return this.buildPrompt(rules, languagePrompt, diff, blameAnalysis, STRICT_FORMAT_REMINDER);
         }
 
@@ -117,7 +118,8 @@ Please provide ONLY the commit message, without any additional text or explanati
 
         // Full rule set included so the model doesn't fix one rule while breaking another
         const rulesPath = ConfigService.get('commit.commitlint.rulesPath');
-        const rules = CommitLintService.extractRules(repoPath, rulesPath);
+        const engine = ConfigService.get('commit.commitlint.engine') as CommitLintEngine;
+        const rules = await CommitLintService.extractRules(repoPath, rulesPath, { engine });
 
         return `The following commit message failed commitlint validation:
 

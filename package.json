@@ -402,6 +402,22 @@
           "markdownDescription": "Custom path to the commitlint rules file (e.g. `./config/commitlint.config.js`). Leave empty to auto-discover `commitlint.config.{js,cjs,json,yml,yaml}` in the repository root.",
           "order": 11
         },
+        "commitSage.commit.commitlint.engine": {
+          "type": "string",
+          "enum": [
+            "auto",
+            "project",
+            "builtin"
+          ],
+          "enumDescriptions": [
+            "Use the project's own commitlint (from node_modules) when installed and the workspace is trusted; otherwise the builtin validator.",
+            "Always use the project's commitlint; falls back to builtin with a warning when unavailable.",
+            "Always use the builtin static validator (no project code is executed)."
+          ],
+          "default": "auto",
+          "markdownDescription": "Which engine validates generated messages when `#commitSage.commit.commitFormat#` is `commitlint`. The project engine runs the repo's own commitlint CLI in a child process, giving exact parity with CI: shareable presets, extends chains, plugins and custom parsers all work.",
+          "order": 12
+        },
         "commitSage.commit.onlyStagedChanges": {
           "type": "boolean",
           "default": false,

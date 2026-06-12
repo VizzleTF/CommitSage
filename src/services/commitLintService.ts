@@ -6,7 +6,20 @@ import * as vscode from 'vscode';
 
 import { Logger } from '../utils/logger';
 
+import { CommitLintCliService } from './commitLintCliService';
 import { CommitLintConfig, CommitLintRules, CommitLintResult, ParsedCommit } from '../models/types';
+
+/**
+ * auto    — project's own commitlint CLI when installed and trusted, builtin otherwise;
+ * project — project CLI only (warns and falls back when unavailable);
+ * builtin — always the static engine.
+ */
+export type CommitLintEngine = 'auto' | 'project' | 'builtin';
+
+export interface CommitLintOptions {
+  engine?: CommitLintEngine;
+  signal?: AbortSignal;
+}
 
 const CONFIG_FILES = [
   '.commitlintrc',
@@ -38,8 +51,20 @@ const KNOWN_PRESETS: Record<string, CommitLintRules> = {
     'body-leading-blank':   [1, 'always'],
     'footer-leading-blank': [1, 'always'],
   },
+  // Differs from conventional: no `chore` type and no `!` breaking marker.
+  '@commitlint/config-angular': {
+    'type-enum':                [2, 'always', ['build','ci','docs','feat','fix','perf','refactor','revert','style','test']],
+    'type-case':                [2, 'always', 'lower-case'],
+    'type-empty':               [2, 'never'],
+    'scope-case':               [2, 'always', 'lower-case'],
+    'subject-case':             [2, 'never',  ['sentence-case','start-case','pascal-case','upper-case']],
+    'subject-empty':            [2, 'never'],
+    'subject-full-stop':        [2, 'never',  '.'],
+    'subject-exclamation-mark': [2, 'never'],
+    'header-max-length':        [2, 'always', 72],
+    'body-leading-blank':       [1, 'always'],
+  },
 };
-KNOWN_PRESETS['@commitlint/config-angular'] = KNOWN_PRESETS['@commitlint/config-conventional'];
 
 const COMMIT_RULES_DEFAULT = `Conventional Commits format rules:
 - <type>: A noun describing the type of change (e.g., feat, fix, docs, style, refactor, test, chore).
@@ -105,7 +130,28 @@ class CommitLintService {
     return null;
   }
 
-  static extractRules(repoPath: string, rulesPath?: string): string {
+  private static useProjectEngine(engine: CommitLintEngine): boolean {
+    return engine !== 'builtin' && vscode.workspace.isTrusted;
+  }
+
+  static async extractRules(repoPath: string, rulesPath?: string, opts: CommitLintOptions = {}): Promise<string> {
+    if (this.useProjectEngine(opts.engine ?? 'auto')) {
+      try {
+        // Fully resolved rules: extends chains, community presets and plugins
+        // are already applied by the project's own commitlint.
+        const resolved = await CommitLintCliService.resolvedRules(repoPath, rulesPath, opts.signal);
+        if (resolved) { return this.rulesToInstructions(resolved); }
+      } catch (error) {
+        Logger.log(`CommitLint: project CLI rule extraction failed: ${error instanceof Error ? error.message : String(error)}`);
+      }
+      if (opts.engine === 'project') {
+        Logger.warn('CommitLint: project engine requested but commitlint CLI is unavailable — using builtin rule extraction');
+      }
+    }
+    return this.extractRulesBuiltin(repoPath, rulesPath);
+  }
+
+  private static extractRulesBuiltin(repoPath: string, rulesPath?: string): string {
     try {
       const configPath = this.resolveConfigPath(repoPath, rulesPath);
       if (!configPath) {
@@ -124,9 +170,30 @@ class CommitLintService {
     }
   }
 
-  static validate(message: string, repoPath: string, rulesPath?: string): CommitLintResult {
+  static async validate(
+    message: string,
+    repoPath: string,
+    rulesPath?: string,
+    opts: CommitLintOptions = {},
+  ): Promise<CommitLintResult> {
+    if (this.useProjectEngine(opts.engine ?? 'auto')) {
+      try {
+        const cliResult = await CommitLintCliService.validate(message, repoPath, rulesPath, opts.signal);
+        if (cliResult) { return cliResult; }
+      } catch (error) {
+        Logger.log(`CommitLint: project CLI validation failed: ${error instanceof Error ? error.message : String(error)}`);
+      }
+      if (opts.engine === 'project') {
+        Logger.warn('CommitLint: project engine requested but commitlint CLI is unavailable — using builtin validator');
+      }
+    }
+    return this.validateBuiltin(message, repoPath, rulesPath);
+  }
+
+  private static validateBuiltin(message: string, repoPath: string, rulesPath?: string): CommitLintResult {
     try {
-      if (!this.hasConfig(repoPath)) { return { valid: true, errors: [] }; }
+      const explicitPath = Boolean(rulesPath && rulesPath !== '.');
+      if (!explicitPath && !this.hasConfig(repoPath)) { return { valid: true, errors: [] }; }
       const configPath = this.resolveConfigPath(repoPath, rulesPath);
       if (!configPath) { return { valid: true, errors: [] }; }
       return this.validateCommit(message, this.loadConfig(configPath));
@@ -186,7 +253,7 @@ class CommitLintService {
 
   // ── Config parsing ───────────────────────────────────────────────────────
 
-  private static mergePresets(config: CommitLintConfig): CommitLintRules {
+  private static mergePresets(config: CommitLintConfig, configPath: string, visited: Set<string>): CommitLintRules {
     const presetNames = config.extends
       ? (Array.isArray(config.extends) ? config.extends : [config.extends])
       : [];
@@ -195,12 +262,35 @@ class CommitLintService {
     for (const name of presetNames) {
       if (KNOWN_PRESETS[name]) {
         Object.assign(merged, KNOWN_PRESETS[name]);
+      } else if (name.startsWith('.')) {
+        Object.assign(merged, this.loadLocalExtends(name, configPath, visited));
       } else {
         Logger.warn(`CommitLint: unknown preset "${name}" — only config-conventional and config-angular are built-in; its rules are ignored`);
       }
     }
     Object.assign(merged, config.rules ?? {});
     return merged;
+  }
+
+  /** Resolves `extends: "./base"` relative to the extending config, like commitlint does. */
+  private static loadLocalExtends(name: string, configPath: string, visited: Set<string>): CommitLintRules {
+    const base = path.resolve(path.dirname(configPath), name);
+    const candidates = path.extname(base)
+      ? [base]
+      : [`${base}.js`, `${base}.cjs`, `${base}.json`, `${base}.yml`, `${base}.yaml`, base];
+
+    for (const candidate of candidates) {
+      let stat;
+      try { stat = fs.statSync(candidate); } catch { continue; }
+      if (!stat.isFile()) { continue; }
+      if (visited.has(candidate)) {
+        Logger.warn(`CommitLint: circular extends detected at ${candidate} — skipping`);
+        return {};
+      }
+      return this.loadConfig(candidate, visited);
+    }
+    Logger.warn(`CommitLint: local extends "${name}" not found next to ${path.basename(configPath)}`);
+    return {};
   }
 
   private static parseYamlConfig(content: string): CommitLintConfig {
@@ -248,12 +338,13 @@ class CommitLintService {
     return result;
   }
 
-  private static loadConfig(configPath: string): CommitLintRules {
+  private static loadConfig(configPath: string, visited: Set<string> = new Set()): CommitLintRules {
     const ext = path.extname(configPath).toLowerCase();
+    visited.add(configPath);
     try {
       if (path.basename(configPath) === 'package.json') {
         const pkg = JSON.parse(fs.readFileSync(configPath, 'utf8')) as { commitlint?: CommitLintConfig };
-        return pkg.commitlint ? this.mergePresets(pkg.commitlint) : {};
+        return pkg.commitlint ? this.mergePresets(pkg.commitlint, configPath, visited) : {};
       }
 
       if (ext === '.mjs' || ext === '.ts') {
@@ -277,16 +368,25 @@ class CommitLintService {
           }
           throw e;
         }
-        return this.mergePresets(mod?.default ?? mod);
+        return this.mergePresets(mod?.default ?? mod, configPath, visited);
       }
 
       const content = fs.readFileSync(configPath, 'utf8');
 
       if (ext === '.yml' || ext === '.yaml') {
-        return this.mergePresets(this.parseYamlConfig(content));
+        return this.mergePresets(this.parseYamlConfig(content), configPath, visited);
       }
 
-      return this.mergePresets(JSON.parse(content) as CommitLintConfig);
+      // .json — and extensionless .commitlintrc, which cosmiconfig parses as
+      // JSON or YAML; mirror that with a YAML fallback.
+      try {
+        return this.mergePresets(JSON.parse(content) as CommitLintConfig, configPath, visited);
+      } catch (jsonError) {
+        if (ext === '') {
+          return this.mergePresets(this.parseYamlConfig(content), configPath, visited);
+        }
+        throw jsonError;
+      }
     } catch (error) {
       Logger.log(`CommitLint: failed to parse ${configPath}: ${error instanceof Error ? error.message : String(error)}`);
       return {};
@@ -352,6 +452,11 @@ class CommitLintService {
     if (rules['subject-min-length']?.[2]) {
       lines.push(`- Subject min length: ${rules['subject-min-length'][2]} characters`);
     }
+    if (rules['subject-exclamation-mark']?.[0] === 2) {
+      lines.push(rules['subject-exclamation-mark'][1] === 'never'
+        ? '- Never put "!" before the ":" in the header'
+        : '- Always put "!" before the ":" in the header');
+    }
 
     // header
     if (rules['header-max-length']?.[2]) {
@@ -359,6 +464,9 @@ class CommitLintService {
     }
     if (rules['header-min-length']?.[2]) {
       lines.push(`- Header (first line) min length: ${rules['header-min-length'][2]} characters`);
+    }
+    if (rules['header-full-stop']?.[0] === 2 && rules['header-full-stop']?.[1] === 'never') {
+      lines.push(`- Header must not end with "${rules['header-full-stop'][2] ?? '.'}"`);
     }
 
     // body
@@ -387,6 +495,13 @@ class CommitLintService {
     }
     if (rules['footer-empty']?.[0] === 2 && rules['footer-empty']?.[1] === 'never') {
       lines.push('- Footer is required');
+    }
+
+    // trailers
+    for (const ruleName of ['signed-off-by', 'trailer-exists'] as const) {
+      if (rules[ruleName]?.[0] === 2 && rules[ruleName]?.[1] === 'always') {
+        lines.push(`- End the message with a "${rules[ruleName][2] ?? 'Signed-off-by:'}" trailer line`);
+      }
     }
 
     return lines.length > 1 ? lines.join('\n') : COMMIT_RULES_DEFAULT;
@@ -479,11 +594,13 @@ class CommitLintService {
 
       switch (ruleName) {
         // type
-        case 'type-enum':
-          if (type && !(value as string[]).includes(type)) {
-            errors.push(`type must be one of [${(value as string[]).join(', ')}]`);
+        case 'type-enum': {
+          const list = value as string[];
+          if (type && (condition === 'never' ? list.includes(type) : !list.includes(type))) {
+            errors.push(`type must ${condition === 'never' ? 'not ' : ''}be one of [${list.join(', ')}]`);
           }
           break;
+        }
         case 'type-case':
           if (type && !this.checkCase(type, value, condition)) {
             errors.push(`type must be ${condition === 'always' ? '' : 'not '}${this.caseStr(value)}`);
@@ -501,11 +618,20 @@ class CommitLintService {
           break;
 
         // scope
-        case 'scope-enum':
-          if (scope !== null && !(value as string[]).includes(scope)) {
-            errors.push(`scope must be one of [${(value as string[]).join(', ')}]`);
+        case 'scope-enum': {
+          const list = value as string[];
+          if (scope !== null && scope !== '') {
+            // commitlint allows multiple scopes delimited by "/", "\" or ","
+            const scopes = scope.split(/[/,\\]/).map(s => s.trim()).filter(Boolean);
+            const violates = condition === 'never'
+              ? scopes.some(s => list.includes(s))
+              : !scopes.every(s => list.includes(s));
+            if (violates) {
+              errors.push(`scope must ${condition === 'never' ? 'not ' : ''}be one of [${list.join(', ')}]`);
+            }
           }
           break;
+        }
         case 'scope-case':
           if (scope !== null && scope !== '' && !this.checkCase(scope, value, condition)) {
             errors.push(`scope must be ${condition === 'always' ? '' : 'not '}${this.caseStr(value)}`);
@@ -543,6 +669,12 @@ class CommitLintService {
         case 'subject-min-length':
           if (subject.length < (value as number)) { errors.push(`subject must not be shorter than ${value} characters`); }
           break;
+        case 'subject-exclamation-mark': {
+          const hasMark = /^[a-zA-Z0-9_-]+(?:\([^)]*\))?!:/.test(header);
+          if (condition === 'never' && hasMark) { errors.push('subject must not have an exclamation mark before the ":" marker'); }
+          else if (condition === 'always' && !hasMark) { errors.push('subject must have an exclamation mark before the ":" marker'); }
+          break;
+        }
 
         // header
         case 'header-max-length':
@@ -550,6 +682,20 @@ class CommitLintService {
           break;
         case 'header-min-length':
           if (header.length < (value as number)) { errors.push(`header must not be shorter than ${value} characters`); }
+          break;
+        case 'header-case':
+          if (header && !this.checkCase(header, value, condition)) {
+            errors.push(`header must be ${condition === 'always' ? '' : 'not '}${this.caseStr(value)}`);
+          }
+          break;
+        case 'header-full-stop': {
+          const stop = (value as string) ?? '.';
+          if (condition === 'never' && header.endsWith(stop)) { errors.push(`header may not end with "${stop}"`); }
+          else if (condition === 'always' && !header.endsWith(stop)) { errors.push(`header must end with "${stop}"`); }
+          break;
+        }
+        case 'header-trim':
+          if (header !== header.trim()) { errors.push('header must not have leading or trailing whitespace'); }
           break;
 
         // body
@@ -569,6 +715,20 @@ class CommitLintService {
         case 'body-empty':
           if (condition === 'never' && empty(body)) { errors.push('body may not be empty'); }
           break;
+        case 'body-min-length':
+          if (body.length < (value as number)) { errors.push(`body must not be shorter than ${value} characters`); }
+          break;
+        case 'body-case':
+          if (body && !this.checkCase(body, value, condition)) {
+            errors.push(`body must be ${condition === 'always' ? '' : 'not '}${this.caseStr(value)}`);
+          }
+          break;
+        case 'body-full-stop': {
+          const stop = (value as string) ?? '.';
+          if (body && condition === 'never' && body.endsWith(stop)) { errors.push(`body may not end with "${stop}"`); }
+          else if (body && condition === 'always' && !body.endsWith(stop)) { errors.push(`body must end with "${stop}"`); }
+          break;
+        }
 
         // footer
         case 'footer-leading-blank': {
@@ -592,6 +752,19 @@ class CommitLintService {
         case 'footer-empty':
           if (condition === 'never' && empty(footer)) { errors.push('footer may not be empty'); }
           break;
+        case 'footer-min-length':
+          if (footer.length < (value as number)) { errors.push(`footer must not be shorter than ${value} characters`); }
+          break;
+
+        // trailers
+        case 'signed-off-by':
+        case 'trailer-exists': {
+          const trailer = (value as string) ?? 'Signed-off-by:';
+          const present = msgLines.some(l => l.startsWith(trailer));
+          if (condition === 'always' && !present) { errors.push(`message must contain a "${trailer}" trailer`); }
+          else if (condition === 'never' && present) { errors.push(`message must not contain a "${trailer}" trailer`); }
+          break;
+        }
       }
     }
 

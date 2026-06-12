@@ -59,6 +59,7 @@ export const SETTING_DEFAULTS = {
     'telemetry.enabled': true,
     'commit.commitlint.maxRetries': 3,
     'commit.commitlint.rulesPath': '',
+    'commit.commitlint.engine': 'auto',
 } as const satisfies Record<string, CacheValue>;
 /* eslint-enable @typescript-eslint/naming-convention */
 
