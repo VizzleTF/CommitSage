@@ -65,6 +65,7 @@ interface InitData {
         autoPushNeedsCommit: string;
         untrusted: string;
         customInstructions: string;
+        commitlint: string;
         commitlintEnabled: string;
         commitlintEngine: string;
         commitlintMaxRetries: string;
@@ -814,7 +815,13 @@ function renderCommitSection(state: ViewState): HTMLElement {
         v => setSetting(KEYS.onlyStagedChanges, v),
     ));
 
+    return section('commit', L.commit, true, body);
+}
+
+function renderCommitlintSection(state: ViewState): HTMLElement {
+    const body = el('div');
     const isCustomFormat = state.commit.format === 'custom';
+
     body.appendChild(makeCheckbox(
         'commitlint-enabled',
         L.commitlintEnabled,
@@ -865,7 +872,7 @@ function renderCommitSection(state: ViewState): HTMLElement {
         }
     }
 
-    return section('commit', L.commit, true, body);
+    return section('commitlint', L.commitlint, true, body);
 }
 
 function renderAutomationSection(state: ViewState): HTMLElement {
@@ -949,6 +956,7 @@ function render(state: ViewState): void {
     fragment.appendChild(renderModelAuthSection(state));
     fragment.appendChild(renderCommitSection(state));
     fragment.appendChild(renderAutomationSection(state));
+    fragment.appendChild(renderCommitlintSection(state));
     fragment.appendChild(renderAdvancedSection(state));
     root.innerHTML = '';
     root.appendChild(fragment);
