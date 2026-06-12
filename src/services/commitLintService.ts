@@ -145,7 +145,10 @@ class CommitLintService {
         // Fully resolved rules: extends chains, community presets and plugins
         // are already applied by the project's own commitlint.
         const resolved = await CommitLintCliService.resolvedRules(repoPath, rulesPath, opts.signal);
-        if (resolved) { return this.rulesToInstructions(resolved); }
+        if (resolved) {
+          Logger.log(`CommitLint: prompt rules from project CLI (${Object.keys(resolved).length} resolved rules)`);
+          return this.rulesToInstructions(resolved);
+        }
       } catch (error) {
         Logger.log(`CommitLint: project CLI rule extraction failed: ${error instanceof Error ? error.message : String(error)}`);
       }
@@ -184,13 +187,18 @@ class CommitLintService {
     if (this.useProjectEngine(opts.engine ?? 'builtin', format)) {
       try {
         const cliResult = await CommitLintCliService.validate(message, repoPath, rulesPath, opts.signal);
-        if (cliResult) { return cliResult; }
+        if (cliResult) {
+          Logger.log(`CommitLint: project CLI verdict — ${cliResult.valid ? 'valid' : `invalid (${cliResult.errors.length} errors: ${cliResult.errors.join('; ')})`}`);
+          return cliResult;
+        }
       } catch (error) {
         Logger.log(`CommitLint: project CLI validation failed: ${error instanceof Error ? error.message : String(error)}`);
       }
       Logger.warn('CommitLint: project engine requested but commitlint CLI is unavailable — using builtin validator');
     }
-    return this.validateBuiltin(message, repoPath, rulesPath, format);
+    const result = this.validateBuiltin(message, repoPath, rulesPath, format);
+    Logger.log(`CommitLint: builtin verdict (${format}) — ${result.valid ? 'valid' : `invalid (${result.errors.length} errors: ${result.errors.join('; ')})`}`);
+    return result;
   }
 
   private static validateBuiltin(message: string, repoPath: string, rulesPath: string | undefined, format: string): CommitLintResult {
