@@ -23,6 +23,7 @@ Commit Sage is a VSCode extension that automatically generates commit messages u
 - 🌍 Multiple language support (English, Russian, Chinese, Japanese, Korean, German, French, Spanish, Portuguese)
 - 📝 Various commit formats (Conventional, Angular, Karma, Semantic, Emoji, EmojiKarma, Google, Atom)
 - 🔄 Smart handling of staged/unstaged changes
+- ✅ Commitlint validation with auto-fix and retries — built-in rules for every format, or your project's own commitlint for exact CI parity
 - 🚀 Auto-commit and auto-push capabilities
 - 🎯 Custom instructions support
 - ⚡ Fast and efficient processing
@@ -284,6 +285,18 @@ Commit Sage — расширение VSCode для автоматической 
 Все настройки доступны через:
 - Палитра команд → "Preferences: Open Settings (UI)"
 - Поиск "Commit Sage"
+
+## Валидация сообщений (commitlint)
+
+Секция **Commitlint** в сайдбаре включает проверку сгенерированного сообщения с автоисправлением и повторными попытками (`commitSage.commit.commitlint.enabled`).
+
+Как это работает:
+
+- Без какой-либо настройки сообщение проверяется встроенными правилами выбранного формата — у каждого формата свой набор (conventional, angular, karma, semantic, google, emoji, emojiKarma, detailed). Механические нарушения (регистр типа, точка в конце, пустая строка перед телом) исправляются кодом без лишнего запроса к модели, остальное уходит модели на переписывание (до `maxRetries` раз).
+- Если в репозитории есть commitlint-конфиг, форматы conventional/angular читают его: `.commitlintrc.*`, `commitlint.config.*`, поле `commitlint` в `package.json`, локальные `extends` (JSON/YAML/CJS). Нестандартный путь задаётся через `commitlint.rulesPath`.
+- Если в репозитории установлен пакет commitlint, в сайдбаре появляется выбор валидатора: можно отдать проверку **проектному commitlint CLI** — полный паритет с CI (любые пресеты, плагины, цепочки `extends`, кастомные парсеры, любая версия commitlint). Ошибки CLI дословно попадают в промпт переписывания.
+
+Действующие правила также добавляются в промпт генерации, поэтому обычно сообщение проходит с первой попытки. Вердикты движков пишутся в Output-канал Commit Sage. Для формата `custom` валидация недоступна и выключается автоматически.
 
 ## Конфигурация проекта (.commitsage/config.json)
 
