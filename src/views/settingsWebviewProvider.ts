@@ -49,7 +49,7 @@ const LANGUAGES = [
 ] as const;
 const FORMATS = [
     'conventional', 'angular', 'karma', 'semantic',
-    'emoji', 'emojiKarma', 'google', 'atom', 'detailed', 'commitlint', 'custom',
+    'emoji', 'emojiKarma', 'google', 'atom', 'detailed', 'custom',
 ] as const;
 
 const SECRET_KEYS: Record<Provider, string> = {
