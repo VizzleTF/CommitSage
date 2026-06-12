@@ -1,5 +1,6 @@
 import * as vscode from 'vscode';
 import { ConfigService } from '../utils/configService';
+import { CommitLintCliService } from '../services/commitLintCliService';
 import { ApiKeyManager } from '../services/apiKeyManager';
 import {
     fetchGeminiModels,
@@ -98,8 +99,10 @@ const SETTING_KEYS = {
     apiRequestTimeout: 'commitSage.apiRequestTimeout',
     gitTimeout: 'commitSage.gitTimeout',
     telemetryEnabled: 'commitSage.telemetry.enabled',
+    commitlintEnabled: 'commitSage.commit.commitlint.enabled',
     commitlintMaxRetries: 'commitSage.commit.commitlint.maxRetries',
     commitlintRulesPath: 'commitSage.commit.commitlint.rulesPath',
+    commitlintEngine: 'commitSage.commit.commitlint.engine',
 } as const;
 
 interface ModelSlot {
@@ -130,8 +133,11 @@ interface ViewState {
         autoPush: boolean;
         useCustomInstructions: boolean;
         customInstructions: string;
+        commitlintEnabled: boolean;
         commitlintMaxRetries: number;
         commitlintRulesPath: string;
+        commitlintEngine: string;
+        commitlintCliAvailable: boolean;
     };
     advanced: {
         apiRequestTimeout: number;
@@ -496,8 +502,14 @@ export class SettingsWebviewProvider implements vscode.WebviewViewProvider {
                 autoPush: ConfigService.get('commit.autoPush'),
                 useCustomInstructions: ConfigService.get('commit.useCustomInstructions'),
                 customInstructions: ConfigService.get('commit.customInstructions'),
+                commitlintEnabled: ConfigService.get('commit.commitlint.enabled'),
                 commitlintMaxRetries: ConfigService.get('commit.commitlint.maxRetries'),
                 commitlintRulesPath: ConfigService.get('commit.commitlint.rulesPath'),
+                commitlintEngine: ConfigService.get('commit.commitlint.engine'),
+                commitlintCliAvailable: (() => {
+                    const root = ConfigService.getProjectRootPath();
+                    return root ? CommitLintCliService.detect(root) !== null : false;
+                })(),
             },
             advanced: {
                 apiRequestTimeout: ConfigService.get('apiRequestTimeout'),
@@ -712,6 +724,8 @@ export class SettingsWebviewProvider implements vscode.WebviewViewProvider {
                 autoPushNeedsCommit: vscode.l10n.t('Requires auto-commit'),
                 untrusted: vscode.l10n.t('Disabled in untrusted workspaces'),
                 customInstructions: vscode.l10n.t('Custom instructions'),
+                commitlintEnabled: vscode.l10n.t('Validate & retry generated message'),
+                commitlintEngine: vscode.l10n.t('Validator'),
                 commitlintMaxRetries: vscode.l10n.t('Max commitlint retries'),
                 commitlintRulesPath: vscode.l10n.t('Commitlint rules path'),
                 enableCustom: vscode.l10n.t('Enable custom instructions'),

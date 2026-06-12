@@ -355,7 +355,6 @@
             "google",
             "atom",
             "detailed",
-            "commitlint",
             "custom"
           ],
           "enumDescriptions": [
@@ -368,11 +367,10 @@
             "Type: Description\n\nBody\n\nFooter",
             "type(scope): subject\n\nbody\n\nfooter",
             "Summary: ...\n\nDetails:\n- ...\n\nEffects:\n- ...",
-            "Build the prompt from the project's commitlint config and validate the result against it (auto-fix + refinement retries).",
             "Use the text in 'Custom Instructions' verbatim instead of a built-in template."
           ],
           "default": "conventional",
-          "markdownDescription": "Format style for commit messages. Pick `commitlint` to drive the format from the project's commitlint config (`.commitlintrc.*`, `commitlint.config.*` or the `commitlint` field in `package.json`). Pick `custom` to use the free-form text from `#commitSage.commit.customInstructions#` as the entire prompt template (auto-enables `#commitSage.commit.useCustomInstructions#` when selected via the [Commit Sage sidebar](command:commitsage.settings.focus)).",
+          "markdownDescription": "Format style for commit messages. Pick `custom` to use the free-form text from `#commitSage.commit.customInstructions#` as the entire prompt template (auto-enables `#commitSage.commit.useCustomInstructions#` when selected via the [Commit Sage sidebar](command:commitsage.settings.focus)).",
           "order": 4
         },
         "commitSage.commit.useCustomInstructions": {
@@ -388,34 +386,38 @@
           "editPresentation": "multilineText",
           "order": 6
         },
+        "commitSage.commit.commitlint.enabled": {
+          "type": "boolean",
+          "default": false,
+          "markdownDescription": "Validate the generated message against the rules of the selected `#commitSage.commit.commitFormat#`, auto-fix mechanical violations and retry with the LLM when needed (up to `#commitSage.commit.commitlint.maxRetries#` times). Has no effect with the `custom` format and is switched off automatically when `custom` is selected.",
+          "order": 9
+        },
         "commitSage.commit.commitlint.maxRetries": {
           "type": "number",
           "default": 3,
           "minimum": 1,
           "maximum": 10,
-          "markdownDescription": "Maximum number of validation+refinement cycles when `#commitSage.commit.commitFormat#` is set to `commitlint`.",
+          "markdownDescription": "Maximum number of validation+refinement cycles when `#commitSage.commit.commitlint.enabled#` is on.",
           "order": 10
         },
         "commitSage.commit.commitlint.rulesPath": {
           "type": "string",
           "default": "",
-          "markdownDescription": "Custom path to the commitlint rules file (e.g. `./config/commitlint.config.js`). Leave empty to auto-discover `commitlint.config.{js,cjs,json,yml,yaml}` in the repository root.",
+          "markdownDescription": "Custom path to the commitlint rules file (e.g. `./config/commitlint.config.js`). Used by the `conventional` and `angular` formats. Leave empty to auto-discover `commitlint.config.{js,cjs,json,yml,yaml}` in the repository root.",
           "order": 11
         },
         "commitSage.commit.commitlint.engine": {
           "type": "string",
           "enum": [
-            "auto",
-            "project",
-            "builtin"
+            "builtin",
+            "project"
           ],
           "enumDescriptions": [
-            "Use the project's own commitlint (from node_modules) when installed and the workspace is trusted; otherwise the builtin validator.",
-            "Always use the project's commitlint; falls back to builtin with a warning when unavailable.",
-            "Always use the builtin static validator (no project code is executed)."
+            "The bundled static validator with per-format rule sets (no project code is executed).",
+            "The repo's own commitlint CLI from node_modules — exact parity with CI (presets, extends chains, plugins). Falls back to builtin when unavailable. Applies to commitlint-compatible formats only (conventional, angular, atom, karma, semantic, google)."
           ],
-          "default": "auto",
-          "markdownDescription": "Which engine validates generated messages when `#commitSage.commit.commitFormat#` is `commitlint`. The project engine runs the repo's own commitlint CLI in a child process, giving exact parity with CI: shareable presets, extends chains, plugins and custom parsers all work.",
+          "default": "builtin",
+          "markdownDescription": "Which engine validates generated messages when `#commitSage.commit.commitlint.enabled#` is on.",
           "order": 12
         },
         "commitSage.commit.onlyStagedChanges": {

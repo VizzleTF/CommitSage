@@ -57,9 +57,10 @@ export const SETTING_DEFAULTS = {
     'apiRequestTimeout': 30,
     'gitTimeout': 120,
     'telemetry.enabled': true,
+    'commit.commitlint.enabled': false,
     'commit.commitlint.maxRetries': 3,
     'commit.commitlint.rulesPath': '',
-    'commit.commitlint.engine': 'auto',
+    'commit.commitlint.engine': 'builtin',
 } as const satisfies Record<string, CacheValue>;
 /* eslint-enable @typescript-eslint/naming-convention */
 

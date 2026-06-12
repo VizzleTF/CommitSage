@@ -65,6 +65,8 @@ interface InitData {
         autoPushNeedsCommit: string;
         untrusted: string;
         customInstructions: string;
+        commitlintEnabled: string;
+        commitlintEngine: string;
         commitlintMaxRetries: string;
         commitlintRulesPath: string;
         enableCustom: string;
@@ -107,8 +109,11 @@ interface ViewState {
         autoPush: boolean;
         useCustomInstructions: boolean;
         customInstructions: string;
+        commitlintEnabled: boolean;
         commitlintMaxRetries: number;
         commitlintRulesPath: string;
+        commitlintEngine: string;
+        commitlintCliAvailable: boolean;
     };
     advanced: {
         apiRequestTimeout: number;
@@ -127,6 +132,9 @@ if (!initEl?.textContent) {
 const init: InitData = JSON.parse(initEl.textContent);
 const L = init.l10n;
 const KEYS = init.settingKeys;
+
+/** Formats the project's commitlint parser can validate directly. */
+const COMMITLINT_COMPAT_FORMATS = new Set(['conventional', 'angular', 'atom', 'karma', 'semantic', 'google']);
 
 const root = document.getElementById('root') as HTMLElement;
 
@@ -754,6 +762,10 @@ function renderCommitSection(state: ViewState): HTMLElement {
             // gate that promptService reads in lock-step so the user doesn't
             // have to toggle two checkboxes.
             setSetting(KEYS.useCustomInstructions, v === 'custom');
+            // Validation doesn't apply to free-form prompts.
+            if (v === 'custom' && state.commit.commitlintEnabled) {
+                setSetting(KEYS.commitlintEnabled, false);
+            }
         },
         { disabled: formatPinned },
     ));
@@ -802,23 +814,55 @@ function renderCommitSection(state: ViewState): HTMLElement {
         v => setSetting(KEYS.onlyStagedChanges, v),
     ));
 
-    if (state.commit.format === 'commitlint') {
+    const isCustomFormat = state.commit.format === 'custom';
+    body.appendChild(makeCheckbox(
+        'commitlint-enabled',
+        L.commitlintEnabled,
+        state.commit.commitlintEnabled && !isCustomFormat,
+        v => setSetting(KEYS.commitlintEnabled, v),
+        {
+            disabled: isCustomFormat,
+            hint: isCustomFormat ? 'Not available for the custom format.' : undefined,
+        },
+    ));
+
+    if (state.commit.commitlintEnabled && !isCustomFormat) {
+        if (COMMITLINT_COMPAT_FORMATS.has(state.commit.format) && state.commit.commitlintCliAvailable) {
+            body.appendChild(fieldLabel(L.commitlintEngine));
+            body.appendChild(makeSelect(
+                'commitlint-engine',
+                [
+                    { value: 'builtin', label: 'Built-in static rules' },
+                    { value: 'project', label: 'Project commitlint (node_modules)' },
+                ],
+                state.commit.commitlintEngine,
+                v => setSetting(KEYS.commitlintEngine, v),
+            ));
+        } else if (!COMMITLINT_COMPAT_FORMATS.has(state.commit.format)) {
+            body.appendChild(el('div', { class: 'hint' }, [
+                'This format is checked by built-in rules; project commitlint cannot parse it.',
+            ]));
+        }
+
         body.appendChild(fieldLabel(L.commitlintMaxRetries));
         body.appendChild(makeNumberInput(
             'commitlint-max-retries',
             state.commit.commitlintMaxRetries,
             v => setSetting(KEYS.commitlintMaxRetries, v),
         ));
-        body.appendChild(fieldLabel(L.commitlintRulesPath));
-        body.appendChild(makeTextInput(
-            'commitlint-rules-path',
-            state.commit.commitlintRulesPath,
-            v => setSetting(KEYS.commitlintRulesPath, v),
-            './config',
-        ));
-        body.appendChild(el('div', { class: 'hint' }, [
-            'Folder containing the commitlint config file. Relative to the repo root, or absolute.',
-        ]));
+
+        if (state.commit.format === 'conventional' || state.commit.format === 'angular') {
+            body.appendChild(fieldLabel(L.commitlintRulesPath));
+            body.appendChild(makeTextInput(
+                'commitlint-rules-path',
+                state.commit.commitlintRulesPath,
+                v => setSetting(KEYS.commitlintRulesPath, v),
+                './config',
+            ));
+            body.appendChild(el('div', { class: 'hint' }, [
+                'Path to the commitlint config file. Relative to the repo root, or absolute. Empty = auto-discover.',
+            ]));
+        }
     }
 
     return section('commit', L.commit, true, body);

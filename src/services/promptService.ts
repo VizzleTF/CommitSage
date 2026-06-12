@@ -91,37 +91,36 @@ Please provide ONLY the commit message, without any additional text or explanati
         }
 
         const formatSetting = ConfigService.get('commit.commitFormat');
-
-        if (formatSetting === 'commitlint') {
-            // No built-in template for this format — the prompt is the extracted
-            // rule set; 'conventional' only anchors the language resolution.
-            const { languagePrompt } = await this.resolveLanguagePrompt('conventional', progress);
-            const rulesPath = ConfigService.get('commit.commitlint.rulesPath');
-            const engine = ConfigService.get('commit.commitlint.engine') as CommitLintEngine;
-            const rules = await CommitLintService.extractRules(repoPath, rulesPath, { engine });
-            return this.buildPrompt(rules, languagePrompt, diff, blameAnalysis, STRICT_FORMAT_REMINDER);
-        }
-
         const format = formatSetting as CommitFormat;
 
         const { template, languagePrompt } = await this.resolveLanguagePrompt(format, progress);
 
         const reminder = format === 'detailed' ? DETAILED_FORMAT_REMINDER : STRICT_FORMAT_REMINDER;
 
-        return this.buildPrompt(template, languagePrompt, diff, blameAnalysis, reminder);
+        // Validation enabled → the active rule set rides along with the format
+        // template, so the model sees exactly what the validator will check.
+        let mainInstructions = template;
+        if (ConfigService.get('commit.commitlint.enabled') && formatSetting !== 'custom') {
+            const rulesPath = ConfigService.get('commit.commitlint.rulesPath');
+            const engine = ConfigService.get('commit.commitlint.engine') as CommitLintEngine;
+            const rules = await CommitLintService.extractRules(repoPath, rulesPath, { engine, format: formatSetting });
+            mainInstructions = `${template}\n\n${rules}`;
+        }
+
+        return this.buildPrompt(mainInstructions, languagePrompt, diff, blameAnalysis, reminder);
     }
 
     static async generateRefinementPrompt(repoPath: string, originalMessage: string, errors: string[], progress: ProgressReporter): Promise<string> {
-        // Only reached when commitFormat is 'commitlint', which has no template
-        // of its own — 'conventional' anchors the language resolution.
-        const { languagePrompt } = await this.resolveLanguagePrompt('conventional', progress);
+        const formatSetting = ConfigService.get('commit.commitFormat');
+        const format = (formatSetting === 'custom' ? 'conventional' : formatSetting) as CommitFormat;
+        const { languagePrompt } = await this.resolveLanguagePrompt(format, progress);
 
         // Full rule set included so the model doesn't fix one rule while breaking another
         const rulesPath = ConfigService.get('commit.commitlint.rulesPath');
         const engine = ConfigService.get('commit.commitlint.engine') as CommitLintEngine;
-        const rules = await CommitLintService.extractRules(repoPath, rulesPath, { engine });
+        const rules = await CommitLintService.extractRules(repoPath, rulesPath, { engine, format: formatSetting });
 
-        return `The following commit message failed commitlint validation:
+        return `The following commit message failed validation:
 
 ${originalMessage}
 

@@ -7,18 +7,20 @@ import * as vscode from 'vscode';
 import { Logger } from '../utils/logger';
 
 import { CommitLintCliService } from './commitLintCliService';
+import { FORMAT_RULE_SETS, COMMITLINT_COMPATIBLE_FORMATS, CONFIG_DRIVEN_FORMATS, FormatRuleSet } from './formatRules';
 import { CommitLintConfig, CommitLintRules, CommitLintResult, ParsedCommit } from '../models/types';
 
 /**
- * auto    — project's own commitlint CLI when installed and trusted, builtin otherwise;
- * project — project CLI only (warns and falls back when unavailable);
- * builtin — always the static engine.
+ * project — the repo's own commitlint CLI (full CI parity; falls back to builtin when unavailable);
+ * builtin — the bundled static engine with per-format rule sets.
  */
-export type CommitLintEngine = 'auto' | 'project' | 'builtin';
+export type CommitLintEngine = 'project' | 'builtin';
 
 export interface CommitLintOptions {
   engine?: CommitLintEngine;
   signal?: AbortSignal;
+  /** Selected commitFormat — picks the builtin rule set and gates the project engine. */
+  format?: string;
 }
 
 const CONFIG_FILES = [
@@ -130,12 +132,15 @@ class CommitLintService {
     return null;
   }
 
-  private static useProjectEngine(engine: CommitLintEngine): boolean {
-    return engine !== 'builtin' && vscode.workspace.isTrusted;
+  private static useProjectEngine(engine: CommitLintEngine, format: string): boolean {
+    return engine === 'project'
+      && vscode.workspace.isTrusted
+      && COMMITLINT_COMPATIBLE_FORMATS.has(format);
   }
 
   static async extractRules(repoPath: string, rulesPath?: string, opts: CommitLintOptions = {}): Promise<string> {
-    if (this.useProjectEngine(opts.engine ?? 'auto')) {
+    const format = opts.format ?? 'conventional';
+    if (this.useProjectEngine(opts.engine ?? 'builtin', format)) {
       try {
         // Fully resolved rules: extends chains, community presets and plugins
         // are already applied by the project's own commitlint.
@@ -144,26 +149,25 @@ class CommitLintService {
       } catch (error) {
         Logger.log(`CommitLint: project CLI rule extraction failed: ${error instanceof Error ? error.message : String(error)}`);
       }
-      if (opts.engine === 'project') {
-        Logger.warn('CommitLint: project engine requested but commitlint CLI is unavailable — using builtin rule extraction');
-      }
+      Logger.warn('CommitLint: project engine requested but commitlint CLI is unavailable — using builtin rule extraction');
     }
-    return this.extractRulesBuiltin(repoPath, rulesPath);
+    return this.extractRulesBuiltin(repoPath, rulesPath, format);
   }
 
-  private static extractRulesBuiltin(repoPath: string, rulesPath?: string): string {
+  private static extractRulesBuiltin(repoPath: string, rulesPath: string | undefined, format: string): string {
     try {
-      const configPath = this.resolveConfigPath(repoPath, rulesPath);
-      if (!configPath) {
-        Logger.log('CommitLint: no config found, using defaults');
-        return COMMIT_RULES_DEFAULT;
+      // conventional/angular read the repo's commitlint config when present;
+      // every other format is checked against its own static rule set.
+      if (CONFIG_DRIVEN_FORMATS.has(format)) {
+        const configPath = this.resolveConfigPath(repoPath, rulesPath);
+        if (configPath) {
+          const rules = this.loadConfig(configPath);
+          if (Object.keys(rules).length > 0) { return this.rulesToInstructions(rules); }
+        }
       }
-      const rules = this.loadConfig(configPath);
-      if (Object.keys(rules).length === 0) {
-        Logger.log('CommitLint: no rules found, using defaults');
-        return COMMIT_RULES_DEFAULT;
-      }
-      return this.rulesToInstructions(rules);
+      const ruleSet = FORMAT_RULE_SETS[format];
+      if (!ruleSet) { return COMMIT_RULES_DEFAULT; }
+      return this.rulesToInstructions(ruleSet.rules, ruleSet.headerHint);
     } catch (error) {
       Logger.log(`CommitLint: error extracting rules: ${error instanceof Error ? error.message : String(error)}`);
       return COMMIT_RULES_DEFAULT;
@@ -176,31 +180,74 @@ class CommitLintService {
     rulesPath?: string,
     opts: CommitLintOptions = {},
   ): Promise<CommitLintResult> {
-    if (this.useProjectEngine(opts.engine ?? 'auto')) {
+    const format = opts.format ?? 'conventional';
+    if (this.useProjectEngine(opts.engine ?? 'builtin', format)) {
       try {
         const cliResult = await CommitLintCliService.validate(message, repoPath, rulesPath, opts.signal);
         if (cliResult) { return cliResult; }
       } catch (error) {
         Logger.log(`CommitLint: project CLI validation failed: ${error instanceof Error ? error.message : String(error)}`);
       }
-      if (opts.engine === 'project') {
-        Logger.warn('CommitLint: project engine requested but commitlint CLI is unavailable — using builtin validator');
-      }
+      Logger.warn('CommitLint: project engine requested but commitlint CLI is unavailable — using builtin validator');
     }
-    return this.validateBuiltin(message, repoPath, rulesPath);
+    return this.validateBuiltin(message, repoPath, rulesPath, format);
   }
 
-  private static validateBuiltin(message: string, repoPath: string, rulesPath?: string): CommitLintResult {
+  private static validateBuiltin(message: string, repoPath: string, rulesPath: string | undefined, format: string): CommitLintResult {
     try {
-      const explicitPath = Boolean(rulesPath && rulesPath !== '.');
-      if (!explicitPath && !this.hasConfig(repoPath)) { return { valid: true, errors: [] }; }
-      const configPath = this.resolveConfigPath(repoPath, rulesPath);
-      if (!configPath) { return { valid: true, errors: [] }; }
-      return this.validateCommit(message, this.loadConfig(configPath));
+      if (CONFIG_DRIVEN_FORMATS.has(format)) {
+        const explicitPath = Boolean(rulesPath && rulesPath !== '.');
+        const configPath = (explicitPath || this.hasConfig(repoPath))
+          ? this.resolveConfigPath(repoPath, rulesPath)
+          : null;
+        if (configPath) {
+          const rules = this.loadConfig(configPath);
+          if (Object.keys(rules).length > 0) { return this.validateCommit(message, rules); }
+        }
+      }
+      const ruleSet = FORMAT_RULE_SETS[format];
+      if (!ruleSet) { return { valid: true, errors: [] }; }
+      return this.validateWithRuleSet(message, ruleSet);
     } catch (error) {
       Logger.log(`CommitLint: validation error: ${error instanceof Error ? error.message : String(error)}`);
       return { valid: true, errors: [] };
     }
+  }
+
+  private static validateWithRuleSet(message: string, ruleSet: FormatRuleSet): CommitLintResult {
+    if (ruleSet.structural === 'detailed') { return this.validateDetailed(message); }
+
+    const lines = message.split('\n');
+    const header = lines[0] ?? '';
+
+    if (ruleSet.headerPattern && !ruleSet.headerPattern.test(header)) {
+      return { valid: false, errors: [ruleSet.headerHint ?? 'header does not match the required format'] };
+    }
+
+    // Strip the non-conventional lead-in (emoji) so standard rules can run.
+    const checked = ruleSet.stripPrefix
+      ? [header.replace(ruleSet.stripPrefix, ''), ...lines.slice(1)].join('\n')
+      : message;
+    return this.validateCommit(checked, ruleSet.rules);
+  }
+
+  private static validateDetailed(message: string): CommitLintResult {
+    const errors: string[] = [];
+    const lines = message.split('\n');
+    const header = lines[0] ?? '';
+
+    if (!/^Summary: \S/.test(header)) {
+      errors.push('first line must be "Summary: <imperative summary>"');
+    } else if (header.length > 'Summary: '.length + 72) {
+      errors.push('summary must not be longer than 72 characters');
+    }
+    if (!lines.some(l => l.trim() === 'Details:')) {
+      errors.push('message must contain a "Details:" section');
+    }
+    if (!lines.some(l => l.trim() === 'Effects:')) {
+      errors.push('message must contain an "Effects:" section');
+    }
+    return { valid: errors.length === 0, errors };
   }
 
   /**
@@ -208,11 +255,20 @@ class CommitLintService {
    * type/scope casing, trailing full stop, missing blank line before the body.
    * Returns the message unchanged when nothing is fixable.
    */
-  static autoFix(message: string, repoPath: string, rulesPath?: string): string {
+  static autoFix(message: string, repoPath: string, rulesPath?: string, format = 'conventional'): string {
     try {
-      const configPath = this.resolveConfigPath(repoPath, rulesPath);
-      if (!configPath) { return message; }
-      return this.applyAutoFixes(message, this.loadConfig(configPath));
+      if (CONFIG_DRIVEN_FORMATS.has(format)) {
+        const configPath = this.resolveConfigPath(repoPath, rulesPath);
+        if (configPath) {
+          const rules = this.loadConfig(configPath);
+          if (Object.keys(rules).length > 0) { return this.applyAutoFixes(message, rules); }
+        }
+      }
+      const ruleSet = FORMAT_RULE_SETS[format];
+      // Emoji-prefixed and structural formats are left to the LLM refinement
+      // loop — mechanical header fixes assume a conventional-shaped header.
+      if (!ruleSet || ruleSet.stripPrefix || ruleSet.structural) { return message; }
+      return this.applyAutoFixes(message, ruleSet.rules);
     } catch (error) {
       Logger.log(`CommitLint: autofix error: ${error instanceof Error ? error.message : String(error)}`);
       return message;
@@ -398,8 +454,9 @@ class CommitLintService {
     return CASE_LABELS[v as string] ?? String(v);
   }
 
-  private static rulesToInstructions(rules: CommitLintRules): string {
-    const lines: string[] = ['CommitLint rules for this project:\n'];
+  private static rulesToInstructions(rules: CommitLintRules, headerHint?: string): string {
+    const lines: string[] = ['Commit message rules for this project:\n'];
+    if (headerHint) { lines.push(`- ${headerHint}`); }
 
     // type
     if (rules['type-enum']?.[2]?.length) {

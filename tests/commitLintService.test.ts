@@ -46,15 +46,15 @@ describe('CommitLintService.hasConfig', () => {
 // ─── extractRules ────────────────────────────────────────────────────────────
 
 describe('CommitLintService.extractRules', () => {
-    it('returns default rules when no config file exists', async () => {
+    it('falls back to the conventional format rule set when no config file exists', async () => {
         const result = await CommitLintService.extractRules(tmpDir);
-        expect(result).toContain('Conventional Commits');
+        expect(result).toContain('Allowed types: feat');
     });
 
-    it('returns default rules when config has no rules', async () => {
+    it('falls back to the format rule set when config has no rules', async () => {
         fs.writeFileSync(path.join(tmpDir, '.commitlintrc.json'), JSON.stringify({ rules: {} }));
         const result = await CommitLintService.extractRules(tmpDir);
-        expect(result).toContain('Conventional Commits');
+        expect(result).toContain('Allowed types: feat');
     });
 
     it('extracts type-enum from JSON config', async () => {
@@ -233,10 +233,10 @@ describe('CommitLintService.validate', () => {
         expect(result.errors[0]).toContain('subject may not end with "."');
     });
 
-    it('returns valid:true when config has no rules (empty rules object)', async () => {
+    it('falls back to format rules when config has no rules (empty rules object)', async () => {
         fs.writeFileSync(path.join(tmpDir, '.commitlintrc.json'), JSON.stringify({ rules: {} }));
-        const result = await CommitLintService.validate('wip: anything goes', tmpDir);
-        expect(result.valid).toBe(true);
+        expect((await CommitLintService.validate('wip: anything goes', tmpDir)).valid).toBe(false);
+        expect((await CommitLintService.validate('feat: anything goes', tmpDir)).valid).toBe(true);
     });
 
     it('degrades gracefully when config file is malformed JSON', async () => {
@@ -338,7 +338,7 @@ describe('CommitLintService package.json config', () => {
     it('ignores package.json without a commitlint field', async () => {
         fs.writeFileSync(path.join(tmpDir, 'package.json'), JSON.stringify({ name: 'x' }));
         expect(CommitLintService.hasConfig(tmpDir)).toBe(false);
-        expect(await CommitLintService.extractRules(tmpDir)).toContain('Conventional Commits');
+        expect(await CommitLintService.extractRules(tmpDir)).toContain('Allowed types: feat');
     });
 
     it('prefers package.json over rc files (cosmiconfig order)', async () => {
@@ -405,8 +405,8 @@ describe('CommitLintService.autoFix', () => {
         expect(CommitLintService.autoFix(msg, tmpDir)).toBe(msg);
     });
 
-    it('returns the message unchanged when no config exists', async () => {
-        expect(CommitLintService.autoFix('Whatever: text.', tmpDir)).toBe('Whatever: text.');
+    it('applies the conventional format rules when no config exists', async () => {
+        expect(CommitLintService.autoFix('Whatever: text.', tmpDir)).toBe('whatever: text');
     });
 });
 
@@ -493,5 +493,75 @@ describe('CommitLintService static engine compatibility', () => {
         }));
         expect((await CommitLintService.validate('feat: x\n\nshort', tmpDir)).valid).toBe(false);
         expect((await CommitLintService.validate('feat: x\n\nlong enough body text', tmpDir)).valid).toBe(true);
+    });
+});
+
+// ─── per-format rule sets ────────────────────────────────────────────────────
+
+describe('CommitLintService per-format validation', () => {
+    const v = (msg: string, format: string) =>
+        CommitLintService.validate(msg, tmpDir, undefined, { format });
+
+    it('karma: conventional-like header, limited types', async () => {
+        expect((await v('feat(api): add thing', 'karma')).valid).toBe(true);
+        expect((await v('perf(api): not a karma type', 'karma')).valid).toBe(false);
+    });
+
+    it('semantic: type only, scope forbidden', async () => {
+        expect((await v('feat: add thing', 'semantic')).valid).toBe(true);
+        expect((await v('feat(api): scope not allowed', 'semantic')).valid).toBe(false);
+    });
+
+    it('google: capitalized type required', async () => {
+        expect((await v('Feat: add thing', 'google')).valid).toBe(true);
+        expect((await v('feat: lowercase type', 'google')).valid).toBe(false);
+    });
+
+    it('emoji: header must start with an emoji', async () => {
+        expect((await v(':sparkles: add new feature', 'emoji')).valid).toBe(true);
+        expect((await v('✨ add new feature', 'emoji')).valid).toBe(true);
+        expect((await v('feat: no emoji here', 'emoji')).valid).toBe(false);
+    });
+
+    it('emojiKarma: emoji + karma header', async () => {
+        expect((await v(':sparkles: feat(api): add thing', 'emojiKarma')).valid).toBe(true);
+        expect((await v(':sparkles: just a message', 'emojiKarma')).valid).toBe(false);
+        expect((await v('feat(api): emoji missing', 'emojiKarma')).valid).toBe(false);
+    });
+
+    it('emojiKarma: karma rules checked after the emoji prefix', async () => {
+        const result = await v(':sparkles: wip(api): bad type', 'emojiKarma');
+        expect(result.valid).toBe(false);
+        expect(result.errors.join()).toContain('type must');
+    });
+
+    it('detailed: requires Summary/Details/Effects structure', async () => {
+        const good = 'Summary: add commitlint support\n\nDetails:\n- service: new validator\n\nEffects:\n- safer commits';
+        expect((await v(good, 'detailed')).valid).toBe(true);
+        expect((await v('feat: not detailed at all', 'detailed')).valid).toBe(false);
+        const noEffects = 'Summary: add thing\n\nDetails:\n- x: y';
+        expect((await v(noEffects, 'detailed')).valid).toBe(false);
+    });
+
+    it('angular format: chore banned, ! banned', async () => {
+        expect((await v('chore: tidy', 'angular')).valid).toBe(false);
+        expect((await v('feat!: breaking', 'angular')).valid).toBe(false);
+        expect((await v('build: tidy', 'angular')).valid).toBe(true);
+    });
+
+    it('conventional format prefers repo commitlint config over the static set', async () => {
+        fs.writeFileSync(path.join(tmpDir, '.commitlintrc.json'), JSON.stringify({
+            rules: { 'type-enum': [2, 'always', ['weird']] },
+        }));
+        expect((await v('weird: from config', 'conventional')).valid).toBe(true);
+        expect((await v('feat: static says ok, config says no', 'conventional')).valid).toBe(false);
+    });
+
+    it('karma format ignores the repo commitlint config (static rules only)', async () => {
+        fs.writeFileSync(path.join(tmpDir, '.commitlintrc.json'), JSON.stringify({
+            rules: { 'type-enum': [2, 'always', ['weird']] },
+        }));
+        expect((await v('weird: config ignored', 'karma')).valid).toBe(false);
+        expect((await v('feat: karma static rules', 'karma')).valid).toBe(true);
     });
 });

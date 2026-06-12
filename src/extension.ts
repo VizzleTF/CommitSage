@@ -45,6 +45,20 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
             void SettingsValidator.validateProjectConfig();
         }),
     );
+    // Validation makes no sense for free-form custom prompts: switch the
+    // checkbox off whenever the user picks the custom format, also when the
+    // format is changed through the VS Code settings UI or settings.json.
+    context.subscriptions.push(
+        vscode.workspace.onDidChangeConfiguration(e => {
+            if (!e.affectsConfiguration('commitSage.commit.commitFormat')) { return; }
+            const config = vscode.workspace.getConfiguration();
+            if (config.get('commitSage.commit.commitFormat') === 'custom'
+                && config.get('commitSage.commit.commitlint.enabled')) {
+                void config.update('commitSage.commit.commitlint.enabled', false, vscode.ConfigurationTarget.Global);
+            }
+        }),
+    );
+
     TelemetryService.sendEvent({ name: 'extension_activated' });
     Logger.log('Extension activated successfully');
 

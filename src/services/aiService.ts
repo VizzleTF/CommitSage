@@ -65,7 +65,9 @@ export class AIService {
 
         result.message = removeThinkTags(result.message);
 
-        const commitlintEnabled = ConfigService.get('commit.commitFormat') === 'commitlint';
+        const commitFormat = ConfigService.get('commit.commitFormat');
+        // Validation never applies to free-form custom prompts.
+        const commitlintEnabled = ConfigService.get('commit.commitlint.enabled') && commitFormat !== 'custom';
         if (commitlintEnabled) {
             const maxRetries = ConfigService.get('commit.commitlint.maxRetries');
             let attempt = 0;
@@ -75,13 +77,14 @@ export class AIService {
                 const lintOpts = {
                     engine: ConfigService.get('commit.commitlint.engine') as CommitLintEngine,
                     signal: context.signal,
+                    format: commitFormat,
                 };
                 let { valid, errors } = await CommitLintService.validate(result.message, repoPath, rulesPath, lintOpts);
 
                 if (!valid) {
                     // Mechanical violations (casing, trailing period, blank line)
                     // are fixed in code to save an LLM round-trip.
-                    const fixed = CommitLintService.autoFix(result.message, repoPath, rulesPath);
+                    const fixed = CommitLintService.autoFix(result.message, repoPath, rulesPath, commitFormat);
                     if (fixed !== result.message) {
                         result.message = fixed;
                         ({ valid, errors } = await CommitLintService.validate(fixed, repoPath, rulesPath, lintOpts));

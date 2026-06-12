@@ -118,24 +118,26 @@ describe('CommitLintCliService.resolvedRules', () => {
 });
 
 describe('CommitLintService engine selection', () => {
-    it('auto engine prefers the project CLI result over the builtin validator', async () => {
+    it('project engine prefers the CLI result over the builtin validator', async () => {
         installFakeCli(tmpDir);
-        // No static config in the repo at all — only the project CLI knows the rules.
-        const result = await CommitLintService.validate('bad: nope', tmpDir, undefined, { engine: 'auto' });
+        // "feat: contains bad word" passes builtin conventional rules, but the
+        // fake CLI rejects anything containing "bad" — proving the CLI ran.
+        const result = await CommitLintService.validate('feat: contains bad word', tmpDir, undefined, { engine: 'project' });
         expect(result.valid).toBe(false);
         expect(result.errors[0]).toContain('cli-only-rule');
     });
 
     it('builtin engine never spawns the project CLI', async () => {
         installFakeCli(tmpDir);
-        // The fake CLI would reject this, but builtin has no config → valid.
-        const result = await CommitLintService.validate('bad: nope', tmpDir, undefined, { engine: 'builtin' });
+        // The fake CLI would reject this (contains "bad"), but builtin
+        // conventional rules accept it.
+        const result = await CommitLintService.validate('feat: contains bad word', tmpDir, undefined, { engine: 'builtin' });
         expect(result.valid).toBe(true);
     });
 
     it('extractRules uses the fully resolved rules from the project CLI', async () => {
         installFakeCli(tmpDir);
-        const rules = await CommitLintService.extractRules(tmpDir, undefined, { engine: 'auto' });
+        const rules = await CommitLintService.extractRules(tmpDir, undefined, { engine: 'project' });
         expect(rules).toContain('cli-only-rule');
     });
 
@@ -145,5 +147,18 @@ describe('CommitLintService engine selection', () => {
         }));
         const rules = await CommitLintService.extractRules(tmpDir, undefined, { engine: 'project' });
         expect(rules).toContain('static-rule');
+    });
+});
+
+describe('CommitLintService format gating for the project engine', () => {
+    it('emoji format never uses the project CLI', async () => {
+        installFakeCli(tmpDir);
+        // Fake CLI would reject this ("bad"), but emoji isn't commitlint-parsable,
+        // so the builtin emoji rules run instead — and they accept it.
+        const result = await CommitLintService.validate(':sparkles: bad emoji message', tmpDir, undefined, {
+            engine: 'project',
+            format: 'emoji',
+        });
+        expect(result.valid).toBe(true);
     });
 });

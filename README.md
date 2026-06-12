@@ -106,27 +106,26 @@ Where to get keys:
   - Prompts for issue/PR references
   - Default: `false`
 
-### Commitlint Integration
+### Message Validation
 
-- **Enable**: set `commitSage.commit.commitFormat` to `commitlint`.
-  - Reads the project's commitlint config and uses its rules as the prompt template.
-  - After generation, validates the message and retries if it fails (up to `maxRetries` times).
-  - Mechanical violations (type/scope casing, trailing full stop, missing blank line before the body) are fixed in code without an extra LLM request.
-  - Falls back to conventional rules if no commitlint config is found.
+- **Enable** (`commitSage.commit.commitlint.enabled`):
+  - Validates the generated message against the rules of the selected commit format, auto-fixes mechanical violations (type/scope casing, trailing full stop, missing blank line) in code, and asks the LLM to rewrite when needed.
+  - Every format has its own built-in rule set: conventional, angular, atom, karma, semantic, google, emoji, emojiKarma and detailed are all checked (emoji formats by header pattern, detailed by its Summary/Details/Effects structure).
+  - Not available for the `custom` format — the checkbox switches off automatically when `custom` is selected.
+  - The rules in force are also appended to the generation prompt, so the model sees exactly what the validator will check.
+  - Default: `false`
 
-- **Engine** (`commitSage.commit.commitlint.engine`):
-  - `auto` (default): when the repo has commitlint installed and the workspace is trusted, validation runs the **project's own commitlint CLI** in a child process — exact parity with your CI: shareable presets (gitmoji, jira, lerna-scopes, …), `extends` chains, plugins and custom `parserPreset` all work, on any commitlint version.
-  - `project`: always use the project CLI; warns and falls back to builtin when it's unavailable.
-  - `builtin`: always use the bundled static validator (no project code is executed). It covers conventional/angular presets, local `extends`, JSON/YAML/CJS/`package.json` configs and ~35 rules.
+- **Validator** (`commitSage.commit.commitlint.engine`):
+  - `builtin` (default): the bundled static validator, no project code is executed. For `conventional`/`angular` it reads the repo's commitlint config when present (JSON, YAML, CJS, `package.json` field, local `extends`); other formats use their static rule sets.
+  - `project`: the repo's **own commitlint CLI** from node_modules runs in a child process — exact parity with your CI: shareable presets (gitmoji, jira, lerna-scopes, …), `extends` chains, plugins and custom `parserPreset` work on any commitlint version. Applies to commitlint-compatible formats (conventional, angular, atom, karma, semantic, google); requires a trusted workspace; falls back to builtin when unavailable. The sidebar shows this choice only when commitlint is detected in the repo.
 
 - **Max Retries** (`commitSage.commit.commitlint.maxRetries`):
   - Maximum number of validation + refinement cycles.
   - Range: 1–10. Default: `3`
 
 - **Rules Path** (`commitSage.commit.commitlint.rulesPath`):
-  - Custom path to the commitlint config file (e.g. `./config/commitlint.config.js`).
+  - Custom path to the commitlint config file (e.g. `./config/commitlint.config.js`). Used by the `conventional` and `angular` formats.
   - Leave empty to auto-discover the `commitlint` field in `package.json` or `commitlint.config.{js,cjs,json,yml,yaml}` in the repository root.
-  - Supported formats: JSON, YAML, CommonJS (`.js`/`.cjs`). ESM (`.mjs`) and TypeScript configs are not supported — use JSON or YAML.
   - Default: (empty — auto-discover)
 
 ### Custom Instructions
