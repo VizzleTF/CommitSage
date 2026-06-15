@@ -537,17 +537,21 @@ export class SettingsWebviewProvider implements vscode.WebviewViewProvider {
         const cspSource = webview.cspSource;
 
         const styles = `
-            :root { color-scheme: light dark; }
+            /* No color-scheme override: VS Code injects the correct one per
+               active theme. Forcing 'light dark' makes native controls
+               (checkbox, scrollbar, number spinners) follow the OS instead of
+               the VS Code theme — the cause of dark widgets on a light theme. */
             body {
                 font-family: var(--vscode-font-family);
                 font-size: var(--vscode-font-size);
-                color: var(--vscode-foreground);
+                color: var(--vscode-sideBar-foreground, var(--vscode-foreground));
+                background: var(--vscode-sideBar-background);
                 padding: 10px 12px;
                 margin: 0;
             }
             details {
                 margin-bottom: 12px;
-                border: 1px solid var(--vscode-panel-border, transparent);
+                border: 1px solid var(--vscode-sideBarSectionHeader-border, var(--vscode-widget-border, var(--vscode-panel-border, transparent)));
                 border-radius: 3px;
             }
             details > summary {
@@ -556,8 +560,13 @@ export class SettingsWebviewProvider implements vscode.WebviewViewProvider {
                 font-weight: 600;
                 user-select: none;
                 outline: none;
+                background: var(--vscode-sideBarSectionHeader-background, transparent);
+                color: var(--vscode-sideBarSectionHeader-foreground, inherit);
+                border-radius: 2px 2px 0 0;
             }
-            details[open] > summary { border-bottom: 1px solid var(--vscode-panel-border, transparent); }
+            details:not([open]) > summary { border-radius: 2px; }
+            details > summary:hover { background: var(--vscode-list-hoverBackground, var(--vscode-sideBarSectionHeader-background, transparent)); }
+            details[open] > summary { border-bottom: 1px solid var(--vscode-sideBarSectionHeader-border, var(--vscode-widget-border, var(--vscode-panel-border, transparent))); }
             .body { padding: 8px 10px 10px; }
             section.provider-pick { margin-bottom: 12px; }
             label.field {
@@ -580,6 +589,7 @@ export class SettingsWebviewProvider implements vscode.WebviewViewProvider {
                 font-family: inherit;
                 font-size: inherit;
             }
+            ::placeholder { color: var(--vscode-input-placeholderForeground, var(--vscode-descriptionForeground)); opacity: 1; }
             textarea { resize: vertical; min-height: 60px; font-family: var(--vscode-editor-font-family, monospace); }
             select:focus, input:focus, textarea:focus {
                 outline: 1px solid var(--vscode-focusBorder);
@@ -665,7 +675,7 @@ export class SettingsWebviewProvider implements vscode.WebviewViewProvider {
                 border: 1px solid var(--vscode-dropdown-border, var(--vscode-input-border, transparent));
                 border-radius: 2px;
                 z-index: 10;
-                box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+                box-shadow: 0 2px 8px var(--vscode-widget-shadow, rgba(0, 0, 0, 0.3));
             }
             .combo-list[hidden] { display: none; }
             .combo-list-item {

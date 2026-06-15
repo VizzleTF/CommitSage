@@ -23,5 +23,13 @@
       "WebFetch(domain:github.com)",
       "WebFetch(domain:devblogs.microsoft.com)"
     ]
-  }
+  },
+  "enabledMcpjsonServers": [
+    "github"
+  ],
+  "disabledMcpjsonServers": [
+    "terraform",
+    "kubernetes",
+    "helm"
+  ]
 }

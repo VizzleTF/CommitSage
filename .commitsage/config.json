@@ -3,8 +3,7 @@
     "type": "gemini"
   },
   "commit": {
-    "commitLanguage": "english",
-    "commitFormat": "emojiKarma"
+    "commitLanguage": "english"
   },
   "gemini": {
     "model": "auto"
