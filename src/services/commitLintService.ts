@@ -729,6 +729,50 @@ class CommitLintService {
     }
   }
 
+  // Shared, field-agnostic rule primitives. Each preserves the exact message
+  // and branch semantics the per-category switches used inline; `label` names
+  // the field (type/scope/subject/...) in the message.
+
+  private static checkCaseRule(
+    field: string, label: string, value: unknown, condition: 'always' | 'never',
+  ): string | null {
+    return field && !this.checkCase(field, value, condition)
+      ? `${label} must be ${condition === 'always' ? '' : 'not '}${this.caseStr(value)}`
+      : null;
+  }
+
+  private static checkEmptyRule(
+    field: string | null, label: string, condition: 'always' | 'never', handleAlways: boolean,
+  ): string | null {
+    const empty = field === null || isEmpty(field);
+    if (condition === 'never' && empty) { return `${label} may not be empty`; }
+    if (handleAlways && condition === 'always' && !empty) { return `${label} must be empty`; }
+    return null;
+  }
+
+  private static checkFullStopRule(
+    field: string, label: string, value: unknown, condition: 'always' | 'never', skipEmpty: boolean,
+  ): string | null {
+    if (skipEmpty && !field) { return null; }
+    const stop = (value as string) ?? '.';
+    if (condition === 'never' && field.endsWith(stop)) { return `${label} may not end with "${stop}"`; }
+    if (condition === 'always' && !field.endsWith(stop)) { return `${label} must end with "${stop}"`; }
+    return null;
+  }
+
+  private static checkLengthRule(
+    field: string | null, label: string, ruleName: string, value: unknown, skipEmpty: boolean,
+  ): string | null {
+    if (field === null || (skipEmpty && field === '')) { return null; }
+    if (ruleName.endsWith('-max-length') && field.length > (value as number)) {
+      return `${label} must not be longer than ${value} characters`;
+    }
+    if (ruleName.endsWith('-min-length') && field.length < (value as number)) {
+      return `${label} must not be shorter than ${value} characters`;
+    }
+    return null;
+  }
+
   private static checkTypeRule(
     ruleName: string, condition: 'always' | 'never', value: unknown, ctx: RuleContext,
   ): string | null {
@@ -741,21 +785,11 @@ class CommitLintService {
         }
         return null;
       }
-      case 'type-case':
-        if (type && !this.checkCase(type, value, condition)) {
-          return `type must be ${condition === 'always' ? '' : 'not '}${this.caseStr(value)}`;
-        }
-        return null;
-      case 'type-empty':
-        if (condition === 'never' && isEmpty(type)) { return 'type may not be empty'; }
-        if (condition === 'always' && !isEmpty(type)) { return 'type must be empty'; }
-        return null;
+      case 'type-case':       return this.checkCaseRule(type, 'type', value, condition);
+      case 'type-empty':      return this.checkEmptyRule(type, 'type', condition, true);
       case 'type-max-length':
-        return type.length > (value as number) ? `type must not be longer than ${value} characters` : null;
-      case 'type-min-length':
-        return type.length < (value as number) ? `type must not be shorter than ${value} characters` : null;
-      default:
-        return null;
+      case 'type-min-length': return this.checkLengthRule(type, 'type', ruleName, value, false);
+      default:                return null;
     }
   }
 
@@ -774,19 +808,10 @@ class CommitLintService {
           : !scopes.every(s => list.includes(s));
         return violates ? `scope must ${condition === 'never' ? 'not ' : ''}be one of [${list.join(', ')}]` : null;
       }
-      case 'scope-case':
-        if (scope !== null && scope !== '' && !this.checkCase(scope, value, condition)) {
-          return `scope must be ${condition === 'always' ? '' : 'not '}${this.caseStr(value)}`;
-        }
-        return null;
-      case 'scope-empty':
-        if (condition === 'never' && (scope === null || isEmpty(scope))) { return 'scope may not be empty'; }
-        if (condition === 'always' && scope !== null && !isEmpty(scope)) { return 'scope must be empty'; }
-        return null;
+      case 'scope-case':      return this.checkCaseRule(scope ?? '', 'scope', value, condition);
+      case 'scope-empty':     return this.checkEmptyRule(scope, 'scope', condition, true);
       case 'scope-max-length':
-        return scope && scope.length > (value as number) ? `scope must not be longer than ${value} characters` : null;
-      case 'scope-min-length':
-        return scope && scope.length < (value as number) ? `scope must not be shorter than ${value} characters` : null;
+      case 'scope-min-length': return this.checkLengthRule(scope, 'scope', ruleName, value, true);
       default:
         return null;
     }
@@ -797,23 +822,11 @@ class CommitLintService {
   ): string | null {
     const { subject, header } = ctx;
     switch (ruleName) {
-      case 'subject-case':
-        if (subject && !this.checkCase(subject, value, condition)) {
-          return `subject must be ${condition === 'always' ? '' : 'not '}${this.caseStr(value)}`;
-        }
-        return null;
-      case 'subject-empty':
-        return condition === 'never' && isEmpty(subject) ? 'subject may not be empty' : null;
-      case 'subject-full-stop': {
-        const stop = (value as string) ?? '.';
-        if (condition === 'never' && subject.endsWith(stop)) { return `subject may not end with "${stop}"`; }
-        if (condition === 'always' && !subject.endsWith(stop)) { return `subject must end with "${stop}"`; }
-        return null;
-      }
+      case 'subject-case':       return this.checkCaseRule(subject, 'subject', value, condition);
+      case 'subject-empty':      return this.checkEmptyRule(subject, 'subject', condition, false);
+      case 'subject-full-stop':  return this.checkFullStopRule(subject, 'subject', value, condition, false);
       case 'subject-max-length':
-        return subject.length > (value as number) ? `subject must not be longer than ${value} characters` : null;
-      case 'subject-min-length':
-        return subject.length < (value as number) ? `subject must not be shorter than ${value} characters` : null;
+      case 'subject-min-length': return this.checkLengthRule(subject, 'subject', ruleName, value, false);
       case 'subject-exclamation-mark': {
         const hasMark = /^[a-zA-Z0-9_-]+(?:\([^)]*\))?!:/.test(header);
         if (condition === 'never' && hasMark) { return 'subject must not have an exclamation mark before the ":" marker'; }
@@ -831,20 +844,9 @@ class CommitLintService {
     const { header } = ctx;
     switch (ruleName) {
       case 'header-max-length':
-        return header.length > (value as number) ? `header must not be longer than ${value} characters` : null;
-      case 'header-min-length':
-        return header.length < (value as number) ? `header must not be shorter than ${value} characters` : null;
-      case 'header-case':
-        if (header && !this.checkCase(header, value, condition)) {
-          return `header must be ${condition === 'always' ? '' : 'not '}${this.caseStr(value)}`;
-        }
-        return null;
-      case 'header-full-stop': {
-        const stop = (value as string) ?? '.';
-        if (condition === 'never' && header.endsWith(stop)) { return `header may not end with "${stop}"`; }
-        if (condition === 'always' && !header.endsWith(stop)) { return `header must end with "${stop}"`; }
-        return null;
-      }
+      case 'header-min-length': return this.checkLengthRule(header, 'header', ruleName, value, false);
+      case 'header-case':       return this.checkCaseRule(header, 'header', value, condition);
+      case 'header-full-stop':  return this.checkFullStopRule(header, 'header', value, condition, false);
       case 'header-trim':
         return header !== header.trim() ? 'header must not have leading or trailing whitespace' : null;
       default:
@@ -866,22 +868,10 @@ class CommitLintService {
         return body.split('\n').some(l => l.length > (value as number))
           ? `body line must not be longer than ${value} characters` : null;
       case 'body-max-length':
-        return body.length > (value as number) ? `body must not be longer than ${value} characters` : null;
-      case 'body-empty':
-        return condition === 'never' && isEmpty(body) ? 'body may not be empty' : null;
-      case 'body-min-length':
-        return body.length < (value as number) ? `body must not be shorter than ${value} characters` : null;
-      case 'body-case':
-        if (body && !this.checkCase(body, value, condition)) {
-          return `body must be ${condition === 'always' ? '' : 'not '}${this.caseStr(value)}`;
-        }
-        return null;
-      case 'body-full-stop': {
-        const stop = (value as string) ?? '.';
-        if (body && condition === 'never' && body.endsWith(stop)) { return `body may not end with "${stop}"`; }
-        if (body && condition === 'always' && !body.endsWith(stop)) { return `body must end with "${stop}"`; }
-        return null;
-      }
+      case 'body-min-length': return this.checkLengthRule(body, 'body', ruleName, value, false);
+      case 'body-empty':      return this.checkEmptyRule(body, 'body', condition, false);
+      case 'body-case':       return this.checkCaseRule(body, 'body', value, condition);
+      case 'body-full-stop':  return this.checkFullStopRule(body, 'body', value, condition, true);
       default:
         return null;
     }
@@ -906,11 +896,8 @@ class CommitLintService {
         return footer.split('\n').some(l => l.length > (value as number))
           ? `footer line must not be longer than ${value} characters` : null;
       case 'footer-max-length':
-        return footer.length > (value as number) ? `footer must not be longer than ${value} characters` : null;
-      case 'footer-empty':
-        return condition === 'never' && isEmpty(footer) ? 'footer may not be empty' : null;
-      case 'footer-min-length':
-        return footer.length < (value as number) ? `footer must not be shorter than ${value} characters` : null;
+      case 'footer-min-length': return this.checkLengthRule(footer, 'footer', ruleName, value, false);
+      case 'footer-empty':      return this.checkEmptyRule(footer, 'footer', condition, false);
       default:
         return null;
     }

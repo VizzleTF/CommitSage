@@ -17,6 +17,37 @@ import { buildGitEnv } from '../utils/gitEnv';
 
 const GIT_FANOUT_CONCURRENCY = 8;
 
+// Resolve git to an absolute path instead of letting `spawn` walk $PATH at
+// launch time. Prefer VS Code's own `git.path` setting, then the bundled git
+// extension's resolved binary; fall back to a bare `git` only when neither is
+// available. Hardens against PATH-ordering hijacks (CWE-426 / Sonar S4036).
+let cachedGitPath: string | undefined;
+function resolveGitPath(): string {
+  if (cachedGitPath !== undefined) {
+    return cachedGitPath;
+  }
+  try {
+    const configured = vscode.workspace.getConfiguration('git').get<string | string[]>('path');
+    const candidates = Array.isArray(configured) ? configured : (configured ? [configured] : []);
+    for (const candidate of candidates) {
+      if (typeof candidate === 'string' && path.isAbsolute(candidate)) {
+        cachedGitPath = candidate;
+        return candidate;
+      }
+    }
+    const gitApi = vscode.extensions.getExtension('vscode.git')?.exports?.getAPI?.(1);
+    const apiPath: unknown = gitApi?.git?.path;
+    if (typeof apiPath === 'string' && path.isAbsolute(apiPath)) {
+      cachedGitPath = apiPath;
+      return apiPath;
+    }
+  } catch {
+    // Fall through to a bare lookup — better a working extension than a crash.
+  }
+  cachedGitPath = 'git';
+  return 'git';
+}
+
 // Hard cap on stdout/stderr accumulation per `git` invocation. The diff is
 // later truncated to MAX_DIFF_LENGTH (100k) by aiService.ts; this cap is the
 // *upstream* guard so a runaway generated file never lets the buffer balloon
@@ -593,7 +624,7 @@ export class GitService {
       const timeoutMs =
         timeoutSeconds === -1 ? undefined : timeoutSeconds * 1000;
 
-      const child = spawn('git', args, {
+      const child = spawn(resolveGitPath(), args, {
         cwd,
         env: buildGitEnv(),
         timeout: timeoutMs,
