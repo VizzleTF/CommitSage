@@ -167,7 +167,13 @@ function el<K extends keyof HTMLElementTagNameMap>(
         if (c === null || c === undefined) {
             continue;
         }
-        node.appendChild(typeof c === 'string' ? document.createTextNode(c) : c);
+        // Strings become text nodes (never parsed as HTML); only already-built
+        // DOM nodes are appended as-is. No user value reaches an HTML sink.
+        if (typeof c === 'string') {
+            node.appendChild(document.createTextNode(c));
+        } else {
+            node.appendChild(c);
+        }
     }
     return node;
 }
@@ -963,8 +969,10 @@ function render(state: ViewState): void {
 }
 
 window.addEventListener('message', (event: MessageEvent) => {
-    // Only accept messages from the VS Code host (vscode-webview: locally, https: when hosted).
-    if (!event.origin.startsWith('vscode-webview:') && !event.origin.startsWith('https:')) {
+    // Only accept messages from the VS Code webview host. The webview always
+    // runs under a `vscode-webview://` origin; reject anything else so a framed
+    // or injected context cannot post state into the view.
+    if (!event.origin.startsWith('vscode-webview://')) {
         return;
     }
     const msg = event.data;
