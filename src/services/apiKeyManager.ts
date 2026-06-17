@@ -66,7 +66,7 @@ const API_KEY_CONFIGS: Record<string, ApiKeyConfig> = {
 
 export class ApiKeyManager {
     private static secretStorage: vscode.SecretStorage;
-    private static knownSecretKeys: Set<string> = new Set(
+    private static readonly knownSecretKeys: Set<string> = new Set(
         Object.values(API_KEY_CONFIGS).map(c => c.secretKey),
     );
 

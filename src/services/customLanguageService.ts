@@ -1,5 +1,5 @@
-import * as fs from 'fs';
-import * as path from 'path';
+import * as fs from 'node:fs';
+import * as path from 'node:path';
 import { Logger } from '../utils/logger';
 import { ConfigService } from '../utils/configService';
 import { getTemplate, CommitFormat } from '../templates';
@@ -47,7 +47,7 @@ export class CustomLanguageService {
         } catch (error) {
             const err = error as NodeJS.ErrnoException;
             // Missing file is the common case — not an error to log.
-            if (err && err.code === 'ENOENT') {
+            if (err?.code === 'ENOENT') {
                 return {};
             }
             Logger.error('Failed to read translations.json:', toError(error));

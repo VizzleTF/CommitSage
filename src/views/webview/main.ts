@@ -208,7 +208,7 @@ function makeSelect(
     // If the current value isn't in the list, append it so the user sees what
     // is actually stored. This is the #405 case (deprecated model still in
     // settings).
-    if (current && !options.find(o => o.value === current)) {
+    if (current && !options.some(o => o.value === current)) {
         select.appendChild(el('option', { value: current }, [`${current} ${L.notInList}`]));
     }
     select.value = current;
@@ -294,12 +294,10 @@ function fuzzyScore(query: string, target: string): number | null {
     // Tier 3: target contains every char of query as a multiset (order ignored).
     // Use a counts map so `gg` doesn't match a target with a single `g`.
     const tCounts = new Map<string, number>();
-    for (let i = 0; i < t.length; i++) {
-        const ch = t[i];
+    for (const ch of t) {
         tCounts.set(ch, (tCounts.get(ch) ?? 0) + 1);
     }
-    for (let i = 0; i < q.length; i++) {
-        const ch = q[i];
+    for (const ch of q) {
         const c = tCounts.get(ch) ?? 0;
         if (c === 0) {
             return null;
@@ -358,9 +356,7 @@ function makeCombobox(
     function renderList(filter: string): void {
         const f = filter.trim();
         let matches: string[];
-        if (!f) {
-            matches = options.slice();
-        } else {
+        if (f) {
             const scored: Array<{ value: string; score: number }> = [];
             for (const o of options) {
                 const s = fuzzyScore(f, o);
@@ -372,6 +368,8 @@ function makeCombobox(
             // is stable across renders.
             scored.sort((a, b) => b.score - a.score || a.value.localeCompare(b.value));
             matches = scored.map(s => s.value);
+        } else {
+            matches = options.slice();
         }
 
         list.innerHTML = '';
@@ -380,8 +378,7 @@ function makeCombobox(
             activeIdx = -1;
             return;
         }
-        for (let i = 0; i < matches.length; i++) {
-            const value = matches[i];
+        for (const value of matches) {
             // eslint-disable-next-line @typescript-eslint/naming-convention
             const li = el('li', { class: 'combo-list-item', 'data-value': value }, [value]);
             // mousedown (not click) — click fires AFTER input blur, which
@@ -511,7 +508,7 @@ function makeNumberInput(
     const input = el('input', { type: 'number', id }) as HTMLInputElement;
     input.value = String(value);
     input.addEventListener('change', () => {
-        const parsed = parseFloat(input.value);
+        const parsed = Number.parseFloat(input.value);
         if (!Number.isNaN(parsed)) {
             onChange(parsed);
         }
@@ -679,7 +676,9 @@ function renderModelAuthSection(state: ViewState): HTMLElement {
         { disabled: modelPinned },
     );
 
-    if (!NO_REFRESH_PROVIDERS.has(p)) {
+    if (NO_REFRESH_PROVIDERS.has(p)) {
+        body.appendChild(modelCombobox);
+    } else {
         const refreshBtn = el('button', {
             id: 'refresh-models',
             title: slot.loading ? L.refreshing : L.refresh,
@@ -687,8 +686,6 @@ function renderModelAuthSection(state: ViewState): HTMLElement {
         }, ['⟳']) as HTMLButtonElement;
         refreshBtn.addEventListener('click', () => send({ type: 'refreshModels', provider: p }));
         body.appendChild(el('div', { class: 'row' }, [modelCombobox, refreshBtn]));
-    } else {
-        body.appendChild(modelCombobox);
     }
 
     if (modelPinned) { body.appendChild(pinnedHint()); }

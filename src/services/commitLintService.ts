@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/naming-convention */
-import * as fs from 'fs';
-import * as path from 'path';
-import { createRequire } from 'module';
+import * as fs from 'node:fs';
+import * as path from 'node:path';
+import { createRequire } from 'node:module';
 import * as vscode from 'vscode';
 
 import { Logger } from '../utils/logger';
@@ -188,7 +188,8 @@ class CommitLintService {
       try {
         const cliResult = await CommitLintCliService.validate(message, repoPath, rulesPath, opts.signal);
         if (cliResult) {
-          Logger.log(`CommitLint: project CLI verdict — ${cliResult.valid ? 'valid' : `invalid (${cliResult.errors.length} errors: ${cliResult.errors.join('; ')})`}`);
+          const cliVerdict = cliResult.valid ? 'valid' : `invalid (${cliResult.errors.length} errors: ${cliResult.errors.join('; ')})`;
+          Logger.log(`CommitLint: project CLI verdict — ${cliVerdict}`);
           return cliResult;
         }
       } catch (error) {
@@ -197,7 +198,8 @@ class CommitLintService {
       Logger.warn('CommitLint: project engine requested but commitlint CLI is unavailable — using builtin validator');
     }
     const result = this.validateBuiltin(message, repoPath, rulesPath, format);
-    Logger.log(`CommitLint: builtin verdict (${format}) — ${result.valid ? 'valid' : `invalid (${result.errors.length} errors: ${result.errors.join('; ')})`}`);
+    const builtinVerdict = result.valid ? 'valid' : `invalid (${result.errors.length} errors: ${result.errors.join('; ')})`;
+    Logger.log(`CommitLint: builtin verdict (${format}) — ${builtinVerdict}`);
     return result;
   }
 
@@ -369,16 +371,16 @@ class CommitLintService {
       }
 
       // extends: inline string  →  extends: '@commitlint/config-conventional'
-      const inlineExtends = line.match(/^extends:\s*['"]?([^'"#\s]+)['"]?\s*(?:#.*)?$/);
+      const inlineExtends = /^extends:\s*['"]?([^'"#\s]+)['"]?\s*(?:#.*)?$/.exec(line);
       if (inlineExtends && !result.extends) {
         result.extends = inlineExtends[1].trim();
       }
 
       // extends list item  →    - '@commitlint/config-conventional'
       if (!inRules) {
-        const listItem = line.match(/^[ \t]+-[ \t]+['"]?([^'"#\s]+)['"]?\s*(?:#.*)?$/);
+        const listItem = /^[ \t]+-[ \t]+['"]?([^'"#\s]+)['"]?\s*(?:#.*)?$/.exec(line);
         if (listItem && Array.isArray(result.extends)) {
-          (result.extends as string[]).push(listItem[1].trim());
+          result.extends.push(listItem[1].trim());
         } else if (listItem && result.extends === undefined) {
           result.extends = [listItem[1].trim()];
         }
@@ -386,7 +388,7 @@ class CommitLintService {
 
       // rule line (only inside rules: section)  →    type-enum: [2, always, [feat, fix]]
       if (inRules) {
-        const ruleMatch = line.match(/^[ \t]+([a-z][a-z-]+):\s*(\[.+\])\s*(?:#.*)?$/);
+        const ruleMatch = /^[ \t]+([a-z][a-z-]+):\s*(\[.+\])\s*(?:#.*)?$/.exec(line);
         if (ruleMatch) {
           try {
             // Quote unquoted bare words so the flow sequence becomes valid JSON
@@ -616,7 +618,7 @@ class CommitLintService {
     const body   = bodyLines.join('\n').trim();
     const footer = footerLines.join('\n').trim();
 
-    const headerMatch = header.match(/^([a-zA-Z0-9_-]+)(?:\(([^)]*)\))?!?:\s*(.*)$/);
+    const headerMatch = /^([a-zA-Z0-9_-]+)(?:\(([^)]*)\))?!?:\s*(.*)$/.exec(header);
 
     return {
       header,

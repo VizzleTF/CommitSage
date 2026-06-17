@@ -44,11 +44,9 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         ConfigService.onProjectConfigChange(() => {
             void SettingsValidator.validateProjectConfig();
         }),
-    );
-    // Validation makes no sense for free-form custom prompts: switch the
-    // checkbox off whenever the user picks the custom format, also when the
-    // format is changed through the VS Code settings UI or settings.json.
-    context.subscriptions.push(
+        // Validation makes no sense for free-form custom prompts: switch the
+        // checkbox off whenever the user picks the custom format, also when the
+        // format is changed through the VS Code settings UI or settings.json.
         vscode.workspace.onDidChangeConfiguration(e => {
             if (!e.affectsConfiguration('commitSage.commit.commitFormat')) { return; }
             const config = vscode.workspace.getConfiguration();

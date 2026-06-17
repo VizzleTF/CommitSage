@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
-import * as fs from 'fs/promises';
-import * as path from 'path';
+import * as fs from 'node:fs/promises';
+import * as path from 'node:path';
 import { Logger } from './logger';
 import { ProjectConfig } from '../models/types';
 import { toError } from './errorUtils';
@@ -76,12 +76,12 @@ type Widened<T> =
 type SettingValue<K extends SettingKey> = Widened<(typeof SETTING_DEFAULTS)[K]>;
 
 export class ConfigService {
-  private static cache = new Map<string, CacheValue>();
+  private static readonly cache = new Map<string, CacheValue>();
   private static projectConfigCache: ProjectConfig | null = null;
   private static projectConfigFileWatcher: vscode.FileSystemWatcher | null =
     null;
   private static disposables: vscode.Disposable[] = [];
-  private static projectConfigChangeListeners: Array<() => void> = [];
+  private static readonly projectConfigChangeListeners: Array<() => void> = [];
 
   /**
    * Subscribe to project-config file change/create/delete events. Used by
@@ -353,7 +353,7 @@ export class ConfigService {
       }
       validated[section] = validatedSection;
     }
-    return validated as ProjectConfig;
+    return validated;
   }
 
   private static isPlainObject(value: unknown): value is Record<string, unknown> {
@@ -511,7 +511,7 @@ export class ConfigService {
   }
 
   static dispose(): void {
-    this.disposables.forEach((d) => void d.dispose());
+    this.disposables.forEach((d) => d.dispose());
     this.disposables = [];
     this.clearCache();
     this.projectConfigCache = null;

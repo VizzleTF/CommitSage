@@ -166,7 +166,7 @@ export class TelemetryService {
     }
 
     static dispose(): void {
-        this.disposables.forEach(d => void d.dispose());
+        this.disposables.forEach(d => { d.dispose(); });
         this.disposables = [];
         this.logger?.dispose();
         this.logger = null;

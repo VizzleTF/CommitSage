@@ -158,7 +158,7 @@ export class CommitWorkflow {
             (file) => GitBlameAnalyzer.analyzeChanges(repoPath, file.path, file.status, signal),
             signal,
         );
-        const blameAnalysis = blameAnalyses.filter(analysis => analysis).join('\n\n');
+        const blameAnalysis = blameAnalyses.filter(Boolean).join('\n\n');
 
         if (token.isCancellationRequested) {
             throw new UserCancelledError();

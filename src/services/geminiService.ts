@@ -61,7 +61,7 @@ function geminiQualityTier(name: string): number {
 // Extract the leading numeric version (e.g. "gemini-2.5-flash" -> 2.5,
 // "gemini-3-flash-preview" -> 3). Newer versions sort first within a tier.
 function geminiVersionScore(name: string): number {
-    const match = name.match(/gemini-(\d+(?:\.\d+)?)/);
+    const match = /gemini-(\d+(?:\.\d+)?)/.exec(name);
     return match ? Number.parseFloat(match[1]) : 0;
 }
 
@@ -157,7 +157,8 @@ export class GeminiService {
             throw new ApiKeyInvalidError('Gemini');
         }
 
-        throw new Error(`All models failed. Errors: ${errors.map(e => `${e.model}: ${e.error}`).join('; ')}`);
+        const errorDetails = errors.map(e => `${e.model}: ${e.error}`).join('; ');
+        throw new Error(`All models failed. Errors: ${errorDetails}`);
     }
 
     static async generateCommitMessage(

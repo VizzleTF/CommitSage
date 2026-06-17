@@ -37,7 +37,7 @@ export function parseBlameOutput(blameOutput: string): BlameInfo[] {
             currentBlame = {};
         } else {
             // Header line of a blame entry:  <40-hex-sha> <orig> <final> [count]
-            const match = line.match(/^([0-9a-f]{40}) \d+ (\d+)(?: \d+)?$/);
+            const match = /^([0-9a-f]{40}) \d+ (\d+)(?: \d+)?$/.exec(line);
             if (match) {
                 currentBlame.commit = match[1];
                 currentBlame.lineNumber = Number.parseInt(match[2], 10);
@@ -54,7 +54,7 @@ export function parseChangedLines(diff: string): Set<number> {
     let currentLine = 0;
 
     for (const line of lines) {
-        const match = line.match(/^@@ -\d+(?:,\d+)? \+(\d+)(?:,\d+)? @@/);
+        const match = /^@@ -\d+(?:,\d+)? \+(\d+)(?:,\d+)? @@/.exec(line);
         if (match) {
             currentLine = Number.parseInt(match[1], 10);
         } else if (line.startsWith('+') && !line.startsWith('+++')) {

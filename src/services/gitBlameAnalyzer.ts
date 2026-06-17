@@ -1,5 +1,5 @@
-import * as path from 'path';
-import * as fs from 'fs/promises';
+import * as path from 'node:path';
+import * as fs from 'node:fs/promises';
 import { Logger } from '../utils/logger';
 import { errorMessages } from '../utils/constants';
 import { GitService, isDeletedStatus, isNewStatus } from './gitService';

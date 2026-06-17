@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
-import * as path from 'path';
-import { spawn } from 'child_process';
+import * as path from 'node:path';
+import { spawn } from 'node:child_process';
 import { Logger } from '../utils/logger';
 import {
   GitExtensionNotFoundError,
@@ -34,12 +34,12 @@ const GIT_STATUS_CODES = {
 
 type GitStatusCode = (typeof GIT_STATUS_CODES)[keyof typeof GIT_STATUS_CODES];
 
-const STAGED_STATUS_CODES: GitStatusCode[] = [
+const STAGED_STATUS_CODES: Set<GitStatusCode> = new Set([
   GIT_STATUS_CODES.modified,
   GIT_STATUS_CODES.added,
   GIT_STATUS_CODES.deleted,
   GIT_STATUS_CODES.renamed,
-];
+]);
 
 export class GitService {
   static async initialize(): Promise<void> {
@@ -437,7 +437,7 @@ export class GitService {
         .filter((line) => {
           if (onlyStaged) {
             // For staged changes, check first character
-            return STAGED_STATUS_CODES.includes(line[0] as GitStatusCode);
+            return STAGED_STATUS_CODES.has(line[0] as GitStatusCode);
           }
           // For all changes, check both staged and unstaged status
           const [staged, unstaged] = [line[0], line[1]];

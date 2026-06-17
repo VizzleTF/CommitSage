@@ -37,9 +37,6 @@ export function registerSetApiKeyCommands(_context: vscode.ExtensionContext): vs
             vscode.commands.registerCommand(spec.setCommand, () =>
                 ApiKeyManager.promptForKey(spec.provider),
             ),
-        );
-
-        disposables.push(
             vscode.commands.registerCommand(spec.removeCommand, async () => {
                 try {
                     await ApiKeyManager.removeKey(spec.provider);
