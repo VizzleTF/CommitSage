@@ -327,10 +327,8 @@ class CommitLintService {
   // ── Config parsing ───────────────────────────────────────────────────────
 
   private static mergePresets(config: CommitLintConfig, configPath: string, visited: Set<string>): CommitLintRules {
-    let presetNames: string[];
-    if (!config.extends) {
-      presetNames = [];
-    } else {
+    let presetNames: string[] = [];
+    if (config.extends) {
       presetNames = Array.isArray(config.extends) ? config.extends : [config.extends];
     }
 
