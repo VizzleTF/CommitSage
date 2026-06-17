@@ -963,6 +963,10 @@ function render(state: ViewState): void {
 }
 
 window.addEventListener('message', (event: MessageEvent) => {
+    // Only accept messages from the VS Code host (vscode-webview: locally, https: when hosted).
+    if (!event.origin.startsWith('vscode-webview:') && !event.origin.startsWith('https:')) {
+        return;
+    }
     const msg = event.data;
     if (msg?.type === 'state') {
         render(msg.state as ViewState);
