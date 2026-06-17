@@ -2,6 +2,8 @@
 
 <img alt="Visual Studio Marketplace Version" src="https://img.shields.io/visual-studio-marketplace/v/VizzleTF.geminicommit"> <img alt="Visual Studio Marketplace Last Updated" src="https://img.shields.io/visual-studio-marketplace/last-updated/VizzleTF.geminicommit"> <img alt="Visual Studio Marketplace Installs" src="https://img.shields.io/visual-studio-marketplace/i/VizzleTF.geminicommit"> <img alt="Visual Studio Marketplace Rating" src="https://img.shields.io/visual-studio-marketplace/stars/VizzleTF.geminicommit"> [![Ask DeepWiki](deepwiki.png)](https://deepwiki.com/VizzleTF/CommitSage)
 
+[![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=VizzleTF_CommitSage&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=VizzleTF_CommitSage) [![Security Rating](https://sonarcloud.io/api/project_badges/measure?project=VizzleTF_CommitSage&metric=security_rating)](https://sonarcloud.io/summary/new_code?id=VizzleTF_CommitSage) [![Vulnerabilities](https://sonarcloud.io/api/project_badges/measure?project=VizzleTF_CommitSage&metric=vulnerabilities)](https://sonarcloud.io/summary/new_code?id=VizzleTF_CommitSage) [![CodeQL](https://github.com/VizzleTF/CommitSage/actions/workflows/codeql.yml/badge.svg)](https://github.com/VizzleTF/CommitSage/actions/workflows/codeql.yml)
+
 <a href="https://www.buymeacoffee.com/vizzletf" target="_blank"><img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" alt="Buy Me a Coffee" height="60" width="217"></a>
 
 Commit Sage is a VSCode extension that automatically generates commit messages using various AI providers:
