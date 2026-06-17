@@ -49,7 +49,7 @@ export async function generateViaOpenAICompatible(
         retryFn,
         async () => {
             const path = request.chatCompletionsPath ?? '/chat/completions';
-            const baseUrl = request.baseUrl.replace(/\/+$/, '');
+            const baseUrl = HttpUtils.stripTrailingSlashes(request.baseUrl);
 
             const payload = {
                 model: request.model,

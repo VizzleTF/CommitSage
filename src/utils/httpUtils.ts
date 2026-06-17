@@ -49,6 +49,15 @@ interface RequestOptions {
 export type AuthStyle = 'bearer' | 'x-api-key' | 'none';
 
 export class HttpUtils {
+  // Remove trailing slashes without a regex (avoids any backtracking concern).
+  static stripTrailingSlashes(value: string): string {
+    let end = value.length;
+    while (end > 0 && value.charCodeAt(end - 1) === 47 /* '/' */) {
+      end--;
+    }
+    return value.slice(0, end);
+  }
+
   static createRequestHeaders(
     apiKey?: string,
     additionalHeaders?: Record<string, string>,

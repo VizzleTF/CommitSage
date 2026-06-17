@@ -369,14 +369,14 @@ class CommitLintService {
       }
 
       // extends: inline string  →  extends: '@commitlint/config-conventional'
-      const inlineExtends = line.match(/^extends:\s*['"]?([^'"\n\r#]+?)['"]?\s*(?:#.*)?$/);
+      const inlineExtends = line.match(/^extends:\s*['"]?([^'"#\s]+)['"]?\s*(?:#.*)?$/);
       if (inlineExtends && !result.extends) {
         result.extends = inlineExtends[1].trim();
       }
 
       // extends list item  →    - '@commitlint/config-conventional'
       if (!inRules) {
-        const listItem = line.match(/^[ \t]+-[ \t]+['"]?([^'"\n\r#]+?)['"]?\s*(?:#.*)?$/);
+        const listItem = line.match(/^[ \t]+-[ \t]+['"]?([^'"#\s]+)['"]?\s*(?:#.*)?$/);
         if (listItem && Array.isArray(result.extends)) {
           (result.extends as string[]).push(listItem[1].trim());
         } else if (listItem && result.extends === undefined) {

@@ -5,7 +5,7 @@ export function toError(error: unknown): Error {
     return new Error(String(error));
 }
 
-const PATH_PATTERN = /(?:[A-Za-z]:[\\/]|\/)[^\s:,'"]+\.[a-zA-Z]+/g;
+const PATH_PATTERN = /(?:[A-Za-z]:[\\/]|\/)[^\s:,'"]{1,256}\.[a-zA-Z]{1,16}/g;
 const URL_KEY_PATTERN = /([?&])key=[^&\s'"]+/gi;
 const BEARER_PATTERN = /Bearer\s+[A-Za-z0-9._-]+/gi;
 const GOOGLE_API_KEY_HEADER = /x-goog-api-key:\s*[^\s'",]+/gi;

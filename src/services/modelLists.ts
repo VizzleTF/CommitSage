@@ -52,7 +52,7 @@ export async function fetchOpenAIModels(
     baseUrl: string,
     signal?: AbortSignal,
 ): Promise<string[]> {
-    const trimmed = baseUrl.replace(/\/+$/, '');
+    const trimmed = HttpUtils.stripTrailingSlashes(baseUrl);
     const data = await HttpUtils.getJson<OpenAIModelsResponse>(`${trimmed}/models`, {
         headers: { Authorization: `Bearer ${apiKey}` },
         signal,
@@ -100,7 +100,7 @@ export async function fetchOllamaModels(
     authToken?: string,
     signal?: AbortSignal,
 ): Promise<string[]> {
-    const trimmed = baseUrl.replace(/\/+$/, '');
+    const trimmed = HttpUtils.stripTrailingSlashes(baseUrl);
     const headers: Record<string, string> = {};
     if (authToken) {
         headers.Authorization = `Bearer ${authToken}`;
