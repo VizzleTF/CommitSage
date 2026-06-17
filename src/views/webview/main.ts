@@ -143,6 +143,36 @@ function send(message: unknown): void {
     vscode.postMessage(message);
 }
 
+function applyAttr(
+    node: HTMLElement,
+    k: string,
+    v: string | boolean | number | null | undefined,
+): void {
+    if (v === null || v === undefined || v === false) {
+        return;
+    }
+    if (k === 'class') {
+        node.className = String(v);
+    } else if (k.startsWith('on')) {
+        return; // handlers attached separately
+    } else {
+        node.setAttribute(k, v === true ? '' : String(v));
+    }
+}
+
+function appendChildNode(node: HTMLElement, c: Node | string | null | undefined): void {
+    if (c === null || c === undefined) {
+        return;
+    }
+    // Strings become text nodes (never parsed as HTML); only already-built
+    // DOM nodes are appended as-is. No user value reaches an HTML sink.
+    if (typeof c === 'string') {
+        node.appendChild(document.createTextNode(c));
+    } else {
+        node.appendChild(c);
+    }
+}
+
 function el<K extends keyof HTMLElementTagNameMap>(
     tag: K,
     attrs?: Record<string, string | boolean | number | null | undefined>,
@@ -151,29 +181,11 @@ function el<K extends keyof HTMLElementTagNameMap>(
     const node = document.createElement(tag);
     if (attrs) {
         for (const [k, v] of Object.entries(attrs)) {
-            if (v === null || v === undefined || v === false) {
-                continue;
-            }
-            if (k === 'class') {
-                node.className = String(v);
-            } else if (k.startsWith('on')) {
-                continue; // handlers attached separately
-            } else {
-                node.setAttribute(k, v === true ? '' : String(v));
-            }
+            applyAttr(node, k, v);
         }
     }
     for (const c of children) {
-        if (c === null || c === undefined) {
-            continue;
-        }
-        // Strings become text nodes (never parsed as HTML); only already-built
-        // DOM nodes are appended as-is. No user value reaches an HTML sink.
-        if (typeof c === 'string') {
-            node.appendChild(document.createTextNode(c));
-        } else {
-            node.appendChild(c);
-        }
+        appendChildNode(node, c);
     }
     return node;
 }
@@ -605,13 +617,9 @@ function renderProviderPick(state: ViewState): HTMLElement {
     ]);
 }
 
-function renderModelAuthSection(state: ViewState): HTMLElement {
-    const p = state.provider;
-    const slot = state.models[p];
-    const body = el('div');
-
-    // Provider-specific endpoint config (baseUrl / path) above the model
-    // picker. Only providers whose endpoint is configurable get these.
+// Provider-specific endpoint config (baseUrl / path) above the model picker.
+// Only providers whose endpoint is configurable get these.
+function appendEndpointConfig(body: HTMLElement, state: ViewState, p: Provider): void {
     if (p === 'openai') {
         body.appendChild(fieldLabel(L.baseUrl));
         body.appendChild(makeTextInput(
@@ -649,7 +657,10 @@ function renderModelAuthSection(state: ViewState): HTMLElement {
             v => setSetting(KEYS.openrouterPreferFreeModels, v),
         ));
     }
+}
 
+function appendModelPicker(body: HTMLElement, state: ViewState, p: Provider): void {
+    const slot = state.models[p];
     body.appendChild(fieldLabel(L.model));
 
     const settingKeyName = SETTING_KEY_BY_PROVIDER[p];
@@ -695,8 +706,9 @@ function renderModelAuthSection(state: ViewState): HTMLElement {
     if (slot.error) {
         body.appendChild(el('div', { class: 'error' }, [slot.error]));
     }
+}
 
-    // Auth controls
+function appendAuthControls(body: HTMLElement, state: ViewState, p: Provider): void {
     if (p === 'ollama') {
         body.appendChild(makeCheckbox(
             'ollama-useauth',
@@ -727,6 +739,15 @@ function renderModelAuthSection(state: ViewState): HTMLElement {
             body.appendChild(el('div', { class: 'hint' }, [L.noKey]));
         }
     }
+}
+
+function renderModelAuthSection(state: ViewState): HTMLElement {
+    const p = state.provider;
+    const body = el('div');
+
+    appendEndpointConfig(body, state, p);
+    appendModelPicker(body, state, p);
+    appendAuthControls(body, state, p);
 
     return section('modelAuth', L.modelAuth, true, body);
 }

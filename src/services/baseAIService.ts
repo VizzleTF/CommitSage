@@ -101,80 +101,72 @@ export function extractAndValidateMessage(
     return validateCommitMessage(content);
 }
 
+type HttpErrorData =
+    | { error?: string | { message?: string }; code?: string }
+    | string
+    | undefined;
+
+function extractErrorMessage(data: HttpErrorData): string | undefined {
+    const rawError = typeof data === 'object' ? data?.error : undefined;
+    return typeof rawError === 'string' ? rawError : rawError?.message;
+}
+
+function handle403(
+    status: number,
+    errorMessage: string | undefined,
+    data: HttpErrorData,
+): ApiErrorResult {
+    // xAI returns 403 when a team has no credits/licenses yet,
+    // with `error: "Your newly created team doesn't have any
+    // credits or licenses yet. ..."`. Surface that text directly
+    // so users see the purchase URL instead of a generic 403.
+    const text = errorMessage ?? (typeof data === 'string' ? data : '');
+    if (/credits or licenses/i.test(text)) {
+        return { errorMessage: text, shouldRetry: false, statusCode: status };
+    }
+    return {
+        errorMessage: text || errorMessages.authenticationError,
+        shouldRetry: false,
+        statusCode: status,
+    };
+}
+
+function handleHttpStatus(
+    status: number,
+    errorMessage: string | undefined,
+    data: HttpErrorData,
+): ApiErrorResult {
+    switch (status) {
+        case 401:
+            return { errorMessage: errorMessages.authenticationError, shouldRetry: false, statusCode: status };
+        case 402:
+            return { errorMessage: errorMessages.paymentRequired, shouldRetry: false, statusCode: status };
+        case 403:
+            return handle403(status, errorMessage, data);
+        case 429:
+            return { errorMessage: errorMessages.rateLimitExceeded, shouldRetry: true, statusCode: status };
+        case 422:
+            return { errorMessage: errorMessage || errorMessages.invalidRequest, shouldRetry: false, statusCode: status };
+        case 500:
+            return { errorMessage: errorMessages.serverError, shouldRetry: true, statusCode: status };
+        default: {
+            const responseData = typeof data === 'string' ? data : JSON.stringify(data);
+            return {
+                errorMessage: `${errorMessages.apiError.replace('{0}', String(status))}: ${errorMessage || responseData}`,
+                shouldRetry: status >= 500,
+                statusCode: status,
+            };
+        }
+    }
+}
+
 export function handleHttpError(error: Error, serviceName: string): ApiErrorResult {
     if (error instanceof HttpError) {
-        const status = error.status;
         // Provider error bodies are inconsistent: some use `{error: {message}}`,
         // some `{error: "..."}` (a string), some bare strings. Normalize.
-        const data = error.data as
-            | { error?: string | { message?: string }; code?: string }
-            | string
-            | undefined;
-        const rawError = typeof data === 'object' ? data?.error : undefined;
-        const errorMessage =
-            typeof rawError === 'string'
-                ? rawError
-                : rawError?.message;
-
-        switch (status) {
-            case 401:
-                return {
-                    errorMessage: errorMessages.authenticationError,
-                    shouldRetry: false,
-                    statusCode: status,
-                };
-            case 402:
-                return {
-                    errorMessage: errorMessages.paymentRequired,
-                    shouldRetry: false,
-                    statusCode: status,
-                };
-            case 403: {
-                // xAI returns 403 when a team has no credits/licenses yet,
-                // with `error: "Your newly created team doesn't have any
-                // credits or licenses yet. ..."`. Surface that text directly
-                // so users see the purchase URL instead of a generic 403.
-                const text = errorMessage ?? (typeof data === 'string' ? data : '');
-                if (/credits or licenses/i.test(text)) {
-                    return {
-                        errorMessage: text,
-                        shouldRetry: false,
-                        statusCode: status,
-                    };
-                }
-                return {
-                    errorMessage: text || errorMessages.authenticationError,
-                    shouldRetry: false,
-                    statusCode: status,
-                };
-            }
-            case 429:
-                return {
-                    errorMessage: errorMessages.rateLimitExceeded,
-                    shouldRetry: true,
-                    statusCode: status,
-                };
-            case 422:
-                return {
-                    errorMessage: errorMessage || errorMessages.invalidRequest,
-                    shouldRetry: false,
-                    statusCode: status,
-                };
-            case 500:
-                return {
-                    errorMessage: errorMessages.serverError,
-                    shouldRetry: true,
-                    statusCode: status,
-                };
-            default: {
-                const responseData = typeof data === 'string' ? data : JSON.stringify(data);
-                return {
-                    errorMessage: `${errorMessages.apiError.replace('{0}', String(status))}: ${errorMessage || responseData}`,
-                    shouldRetry: status >= 500,
-                    statusCode: status,
-                };
-            }
-        }
+        const data = error.data as HttpErrorData;
+        const errorMessage = extractErrorMessage(data);
+        return handleHttpStatus(error.status, errorMessage, data);
     }
 
     if (error instanceof NetworkError) {

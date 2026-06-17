@@ -356,73 +356,50 @@ export class SettingsWebviewProvider implements vscode.WebviewViewProvider {
         return err.message;
     }
 
+    private static async requireKey(
+        provider: 'gemini' | 'openai' | 'codestral' | 'openrouter' | 'groq' | 'anthropic' | 'deepseek' | 'xai',
+        label: string,
+    ): Promise<string> {
+        const key = await ApiKeyManager.getOptionalKey(provider);
+        if (!key) {
+            throw new Error(`${label} API key is not set`);
+        }
+        return key;
+    }
+
     private async fetchByProvider(provider: Provider): Promise<string[]> {
         switch (provider) {
-            case 'gemini': {
-                const key = await ApiKeyManager.getOptionalKey('gemini');
-                if (!key) {
-                    throw new Error('Gemini API key is not set');
-                }
-                return fetchGeminiModels(key);
-            }
-            case 'openai': {
-                const key = await ApiKeyManager.getOptionalKey('openai');
-                if (!key) {
-                    throw new Error('OpenAI API key is not set');
-                }
-                return fetchOpenAIModels(key, ConfigService.get('openai.baseUrl'));
-            }
-            case 'codestral': {
-                const key = await ApiKeyManager.getOptionalKey('codestral');
-                if (!key) {
-                    throw new Error('Codestral API key is not set');
-                }
-                return fetchCodestralModels(key);
-            }
+            case 'gemini':
+                return fetchGeminiModels(await SettingsWebviewProvider.requireKey('gemini', 'Gemini'));
+            case 'openai':
+                return fetchOpenAIModels(
+                    await SettingsWebviewProvider.requireKey('openai', 'OpenAI'),
+                    ConfigService.get('openai.baseUrl'),
+                );
+            case 'codestral':
+                return fetchCodestralModels(await SettingsWebviewProvider.requireKey('codestral', 'Codestral'));
             case 'ollama': {
                 const useAuth = ConfigService.get('ollama.useAuthToken');
                 const token = useAuth ? await ApiKeyManager.getOptionalKey('ollama') : undefined;
                 return fetchOllamaModels(ConfigService.get('ollama.baseUrl'), token);
             }
-            case 'openrouter': {
-                const key = await ApiKeyManager.getOptionalKey('openrouter');
-                if (!key) {
-                    throw new Error('OpenRouter API key is not set');
-                }
-                return fetchOpenRouterModels(key, ConfigService.get('openrouter.preferFreeModels'));
-            }
-            case 'groq': {
-                const key = await ApiKeyManager.getOptionalKey('groq');
-                if (!key) {
-                    throw new Error('Groq API key is not set');
-                }
-                return fetchGroqModels(key);
-            }
-            case 'anthropic': {
+            case 'openrouter':
+                return fetchOpenRouterModels(
+                    await SettingsWebviewProvider.requireKey('openrouter', 'OpenRouter'),
+                    ConfigService.get('openrouter.preferFreeModels'),
+                );
+            case 'groq':
+                return fetchGroqModels(await SettingsWebviewProvider.requireKey('groq', 'Groq'));
+            case 'anthropic':
                 // Anthropic has no public /models endpoint; the list is a
                 // static fallback baked into modelLists.ts. We still gate on
                 // the key being set so the UI surfaces the same "set a key"
                 // hint as the other providers.
-                const key = await ApiKeyManager.getOptionalKey('anthropic');
-                if (!key) {
-                    throw new Error('Anthropic API key is not set');
-                }
-                return fetchAnthropicModels(key);
-            }
-            case 'deepseek': {
-                const key = await ApiKeyManager.getOptionalKey('deepseek');
-                if (!key) {
-                    throw new Error('DeepSeek API key is not set');
-                }
-                return fetchDeepSeekModels(key);
-            }
-            case 'xai': {
-                const key = await ApiKeyManager.getOptionalKey('xai');
-                if (!key) {
-                    throw new Error('xAI API key is not set');
-                }
-                return fetchXaiModels(key);
-            }
+                return fetchAnthropicModels(await SettingsWebviewProvider.requireKey('anthropic', 'Anthropic'));
+            case 'deepseek':
+                return fetchDeepSeekModels(await SettingsWebviewProvider.requireKey('deepseek', 'DeepSeek'));
+            case 'xai':
+                return fetchXaiModels(await SettingsWebviewProvider.requireKey('xai', 'xAI'));
             case 'custom': {
                 // Custom has no listing endpoint — user types the model
                 // manually. Returning an empty list lets the dropdown render

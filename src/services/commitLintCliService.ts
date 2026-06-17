@@ -36,25 +36,36 @@ class CommitLintCliService {
   static detect(repoPath: string): string | null {
     let dir = repoPath;
     for (;;) {
-      for (const name of ['commitlint', '@commitlint/cli']) {
-        const pkgJsonPath = path.join(dir, 'node_modules', name, 'package.json');
-        try {
-          const pkgJson = JSON.parse(fs.readFileSync(pkgJsonPath, 'utf8')) as {
-            bin?: string | Record<string, string>;
-          };
-          const bin = typeof pkgJson.bin === 'string' ? pkgJson.bin : pkgJson.bin?.['commitlint'];
-          if (bin) {
-            const cliPath = path.join(path.dirname(pkgJsonPath), bin);
-            if (fs.existsSync(cliPath)) { return cliPath; }
-          }
-        } catch {
-          // missing or unreadable — try the next name / parent dir
-        }
-      }
+      const found = this.detectInDir(dir);
+      if (found) { return found; }
       const parent = path.dirname(dir);
       if (parent === dir) { return null; }
       dir = parent;
     }
+  }
+
+  private static detectInDir(dir: string): string | null {
+    for (const name of ['commitlint', '@commitlint/cli']) {
+      const cliPath = this.resolveCliFromPkg(path.join(dir, 'node_modules', name, 'package.json'));
+      if (cliPath) { return cliPath; }
+    }
+    return null;
+  }
+
+  private static resolveCliFromPkg(pkgJsonPath: string): string | null {
+    try {
+      const pkgJson = JSON.parse(fs.readFileSync(pkgJsonPath, 'utf8')) as {
+        bin?: string | Record<string, string>;
+      };
+      const bin = typeof pkgJson.bin === 'string' ? pkgJson.bin : pkgJson.bin?.['commitlint'];
+      if (bin) {
+        const cliPath = path.join(path.dirname(pkgJsonPath), bin);
+        if (fs.existsSync(cliPath)) { return cliPath; }
+      }
+    } catch {
+      // missing or unreadable — try the next name / parent dir
+    }
+    return null;
   }
 
   /**

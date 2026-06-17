@@ -161,6 +161,73 @@ export class GitService {
     }
   }
 
+  private static async detectChanges(
+    repoPath: string,
+    onlyStagedChanges: boolean,
+    knownHasStagedChanges: boolean | undefined,
+    signal?: AbortSignal,
+  ): Promise<{
+    hasStagedChanges: boolean;
+    hasUnstagedChanges: boolean;
+    hasUntrackedFiles: boolean;
+    hasDeletedFiles: boolean;
+  }> {
+    const hasHead = await this.hasHead(repoPath, signal);
+    const hasStagedChanges = knownHasStagedChanges ?? await this.hasChanges(repoPath, 'staged', signal);
+    const hasUnstagedChanges =
+      !onlyStagedChanges && (await this.hasChanges(repoPath, 'unstaged', signal));
+    const hasUntrackedFiles =
+      !onlyStagedChanges &&
+      !hasStagedChanges &&
+      (await this.hasChanges(repoPath, 'untracked', signal));
+    const hasDeletedFiles =
+      hasHead &&
+      !onlyStagedChanges &&
+      !hasStagedChanges &&
+      (await this.hasChanges(repoPath, 'deleted', signal));
+
+    return { hasStagedChanges, hasUnstagedChanges, hasUntrackedFiles, hasDeletedFiles };
+  }
+
+  private static async collectDiffs(
+    repoPath: string,
+    changes: {
+      hasStagedChanges: boolean;
+      hasUnstagedChanges: boolean;
+      hasUntrackedFiles: boolean;
+      hasDeletedFiles: boolean;
+    },
+    signal?: AbortSignal,
+  ): Promise<string[]> {
+    const diffs: string[] = [];
+
+    if (changes.hasStagedChanges) {
+      const staged = await this.getStagedDiff(repoPath, '# Staged changes:\n', signal);
+      diffs.push(...staged);
+    }
+
+    if (changes.hasUnstagedChanges) {
+      const unstaged = await this.getUnstagedDiff(repoPath, signal);
+      diffs.push(...unstaged);
+    }
+
+    if (changes.hasUntrackedFiles) {
+      const untracked = await this.getUntrackedDiff(repoPath, signal);
+      if (untracked) {
+        diffs.push(untracked);
+      }
+    }
+
+    if (changes.hasDeletedFiles) {
+      const deleted = await this.getDeletedDiff(repoPath, signal);
+      if (deleted) {
+        diffs.push(deleted);
+      }
+    }
+
+    return diffs;
+  }
+
   static async getDiff(
     repoPath: string,
     onlyStagedChanges: boolean,
@@ -168,60 +235,28 @@ export class GitService {
     signal?: AbortSignal,
   ): Promise<string> {
     try {
-      const hasHead = await this.hasHead(repoPath, signal);
-      const hasStagedChanges = knownHasStagedChanges ?? await this.hasChanges(repoPath, 'staged', signal);
-      const hasUnstagedChanges =
-        !onlyStagedChanges && (await this.hasChanges(repoPath, 'unstaged', signal));
-      const hasUntrackedFiles =
-        !onlyStagedChanges &&
-        !hasStagedChanges &&
-        (await this.hasChanges(repoPath, 'untracked', signal));
-      const hasDeletedFiles =
-        hasHead &&
-        !onlyStagedChanges &&
-        !hasStagedChanges &&
-        (await this.hasChanges(repoPath, 'deleted', signal));
+      const changes = await this.detectChanges(
+        repoPath,
+        onlyStagedChanges,
+        knownHasStagedChanges,
+        signal,
+      );
 
       if (
-        !hasStagedChanges &&
-        !hasUnstagedChanges &&
-        !hasUntrackedFiles &&
-        !hasDeletedFiles
+        !changes.hasStagedChanges &&
+        !changes.hasUnstagedChanges &&
+        !changes.hasUntrackedFiles &&
+        !changes.hasDeletedFiles
       ) {
         throw new NoChangesDetectedError();
       }
 
-      const diffs: string[] = [];
-
-      if (onlyStagedChanges && hasStagedChanges) {
+      if (onlyStagedChanges && changes.hasStagedChanges) {
         const staged = await this.getStagedDiff(repoPath, undefined, signal);
-        diffs.push(...staged);
-        return diffs.join('\n\n').trim();
+        return staged.join('\n\n').trim();
       }
 
-      if (hasStagedChanges) {
-        const staged = await this.getStagedDiff(repoPath, '# Staged changes:\n', signal);
-        diffs.push(...staged);
-      }
-
-      if (hasUnstagedChanges) {
-        const unstaged = await this.getUnstagedDiff(repoPath, signal);
-        diffs.push(...unstaged);
-      }
-
-      if (hasUntrackedFiles) {
-        const untracked = await this.getUntrackedDiff(repoPath, signal);
-        if (untracked) {
-          diffs.push(untracked);
-        }
-      }
-
-      if (hasDeletedFiles) {
-        const deleted = await this.getDeletedDiff(repoPath, signal);
-        if (deleted) {
-          diffs.push(deleted);
-        }
-      }
+      const diffs = await this.collectDiffs(repoPath, changes, signal);
 
       const combinedDiff = diffs.join('\n\n').trim();
       if (!combinedDiff) {

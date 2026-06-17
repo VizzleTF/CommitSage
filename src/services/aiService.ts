@@ -69,51 +69,7 @@ export class AIService {
         // Validation never applies to free-form custom prompts.
         const commitlintEnabled = ConfigService.get('commit.commitlint.enabled') && commitFormat !== 'custom';
         if (commitlintEnabled) {
-            const maxRetries = ConfigService.get('commit.commitlint.maxRetries');
-            let attempt = 0;
-
-            while (attempt < maxRetries) {
-                const rulesPath = ConfigService.get('commit.commitlint.rulesPath');
-                const lintOpts = {
-                    engine: ConfigService.get('commit.commitlint.engine') as CommitLintEngine,
-                    signal: context.signal,
-                    format: commitFormat,
-                };
-                let { valid, errors } = await CommitLintService.validate(result.message, repoPath, rulesPath, lintOpts);
-
-                if (!valid) {
-                    // Mechanical violations (casing, trailing period, blank line)
-                    // are fixed in code to save an LLM round-trip.
-                    const fixed = CommitLintService.autoFix(result.message, repoPath, rulesPath, commitFormat);
-                    if (fixed !== result.message) {
-                        result.message = fixed;
-                        ({ valid, errors } = await CommitLintService.validate(fixed, repoPath, rulesPath, lintOpts));
-                    }
-                }
-
-                if (valid) {
-                    break;
-                }
-
-                attempt++;
-                if (attempt >= maxRetries) {
-                    Logger.warn(`CommitLint: max retries (${maxRetries}) reached, using message as-is`);
-                    break;
-                }
-
-                progress.report({ message: `CommitLint validation failed, refining… (${attempt}/${maxRetries})`, increment: 10 });
-
-                const refinementPrompt = await PromptService.generateRefinementPrompt(repoPath, result.message, errors, progress);
-                const refined = await AIServiceFactory.generateCommitMessage(
-                    serviceType,
-                    refinementPrompt,
-                    progress,
-                    undefined,
-                    { signal: context.signal }
-                );
-
-                result = { ...refined, message: removeThinkTags(refined.message) };
-            }
+            result = await this.applyCommitLint(result, repoPath, commitFormat, serviceType, progress, context);
         }
 
         TelemetryService.sendEvent({
@@ -125,6 +81,75 @@ export class AIService {
             onlyStagedChanges: context.onlyStagedChanges ?? false,
         });
         return result;
+    }
+
+    private static async applyCommitLint(
+        result: CommitMessage,
+        repoPath: string,
+        commitFormat: string,
+        serviceType: AIServiceType,
+        progress: ProgressReporter,
+        context: GenerateContext
+    ): Promise<CommitMessage> {
+        const maxRetries = ConfigService.get('commit.commitlint.maxRetries');
+        let attempt = 0;
+
+        while (attempt < maxRetries) {
+            const rulesPath = ConfigService.get('commit.commitlint.rulesPath');
+            const lintOpts = {
+                engine: ConfigService.get('commit.commitlint.engine') as CommitLintEngine,
+                signal: context.signal,
+                format: commitFormat,
+            };
+            const { valid, errors } = await this.validateWithAutoFix(result, repoPath, rulesPath, commitFormat, lintOpts);
+
+            if (valid) {
+                break;
+            }
+
+            attempt++;
+            if (attempt >= maxRetries) {
+                Logger.warn(`CommitLint: max retries (${maxRetries}) reached, using message as-is`);
+                break;
+            }
+
+            progress.report({ message: `CommitLint validation failed, refining… (${attempt}/${maxRetries})`, increment: 10 });
+
+            const refinementPrompt = await PromptService.generateRefinementPrompt(repoPath, result.message, errors, progress);
+            const refined = await AIServiceFactory.generateCommitMessage(
+                serviceType,
+                refinementPrompt,
+                progress,
+                undefined,
+                { signal: context.signal }
+            );
+
+            result = { ...refined, message: removeThinkTags(refined.message) };
+        }
+
+        return result;
+    }
+
+    private static async validateWithAutoFix(
+        result: CommitMessage,
+        repoPath: string,
+        rulesPath: string,
+        commitFormat: string,
+        lintOpts: { engine: CommitLintEngine; signal?: AbortSignal; format: string }
+    ): Promise<{ valid: boolean; errors: string[] }> {
+        let { valid, errors } = await CommitLintService.validate(result.message, repoPath, rulesPath, lintOpts);
+
+        if (!valid) {
+            // Mechanical violations (casing, trailing period, blank line)
+            // are fixed in code to save an LLM round-trip.
+            const fixed = CommitLintService.autoFix(result.message, repoPath, rulesPath, commitFormat);
+            if (fixed !== result.message) {
+                result.message = fixed;
+                ({ valid, errors } = await CommitLintService.validate(fixed, repoPath, rulesPath, lintOpts));
+            }
+        }
+
+        return { valid, errors };
     }
 
     private static truncateDiff(diff: string, maxDiffLength: number): string {
