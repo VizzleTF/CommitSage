@@ -20,7 +20,7 @@ export function unquoteGitPath(filePath: string): string {
         // Caller logs; we still return best-effort result
     }
 
-    unquoted = unquoted.replaceAll('\\"', '"');
-    unquoted = unquoted.replaceAll('\\\\', '\\');
+    unquoted = unquoted.replaceAll(String.raw`\"`, '"');
+    unquoted = unquoted.replaceAll(String.raw`\\`, '\\');
     return unquoted;
 }

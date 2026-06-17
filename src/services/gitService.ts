@@ -28,7 +28,12 @@ function resolveGitPath(): string {
   }
   try {
     const configured = vscode.workspace.getConfiguration('git').get<string | string[]>('path');
-    const candidates = Array.isArray(configured) ? configured : (configured ? [configured] : []);
+    let candidates: string[] = [];
+    if (Array.isArray(configured)) {
+      candidates = configured;
+    } else if (configured) {
+      candidates = [configured];
+    }
     for (const candidate of candidates) {
       if (typeof candidate === 'string' && path.isAbsolute(candidate)) {
         cachedGitPath = candidate;

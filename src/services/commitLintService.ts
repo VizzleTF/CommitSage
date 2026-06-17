@@ -327,9 +327,12 @@ class CommitLintService {
   // ── Config parsing ───────────────────────────────────────────────────────
 
   private static mergePresets(config: CommitLintConfig, configPath: string, visited: Set<string>): CommitLintRules {
-    const presetNames = config.extends
-      ? (Array.isArray(config.extends) ? config.extends : [config.extends])
-      : [];
+    let presetNames: string[];
+    if (!config.extends) {
+      presetNames = [];
+    } else {
+      presetNames = Array.isArray(config.extends) ? config.extends : [config.extends];
+    }
 
     const merged: CommitLintRules = {};
     for (const name of presetNames) {
@@ -411,7 +414,7 @@ class CommitLintService {
     try {
       // Quote unquoted bare words so the flow sequence becomes valid JSON
       const json = ruleMatch[2]
-        .replaceAll(/'/g, '"')
+        .replaceAll("'", '"')
         .replaceAll(/([[\s,])([a-zA-Z][a-zA-Z0-9-]*)(?=[,\]\s])/g, '$1"$2"');
       result.rules[ruleMatch[1]] = JSON.parse(json);
     } catch { /* skip malformed rule */ }
@@ -736,9 +739,9 @@ class CommitLintService {
   private static checkCaseRule(
     field: string, label: string, value: unknown, condition: 'always' | 'never',
   ): string | null {
-    return field && !this.checkCase(field, value, condition)
-      ? `${label} must be ${condition === 'always' ? '' : 'not '}${this.caseStr(value)}`
-      : null;
+    if (!field || this.checkCase(field, value, condition)) { return null; }
+    const negation = condition === 'always' ? '' : 'not ';
+    return `${label} must be ${negation}${this.caseStr(value)}`;
   }
 
   private static checkEmptyRule(
@@ -806,7 +809,8 @@ class CommitLintService {
         const violates = condition === 'never'
           ? scopes.some(s => list.includes(s))
           : !scopes.every(s => list.includes(s));
-        return violates ? `scope must ${condition === 'never' ? 'not ' : ''}be one of [${list.join(', ')}]` : null;
+        if (!violates) { return null; }
+        return `scope must ${condition === 'never' ? 'not ' : ''}be one of [${list.join(', ')}]`;
       }
       case 'scope-case':      return this.checkCaseRule(scope ?? '', 'scope', value, condition);
       case 'scope-empty':     return this.checkEmptyRule(scope, 'scope', condition, true);
@@ -848,7 +852,7 @@ class CommitLintService {
       case 'header-case':       return this.checkCaseRule(header, 'header', value, condition);
       case 'header-full-stop':  return this.checkFullStopRule(header, 'header', value, condition, false);
       case 'header-trim':
-        return header !== header.trim() ? 'header must not have leading or trailing whitespace' : null;
+        return header === header.trim() ? null : 'header must not have leading or trailing whitespace';
       default:
         return null;
     }

@@ -197,7 +197,7 @@ export class SettingsWebviewProvider implements vscode.WebviewViewProvider {
     public static readonly viewId = VIEW_ID;
 
     private view: vscode.WebviewView | undefined;
-    private models: Record<Provider, ModelSlot> = {
+    private readonly models: Record<Provider, ModelSlot> = {
         gemini: { list: [], loading: false, error: null },
         openai: { list: [], loading: false, error: null },
         codestral: { list: [], loading: false, error: null },

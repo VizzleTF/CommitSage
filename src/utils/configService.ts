@@ -5,7 +5,7 @@ import { Logger } from './logger';
 import { ProjectConfig } from '../models/types';
 import { toError } from './errorUtils';
 
-async function statOrUndefined(p: string): Promise<import('fs').Stats | undefined> {
+async function statOrUndefined(p: string): Promise<import('node:fs').Stats | undefined> {
   try {
     return await fs.stat(p);
   } catch {

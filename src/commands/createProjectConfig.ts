@@ -4,7 +4,7 @@ import * as path from 'node:path';
 import { Logger } from '../utils/logger';
 import { toError } from '../utils/errorUtils';
 
-async function statOrUndefined(p: string): Promise<import('fs').Stats | undefined> {
+async function statOrUndefined(p: string): Promise<import('node:fs').Stats | undefined> {
     try {
         return await fs.stat(p);
     } catch {
