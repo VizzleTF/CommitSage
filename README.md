@@ -4,8 +4,6 @@
 [![Open VSX Version](https://img.shields.io/open-vsx/v/VizzleTF/geminicommit?label=Open%20VSX)](https://open-vsx.org/extension/VizzleTF/geminicommit) [![Open VSX Downloads](https://img.shields.io/open-vsx/dt/VizzleTF/geminicommit?label=Open%20VSX%20downloads)](https://open-vsx.org/extension/VizzleTF/geminicommit) [![Open VSX Rating](https://img.shields.io/open-vsx/rating/VizzleTF/geminicommit?label=Open%20VSX%20rating)](https://open-vsx.org/extension/VizzleTF/geminicommit)<br>
 [![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=VizzleTF_CommitSage&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=VizzleTF_CommitSage) [![Security Rating](https://sonarcloud.io/api/project_badges/measure?project=VizzleTF_CommitSage&metric=security_rating)](https://sonarcloud.io/summary/new_code?id=VizzleTF_CommitSage) [![Vulnerabilities](https://sonarcloud.io/api/project_badges/measure?project=VizzleTF_CommitSage&metric=vulnerabilities)](https://sonarcloud.io/summary/new_code?id=VizzleTF_CommitSage) [![CodeQL](https://github.com/VizzleTF/CommitSage/actions/workflows/codeql.yml/badge.svg)](https://github.com/VizzleTF/CommitSage/actions/workflows/codeql.yml)
 
-<a href="https://www.buymeacoffee.com/vizzletf" target="_blank"><img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" alt="Buy Me a Coffee" height="60" width="217"></a>
-
 Commit Sage is a VSCode extension that automatically generates commit messages using various AI providers:
 - **Gemini** (default, requires API key, free tier)
 - **OpenRouter** (300+ models behind one key, free-tier models available)
@@ -354,3 +352,5 @@ Commit Sage — расширение VSCode для автоматической 
 
 - [Telegram Канал](https://t.me/geminicommit) - Анонсы обновлений
 - [Telegram Группа](https://t.me/gemini_commit) - Обсуждения и поддержка сообщества
+
+<a href="https://www.buymeacoffee.com/vizzletf" target="_blank"><img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" alt="Buy Me a Coffee" height="60" width="217"></a>
