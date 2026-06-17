@@ -12,6 +12,7 @@ vi.mock('../src/utils/httpUtils', async () => {
         ...actual,
         HttpUtils: {
             createRequestHeaders: actual.HttpUtils.createRequestHeaders,
+            stripTrailingSlashes: actual.HttpUtils.stripTrailingSlashes,
             postJson: mockedPostJson,
             getJson: mockedGetJson,
         },

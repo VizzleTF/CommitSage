@@ -602,6 +602,7 @@
     "typecheck": "tsc --noEmit",
     "test": "npm run test:unit && npm run test:e2e",
     "test:unit": "vitest run",
+    "test:unit:coverage": "vitest run --coverage",
     "test:unit:watch": "vitest",
     "pretest:e2e": "tsc -p tests/e2e/tsconfig.e2e.json && npm run compile",
     "test:e2e": "vscode-test"
@@ -614,6 +615,7 @@
     "@types/vscode": "^1.93.0",
     "@typescript-eslint/eslint-plugin": "^8.61.0",
     "@typescript-eslint/parser": "^8.61.0",
+    "@vitest/coverage-v8": "^4.1.9",
     "@vscode/test-cli": "^0.0.12",
     "@vscode/test-electron": "^3.0.0",
     "@vscode/vsce": "^3.9.2",

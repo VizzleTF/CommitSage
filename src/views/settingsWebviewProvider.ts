@@ -1,5 +1,4 @@
 import * as vscode from 'vscode';
-import * as crypto from 'crypto';
 import { ConfigService } from '../utils/configService';
 import { CommitLintCliService } from '../services/commitLintCliService';
 import { ApiKeyManager } from '../services/apiKeyManager';
@@ -16,6 +15,7 @@ import {
 } from '../services/modelLists';
 import { Logger } from '../utils/logger';
 import { toError } from '../utils/errorUtils';
+import { getNonce } from '../utils/nonce';
 
 const VIEW_ID = 'commitsage.settings';
 
@@ -796,11 +796,6 @@ export class SettingsWebviewProvider implements vscode.WebviewViewProvider {
 </body>
 </html>`;
     }
-}
-
-function getNonce(): string {
-    // Cryptographically strong nonce for the CSP script-src directive.
-    return crypto.randomBytes(24).toString('base64').replace(/[^a-zA-Z0-9]/g, '');
 }
 
 function escapeForScript(s: string): string {

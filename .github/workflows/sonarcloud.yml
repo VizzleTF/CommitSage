@@ -10,9 +10,29 @@ jobs:
     name: SonarCloud
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           fetch-depth: 0  # Shallow clones should be disabled for a better relevancy of analysis
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Stub API key constant
+        # src/constants/apiKeys.ts is gitignored and generated only by the
+        # release pipeline. Tests use a mock LLM server, so a placeholder is fine.
+        run: |
+          mkdir -p src/constants
+          echo "export const AMPLITUDE_API_KEY = 'sonar-test-stub';" > src/constants/apiKeys.ts
+
+      - name: Unit tests with coverage
+        run: npm run test:unit:coverage
+
       - name: SonarCloud Scan
         uses: SonarSource/sonarcloud-github-action@master
         env:
