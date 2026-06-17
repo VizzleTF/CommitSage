@@ -660,7 +660,7 @@ class CommitLintService {
     const body   = bodyLines.join('\n').trim();
     const footer = footerLines.join('\n').trim();
 
-    const headerMatch = /^([a-zA-Z0-9_-]+)(?:\(([^)]*)\))?!?:\s*(.*)$/.exec(header);
+    const headerMatch = /^([a-zA-Z0-9_-]{1,50})(?:\(([^)]{0,100})\))?!?:\s{0,16}(.*)$/.exec(header);
 
     return {
       header,

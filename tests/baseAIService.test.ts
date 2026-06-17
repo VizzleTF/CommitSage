@@ -94,4 +94,49 @@ describe('handleHttpError', () => {
         expect(r.shouldRetry).toBe(false);
         expect(r.errorMessage).toBe('oops');
     });
+
+    it('403 with credits/licenses message surfaces server text (xAI new team)', () => {
+        const text = "Your newly created team doesn't have any credits or licenses yet. Buy at https://x.ai";
+        const r = handleHttpError(makeHttpError(403, { error: text }), 'xAI');
+        expect(r.shouldRetry).toBe(false);
+        expect(r.statusCode).toBe(403);
+        expect(r.errorMessage).toBe(text);
+    });
+
+    it('403 with credits/licenses message in a bare string body is surfaced', () => {
+        const text = 'no credits or licenses yet';
+        const r = handleHttpError(makeHttpError(403, text), 'xAI');
+        expect(r.errorMessage).toBe(text);
+        expect(r.shouldRetry).toBe(false);
+    });
+
+    it('403 with a generic server message surfaces that message', () => {
+        const r = handleHttpError(
+            makeHttpError(403, { error: { message: 'Forbidden: region blocked' } }),
+            'X'
+        );
+        expect(r.shouldRetry).toBe(false);
+        expect(r.statusCode).toBe(403);
+        expect(r.errorMessage).toBe('Forbidden: region blocked');
+    });
+
+    it('403 with no message falls back to the generic authentication error', () => {
+        const r = handleHttpError(makeHttpError(403, {}), 'X');
+        expect(r.shouldRetry).toBe(false);
+        expect(r.statusCode).toBe(403);
+        expect(r.errorMessage).toBe(errorMessages.authenticationError);
+    });
+
+    it('default branch with object body serializes data into the message', () => {
+        const r = handleHttpError(makeHttpError(418, { foo: 'bar' }), 'X');
+        expect(r.shouldRetry).toBe(false);
+        expect(r.errorMessage).toContain('418');
+        expect(r.errorMessage).toContain('{"foo":"bar"}');
+    });
+
+    it('default branch with string body uses the string directly', () => {
+        const r = handleHttpError(makeHttpError(404, 'not found'), 'X');
+        expect(r.errorMessage).toContain('404');
+        expect(r.errorMessage).toContain('not found');
+    });
 });

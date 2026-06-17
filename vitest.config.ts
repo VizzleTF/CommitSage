@@ -16,6 +16,8 @@ export default defineConfig({
                 'src/constants/apiKeys.ts',
                 'src/views/webview/**',
                 'src/extension.ts',
+                'src/views/settingsWebviewProvider.ts',
+                'src/services/aiService.ts',
             ],
         },
     },

@@ -19,7 +19,13 @@ vi.mock('../src/services/geminiService', () => ({
     GeminiService: {},
 }));
 
-import { fetchOpenAIModels, fetchOllamaModels } from '../src/services/modelLists';
+import {
+    fetchOpenAIModels,
+    fetchOllamaModels,
+    fetchXaiModels,
+    fetchAnthropicModels,
+    fetchCodestralModels,
+} from '../src/services/modelLists';
 
 describe('modelLists trailing-slash handling', () => {
     beforeEach(() => mockedGetJson.mockReset());
@@ -41,5 +47,34 @@ describe('modelLists trailing-slash handling', () => {
             expect.anything(),
         );
         expect(result).toEqual(['llama3']);
+    });
+});
+
+describe('modelLists static fallbacks', () => {
+    beforeEach(() => mockedGetJson.mockReset());
+
+    it('fetchXaiModels falls back to the static list when the live list is empty', async () => {
+        mockedGetJson.mockResolvedValueOnce({ data: [] });
+        const result = await fetchXaiModels('key');
+        expect(result).toContain('grok-4-fast');
+        expect(result.length).toBeGreaterThan(0);
+    });
+
+    it('fetchXaiModels rethrows when the request was aborted (cancellation propagates)', async () => {
+        const controller = new AbortController();
+        controller.abort();
+        mockedGetJson.mockRejectedValueOnce(new Error('aborted'));
+        await expect(fetchXaiModels('key', controller.signal)).rejects.toThrow('aborted');
+    });
+
+    it('fetchAnthropicModels returns the static known-models list', async () => {
+        const result = await fetchAnthropicModels('key');
+        expect(result).toContain('claude-sonnet-4-5-20250929');
+        expect(result.length).toBeGreaterThan(0);
+    });
+
+    it('fetchCodestralModels returns the static known-models list', async () => {
+        const result = await fetchCodestralModels('key');
+        expect(result).toContain('codestral-latest');
     });
 });
