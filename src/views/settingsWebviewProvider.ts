@@ -801,5 +801,5 @@ export class SettingsWebviewProvider implements vscode.WebviewViewProvider {
 function escapeForScript(s: string): string {
     // </script> in JSON would break out of the <script> block. The other two
     // pairs neutralise HTML comment / CDATA endings just in case.
-    return s.replace(/<\/script>/gi, '<\\/script>').replace(/<!--/g, '<\\!--').replace(/]]>/g, ']]\\>');
+    return s.replaceAll(/<\/script>/gi, '<\\/script>').replaceAll(/<!--/g, '<\\!--').replaceAll(/]]>/g, ']]\\>');
 }

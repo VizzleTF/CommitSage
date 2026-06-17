@@ -62,7 +62,7 @@ function geminiQualityTier(name: string): number {
 // "gemini-3-flash-preview" -> 3). Newer versions sort first within a tier.
 function geminiVersionScore(name: string): number {
     const match = name.match(/gemini-(\d+(?:\.\d+)?)/);
-    return match ? parseFloat(match[1]) : 0;
+    return match ? Number.parseFloat(match[1]) : 0;
 }
 
 function sortGeminiModelsByQuality(models: string[]): string[] {

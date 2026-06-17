@@ -42,7 +42,7 @@ async function fetchOpenAICompatModels(
         .map(m => m.id ?? '')
         .filter(id => id && (!filter || filter(id)));
 
-    return [...new Set(ids)].sort();
+    return [...new Set(ids)].sort((a, b) => a.localeCompare(b));
 }
 
 const OPENAI_CHAT_PREFIXES = ['gpt-', 'chatgpt-', 'o1', 'o3', 'o4'];
@@ -115,7 +115,7 @@ export async function fetchOllamaModels(
         .map(m => m.name ?? '')
         .filter(Boolean);
 
-    return [...new Set(names)].sort();
+    return [...new Set(names)].sort((a, b) => a.localeCompare(b));
 }
 
 interface OpenRouterModelsResponse {
@@ -157,7 +157,7 @@ export async function fetchOpenRouterModels(
         .filter(m => m.id);
 
     const filtered = preferFreeModels ? all.filter(m => m.isFree) : all;
-    return [...new Set(filtered.map(m => m.id))].sort();
+    return [...new Set(filtered.map(m => m.id))].sort((a, b) => a.localeCompare(b));
 }
 
 export async function fetchGroqModels(

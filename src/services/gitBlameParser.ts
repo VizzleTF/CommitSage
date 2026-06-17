@@ -20,7 +20,7 @@ export function parseBlameOutput(blameOutput: string): BlameInfo[] {
         } else if (line.startsWith('author-mail ')) {
             currentBlame.email = line.substring(12).replace(/[<>]/g, '');
         } else if (line.startsWith('author-time ')) {
-            currentBlame.timestamp = parseInt(line.substring(11), 10);
+            currentBlame.timestamp = Number.parseInt(line.substring(11), 10);
             currentBlame.date = new Date(currentBlame.timestamp * 1000).toISOString();
         } else if (line.startsWith('\t')) {
             currentBlame.line = line.substring(1);
@@ -40,7 +40,7 @@ export function parseBlameOutput(blameOutput: string): BlameInfo[] {
             const match = line.match(/^([0-9a-f]{40}) \d+ (\d+)(?: \d+)?$/);
             if (match) {
                 currentBlame.commit = match[1];
-                currentBlame.lineNumber = parseInt(match[2], 10);
+                currentBlame.lineNumber = Number.parseInt(match[2], 10);
             }
         }
     }
@@ -56,7 +56,7 @@ export function parseChangedLines(diff: string): Set<number> {
     for (const line of lines) {
         const match = line.match(/^@@ -\d+(?:,\d+)? \+(\d+)(?:,\d+)? @@/);
         if (match) {
-            currentLine = parseInt(match[1], 10);
+            currentLine = Number.parseInt(match[1], 10);
         } else if (line.startsWith('+') && !line.startsWith('+++')) {
             changedLines.add(currentLine);
             currentLine++;

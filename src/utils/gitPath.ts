@@ -9,18 +9,18 @@ export function unquoteGitPath(filePath: string): string {
     }
     let unquoted = filePath.slice(1, -1);
 
-    unquoted = unquoted.replace(/\\([0-7]{3})/g, (_, octal) => {
-        return String.fromCharCode(parseInt(octal, 8));
+    unquoted = unquoted.replaceAll(/\\([0-7]{3})/g, (_, octal) => {
+        return String.fromCodePoint(Number.parseInt(octal, 8));
     });
 
     try {
-        const bytes = new Uint8Array([...unquoted].map((c) => c.charCodeAt(0)));
+        const bytes = new Uint8Array([...unquoted].map((c) => c.codePointAt(0) ?? 0));
         unquoted = new TextDecoder('utf-8').decode(bytes);
     } catch {
         // Caller logs; we still return best-effort result
     }
 
-    unquoted = unquoted.replace(/\\"/g, '"');
-    unquoted = unquoted.replace(/\\\\/g, '\\');
+    unquoted = unquoted.replaceAll(/\\"/g, '"');
+    unquoted = unquoted.replaceAll(/\\\\/g, '\\');
     return unquoted;
 }

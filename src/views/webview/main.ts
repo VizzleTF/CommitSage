@@ -280,7 +280,7 @@ function fuzzyScore(query: string, target: string): number | null {
     let qi = 0;
     let firstMatch = -1;
     for (let i = 0; i < t.length && qi < q.length; i++) {
-        if (t.charCodeAt(i) === q.charCodeAt(qi)) {
+        if (t.codePointAt(i) === q.codePointAt(qi)) {
             if (firstMatch < 0) {
                 firstMatch = i;
             }

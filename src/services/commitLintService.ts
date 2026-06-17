@@ -391,8 +391,8 @@ class CommitLintService {
           try {
             // Quote unquoted bare words so the flow sequence becomes valid JSON
             const json = ruleMatch[2]
-              .replace(/'/g, '"')
-              .replace(/([[\s,])([a-zA-Z][a-zA-Z0-9-]*)(?=[,\]\s])/g, '$1"$2"');
+              .replaceAll(/'/g, '"')
+              .replaceAll(/([[\s,])([a-zA-Z][a-zA-Z0-9-]*)(?=[,\]\s])/g, '$1"$2"');
             result.rules[ruleMatch[1]] = JSON.parse(json);
           } catch { /* skip malformed rule */ }
         }
