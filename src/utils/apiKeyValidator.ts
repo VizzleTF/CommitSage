@@ -33,7 +33,8 @@ export class ApiKeyValidator {
         return ApiKeyValidator.validateNonEmpty(key);
     }
 
-    static validateGeminiApiKey(key: string): string | null {
+    /** Strict charset validation shared by providers with a fixed key shape. */
+    private static validateStrictFormat(key: string): string | null {
         if (!key) {
             return apiValidation.errorMessages.emptyKey;
         }
@@ -43,14 +44,12 @@ export class ApiKeyValidator {
         return null;
     }
 
+    static validateGeminiApiKey(key: string): string | null {
+        return ApiKeyValidator.validateStrictFormat(key);
+    }
+
     static validateCodestralApiKey(key: string): string | null {
-        if (!key) {
-            return apiValidation.errorMessages.emptyKey;
-        }
-        if (!apiValidation.keyFormat.test(key)) {
-            return apiValidation.errorMessages.invalidChars;
-        }
-        return null;
+        return ApiKeyValidator.validateStrictFormat(key);
     }
 
     static validateOllamaAuthToken(key: string): string | null {

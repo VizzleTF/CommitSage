@@ -67,7 +67,7 @@ export async function fetchOpenAIModels(
     // Avoids hardcoding a hierarchy that decays the moment OpenAI adds a model.
     return [...new Set(ids)].sort((a, b) => {
         const lenDiff = b.length - a.length;
-        return lenDiff !== 0 ? lenDiff : a.localeCompare(b);
+        return lenDiff === 0 ? a.localeCompare(b) : lenDiff;
     });
 }
 

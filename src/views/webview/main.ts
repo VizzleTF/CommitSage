@@ -890,6 +890,12 @@ function renderAutomationSection(state: ViewState): HTMLElement {
         { disabled: !state.trusted, hint: trustHint },
     ));
 
+    let autoPushHint: string | undefined;
+    if (state.trusted) {
+        autoPushHint = state.commit.autoCommit ? undefined : L.autoPushNeedsCommit;
+    } else {
+        autoPushHint = L.untrusted;
+    }
     body.appendChild(makeCheckbox(
         'auto-push',
         L.autoPush,
@@ -897,7 +903,7 @@ function renderAutomationSection(state: ViewState): HTMLElement {
         v => setSetting(KEYS.autoPush, v),
         {
             disabled: !state.trusted || !state.commit.autoCommit,
-            hint: !state.trusted ? L.untrusted : (!state.commit.autoCommit ? L.autoPushNeedsCommit : undefined),
+            hint: autoPushHint,
         },
     ));
 

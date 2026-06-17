@@ -127,7 +127,7 @@ export class HttpUtils {
       response = await fetch(url, {
         method,
         headers: opts.headers,
-        body: body !== undefined ? JSON.stringify(body) : undefined,
+        body: body === undefined ? undefined : JSON.stringify(body),
         signal,
       });
     } catch (error) {

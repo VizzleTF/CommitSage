@@ -654,7 +654,7 @@ class CommitLintService {
     const msgLines = message.split('\n');
 
     for (const [ruleName, entry] of Object.entries(rules)) {
-      if (!entry || entry[0] !== 2) { continue; }
+      if (entry?.[0] !== 2) { continue; }
       const condition = entry[1] as 'always' | 'never';
       const value     = entry[2];
       const empty     = (s: string): boolean => s.trim() === '';

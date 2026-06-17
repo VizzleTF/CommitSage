@@ -326,7 +326,7 @@ export class SettingsWebviewProvider implements vscode.WebviewViewProvider {
     }
 
     private describeRefreshError(err: Error): string {
-        const httpMatch = err.message.match(/^HTTP (\d{3})$/);
+        const httpMatch = /^HTTP (\d{3})$/.exec(err.message);
         if (!httpMatch) {
             return err.message;
         }
@@ -801,5 +801,8 @@ export class SettingsWebviewProvider implements vscode.WebviewViewProvider {
 function escapeForScript(s: string): string {
     // </script> in JSON would break out of the <script> block. The other two
     // pairs neutralise HTML comment / CDATA endings just in case.
-    return s.replaceAll(/<\/script>/gi, '<\\/script>').replaceAll(/<!--/g, '<\\!--').replaceAll(/]]>/g, ']]\\>');
+    return s
+        .replaceAll(/<\/script>/gi, String.raw`<\/script>`)
+        .replaceAll('<!--', String.raw`<\!--`)
+        .replaceAll(']]>', String.raw`]]\>`);
 }
