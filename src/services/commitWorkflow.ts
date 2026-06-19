@@ -33,6 +33,9 @@ export class CommitWorkflow {
                 await this.ensureApiKey(provider);
             }
 
+            // Prompt for refs before generation so the progress UI stays clean
+            const refs = await this.promptForRefs();
+
             await this.executeWithProgress(async (progress, token) => {
                 // Check for cancellation
                 if (token.isCancellationRequested) {
@@ -48,7 +51,8 @@ export class CommitWorkflow {
                         progress,
                         sourceControlRepository!,
                         token,
-                        controller.signal
+                        controller.signal,
+                        refs
                     );
                     Logger.log(`Commit message generated: ${commitMessage.message}`);
                 } finally {
@@ -82,6 +86,25 @@ export class CommitWorkflow {
 
     private static async ensureApiKey(provider: string): Promise<void> {
         await ApiKeyManager.getKey(provider);
+    }
+
+    private static async promptForRefs(): Promise<string> {
+        if (!ConfigService.get('commit.promptForRefs')) {
+            return '';
+        }
+
+        const refs = await vscode.window.showInputBox({
+            prompt: vscode.l10n.t('Enter refs (e.g., issue or ticket numbers) to append to the commit message'),
+            placeHolder: vscode.l10n.t('e.g. #123, JIRA-456'),
+            ignoreFocusOut: true
+        });
+
+        // Escape cancels the whole operation
+        if (refs === undefined) {
+            throw new UserCancelledError();
+        }
+
+        return refs.trim();
     }
 
     private static async handleInvalidApiKey(provider: string, sourceControlRepository?: vscode.SourceControl): Promise<void> {
@@ -125,7 +148,8 @@ export class CommitWorkflow {
         progress: vscode.Progress<{ message?: string; increment?: number }>,
         sourceControlRepository: vscode.SourceControl,
         token: vscode.CancellationToken,
-        signal: AbortSignal
+        signal: AbortSignal,
+        refs: string
     ): Promise<CommitMessage> {
         progress.report({ message: vscode.l10n.t('Analyzing changes…'), increment: 10 });
 
@@ -170,13 +194,17 @@ export class CommitWorkflow {
             signal,
         });
 
-        sourceControlRepository.inputBox.value = commitMessage.message;
+        const finalMessage = refs
+            ? `${commitMessage.message}\n\n${refs}`
+            : commitMessage.message;
+
+        sourceControlRepository.inputBox.value = finalMessage;
 
         if (ConfigService.get('commit.autoCommit')) {
             await this.handleAutoCommit(sourceControlRepository);
         }
 
-        return commitMessage;
+        return { ...commitMessage, message: finalMessage };
     }
 
     private static async handleError(error: Error): Promise<void> {
