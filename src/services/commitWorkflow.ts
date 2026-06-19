@@ -10,6 +10,8 @@ import { ApiKeyManager } from './apiKeyManager';
 import { UserCancelledError, ApiKeyInvalidError } from '../models/errors';
 import { toError, sanitizeErrorForTelemetry } from '../utils/errorUtils';
 import { mapLimit } from '../utils/concurrency';
+import { extractTicketId, injectTicketIntoMessage } from '../utils/ticketUtils';
+import { getTicketPlacement } from '../templates';
 
 const BLAME_CONCURRENCY = 8;
 const MAX_API_KEY_RETRIES = 3;
@@ -40,6 +42,10 @@ export class CommitWorkflow {
             // Prompt for refs before generation so the progress UI stays clean
             const refs = await this.promptForRefs();
 
+            // Resolve ticket ID before generation (may show an input box for 'prompt' mode)
+            const repoPath = sourceControlRepository?.rootUri?.fsPath ?? '';
+            const ticketId = await this.resolveTicketId(repoPath);
+
             await this.executeWithProgress(async (progress, token) => {
                 // Check for cancellation
                 if (token.isCancellationRequested) {
@@ -56,7 +62,8 @@ export class CommitWorkflow {
                         sourceControlRepository!,
                         token,
                         controller.signal,
-                        refs
+                        refs,
+                        ticketId,
                     );
                     Logger.log(`Commit message generated: ${commitMessage.message}`);
                 } finally {
@@ -118,6 +125,30 @@ export class CommitWorkflow {
         return refs.trim();
     }
 
+    private static async resolveTicketId(repoPath: string): Promise<string | undefined> {
+        const source = ConfigService.get('commit.ticketSource');
+
+        if (source === 'branch') {
+            const branch = await GitService.getBranchName(repoPath);
+            return extractTicketId(branch) ?? undefined;
+        }
+
+        if (source === 'prompt') {
+            const input = await vscode.window.showInputBox({
+                prompt: vscode.l10n.t('Enter the issue/ticket ID to include in the commit message'),
+                placeHolder: vscode.l10n.t('e.g. PROJ-123, ABC-456'),
+                ignoreFocusOut: true,
+            });
+            // Escape cancels the operation; empty string means skip
+            if (input === undefined) {
+                throw new UserCancelledError();
+            }
+            return input.trim() || undefined;
+        }
+
+        return undefined;
+    }
+
     private static async handleInvalidApiKey(
         provider: string,
         sourceControlRepository?: vscode.SourceControl,
@@ -164,7 +195,8 @@ export class CommitWorkflow {
         sourceControlRepository: vscode.SourceControl,
         token: vscode.CancellationToken,
         signal: AbortSignal,
-        refs: string
+        refs: string,
+        ticketId?: string,
     ): Promise<CommitMessage> {
         progress.report({ message: vscode.l10n.t('Analyzing changes…'), increment: 10 });
 
@@ -216,7 +248,14 @@ export class CommitWorkflow {
             fileCount: changedFiles.length,
             onlyStagedChanges: useStagedChanges,
             signal,
+            ticketId,
         });
+
+        // Safety net: if the LLM ignored the ticket instruction, inject it now
+        if (ticketId) {
+            const placement = getTicketPlacement(ConfigService.get('commit.commitFormat'));
+            commitMessage.message = injectTicketIntoMessage(commitMessage.message, ticketId, placement);
+        }
 
         const finalMessage = refs
             ? `${commitMessage.message}\n\n${refs}`
