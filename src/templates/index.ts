@@ -15,6 +15,26 @@ type CommitTemplate = Record<Exclude<CommitLanguage, 'custom'>, string>;
 
 export type CommitFormat = 'conventional' | 'angular' | 'karma' | 'semantic' | 'emoji' | 'emojiKarma' | 'google' | 'atom' | 'detailed';
 
+/**
+ * Defines where a ticket ID (e.g. PROJ-123) is placed in the commit header
+ * for each format. 'scope' → type(TICKET): desc; 'prefix' → type: TICKET desc.
+ */
+const TICKET_PLACEMENT: Record<CommitFormat, 'scope' | 'prefix'> = {
+    conventional: 'scope',
+    angular:      'scope',
+    karma:        'scope',
+    google:       'scope',
+    emoji:        'scope',
+    emojiKarma:   'scope',
+    semantic:     'prefix',
+    atom:         'prefix',
+    detailed:     'prefix',
+};
+
+export function getTicketPlacement(format: string): 'scope' | 'prefix' {
+    return TICKET_PLACEMENT[format as CommitFormat] ?? 'scope';
+}
+
 const templates: Record<CommitFormat, CommitTemplate> = {
     conventional: conventionalTemplate,
     angular: angularTemplate,
