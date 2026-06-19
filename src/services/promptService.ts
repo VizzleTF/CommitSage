@@ -1,4 +1,4 @@
-import { CommitFormat, getTemplate, getTicketPlacement } from '../templates';
+import { CommitFormat, getTemplate } from '../templates';
 import { ConfigService } from '../utils/configService';
 import { CommitLintService, CommitLintEngine } from './commitLintService';
 import { CustomLanguageService } from './customLanguageService';
