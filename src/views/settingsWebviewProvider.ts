@@ -72,6 +72,7 @@ const SETTING_PATHS = {
     useRecentCommitsAsContext: 'commit.useRecentCommitsAsContext',
     recentCommitsCount: 'commit.recentCommitsCount',
     recentCommitsScope: 'commit.recentCommitsScope',
+    ticketSource: 'commit.ticketSource',
     apiRequestTimeout: 'apiRequestTimeout',
     gitTimeout: 'gitTimeout',
     telemetryEnabled: 'telemetry.enabled',
