@@ -40,6 +40,7 @@ export interface ProjectConfig {
         autoCommit?: boolean;
         autoPush?: boolean;
         promptForRefs?: boolean;
+        insertTicketId?: boolean;
         commitlint?: {
             enabled?: boolean;
             maxRetries?: number;
