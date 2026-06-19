@@ -72,6 +72,11 @@ export interface WebviewL10n {
     recentCommitsScope: string;
     recentCommitsScopeAll: string;
     recentCommitsScopeMine: string;
+    ticketSource: string;
+    ticketSourceOff: string;
+    ticketSourcePrompt: string;
+    ticketSourceBranch: string;
+    ticketSourceHint: string;
     advanced: string;
     apiTimeout: string;
     gitTimeout: string;
@@ -133,6 +138,7 @@ export interface ViewState {
         commitlintRulesPath: string;
         commitlintEngine: string;
         commitlintCliAvailable: boolean;
+        ticketSource: string;
     };
     advanced: {
         apiRequestTimeout: number;

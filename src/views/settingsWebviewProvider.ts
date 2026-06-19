@@ -296,6 +296,7 @@ export class SettingsWebviewProvider implements vscode.WebviewViewProvider {
                     const root = ConfigService.getProjectRootPath();
                     return root ? CommitLintCliService.detect(root) !== null : false;
                 })(),
+                ticketSource: ConfigService.get('commit.ticketSource'),
             },
             advanced: {
                 apiRequestTimeout: ConfigService.get('apiRequestTimeout'),

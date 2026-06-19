@@ -295,6 +295,19 @@ export function renderCommitSection(state: ViewState): HTMLElement {
         v => setSetting(KEYS.onlyStagedChanges, v),
     ));
 
+    body.appendChild(fieldLabel(L.ticketSource));
+    body.appendChild(makeSelect(
+        'ticket-source',
+        [
+            { value: 'off',    label: L.ticketSourceOff    },
+            { value: 'prompt', label: L.ticketSourcePrompt },
+            { value: 'branch', label: L.ticketSourceBranch },
+        ],
+        state.commit.ticketSource,
+        v => setSetting(KEYS.ticketSource, v),
+    ));
+    body.appendChild(el('div', { class: 'hint' }, [L.ticketSourceHint]));
+
     return section('commit', L.commit, true, body);
 }
 
