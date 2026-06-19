@@ -1,4 +1,4 @@
-import { CommitFormat, getTemplate } from '../templates';
+import { CommitFormat, getTemplate, getTicketPlacement } from '../templates';
 import { ConfigService } from '../utils/configService';
 import { CommitLintService, CommitLintEngine } from './commitLintService';
 import { CustomLanguageService } from './customLanguageService';
@@ -124,6 +124,7 @@ Please provide ONLY the commit message, without any additional text or explanati
     static async generatePrompt(repoPath: string, diff: string, blameAnalysis: string, progress: ProgressReporter): Promise<string> {
         const useCustomInstructions = ConfigService.get('commit.useCustomInstructions');
         const customInstructions = ConfigService.get('commit.customInstructions');
+        const formatSetting = ConfigService.get('commit.commitFormat');
 
         if (useCustomInstructions && customInstructions.trim()) {
             return `${customInstructions}
@@ -139,7 +140,6 @@ ${STRICT_FORMAT_REMINDER}
 Please provide ONLY the commit message, without any additional text or explanations.`;
         }
 
-        const formatSetting = ConfigService.get('commit.commitFormat');
         const examples = await this.loadRecentCommitExamples(repoPath, formatSetting);
 
         // `previous` needs example commits to define its style; with no usable
