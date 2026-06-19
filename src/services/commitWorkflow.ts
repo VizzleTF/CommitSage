@@ -224,7 +224,6 @@ export class CommitWorkflow {
             fileCount: changedFiles.length,
             onlyStagedChanges: useStagedChanges,
             signal,
-            ticketId,
         });
 
         // Safety net: if the LLM ignored the ticket instruction, inject it now

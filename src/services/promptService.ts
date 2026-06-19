@@ -1,4 +1,4 @@
-import { CommitFormat, getTemplate, getTicketPlacement } from '../templates';
+import { CommitFormat, getTemplate } from '../templates';
 import { ConfigService } from '../utils/configService';
 import { CommitLintService, CommitLintEngine } from './commitLintService';
 import { CustomLanguageService } from './customLanguageService';
@@ -72,28 +72,12 @@ Please provide ONLY the commit message, without any additional text or explanati
 `;
     }
 
-    private static buildTicketInstruction(ticketId: string, formatSetting: string): string {
-        const placement = getTicketPlacement(formatSetting);
-        if (placement === 'scope') {
-            return `MANDATORY: Use "${ticketId}" as the commit scope. The first line MUST follow: type(${ticketId}): description.`;
-        }
-        return `MANDATORY: Start the description with "${ticketId}". The first line MUST follow: type: ${ticketId} description.`;
-    }
-
-    static async generatePrompt(repoPath: string, diff: string, blameAnalysis: string, progress: ProgressReporter, ticketId?: string): Promise<string> {
+    static async generatePrompt(repoPath: string, diff: string, blameAnalysis: string, progress: ProgressReporter): Promise<string> {
         const useCustomInstructions = ConfigService.get('commit.useCustomInstructions');
         const customInstructions = ConfigService.get('commit.customInstructions');
-        const formatSetting = ConfigService.get('commit.commitFormat');
-
-        const ticketInstruction = ticketId
-            ? this.buildTicketInstruction(ticketId, formatSetting)
-            : '';
 
         if (useCustomInstructions && customInstructions.trim()) {
-            const base = ticketInstruction
-                ? `${customInstructions}\n\n${ticketInstruction}`
-                : customInstructions;
-            return `${base}
+            return `${customInstructions}
 
 Git diff to analyze:
 ${diff}
@@ -106,6 +90,7 @@ ${STRICT_FORMAT_REMINDER}
 Please provide ONLY the commit message, without any additional text or explanations.`;
         }
 
+        const formatSetting = ConfigService.get('commit.commitFormat');
         const format = formatSetting as CommitFormat;
 
         const { template, languagePrompt } = await this.resolveLanguagePrompt(format, progress);
@@ -120,10 +105,6 @@ Please provide ONLY the commit message, without any additional text or explanati
             const engine = ConfigService.get('commit.commitlint.engine') as CommitLintEngine;
             const rules = await CommitLintService.extractRules(repoPath, rulesPath, { engine, format: formatSetting });
             mainInstructions = `${template}\n\n${rules}`;
-        }
-
-        if (ticketInstruction) {
-            mainInstructions = `${mainInstructions}\n\n${ticketInstruction}`;
         }
 
         return this.buildPrompt(mainInstructions, languagePrompt, diff, blameAnalysis, reminder);

@@ -18,7 +18,6 @@ interface GenerateContext {
     fileCount?: number;
     onlyStagedChanges?: boolean;
     signal?: AbortSignal;
-    ticketId?: string;
 }
 
 export class AIService {
@@ -51,7 +50,7 @@ export class AIService {
 
         const startTime = Date.now();
         const truncatedDiff = this.truncateDiff(diff, maxDiffLength);
-        const prompt = await PromptService.generatePrompt(repoPath, truncatedDiff, blameAnalysis, progress, context.ticketId);
+        const prompt = await PromptService.generatePrompt(repoPath, truncatedDiff, blameAnalysis, progress);
 
         progress.report({ message: 'Generating commit message...', increment: 50 });
 
