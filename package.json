@@ -444,6 +444,12 @@
           "markdownDescription": "Prompt for entering refs (e.g., issue numbers) when generating commit messages. **Note:** this may interrupt automatic flow if `#commitSage.commit.autoCommit#` is enabled.",
           "order": 10
         },
+        "commitSage.commit.insertTicketId": {
+          "type": "boolean",
+          "default": false,
+          "markdownDescription": "Extract an issue ticket ID (e.g. `PROJ-123`, `ABC-456`) from the current Git branch name and insert it into the generated commit message.\n\n- **Formats with scope** (`conventional`, `angular`, `karma`, `google`, `emoji`, `emojiKarma`): inserts the ID as the scope → `feat(PROJ-123): description`.\n- **Formats without scope** (`semantic`, `atom`, `detailed`): prepends the ID to the description → `feat: PROJ-123 description`.\n\nThe ID is also included as a mandatory instruction in the LLM prompt, with a programmatic fallback that injects it if the model omits it.",
+          "order": 11
+        },
         "commitSage.gemini.model": {
           "type": "string",
           "default": "auto",
