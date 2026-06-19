@@ -59,6 +59,7 @@ export const SETTING_DEFAULTS = {
     'commit.commitlint.maxRetries': 3,
     'commit.commitlint.rulesPath': '',
     'commit.commitlint.engine': 'builtin',
+    'commit.ticketSource': 'off',
 } as const satisfies Record<string, CacheValue>;
 /* eslint-enable @typescript-eslint/naming-convention */
 
