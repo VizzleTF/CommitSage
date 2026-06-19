@@ -20,6 +20,7 @@ interface GenerateContext {
     fileCount?: number;
     onlyStagedChanges?: boolean;
     signal?: AbortSignal;
+    ticketId?: string;
 }
 
 export class AIService {
