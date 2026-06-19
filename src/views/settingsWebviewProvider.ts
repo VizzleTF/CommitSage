@@ -104,6 +104,7 @@ const SETTING_KEYS = {
     commitlintMaxRetries: 'commitSage.commit.commitlint.maxRetries',
     commitlintRulesPath: 'commitSage.commit.commitlint.rulesPath',
     commitlintEngine: 'commitSage.commit.commitlint.engine',
+    insertTicketId: 'commitSage.commit.insertTicketId',
 } as const;
 
 interface ModelSlot {
@@ -139,6 +140,7 @@ interface ViewState {
         commitlintRulesPath: string;
         commitlintEngine: string;
         commitlintCliAvailable: boolean;
+        insertTicketId: boolean;
     };
     advanced: {
         apiRequestTimeout: number;
@@ -488,6 +490,7 @@ export class SettingsWebviewProvider implements vscode.WebviewViewProvider {
                     const root = ConfigService.getProjectRootPath();
                     return root ? CommitLintCliService.detect(root) !== null : false;
                 })(),
+                insertTicketId: ConfigService.get('commit.insertTicketId'),
             },
             advanced: {
                 apiRequestTimeout: ConfigService.get('apiRequestTimeout'),
@@ -719,6 +722,8 @@ export class SettingsWebviewProvider implements vscode.WebviewViewProvider {
                 commitlintRulesPath: vscode.l10n.t('Commitlint rules path'),
                 enableCustom: vscode.l10n.t('Enable custom instructions'),
                 customInstructionsPh: vscode.l10n.t('Free-form text appended to the prompt — e.g. ticket-tag conventions.'),
+                insertTicketId: vscode.l10n.t('Insert issue ticket ID'),
+                insertTicketIdHint: vscode.l10n.t('Extracts a ticket ID from the branch name (e.g. PROJ-123) and inserts it as the scope (conventional/angular/karma) or as a description prefix (semantic/atom/detailed).'),
                 advanced: vscode.l10n.t('Advanced'),
                 apiTimeout: vscode.l10n.t('API request timeout (seconds)'),
                 gitTimeout: vscode.l10n.t('Git timeout (seconds)'),

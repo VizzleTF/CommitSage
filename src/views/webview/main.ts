@@ -72,6 +72,8 @@ interface InitData {
         commitlintRulesPath: string;
         enableCustom: string;
         customInstructionsPh: string;
+        insertTicketId: string;
+        insertTicketIdHint: string;
         advanced: string;
         apiTimeout: string;
         gitTimeout: string;
@@ -115,6 +117,7 @@ interface ViewState {
         commitlintRulesPath: string;
         commitlintEngine: string;
         commitlintCliAvailable: boolean;
+        insertTicketId: boolean;
     };
     advanced: {
         apiRequestTimeout: number;
@@ -837,6 +840,14 @@ function renderCommitSection(state: ViewState): HTMLElement {
         L.onlyStaged,
         state.commit.onlyStagedChanges,
         v => setSetting(KEYS.onlyStagedChanges, v),
+    ));
+
+    body.appendChild(makeCheckbox(
+        'insert-ticket-id',
+        L.insertTicketId,
+        state.commit.insertTicketId,
+        v => setSetting(KEYS.insertTicketId, v),
+        { hint: L.insertTicketIdHint },
     ));
 
     return section('commit', L.commit, true, body);
