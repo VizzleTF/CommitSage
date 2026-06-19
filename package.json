@@ -444,6 +444,18 @@
           "markdownDescription": "Prompt for entering refs (e.g., issue numbers) when generating commit messages. **Note:** this may interrupt automatic flow if `#commitSage.commit.autoCommit#` is enabled.",
           "order": 10
         },
+        "commitSage.commit.ticketSource": {
+          "type": "string",
+          "default": "off",
+          "enum": ["off", "prompt", "branch"],
+          "enumDescriptions": [
+            "Disabled — no ticket ID is added to the commit message.",
+            "Prompt — a text input is shown before each generation so you can type the ticket ID manually (e.g. PROJ-123).",
+            "Branch — the ticket ID is extracted automatically from the current Git branch name (e.g. feature/PROJ-123-login → PROJ-123)."
+          ],
+          "markdownDescription": "Controls how an issue/ticket ID is inserted into the generated commit message.\n\n- **off**: disabled.\n- **prompt**: shows an input box before generation — you type the ID.\n- **branch**: extracted automatically from the branch name.\n\nPlacement is format-aware: `conventional`, `angular`, `karma`, `google`, `emoji`, `emojiKarma` → scope (`feat(PROJ-123): …`); `semantic`, `atom`, `detailed` → prefix (`feat: PROJ-123 …`). A programmatic safety net applies the injection even if the LLM omits it.",
+          "order": 11
+        },
         "commitSage.gemini.model": {
           "type": "string",
           "default": "auto",
