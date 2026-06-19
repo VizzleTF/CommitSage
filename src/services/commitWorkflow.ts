@@ -10,6 +10,8 @@ import { ApiKeyManager } from './apiKeyManager';
 import { UserCancelledError, ApiKeyInvalidError } from '../models/errors';
 import { toError, sanitizeErrorForTelemetry } from '../utils/errorUtils';
 import { mapLimit } from '../utils/concurrency';
+import { extractTicketId, injectTicketIntoMessage } from '../utils/ticketUtils';
+import { getTicketPlacement } from '../templates';
 
 const BLAME_CONCURRENCY = 8;
 
@@ -169,6 +171,15 @@ export class CommitWorkflow {
             onlyStagedChanges: useStagedChanges,
             signal,
         });
+
+        if (ConfigService.get('commit.insertTicketId')) {
+            const branchName = await GitService.getBranchName(repoPath, signal);
+            const ticket = extractTicketId(branchName);
+            if (ticket) {
+                const placement = getTicketPlacement(ConfigService.get('commit.commitFormat'));
+                commitMessage.message = injectTicketIntoMessage(commitMessage.message, ticket, placement);
+            }
+        }
 
         sourceControlRepository.inputBox.value = commitMessage.message;
 
