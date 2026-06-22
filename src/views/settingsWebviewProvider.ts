@@ -104,6 +104,7 @@ const SETTING_KEYS = {
     commitlintMaxRetries: 'commitSage.commit.commitlint.maxRetries',
     commitlintRulesPath: 'commitSage.commit.commitlint.rulesPath',
     commitlintEngine: 'commitSage.commit.commitlint.engine',
+    ticketSource: 'commitSage.commit.ticketSource',
 } as const;
 
 interface ModelSlot {
@@ -139,6 +140,7 @@ interface ViewState {
         commitlintRulesPath: string;
         commitlintEngine: string;
         commitlintCliAvailable: boolean;
+        ticketSource: string;
     };
     advanced: {
         apiRequestTimeout: number;
@@ -488,6 +490,7 @@ export class SettingsWebviewProvider implements vscode.WebviewViewProvider {
                     const root = ConfigService.getProjectRootPath();
                     return root ? CommitLintCliService.detect(root) !== null : false;
                 })(),
+                ticketSource: ConfigService.get('commit.ticketSource'),
             },
             advanced: {
                 apiRequestTimeout: ConfigService.get('apiRequestTimeout'),
@@ -719,6 +722,11 @@ export class SettingsWebviewProvider implements vscode.WebviewViewProvider {
                 commitlintRulesPath: vscode.l10n.t('Commitlint rules path'),
                 enableCustom: vscode.l10n.t('Enable custom instructions'),
                 customInstructionsPh: vscode.l10n.t('Free-form text appended to the prompt — e.g. ticket-tag conventions.'),
+                ticketSource: vscode.l10n.t('Issue ticket ID source'),
+                ticketSourceOff: vscode.l10n.t('Off'),
+                ticketSourcePrompt: vscode.l10n.t('Prompt — ask before each generation'),
+                ticketSourceBranch: vscode.l10n.t('Branch — extract from branch name'),
+                ticketSourceHint: vscode.l10n.t('Extracts a ticket ID (e.g. PROJ-123) and inserts it as scope or prefix according to the active commit format.'),
                 advanced: vscode.l10n.t('Advanced'),
                 apiTimeout: vscode.l10n.t('API request timeout (seconds)'),
                 gitTimeout: vscode.l10n.t('Git timeout (seconds)'),

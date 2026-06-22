@@ -72,6 +72,11 @@ interface InitData {
         commitlintRulesPath: string;
         enableCustom: string;
         customInstructionsPh: string;
+        ticketSource: string;
+        ticketSourceOff: string;
+        ticketSourcePrompt: string;
+        ticketSourceBranch: string;
+        ticketSourceHint: string;
         advanced: string;
         apiTimeout: string;
         gitTimeout: string;
@@ -115,6 +120,7 @@ interface ViewState {
         commitlintRulesPath: string;
         commitlintEngine: string;
         commitlintCliAvailable: boolean;
+        ticketSource: string;
     };
     advanced: {
         apiRequestTimeout: number;
@@ -838,6 +844,19 @@ function renderCommitSection(state: ViewState): HTMLElement {
         state.commit.onlyStagedChanges,
         v => setSetting(KEYS.onlyStagedChanges, v),
     ));
+
+    body.appendChild(fieldLabel(L.ticketSource));
+    body.appendChild(makeSelect(
+        'ticket-source',
+        [
+            { value: 'off',    label: L.ticketSourceOff    },
+            { value: 'prompt', label: L.ticketSourcePrompt },
+            { value: 'branch', label: L.ticketSourceBranch },
+        ],
+        state.commit.ticketSource,
+        v => setSetting(KEYS.ticketSource, v),
+    ));
+    body.appendChild(el('div', { class: 'hint' }, [L.ticketSourceHint]));
 
     return section('commit', L.commit, true, body);
 }
