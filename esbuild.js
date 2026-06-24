@@ -74,13 +74,27 @@ const webviewBuildOptions = {
     plugins: [esbuildProblemMatcherPlugin],
 };
 
+// Webview stylesheet, loaded by settingsWebviewProvider via asWebviewUri +
+// <link>. Built separately so it's a real .css file in dist/webview rather
+// than a string baked into the extension bundle.
+const stylesBuildOptions = {
+    entryPoints: ['src/views/webview/styles.css'],
+    bundle: true,
+    outfile: 'dist/webview/styles.css',
+    sourcemap: !production,
+    minify: production,
+    logLevel: 'info',
+    plugins: [esbuildProblemMatcherPlugin],
+};
+
 async function main() {
     if (watch) {
-        const [extCtx, webCtx] = await Promise.all([
+        const [extCtx, webCtx, cssCtx] = await Promise.all([
             esbuild.context(extensionBuildOptions),
             esbuild.context(webviewBuildOptions),
+            esbuild.context(stylesBuildOptions),
         ]);
-        await Promise.all([extCtx.watch(), webCtx.watch()]);
+        await Promise.all([extCtx.watch(), webCtx.watch(), cssCtx.watch()]);
         console.log('[esbuild] watching for changes…');
         return;
     }
@@ -91,6 +105,7 @@ async function main() {
         for (const stale of [
             path.join('dist', 'extension.js.map'),
             path.join('dist', 'webview', 'main.js.map'),
+            path.join('dist', 'webview', 'styles.css.map'),
         ]) {
             if (fs.existsSync(stale)) {
                 fs.unlinkSync(stale);
@@ -101,6 +116,7 @@ async function main() {
     const [extResult] = await Promise.all([
         esbuild.build(extensionBuildOptions),
         esbuild.build(webviewBuildOptions),
+        esbuild.build(stylesBuildOptions),
     ]);
 
     if (analyze && extResult.metafile) {

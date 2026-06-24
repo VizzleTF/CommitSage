@@ -1,0 +1,68 @@
+import * as vscode from 'vscode';
+import { PROVIDER_LABELS, PROVIDER_LIVE_SOURCES } from '../services/providerRegistry';
+import { WebviewL10n } from './webview/protocol';
+
+/**
+ * Builds the localized + branded string bundle handed to the webview at render
+ * time. Kept out of the provider so the host file stays focused on wiring, not
+ * a wall of translation calls. Provider display names and live-source labels
+ * come straight from the provider registry (single source of truth).
+ */
+export function buildWebviewL10n(): WebviewL10n {
+    return {
+        provider: vscode.l10n.t('Provider'),
+        modelAuth: vscode.l10n.t('Model & authentication'),
+        model: vscode.l10n.t('Model'),
+        modelPlaceholder: vscode.l10n.t('Type a model ID'),
+        refresh: vscode.l10n.t('Refresh'),
+        refreshing: vscode.l10n.t('Refreshing…'),
+        baseUrl: vscode.l10n.t('Base URL'),
+        path: vscode.l10n.t('Path'),
+        apiKey: vscode.l10n.t('API key'),
+        authToken: vscode.l10n.t('Auth token'),
+        setKey: vscode.l10n.t('Set'),
+        removeKey: vscode.l10n.t('Remove'),
+        getKey: vscode.l10n.t('Get key ↗'),
+        keySet: vscode.l10n.t('● set'),
+        keyMissing: vscode.l10n.t('○ not set'),
+        noKey: vscode.l10n.t('Set an API key to load the live model list.'),
+        useAuthToken: vscode.l10n.t('Use auth token'),
+        useApiKey: vscode.l10n.t('Send API key'),
+        preferFreeModels: vscode.l10n.t('Show free models only'),
+        liveFrom: vscode.l10n.t('Live list from'),
+        notInList: vscode.l10n.t('(not in live list)'),
+        commit: vscode.l10n.t('Commit message'),
+        format: vscode.l10n.t('Format'),
+        language: vscode.l10n.t('Language'),
+        customLanguage: vscode.l10n.t('Custom language name'),
+        promptForRefs: vscode.l10n.t('Prompt for refs'),
+        onlyStaged: vscode.l10n.t('Only staged changes'),
+        automation: vscode.l10n.t('Automation'),
+        autoCommit: vscode.l10n.t('Auto-commit'),
+        autoPush: vscode.l10n.t('Auto-push'),
+        autoPushNeedsCommit: vscode.l10n.t('Requires auto-commit'),
+        untrusted: vscode.l10n.t('Disabled in untrusted workspaces'),
+        customInstructions: vscode.l10n.t('Custom instructions'),
+        commitlint: vscode.l10n.t('Commitlint'),
+        commitlintEnabled: vscode.l10n.t('Enable commitlint'),
+        commitlintEngine: vscode.l10n.t('Validator'),
+        commitlintMaxRetries: vscode.l10n.t('Max commitlint retries'),
+        commitlintRulesPath: vscode.l10n.t('Commitlint rules path'),
+        enableCustom: vscode.l10n.t('Enable custom instructions'),
+        customInstructionsPh: vscode.l10n.t('Free-form text appended to the prompt — e.g. ticket-tag conventions.'),
+        advanced: vscode.l10n.t('Advanced'),
+        apiTimeout: vscode.l10n.t('API request timeout (seconds)'),
+        gitTimeout: vscode.l10n.t('Git timeout (seconds)'),
+        timeoutHint: vscode.l10n.t('-1 disables the timeout'),
+        maxDiffSize: vscode.l10n.t('Max diff size (characters)'),
+        maxDiffSizeHint: vscode.l10n.t('-1 disables truncation. For Groq free tier set ~20000. Default 100000 ≈ 25000 tokens.'),
+        temperature: vscode.l10n.t('Temperature'),
+        temperatureHint: vscode.l10n.t('LLM sampling temperature. 0 = deterministic, 0.7 = default, 1+ = more varied.'),
+        ollamaNumCtx: vscode.l10n.t('Context window (num_ctx)'),
+        ollamaNumCtxHint: vscode.l10n.t('Ollama context length. 0 = use model default. Larger values use more RAM/VRAM.'),
+        telemetry: vscode.l10n.t('Telemetry'),
+        autoOption: vscode.l10n.t('auto — try all available models'),
+        providerLabels: PROVIDER_LABELS,
+        liveSource: PROVIDER_LIVE_SOURCES,
+    };
+}

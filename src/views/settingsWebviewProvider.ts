@@ -7,8 +7,6 @@ import {
     PROVIDERS,
     SECRET_KEYS,
     API_KEY_URLS,
-    PROVIDER_LABELS,
-    PROVIDER_LIVE_SOURCES,
     providerDef,
 } from '../services/providerRegistry';
 import {
@@ -18,6 +16,7 @@ import {
     IncomingMessage,
     InitData,
 } from './webview/protocol';
+import { buildWebviewL10n } from './webviewL10n';
 import { Logger } from '../utils/logger';
 import { toError } from '../utils/errorUtils';
 import { getNonce } from '../utils/nonce';
@@ -299,164 +298,9 @@ export class SettingsWebviewProvider implements vscode.WebviewViewProvider {
             vscode.Uri.joinPath(this.context.extensionUri, 'dist', 'webview', 'main.js'),
         );
         const cspSource = webview.cspSource;
-
-        const styles = `
-            /* No color-scheme override: VS Code injects the correct one per
-               active theme. Forcing 'light dark' makes native controls
-               (checkbox, scrollbar, number spinners) follow the OS instead of
-               the VS Code theme — the cause of dark widgets on a light theme. */
-            body {
-                font-family: var(--vscode-font-family);
-                font-size: var(--vscode-font-size);
-                color: var(--vscode-sideBar-foreground, var(--vscode-foreground));
-                background: var(--vscode-sideBar-background);
-                padding: 10px 12px;
-                margin: 0;
-            }
-            details {
-                margin-bottom: 12px;
-                border: 1px solid var(--vscode-sideBarSectionHeader-border, var(--vscode-widget-border, var(--vscode-panel-border, transparent)));
-                border-radius: 3px;
-            }
-            details > summary {
-                cursor: pointer;
-                padding: 6px 8px;
-                font-weight: 600;
-                user-select: none;
-                outline: none;
-                background: var(--vscode-sideBarSectionHeader-background, transparent);
-                color: var(--vscode-sideBarSectionHeader-foreground, inherit);
-                border-radius: 2px 2px 0 0;
-            }
-            details:not([open]) > summary { border-radius: 2px; }
-            details > summary:hover { background: var(--vscode-list-hoverBackground, var(--vscode-sideBarSectionHeader-background, transparent)); }
-            details[open] > summary { border-bottom: 1px solid var(--vscode-sideBarSectionHeader-border, var(--vscode-widget-border, var(--vscode-panel-border, transparent))); }
-            .body { padding: 8px 10px 10px; }
-            section.provider-pick { margin-bottom: 12px; }
-            label.field {
-                display: block;
-                font-size: 11px;
-                text-transform: uppercase;
-                letter-spacing: 0.04em;
-                color: var(--vscode-descriptionForeground);
-                margin: 8px 0 3px;
-            }
-            label.field:first-child { margin-top: 0; }
-            select, input[type="text"], input[type="number"], textarea {
-                width: 100%;
-                padding: 4px 6px;
-                background: var(--vscode-input-background);
-                color: var(--vscode-input-foreground);
-                border: 1px solid var(--vscode-input-border, transparent);
-                border-radius: 2px;
-                box-sizing: border-box;
-                font-family: inherit;
-                font-size: inherit;
-            }
-            ::placeholder { color: var(--vscode-input-placeholderForeground, var(--vscode-descriptionForeground)); opacity: 1; }
-            textarea { resize: vertical; min-height: 60px; font-family: var(--vscode-editor-font-family, monospace); }
-            select:focus, input:focus, textarea:focus {
-                outline: 1px solid var(--vscode-focusBorder);
-                outline-offset: -1px;
-            }
-            .row { display: flex; gap: 6px; align-items: stretch; }
-            .row > select, .row > input { flex: 1; }
-            button {
-                padding: 4px 10px;
-                background: var(--vscode-button-secondaryBackground);
-                color: var(--vscode-button-secondaryForeground);
-                border: none;
-                border-radius: 2px;
-                cursor: pointer;
-                font-family: inherit;
-                font-size: inherit;
-            }
-            button:hover:not(:disabled) { background: var(--vscode-button-secondaryHoverBackground); }
-            button.primary {
-                background: var(--vscode-button-background);
-                color: var(--vscode-button-foreground);
-            }
-            button.primary:hover:not(:disabled) { background: var(--vscode-button-hoverBackground); }
-            button#refresh-models {
-                font-size: 20px;
-                line-height: 1;
-                padding: 2px 10px;
-            }
-            button:disabled, input:disabled, select:disabled, textarea:disabled {
-                opacity: 0.5;
-                cursor: default;
-            }
-            .actions { display: flex; gap: 6px; align-items: center; margin-top: 4px; flex-wrap: wrap; }
-            .checkbox-row {
-                display: flex;
-                gap: 6px;
-                align-items: center;
-                margin: 6px 0;
-            }
-            .checkbox-row input { width: auto; }
-            .checkbox-row label { color: var(--vscode-foreground); cursor: pointer; }
-            .checkbox-row.disabled label { opacity: 0.6; cursor: default; }
-            .hint {
-                font-size: 11px;
-                color: var(--vscode-descriptionForeground);
-                margin-top: 4px;
-            }
-            .hint.pinned {
-                color: var(--vscode-editorWarning-foreground, var(--vscode-notificationsWarningIcon-foreground, #cca700));
-                font-weight: 600;
-            }
-            .error {
-                font-size: 11px;
-                color: var(--vscode-errorForeground);
-                margin-top: 4px;
-                word-break: break-word;
-            }
-            .badge {
-                font-size: 10px;
-                color: var(--vscode-descriptionForeground);
-            }
-            .badge.on { color: var(--vscode-testing-iconPassed, var(--vscode-charts-green, currentColor)); }
-            .combo {
-                position: relative;
-                flex: 1;
-            }
-            .combo > input {
-                width: 100%;
-                box-sizing: border-box;
-            }
-            .combo-list {
-                position: absolute;
-                top: 100%;
-                left: 0;
-                right: 0;
-                max-height: 280px;
-                overflow-y: auto;
-                margin: 2px 0 0;
-                padding: 0;
-                list-style: none;
-                background: var(--vscode-dropdown-background, var(--vscode-input-background));
-                color: var(--vscode-dropdown-foreground, var(--vscode-foreground));
-                border: 1px solid var(--vscode-dropdown-border, var(--vscode-input-border, transparent));
-                border-radius: 2px;
-                z-index: 10;
-                box-shadow: 0 2px 8px var(--vscode-widget-shadow, rgba(0, 0, 0, 0.3));
-            }
-            .combo-list[hidden] { display: none; }
-            .combo-list-item {
-                padding: 4px 8px;
-                cursor: pointer;
-                white-space: nowrap;
-                overflow: hidden;
-                text-overflow: ellipsis;
-                font-family: inherit;
-                font-size: inherit;
-            }
-            .combo-list-item.active,
-            .combo-list-item:hover {
-                background: var(--vscode-list-activeSelectionBackground, var(--vscode-list-hoverBackground));
-                color: var(--vscode-list-activeSelectionForeground, var(--vscode-foreground));
-            }
-        `;
+        const styleUri = webview.asWebviewUri(
+            vscode.Uri.joinPath(this.context.extensionUri, 'dist', 'webview', 'styles.css'),
+        );
 
         const data: InitData = {
             providers: PROVIDERS,
@@ -465,70 +309,15 @@ export class SettingsWebviewProvider implements vscode.WebviewViewProvider {
             commitlintCompatFormats: [...COMMITLINT_COMPATIBLE_FORMATS],
             settingKeys: SETTING_KEYS,
             apiKeyUrls: API_KEY_URLS,
-            l10n: {
-                provider: vscode.l10n.t('Provider'),
-                modelAuth: vscode.l10n.t('Model & authentication'),
-                model: vscode.l10n.t('Model'),
-                modelPlaceholder: vscode.l10n.t('Type a model ID'),
-                refresh: vscode.l10n.t('Refresh'),
-                refreshing: vscode.l10n.t('Refreshing…'),
-                baseUrl: vscode.l10n.t('Base URL'),
-                path: vscode.l10n.t('Path'),
-                apiKey: vscode.l10n.t('API key'),
-                authToken: vscode.l10n.t('Auth token'),
-                setKey: vscode.l10n.t('Set'),
-                removeKey: vscode.l10n.t('Remove'),
-                getKey: vscode.l10n.t('Get key ↗'),
-                keySet: vscode.l10n.t('● set'),
-                keyMissing: vscode.l10n.t('○ not set'),
-                noKey: vscode.l10n.t('Set an API key to load the live model list.'),
-                useAuthToken: vscode.l10n.t('Use auth token'),
-                useApiKey: vscode.l10n.t('Send API key'),
-                preferFreeModels: vscode.l10n.t('Show free models only'),
-                liveFrom: vscode.l10n.t('Live list from'),
-                notInList: vscode.l10n.t('(not in live list)'),
-                commit: vscode.l10n.t('Commit message'),
-                format: vscode.l10n.t('Format'),
-                language: vscode.l10n.t('Language'),
-                customLanguage: vscode.l10n.t('Custom language name'),
-                promptForRefs: vscode.l10n.t('Prompt for refs'),
-                onlyStaged: vscode.l10n.t('Only staged changes'),
-                automation: vscode.l10n.t('Automation'),
-                autoCommit: vscode.l10n.t('Auto-commit'),
-                autoPush: vscode.l10n.t('Auto-push'),
-                autoPushNeedsCommit: vscode.l10n.t('Requires auto-commit'),
-                untrusted: vscode.l10n.t('Disabled in untrusted workspaces'),
-                customInstructions: vscode.l10n.t('Custom instructions'),
-                commitlint: vscode.l10n.t('Commitlint'),
-                commitlintEnabled: vscode.l10n.t('Enable commitlint'),
-                commitlintEngine: vscode.l10n.t('Validator'),
-                commitlintMaxRetries: vscode.l10n.t('Max commitlint retries'),
-                commitlintRulesPath: vscode.l10n.t('Commitlint rules path'),
-                enableCustom: vscode.l10n.t('Enable custom instructions'),
-                customInstructionsPh: vscode.l10n.t('Free-form text appended to the prompt — e.g. ticket-tag conventions.'),
-                advanced: vscode.l10n.t('Advanced'),
-                apiTimeout: vscode.l10n.t('API request timeout (seconds)'),
-                gitTimeout: vscode.l10n.t('Git timeout (seconds)'),
-                timeoutHint: vscode.l10n.t('-1 disables the timeout'),
-                maxDiffSize: vscode.l10n.t('Max diff size (characters)'),
-                maxDiffSizeHint: vscode.l10n.t('-1 disables truncation. For Groq free tier set ~20000. Default 100000 ≈ 25000 tokens.'),
-                temperature: vscode.l10n.t('Temperature'),
-                temperatureHint: vscode.l10n.t('LLM sampling temperature. 0 = deterministic, 0.7 = default, 1+ = more varied.'),
-                ollamaNumCtx: vscode.l10n.t('Context window (num_ctx)'),
-                ollamaNumCtxHint: vscode.l10n.t('Ollama context length. 0 = use model default. Larger values use more RAM/VRAM.'),
-                telemetry: vscode.l10n.t('Telemetry'),
-                autoOption: vscode.l10n.t('auto — try all available models'),
-                providerLabels: PROVIDER_LABELS,
-                liveSource: PROVIDER_LIVE_SOURCES,
-            },
+            l10n: buildWebviewL10n(),
         };
 
         return `<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline' ${cspSource}; script-src 'nonce-${nonce}'; img-src ${cspSource} data:;">
-    <style>${styles}</style>
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${cspSource}; script-src 'nonce-${nonce}'; img-src ${cspSource} data:;">
+    <link rel="stylesheet" href="${styleUri}">
     <title>Commit Sage</title>
 </head>
 <body>
