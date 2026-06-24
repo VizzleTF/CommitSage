@@ -15,31 +15,8 @@ import {
 } from './widgets';
 import { makeCombobox } from './combobox';
 import { section } from './section';
-import { init, L, KEYS, COMMITLINT_COMPAT_FORMATS } from './init';
+import { init, L, KEYS, COMMITLINT_COMPAT_FORMATS, NO_REFRESH_PROVIDERS } from './init';
 import { send, setSetting } from './vscodeApi';
-
-// Providers that have no live `/models` endpoint and therefore should not
-// show a refresh button (the list is static or user-supplied). Codestral has
-// a static fallback, Anthropic has no public endpoint, Custom has no listing
-// at all.
-const NO_REFRESH_PROVIDERS: ReadonlySet<Provider> = new Set([
-    'codestral',
-    'anthropic',
-    'custom',
-] as const);
-
-const SETTING_KEY_BY_PROVIDER: Record<Provider, string> = {
-    gemini: 'geminiModel',
-    openai: 'openaiModel',
-    codestral: 'codestralModel',
-    ollama: 'ollamaModel',
-    openrouter: 'openrouterModel',
-    groq: 'groqModel',
-    anthropic: 'anthropicModel',
-    deepseek: 'deepseekModel',
-    xai: 'xaiModel',
-    custom: 'customModel',
-};
 
 export function renderProviderPick(state: ViewState): HTMLElement {
     const providerPinned = isPinned(state, 'provider');
@@ -102,7 +79,8 @@ function appendModelPicker(body: HTMLElement, state: ViewState, p: Provider): vo
     const slot = state.models[p];
     body.appendChild(fieldLabel(L.model));
 
-    const settingKeyName = SETTING_KEY_BY_PROVIDER[p];
+    // Model setting key name is uniformly `<provider>Model` (matches SETTING_KEYS).
+    const settingKeyName = `${p}Model`;
     const currentKey = KEYS[settingKeyName];
     const currentValue = state.selected[p];
 

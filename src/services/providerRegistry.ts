@@ -34,6 +34,9 @@ export interface ProviderDef {
     apiKeyUrl?: string;
     /** Human description of where the live model list comes from. */
     liveSource: string;
+    /** True when there is no live `/models` endpoint, so the UI hides the
+     *  refresh button (static fallback or user-supplied list). */
+    noRefresh?: boolean;
     /** Currently configured model id for this provider. */
     selectedModel(): string;
     /** Fetches the live model list, throwing if a required key is missing. */
@@ -93,6 +96,7 @@ export const PROVIDER_DEFS: readonly ProviderDef[] = [
         removeCmd: 'commitsage.removeAnthropicApiKey',
         apiKeyUrl: 'https://console.anthropic.com/settings/keys',
         liveSource: 'Static list (Anthropic has no public /models endpoint)',
+        noRefresh: true,
         selectedModel: () => ConfigService.get('anthropic.model'),
         // Anthropic has no public /models endpoint; the list is a static
         // fallback baked into modelLists.ts. We still gate on the key being set
@@ -143,6 +147,7 @@ export const PROVIDER_DEFS: readonly ProviderDef[] = [
         removeCmd: 'commitsage.removeCodestralApiKey',
         apiKeyUrl: 'https://console.mistral.ai/codestral',
         liveSource: 'Mistral published Codestral aliases (static — no list API)',
+        noRefresh: true,
         selectedModel: () => ConfigService.get('codestral.model'),
         fetchModels: async () => fetchCodestralModels(await requireKey('codestral', 'Codestral')),
     },
@@ -169,6 +174,7 @@ export const PROVIDER_DEFS: readonly ProviderDef[] = [
         removeCmd: 'commitsage.removeCustomApiKey',
         // no listing endpoint, no console
         liveSource: 'Free-form — type the model your endpoint exposes',
+        noRefresh: true,
         selectedModel: () => ConfigService.get('custom.model'),
         // Custom has no listing endpoint — user types the model manually.
         // Returning an empty list lets the dropdown render just the configured model.
@@ -178,6 +184,11 @@ export const PROVIDER_DEFS: readonly ProviderDef[] = [
 
 /** Provider ids in display order. */
 export const PROVIDERS: readonly Provider[] = PROVIDER_DEFS.map(d => d.id);
+
+/** Providers with no live `/models` endpoint — the UI hides their refresh button. */
+export const NO_REFRESH_PROVIDERS: readonly Provider[] = PROVIDER_DEFS
+    .filter(d => d.noRefresh)
+    .map(d => d.id);
 
 const BY_ID = new Map<Provider, ProviderDef>(PROVIDER_DEFS.map(d => [d.id, d]));
 

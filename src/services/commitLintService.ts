@@ -3,7 +3,7 @@ import { Logger } from '../utils/logger';
 import { CommitLintCliService } from './commitLintCliService';
 import { FORMAT_RULE_SETS, COMMITLINT_COMPATIBLE_FORMATS, CONFIG_DRIVEN_FORMATS } from './formatRules';
 import * as vscode from 'vscode';
-import { CommitLintResult } from '../models/types';
+import { CommitLintResult, CommitLintRules } from '../models/types';
 
 import { hasConfig as detectConfig, resolveConfigPath, loadConfig } from './commitlint/configLoader';
 import { rulesToInstructions, COMMIT_RULES_DEFAULT } from './commitlint/ruleInstructions';
@@ -61,17 +61,30 @@ class CommitLintService {
     return this.extractRulesBuiltin(repoPath, rulesPath, format);
   }
 
+  /**
+   * For config-driven formats (conventional/angular), resolves and loads the
+   * repo's commitlint config, returning its rules — or null when the format
+   * isn't config-driven, no config is found, or it yields no rules. Shared by
+   * the builtin extract/validate/autofix paths.
+   */
+  private static loadConfigDrivenRules(format: string, repoPath: string, rulesPath?: string): CommitLintRules | null {
+    if (!CONFIG_DRIVEN_FORMATS.has(format)) { return null; }
+    const explicitPath = Boolean(rulesPath && rulesPath !== '.');
+    const configPath = (explicitPath || detectConfig(repoPath))
+      ? resolveConfigPath(repoPath, rulesPath)
+      : null;
+    if (!configPath) { return null; }
+    const rules = loadConfig(configPath);
+    return Object.keys(rules).length > 0 ? rules : null;
+  }
+
   private static extractRulesBuiltin(repoPath: string, rulesPath: string | undefined, format: string): string {
     try {
       // conventional/angular read the repo's commitlint config when present;
       // every other format is checked against its own static rule set.
-      if (CONFIG_DRIVEN_FORMATS.has(format)) {
-        const configPath = resolveConfigPath(repoPath, rulesPath);
-        if (configPath) {
-          const rules = loadConfig(configPath);
-          if (Object.keys(rules).length > 0) { return rulesToInstructions(rules); }
-        }
-      }
+      const configRules = this.loadConfigDrivenRules(format, repoPath, rulesPath);
+      if (configRules) { return rulesToInstructions(configRules); }
+
       const ruleSet = FORMAT_RULE_SETS[format];
       if (!ruleSet) { return COMMIT_RULES_DEFAULT; }
       return rulesToInstructions(ruleSet.rules, ruleSet.headerHint);
@@ -109,16 +122,9 @@ class CommitLintService {
 
   private static validateBuiltin(message: string, repoPath: string, rulesPath: string | undefined, format: string): CommitLintResult {
     try {
-      if (CONFIG_DRIVEN_FORMATS.has(format)) {
-        const explicitPath = Boolean(rulesPath && rulesPath !== '.');
-        const configPath = (explicitPath || detectConfig(repoPath))
-          ? resolveConfigPath(repoPath, rulesPath)
-          : null;
-        if (configPath) {
-          const rules = loadConfig(configPath);
-          if (Object.keys(rules).length > 0) { return validateCommit(message, rules); }
-        }
-      }
+      const configRules = this.loadConfigDrivenRules(format, repoPath, rulesPath);
+      if (configRules) { return validateCommit(message, configRules); }
+
       const ruleSet = FORMAT_RULE_SETS[format];
       if (!ruleSet) { return { valid: true, errors: [] }; }
       return validateWithRuleSet(message, ruleSet);
@@ -130,13 +136,9 @@ class CommitLintService {
 
   static autoFix(message: string, repoPath: string, rulesPath?: string, format = 'conventional'): string {
     try {
-      if (CONFIG_DRIVEN_FORMATS.has(format)) {
-        const configPath = resolveConfigPath(repoPath, rulesPath);
-        if (configPath) {
-          const rules = loadConfig(configPath);
-          if (Object.keys(rules).length > 0) { return applyAutoFixes(message, rules); }
-        }
-      }
+      const configRules = this.loadConfigDrivenRules(format, repoPath, rulesPath);
+      if (configRules) { return applyAutoFixes(message, configRules); }
+
       const ruleSet = FORMAT_RULE_SETS[format];
       // Emoji-prefixed and structural formats are left to the LLM refinement
       // loop — mechanical header fixes assume a conventional-shaped header.

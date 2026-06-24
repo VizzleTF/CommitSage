@@ -88,6 +88,8 @@ export interface InitData {
     formats: readonly string[];
     /** Formats the project's commitlint parser can validate directly. */
     commitlintCompatFormats: readonly string[];
+    /** Providers with no live model endpoint — UI hides their refresh button. */
+    noRefreshProviders: readonly Provider[];
     settingKeys: Record<string, string>;
     apiKeyUrls: Partial<Record<Provider, string>>;
     l10n: WebviewL10n;

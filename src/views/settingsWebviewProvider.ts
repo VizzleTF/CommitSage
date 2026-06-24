@@ -5,6 +5,7 @@ import { ApiKeyManager } from '../services/apiKeyManager';
 import { COMMITLINT_COMPATIBLE_FORMATS } from '../services/formatRules';
 import {
     PROVIDERS,
+    NO_REFRESH_PROVIDERS,
     SECRET_KEYS,
     API_KEY_URLS,
     providerDef,
@@ -307,6 +308,7 @@ export class SettingsWebviewProvider implements vscode.WebviewViewProvider {
             languages: LANGUAGES,
             formats: FORMATS,
             commitlintCompatFormats: [...COMMITLINT_COMPATIBLE_FORMATS],
+            noRefreshProviders: NO_REFRESH_PROVIDERS,
             settingKeys: SETTING_KEYS,
             apiKeyUrls: API_KEY_URLS,
             l10n: buildWebviewL10n(),

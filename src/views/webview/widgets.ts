@@ -69,7 +69,9 @@ export function makeTextInput(
     onChange: (v: string) => void,
     placeholder?: string,
 ): HTMLInputElement {
-    const input = el('input', { type: 'text', id, value, placeholder }) as HTMLInputElement;
+    // Value set via the property (not the attribute) so it reflects the current
+    // value, matching the number/textarea widgets below.
+    const input = el('input', { type: 'text', id, placeholder }) as HTMLInputElement;
     input.value = value;
     input.addEventListener('change', () => onChange(input.value));
     return input;
