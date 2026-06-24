@@ -2,47 +2,27 @@ import * as vscode from 'vscode';
 import { ConfigService } from '../utils/configService';
 import { CommitLintCliService } from '../services/commitLintCliService';
 import { ApiKeyManager } from '../services/apiKeyManager';
+import { COMMITLINT_COMPATIBLE_FORMATS } from '../services/formatRules';
 import {
-    fetchGeminiModels,
-    fetchOpenAIModels,
-    fetchCodestralModels,
-    fetchOllamaModels,
-    fetchOpenRouterModels,
-    fetchGroqModels,
-    fetchAnthropicModels,
-    fetchDeepSeekModels,
-    fetchXaiModels,
-} from '../services/modelLists';
+    PROVIDERS,
+    SECRET_KEYS,
+    API_KEY_URLS,
+    PROVIDER_LABELS,
+    PROVIDER_LIVE_SOURCES,
+    providerDef,
+} from '../services/providerRegistry';
+import {
+    Provider,
+    ModelSlot,
+    ViewState,
+    IncomingMessage,
+    InitData,
+} from './webview/protocol';
 import { Logger } from '../utils/logger';
 import { toError } from '../utils/errorUtils';
 import { getNonce } from '../utils/nonce';
 
 const VIEW_ID = 'commitsage.settings';
-
-type Provider =
-    | 'gemini'
-    | 'codestral'
-    | 'openai'
-    | 'ollama'
-    | 'openrouter'
-    | 'groq'
-    | 'anthropic'
-    | 'deepseek'
-    | 'xai'
-    | 'custom';
-
-const PROVIDERS: readonly Provider[] = [
-    'gemini',
-    'openrouter',
-    'groq',
-    'anthropic',
-    'openai',
-    'deepseek',
-    'xai',
-    'codestral',
-    'ollama',
-    'custom',
-] as const;
 
 const LANGUAGES = [
     'english', 'russian', 'chinese', 'japanese', 'korean',
@@ -52,19 +32,6 @@ const FORMATS = [
     'conventional', 'angular', 'karma', 'semantic',
     'emoji', 'emojiKarma', 'google', 'atom', 'detailed', 'custom',
 ] as const;
-
-const SECRET_KEYS: Record<Provider, string> = {
-    gemini: 'commitsage.apiKey',
-    openai: 'commitsage.openaiApiKey',
-    codestral: 'commitsage.codestralApiKey',
-    ollama: 'commitsage.ollamaAuthToken',
-    openrouter: 'commitsage.openrouterApiKey',
-    groq: 'commitsage.groqApiKey',
-    anthropic: 'commitsage.anthropicApiKey',
-    deepseek: 'commitsage.deepseekApiKey',
-    xai: 'commitsage.xaiApiKey',
-    custom: 'commitsage.customApiKey',
-};
 
 const SETTING_KEYS = {
     provider: 'commitSage.provider.type',
@@ -106,109 +73,13 @@ const SETTING_KEYS = {
     commitlintEngine: 'commitSage.commit.commitlint.engine',
 } as const;
 
-interface ModelSlot {
-    list: string[];
-    loading: boolean;
-    error: string | null;
-}
-
-interface ViewState {
-    trusted: boolean;
-    /** KEYS names pinned by .commitsage/config.json — their controls are inert. */
-    projectOverrides: string[];
-    provider: Provider;
-    models: Record<Provider, ModelSlot>;
-    selected: Record<Provider, string>;
-    hasApiKey: Record<Provider, boolean>;
-    openai: { baseUrl: string };
-    ollama: { baseUrl: string; useAuthToken: boolean; numCtx: number };
-    openrouter: { preferFreeModels: boolean };
-    custom: { baseUrl: string; useApiKey: boolean; chatCompletionsPath: string };
-    commit: {
-        format: string;
-        language: string;
-        customLanguageName: string;
-        promptForRefs: boolean;
-        onlyStagedChanges: boolean;
-        autoCommit: boolean;
-        autoPush: boolean;
-        useCustomInstructions: boolean;
-        customInstructions: string;
-        commitlintEnabled: boolean;
-        commitlintMaxRetries: number;
-        commitlintRulesPath: string;
-        commitlintEngine: string;
-        commitlintCliAvailable: boolean;
-    };
-    advanced: {
-        apiRequestTimeout: number;
-        gitTimeout: number;
-        maxDiffSize: number;
-        temperature: number;
-        telemetryEnabled: boolean;
-    };
-}
-
-type IncomingMessage =
-    | { type: 'getState' }
-    | { type: 'setSetting'; key: string; value: string | boolean | number }
-    | { type: 'refreshModels'; provider: Provider }
-    | { type: 'setApiKey'; provider: Provider }
-    | { type: 'removeApiKey'; provider: Provider }
-    | { type: 'openExternal'; url: string };
-
-const API_KEY_URLS: Partial<Record<Provider, string>> = {
-    gemini: 'https://aistudio.google.com/app/apikey',
-    codestral: 'https://console.mistral.ai/codestral',
-    openai: 'https://platform.openai.com/api-keys',
-    openrouter: 'https://openrouter.ai/keys',
-    groq: 'https://console.groq.com/keys',
-    anthropic: 'https://console.anthropic.com/settings/keys',
-    deepseek: 'https://platform.deepseek.com/api_keys',
-    xai: 'https://console.x.ai/',
-};
-
-const SET_KEY_COMMAND: Record<Provider, string> = {
-    gemini: 'commitsage.setApiKey',
-    openai: 'commitsage.setOpenAIApiKey',
-    codestral: 'commitsage.setCodestralApiKey',
-    ollama: 'commitsage.setOllamaAuthToken',
-    openrouter: 'commitsage.setOpenRouterApiKey',
-    groq: 'commitsage.setGroqApiKey',
-    anthropic: 'commitsage.setAnthropicApiKey',
-    deepseek: 'commitsage.setDeepSeekApiKey',
-    xai: 'commitsage.setXaiApiKey',
-    custom: 'commitsage.setCustomApiKey',
-};
-const REMOVE_KEY_COMMAND: Record<Provider, string> = {
-    gemini: 'commitsage.removeApiKey',
-    openai: 'commitsage.removeOpenAIApiKey',
-    codestral: 'commitsage.removeCodestralApiKey',
-    ollama: 'commitsage.removeOllamaAuthToken',
-    openrouter: 'commitsage.removeOpenRouterApiKey',
-    groq: 'commitsage.removeGroqApiKey',
-    anthropic: 'commitsage.removeAnthropicApiKey',
-    deepseek: 'commitsage.removeDeepSeekApiKey',
-    xai: 'commitsage.removeXaiApiKey',
-    custom: 'commitsage.removeCustomApiKey',
-};
-
 export class SettingsWebviewProvider implements vscode.WebviewViewProvider {
     public static readonly viewId = VIEW_ID;
 
     private view: vscode.WebviewView | undefined;
-    private readonly models: Record<Provider, ModelSlot> = {
-        gemini: { list: [], loading: false, error: null },
-        openai: { list: [], loading: false, error: null },
-        codestral: { list: [], loading: false, error: null },
-        ollama: { list: [], loading: false, error: null },
-        openrouter: { list: [], loading: false, error: null },
-        groq: { list: [], loading: false, error: null },
-        anthropic: { list: [], loading: false, error: null },
-        deepseek: { list: [], loading: false, error: null },
-        xai: { list: [], loading: false, error: null },
-        custom: { list: [], loading: false, error: null },
-    };
+    private readonly models = Object.fromEntries(
+        PROVIDERS.map((p): [Provider, ModelSlot] => [p, { list: [], loading: false, error: null }]),
+    ) as Record<Provider, ModelSlot>;
 
     constructor(private readonly context: vscode.ExtensionContext) {}
 
@@ -240,7 +111,7 @@ export class SettingsWebviewProvider implements vscode.WebviewViewProvider {
         // Secret changes (Set/Remove key buttons) don't fire onDidChangeConfiguration,
         // so the "● set" indicator drifts unless we also listen to SecretStorage.
         const secretSub = this.context.secrets.onDidChange(e => {
-            if (Object.values(SECRET_KEYS).includes(e.key)) {
+            if (SECRET_KEYS.includes(e.key)) {
                 void this.pushState();
             }
         });
@@ -277,12 +148,12 @@ export class SettingsWebviewProvider implements vscode.WebviewViewProvider {
                     return;
 
                 case 'setApiKey':
-                    await vscode.commands.executeCommand(SET_KEY_COMMAND[msg.provider]);
+                    await vscode.commands.executeCommand(providerDef(msg.provider).setCmd);
                     await this.refreshModelsFor(msg.provider, true);
                     return;
 
                 case 'removeApiKey':
-                    await vscode.commands.executeCommand(REMOVE_KEY_COMMAND[msg.provider]);
+                    await vscode.commands.executeCommand(providerDef(msg.provider).removeCmd);
                     return;
 
                 case 'openExternal':
@@ -310,7 +181,7 @@ export class SettingsWebviewProvider implements vscode.WebviewViewProvider {
         await this.pushState();
 
         try {
-            slot.list = await this.fetchByProvider(provider);
+            slot.list = await providerDef(provider).fetchModels();
             slot.error = null;
         } catch (error) {
             const err = toError(error);
@@ -356,75 +227,10 @@ export class SettingsWebviewProvider implements vscode.WebviewViewProvider {
         return err.message;
     }
 
-    private static async requireKey(
-        provider: 'gemini' | 'openai' | 'codestral' | 'openrouter' | 'groq' | 'anthropic' | 'deepseek' | 'xai',
-        label: string,
-    ): Promise<string> {
-        const key = await ApiKeyManager.getOptionalKey(provider);
-        if (!key) {
-            throw new Error(`${label} API key is not set`);
-        }
-        return key;
-    }
-
-    private async fetchByProvider(provider: Provider): Promise<string[]> {
-        switch (provider) {
-            case 'gemini':
-                return fetchGeminiModels(await SettingsWebviewProvider.requireKey('gemini', 'Gemini'));
-            case 'openai':
-                return fetchOpenAIModels(
-                    await SettingsWebviewProvider.requireKey('openai', 'OpenAI'),
-                    ConfigService.get('openai.baseUrl'),
-                );
-            case 'codestral':
-                return fetchCodestralModels(await SettingsWebviewProvider.requireKey('codestral', 'Codestral'));
-            case 'ollama': {
-                const useAuth = ConfigService.get('ollama.useAuthToken');
-                const token = useAuth ? await ApiKeyManager.getOptionalKey('ollama') : undefined;
-                return fetchOllamaModels(ConfigService.get('ollama.baseUrl'), token);
-            }
-            case 'openrouter':
-                return fetchOpenRouterModels(
-                    await SettingsWebviewProvider.requireKey('openrouter', 'OpenRouter'),
-                    ConfigService.get('openrouter.preferFreeModels'),
-                );
-            case 'groq':
-                return fetchGroqModels(await SettingsWebviewProvider.requireKey('groq', 'Groq'));
-            case 'anthropic':
-                // Anthropic has no public /models endpoint; the list is a
-                // static fallback baked into modelLists.ts. We still gate on
-                // the key being set so the UI surfaces the same "set a key"
-                // hint as the other providers.
-                return fetchAnthropicModels(await SettingsWebviewProvider.requireKey('anthropic', 'Anthropic'));
-            case 'deepseek':
-                return fetchDeepSeekModels(await SettingsWebviewProvider.requireKey('deepseek', 'DeepSeek'));
-            case 'xai':
-                return fetchXaiModels(await SettingsWebviewProvider.requireKey('xai', 'xAI'));
-            case 'custom': {
-                // Custom has no listing endpoint — user types the model
-                // manually. Returning an empty list lets the dropdown render
-                // just the currently configured model.
-                return [];
-            }
-        }
-    }
-
     private async buildState(): Promise<ViewState> {
-        const [
-            geminiKey, openaiKey, codestralKey, ollamaToken,
-            openrouterKey, groqKey, anthropicKey, deepseekKey, xaiKey, customKey,
-        ] = await Promise.all([
-            ApiKeyManager.getOptionalKey('gemini'),
-            ApiKeyManager.getOptionalKey('openai'),
-            ApiKeyManager.getOptionalKey('codestral'),
-            ApiKeyManager.getOptionalKey('ollama'),
-            ApiKeyManager.getOptionalKey('openrouter'),
-            ApiKeyManager.getOptionalKey('groq'),
-            ApiKeyManager.getOptionalKey('anthropic'),
-            ApiKeyManager.getOptionalKey('deepseek'),
-            ApiKeyManager.getOptionalKey('xai'),
-            ApiKeyManager.getOptionalKey('custom'),
-        ]);
+        const hasApiKeyEntries = await Promise.all(
+            PROVIDERS.map(async p => [p, !!(await ApiKeyManager.getOptionalKey(p))] as const),
+        );
 
         return {
             trusted: vscode.workspace.isTrusted,
@@ -432,30 +238,10 @@ export class SettingsWebviewProvider implements vscode.WebviewViewProvider {
                 .filter(name => ConfigService.isProjectOverridden(SETTING_KEYS[name].replace(/^commitSage\./, ''))),
             provider: ConfigService.get('provider.type') as Provider,
             models: this.models,
-            selected: {
-                gemini: ConfigService.get('gemini.model'),
-                openai: ConfigService.get('openai.model'),
-                codestral: ConfigService.get('codestral.model'),
-                ollama: ConfigService.get('ollama.model'),
-                openrouter: ConfigService.get('openrouter.model'),
-                groq: ConfigService.get('groq.model'),
-                anthropic: ConfigService.get('anthropic.model'),
-                deepseek: ConfigService.get('deepseek.model'),
-                xai: ConfigService.get('xai.model'),
-                custom: ConfigService.get('custom.model'),
-            },
-            hasApiKey: {
-                gemini: !!geminiKey,
-                openai: !!openaiKey,
-                codestral: !!codestralKey,
-                ollama: !!ollamaToken,
-                openrouter: !!openrouterKey,
-                groq: !!groqKey,
-                anthropic: !!anthropicKey,
-                deepseek: !!deepseekKey,
-                xai: !!xaiKey,
-                custom: !!customKey,
-            },
+            selected: Object.fromEntries(
+                PROVIDERS.map(p => [p, providerDef(p).selectedModel()]),
+            ) as Record<Provider, string>,
+            hasApiKey: Object.fromEntries(hasApiKeyEntries) as Record<Provider, boolean>,
             openai: { baseUrl: ConfigService.get('openai.baseUrl') },
             ollama: {
                 baseUrl: ConfigService.get('ollama.baseUrl'),
@@ -672,10 +458,11 @@ export class SettingsWebviewProvider implements vscode.WebviewViewProvider {
             }
         `;
 
-        const data = {
+        const data: InitData = {
             providers: PROVIDERS,
             languages: LANGUAGES,
             formats: FORMATS,
+            commitlintCompatFormats: [...COMMITLINT_COMPATIBLE_FORMATS],
             settingKeys: SETTING_KEYS,
             apiKeyUrls: API_KEY_URLS,
             l10n: {
@@ -731,30 +518,8 @@ export class SettingsWebviewProvider implements vscode.WebviewViewProvider {
                 ollamaNumCtxHint: vscode.l10n.t('Ollama context length. 0 = use model default. Larger values use more RAM/VRAM.'),
                 telemetry: vscode.l10n.t('Telemetry'),
                 autoOption: vscode.l10n.t('auto — try all available models'),
-                providerLabels: {
-                    gemini: 'Gemini',
-                    openai: 'OpenAI',
-                    codestral: 'Codestral',
-                    ollama: 'Ollama',
-                    openrouter: 'OpenRouter',
-                    groq: 'Groq',
-                    anthropic: 'Anthropic Claude',
-                    deepseek: 'DeepSeek',
-                    xai: 'xAI Grok',
-                    custom: 'Custom (OpenAI-compatible)',
-                },
-                liveSource: {
-                    gemini: 'Google Generative Language',
-                    openai: 'OpenAI /v1/models (gpt-* / o-series)',
-                    codestral: 'Mistral published Codestral aliases (static — no list API)',
-                    ollama: '/api/tags (local)',
-                    openrouter: 'OpenRouter /api/v1/models',
-                    groq: 'Groq /openai/v1/models',
-                    anthropic: 'Static list (Anthropic has no public /models endpoint)',
-                    deepseek: 'DeepSeek /models',
-                    xai: 'xAI /v1/models',
-                    custom: 'Free-form — type the model your endpoint exposes',
-                },
+                providerLabels: PROVIDER_LABELS,
+                liveSource: PROVIDER_LIVE_SOURCES,
             },
         };
 

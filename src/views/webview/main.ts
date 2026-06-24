@@ -1,129 +1,13 @@
 // Webview frontend. Vanilla DOM, no framework. Runs in the WebviewView iframe;
 // talks to the extension only via `acquireVsCodeApi()`.
 
+import type { Provider, InitData, ViewState } from './protocol';
+
 declare function acquireVsCodeApi(): {
     postMessage(message: unknown): void;
     getState(): unknown;
     setState(state: unknown): void;
 };
-
-type Provider =
-    | 'gemini'
-    | 'codestral'
-    | 'openai'
-    | 'ollama'
-    | 'openrouter'
-    | 'groq'
-    | 'anthropic'
-    | 'deepseek'
-    | 'xai'
-    | 'custom';
-
-interface ModelSlot {
-    list: string[];
-    loading: boolean;
-    error: string | null;
-}
-
-interface InitData {
-    providers: readonly Provider[];
-    languages: readonly string[];
-    formats: readonly string[];
-    settingKeys: Record<string, string>;
-    apiKeyUrls: Partial<Record<Provider, string>>;
-    l10n: {
-        provider: string;
-        modelAuth: string;
-        model: string;
-        modelPlaceholder: string;
-        refresh: string;
-        refreshing: string;
-        baseUrl: string;
-        path: string;
-        apiKey: string;
-        authToken: string;
-        setKey: string;
-        removeKey: string;
-        getKey: string;
-        keySet: string;
-        keyMissing: string;
-        noKey: string;
-        useAuthToken: string;
-        useApiKey: string;
-        preferFreeModels: string;
-        liveFrom: string;
-        notInList: string;
-        commit: string;
-        format: string;
-        language: string;
-        customLanguage: string;
-        promptForRefs: string;
-        onlyStaged: string;
-        automation: string;
-        autoCommit: string;
-        autoPush: string;
-        autoPushNeedsCommit: string;
-        untrusted: string;
-        customInstructions: string;
-        commitlint: string;
-        commitlintEnabled: string;
-        commitlintEngine: string;
-        commitlintMaxRetries: string;
-        commitlintRulesPath: string;
-        enableCustom: string;
-        customInstructionsPh: string;
-        advanced: string;
-        apiTimeout: string;
-        gitTimeout: string;
-        timeoutHint: string;
-        maxDiffSize: string;
-        maxDiffSizeHint: string;
-        temperature: string;
-        temperatureHint: string;
-        ollamaNumCtx: string;
-        ollamaNumCtxHint: string;
-        telemetry: string;
-        autoOption: string;
-        providerLabels: Record<Provider, string>;
-        liveSource: Record<Provider, string>;
-    };
-}
-
-interface ViewState {
-    trusted: boolean;
-    projectOverrides: string[];
-    provider: Provider;
-    models: Record<Provider, ModelSlot>;
-    selected: Record<Provider, string>;
-    hasApiKey: Record<Provider, boolean>;
-    openai: { baseUrl: string };
-    ollama: { baseUrl: string; useAuthToken: boolean; numCtx: number };
-    openrouter: { preferFreeModels: boolean };
-    custom: { baseUrl: string; useApiKey: boolean; chatCompletionsPath: string };
-    commit: {
-        format: string;
-        language: string;
-        customLanguageName: string;
-        promptForRefs: boolean;
-        onlyStagedChanges: boolean;
-        autoCommit: boolean;
-        autoPush: boolean;
-        useCustomInstructions: boolean;
-        customInstructions: string;
-        commitlintEnabled: boolean;
-        commitlintMaxRetries: number;
-        commitlintRulesPath: string;
-        commitlintEngine: string;
-        commitlintCliAvailable: boolean;
-    };
-    advanced: {
-        apiRequestTimeout: number;
-        gitTimeout: number;
-        maxDiffSize: number;
-        temperature: number;
-        telemetryEnabled: boolean;
-    };
-}
 
 const vscode = acquireVsCodeApi();
 const initEl = document.getElementById('init-data');
@@ -134,8 +18,9 @@ const init: InitData = JSON.parse(initEl.textContent);
 const L = init.l10n;
 const KEYS = init.settingKeys;
 
-/** Formats the project's commitlint parser can validate directly. */
-const COMMITLINT_COMPAT_FORMATS = new Set(['conventional', 'angular', 'atom', 'karma', 'semantic', 'google']);
+/** Formats the project's commitlint parser can validate directly. Sourced from
+ *  the host (formatRules.COMMITLINT_COMPATIBLE_FORMATS) — single source of truth. */
+const COMMITLINT_COMPAT_FORMATS = new Set(init.commitlintCompatFormats);
 
 const root = document.getElementById('root') as HTMLElement;
 
