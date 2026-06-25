@@ -11,13 +11,18 @@ export default defineConfig({
             reporter: ['text', 'lcov'],
             reportsDirectory: 'coverage',
             include: ['src/**/*.ts'],
+            // Keep in sync with sonar.coverage.exclusions in
+            // sonar-project.properties — VS Code glue covered by e2e, not unit.
             exclude: [
                 'src/**/*.d.ts',
                 'src/constants/apiKeys.ts',
+                'src/models/types.ts',
                 'src/views/webview/**',
                 'src/extension.ts',
                 'src/views/settingsWebviewProvider.ts',
                 'src/services/aiService.ts',
+                'src/services/commitWorkflow.ts',
+                'src/commands/**',
             ],
         },
     },

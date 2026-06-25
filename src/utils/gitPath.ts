@@ -14,6 +14,8 @@ export function unquoteGitPath(filePath: string): string {
     });
 
     try {
+        /* v8 ignore next -- `?? 0` is a type guard; codePointAt(0) on a
+           non-empty iterated char is always defined, so the fallback is dead. */
         const bytes = new Uint8Array([...unquoted].map((c) => c.codePointAt(0) ?? 0));
         unquoted = new TextDecoder('utf-8').decode(bytes);
     } catch {

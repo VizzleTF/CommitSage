@@ -7,7 +7,7 @@ import { CommitLintRules } from '../../models/types';
  */
 export function applyAutoFixes(message: string, rules: CommitLintRules): string {
   const lines = message.split('\n');
-  let header = lines[0] ?? '';
+  let header = lines[0];
 
   if (rules['type-case']?.[0] === 2 && rules['type-case']?.[1] === 'always') {
     const c = rules['type-case'][2];

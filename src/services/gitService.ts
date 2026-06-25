@@ -95,6 +95,9 @@ export class GitService {
   ): Promise<void> {
     try {
       const repo = repository || (await this.getActiveRepository());
+      /* v8 ignore next -- optional-chaining artifact: `?.` short-circuit on a
+         nullish repo is unreachable (getActiveRepository never returns nullish);
+         the throw itself is covered. */
       if (!repo?.rootUri) {
         throw new Error('No active repository found');
       }
@@ -134,6 +137,9 @@ export class GitService {
               .map(unquoteGitPath),
           );
         }
+        /* v8 ignore next -- the empty branch is unreachable: filesToStage is
+           populated by the same git ls-files command (+ same filter) that
+           hasChanges() used to decide we get here, so it's always non-empty. */
         if (filesToStage.length > 0) {
           await this.executeGitCommand(
             ['add', '--', ...filesToStage],
@@ -174,6 +180,9 @@ export class GitService {
   static async pushChanges(repository?: vscode.SourceControl): Promise<void> {
     try {
       const repo = repository || (await this.getActiveRepository());
+      /* v8 ignore next -- optional-chaining artifact: `?.` short-circuit on a
+         nullish repo is unreachable (getActiveRepository never returns nullish);
+         the throw itself is covered. */
       if (!repo?.rootUri) {
         throw new Error('No active repository found');
       }

@@ -503,6 +503,8 @@ export class ConfigService {
       case 'custom':
         return this.get('custom.model');
     }
+    /* v8 ignore next -- unreachable: getProvider() always returns one of the
+       cased provider ids above; TS still requires a fallback return. */
     return 'unknown';
   }
 

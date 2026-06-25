@@ -16,7 +16,7 @@ export function isTrailerLine(line: string): boolean {
  */
 export function parseCommitMessage(message: string): ParsedCommit {
   const lines = message.split('\n');
-  const header = lines[0] ?? '';
+  const header = lines[0];
 
   // Collect indices of blank lines (skip line 0 which is the header)
   const blankIndices: number[] = [];

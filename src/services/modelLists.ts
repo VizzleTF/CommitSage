@@ -24,14 +24,13 @@ interface OpenAIModelsResponse {
 
 /**
  * Shared fetcher for any provider exposing the OpenAI `/models` endpoint
- * shape (`{data: [{id}, ...]}`). Used by OpenAI, Groq, DeepSeek, xAI.
- * `filter` is optional — defaults to "include all non-empty ids".
+ * shape (`{data: [{id}, ...]}`). Used by Groq, DeepSeek, xAI. Returns all
+ * non-empty ids.
  */
 async function fetchOpenAICompatModels(
     url: string,
     apiKey: string,
     signal?: AbortSignal,
-    filter?: (id: string) => boolean,
 ): Promise<string[]> {
     const data = await HttpUtils.getJson<OpenAIModelsResponse>(url, {
         headers: { Authorization: `Bearer ${apiKey}` },
@@ -40,7 +39,7 @@ async function fetchOpenAICompatModels(
 
     const ids = (data.data ?? [])
         .map(m => m.id ?? '')
-        .filter(id => id && (!filter || filter(id)));
+        .filter(id => id !== '');
 
     return [...new Set(ids)].sort((a, b) => a.localeCompare(b));
 }

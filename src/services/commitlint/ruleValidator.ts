@@ -10,7 +10,7 @@ export function validateWithRuleSet(message: string, ruleSet: FormatRuleSet): Co
   if (ruleSet.structural === 'detailed') { return validateDetailed(message); }
 
   const lines = message.split('\n');
-  const header = lines[0] ?? '';
+  const header = lines[0];
 
   if (ruleSet.headerPattern && !ruleSet.headerPattern.test(header)) {
     return { valid: false, errors: [ruleSet.headerHint ?? 'header does not match the required format'] };
@@ -26,7 +26,7 @@ export function validateWithRuleSet(message: string, ruleSet: FormatRuleSet): Co
 function validateDetailed(message: string): CommitLintResult {
   const errors: string[] = [];
   const lines = message.split('\n');
-  const header = lines[0] ?? '';
+  const header = lines[0];
 
   if (!/^Summary: \S/.test(header)) {
     errors.push('first line must be "Summary: <imperative summary>"');

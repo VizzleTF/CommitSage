@@ -4,13 +4,7 @@ const apiValidation = {
     openaiTestEndpoint: 'https://api.openai.com/v1/models',
     errorMessages: {
         emptyKey: 'API key cannot be empty',
-        invalidChars: 'API key contains invalid characters',
-        invalidFormat: 'Invalid API key format',
-        invalidKey: 'Invalid API key',
-        rateLimit: 'Rate limit exceeded',
-        invalidEndpoint: 'Invalid endpoint URL',
-        validationFailed: (status: number) => `API validation failed: ${status}`,
-        customValidationFailed: (status: number) => `Custom API validation failed: ${status}`
+        invalidChars: 'API key contains invalid characters'
     }
 } as const;
 
