@@ -39,8 +39,14 @@ export function makeCombobox(
     }) as HTMLInputElement;
     input.value = current;
 
-    const list = el('ul', { class: 'combo-list' }) as HTMLUListElement;
+    // Outer clip + inner scroller: the rounded `.combo-list` has
+    // overflow:hidden, so the inner `.combo-list-scroll` (the only scrolling
+    // element) has its scrollbar clipped to the rounded corners — a long model
+    // list scrolls without squaring off the popup.
+    const list = el('div', { class: 'combo-list' }) as HTMLDivElement;
     list.hidden = true;
+    const listScroll = el('ul', { class: 'combo-list-scroll' }) as HTMLUListElement;
+    list.appendChild(listScroll);
 
     let committed = current;
     let activeIdx = -1;
@@ -64,7 +70,7 @@ export function makeCombobox(
             matches = options.slice();
         }
 
-        list.innerHTML = '';
+        listScroll.innerHTML = '';
         if (matches.length === 0) {
             list.hidden = true;
             activeIdx = -1;
@@ -80,7 +86,7 @@ export function makeCombobox(
                 e.preventDefault();
                 commit(value);
             });
-            list.appendChild(li);
+            listScroll.appendChild(li);
         }
         list.hidden = false;
         // When the user is filtering, always start from the top match. When
