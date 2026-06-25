@@ -7,6 +7,7 @@
 
 import type { ViewState } from './protocol';
 import { send } from './vscodeApi';
+import { preserveFocus } from './preserveFocus';
 import {
     renderProviderPick,
     renderModelAuthSection,
@@ -18,7 +19,7 @@ import {
 
 const root = document.getElementById('root') as HTMLElement;
 
-function render(state: ViewState): void {
+function build(state: ViewState): void {
     const fragment = document.createDocumentFragment();
     fragment.appendChild(renderProviderPick(state));
     fragment.appendChild(renderModelAuthSection(state));
@@ -30,6 +31,16 @@ function render(state: ViewState): void {
     root.appendChild(fragment);
 }
 
+// Rebuild the tree but preserve focus/caret/scroll across the swap (see
+// preserveFocus) so a setSetting echo can't disrupt an in-progress edit.
+function render(state: ViewState): void {
+    preserveFocus(() => build(state));
+}
+
+// Serialized last-rendered state. Skips redundant pushes (visibility re-push,
+// secret change that didn't alter anything we render) so they don't flicker.
+let lastRendered = '';
+
 window.addEventListener('message', (event: MessageEvent) => {
     // Only accept messages from the VS Code webview host. The webview always
     // runs under a `vscode-webview://` origin; reject anything else so a framed
@@ -39,6 +50,11 @@ window.addEventListener('message', (event: MessageEvent) => {
     }
     const msg = event.data;
     if (msg?.type === 'state') {
+        const json = JSON.stringify(msg.state);
+        if (json === lastRendered) {
+            return;
+        }
+        lastRendered = json;
         render(msg.state as ViewState);
     }
 });

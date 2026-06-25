@@ -323,12 +323,19 @@ export class SettingsWebviewProvider implements vscode.WebviewViewProvider {
     <title>Commit Sage</title>
 </head>
 <body>
-    <div id="root"></div>
+    <div id="root"><div class="loading">${escapeHtml(vscode.l10n.t('Loading…'))}</div></div>
     <script id="init-data" type="application/json">${escapeForScript(JSON.stringify(data))}</script>
     <script nonce="${nonce}" src="${scriptUri}"></script>
 </body>
 </html>`;
     }
+}
+
+function escapeHtml(s: string): string {
+    return s
+        .replaceAll('&', '&amp;')
+        .replaceAll('<', '&lt;')
+        .replaceAll('>', '&gt;');
 }
 
 function escapeForScript(s: string): string {

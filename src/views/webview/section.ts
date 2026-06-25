@@ -9,12 +9,22 @@ import { vscode } from './vscodeApi';
 
 type SectionState = Record<string, boolean>;
 
+// Cached after the first read: section() runs once per section on every render
+// (6×), and this module is the only writer of the `sections` slice, so reading
+// vscode.getState() each time was redundant. The cache stays in sync because
+// saveSectionState updates it alongside the persisted copy.
+let cache: SectionState | null = null;
+
 function loadSectionState(): SectionState {
-    const raw = vscode.getState() as { sections?: SectionState } | undefined;
-    return raw?.sections ?? {};
+    if (cache === null) {
+        const raw = vscode.getState() as { sections?: SectionState } | undefined;
+        cache = raw?.sections ?? {};
+    }
+    return cache;
 }
 
 function saveSectionState(state: SectionState): void {
+    cache = state;
     const prev = (vscode.getState() as Record<string, unknown> | undefined) ?? {};
     vscode.setState({ ...prev, sections: state });
 }

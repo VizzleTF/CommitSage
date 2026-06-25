@@ -32,6 +32,13 @@ body {
     -webkit-font-smoothing: antialiased;
 }
 
+/* First-paint placeholder shown until the host pushes the initial state. */
+.loading {
+    padding: 16px 2px;
+    color: var(--vscode-descriptionForeground, #8b8b8b);
+    font-size: 12px;
+}
+
 /* ── A. Provider picker (always visible) ─────────────────────────────── */
 section.provider-pick {
     margin: 0 0 16px;
@@ -100,9 +107,8 @@ details[open] > summary {
 .body {
     padding: 11px 12px 13px;
 }
-/* Zero the top margin of the first control in a body (handles both the
-   real DOM's `.body > div > …` wrapping and the flat mockup markup). */
-.body > :first-child,
+/* Zero the top margin of the first control in a body (the real DOM wraps the
+   section content in a single `.body > div`). */
 .body > div:first-child > :first-child { margin-top: 0; }
 
 /* ── Field captions ──────────────────────────────────────────────────── */
@@ -178,6 +184,13 @@ textarea:focus {
     outline: none;
     border-color: var(--vscode-focusBorder, #0078d4);
     box-shadow: 0 0 0 1px var(--vscode-focusBorder, #0078d4);
+}
+/* Non-numeric / rejected input — flag the field instead of silently dropping. */
+input[aria-invalid="true"] {
+    border-color: var(--vscode-inputValidation-errorBorder, var(--vscode-errorForeground, #f14c4c));
+}
+input[aria-invalid="true"]:focus {
+    box-shadow: 0 0 0 1px var(--vscode-inputValidation-errorBorder, var(--vscode-errorForeground, #f14c4c));
 }
 
 /* ── Rows (combobox + refresh) ───────────────────────────────────────── */
@@ -476,7 +489,7 @@ textarea:disabled {
 }
 
 .combo-list-item,
-.select-option {
+.select-list-item {
     padding: 5px 9px;
     border-radius: 4px;
     cursor: pointer;
@@ -487,11 +500,11 @@ textarea:disabled {
     font-size: inherit;
 }
 .combo-list-item:hover,
-.select-option:hover {
+.select-list-item:hover {
     background: var(--vscode-list-hoverBackground, color-mix(in srgb, var(--vscode-foreground, #ccc) 10%, transparent));
 }
 .combo-list-item.active,
-.select-option.active {
+.select-list-item.active {
     background: var(--vscode-list-activeSelectionBackground, var(--vscode-list-hoverBackground, #094771));
     color: var(--vscode-list-activeSelectionForeground, var(--vscode-foreground, #fff));
 }

@@ -4,6 +4,7 @@
 import type { ViewState } from './protocol';
 import { el } from './dom';
 import { L } from './init';
+import { ListboxPopup } from './popup';
 
 export function fieldLabel(text: string): HTMLLabelElement {
     return el('label', { class: 'field' }, [text]);
@@ -24,7 +25,9 @@ export function pinnedHint(): HTMLDivElement {
 // check) instead of the native <select>, whose popup is drawn by the
 // OS/Chromium and cannot be styled (corners, theme) from CSS. Same signature
 // as the old native-select version, so callers are unchanged. The committed
-// value lives on `wrap.dataset.value`; state is normally push-based.
+// value lives on `wrap.dataset.value`; state is normally push-based. Popup
+// mechanics (DOM, highlight, scroll) live in ListboxPopup — this is the
+// adapter that owns the trigger, commit semantics, and keyboard handling.
 export function makeSelect(
     id: string,
     options: Array<{ value: string; label: string }>,
@@ -43,101 +46,68 @@ export function makeSelect(
 
     const currentLabel = items.find(o => o.value === current)?.label ?? current ?? '';
     const valueEl = el('span', { class: 'select-value' }, [currentLabel]);
+
+    const popup = new ListboxPopup('select', id, item => commit(item.value, item.label));
+    popup.setItems(items, current);
+
     /* eslint-disable @typescript-eslint/naming-convention */
     const trigger = el('button', {
         type: 'button',
+        id: `${id}-trigger`,
         class: 'select-trigger',
         'aria-haspopup': 'listbox',
         'aria-expanded': 'false',
+        'aria-controls': popup.listId,
         disabled: opts.disabled,
     }, [valueEl]) as HTMLButtonElement;
     /* eslint-enable @typescript-eslint/naming-convention */
 
-    // Outer clip + inner scroller: the rounded `.select-list` has
-    // overflow:hidden so the inner scroller's scrollbar is clipped to the
-    // rounded corners (matches the model combobox).
-    const list = el('div', { class: 'select-list' }) as HTMLDivElement;
-    list.hidden = true;
-    const listScroll = el('ul', { class: 'select-list-scroll', role: 'listbox' }) as HTMLUListElement;
-    list.appendChild(listScroll);
-
-    let activeIdx = items.findIndex(o => o.value === current);
-
-    const optionEls: HTMLLIElement[] = items.map(o => {
-        /* eslint-disable @typescript-eslint/naming-convention */
-        const li = el('li', {
-            class: 'select-option',
-            role: 'option',
-            'data-value': o.value,
-            'aria-selected': o.value === current ? 'true' : undefined,
-        }, [o.label]) as HTMLLIElement;
-        /* eslint-enable @typescript-eslint/naming-convention */
-        // mousedown (not click): click fires after the trigger's blur, which
-        // would already have closed the list and cancelled the pick.
-        li.addEventListener('mousedown', e => {
-            e.preventDefault();
-            commit(o.value, o.label);
-        });
-        listScroll.appendChild(li);
-        return li;
-    });
-
-    function highlight(): void {
-        optionEls.forEach((li, i) => li.classList.toggle('active', i === activeIdx));
-        if (activeIdx >= 0) {
-            optionEls[activeIdx].scrollIntoView({ block: 'nearest' });
+    function syncActiveDescendant(): void {
+        const optId = popup.activeOptionId();
+        if (optId) {
+            trigger.setAttribute('aria-activedescendant', optId);
+        } else {
+            trigger.removeAttribute('aria-activedescendant');
         }
     }
 
     function open(): void {
-        if (opts.disabled || !list.hidden) { return; }
-        list.hidden = false;
+        if (opts.disabled || popup.isOpen) { return; }
         wrap.classList.add('open');
         trigger.setAttribute('aria-expanded', 'true');
-        activeIdx = Math.max(0, items.findIndex(o => o.value === wrap.dataset.value));
-        highlight();
+        popup.show(wrap.dataset.value);
+        syncActiveDescendant();
     }
     function close(): void {
-        if (list.hidden) { return; }
-        list.hidden = true;
+        if (!popup.isOpen) { return; }
+        popup.hide();
         wrap.classList.remove('open');
         trigger.setAttribute('aria-expanded', 'false');
+        trigger.removeAttribute('aria-activedescendant');
     }
 
     function commit(value: string, label: string): void {
         wrap.dataset.value = value;
         valueEl.textContent = label;
-        for (const li of optionEls) {
-            if (li.dataset.value === value) {
-                li.setAttribute('aria-selected', 'true');
-            } else {
-                li.removeAttribute('aria-selected');
-            }
-        }
+        popup.markSelected(value);
         close();
         trigger.focus();
         onChange(value);
     }
 
-    trigger.addEventListener('click', () => (list.hidden ? open() : close()));
+    trigger.addEventListener('click', () => (popup.isOpen ? close() : open()));
 
     trigger.addEventListener('keydown', (e: KeyboardEvent) => {
         if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
             e.preventDefault();
-            if (list.hidden) { open(); return; }
-            activeIdx = e.key === 'ArrowDown'
-                ? Math.min(activeIdx + 1, items.length - 1)
-                : Math.max(activeIdx - 1, 0);
-            highlight();
+            if (!popup.isOpen) { open(); return; }
+            popup.move(e.key === 'ArrowDown' ? 1 : -1);
+            syncActiveDescendant();
         } else if (e.key === 'Enter' || e.key === ' ') {
             e.preventDefault();
-            if (list.hidden) {
-                open();
-            } else if (activeIdx >= 0) {
-                commit(items[activeIdx].value, items[activeIdx].label);
-            }
+            if (!popup.isOpen) { open(); } else { popup.commitActive(); }
         } else if (e.key === 'Escape') {
-            if (!list.hidden) { e.preventDefault(); close(); }
+            if (popup.isOpen) { e.preventDefault(); close(); }
         } else if (e.key === 'Tab') {
             close();
         }
@@ -150,7 +120,7 @@ export function makeSelect(
     }, 0));
 
     wrap.appendChild(trigger);
-    wrap.appendChild(list);
+    wrap.appendChild(popup.list);
     return wrap;
 }
 
@@ -197,9 +167,15 @@ export function makeNumberInput(
     input.value = String(value);
     input.addEventListener('change', () => {
         const parsed = Number.parseFloat(input.value);
-        if (!Number.isNaN(parsed)) {
-            onChange(parsed);
+        // Non-numeric input used to be swallowed silently, leaving the user
+        // wondering why nothing saved. Flag it instead (accessible + styled),
+        // and only persist a real number.
+        if (Number.isNaN(parsed)) {
+            input.setAttribute('aria-invalid', 'true');
+            return;
         }
+        input.removeAttribute('aria-invalid');
+        onChange(parsed);
     });
     return input;
 }
