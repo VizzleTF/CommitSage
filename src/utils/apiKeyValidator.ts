@@ -1,6 +1,9 @@
 
 const apiValidation = {
     keyFormat: /^[A-Za-z0-9_-]+$/,
+    // Gemini accepts both old AI Studio keys (`AIza...`) and newer Google keys
+    // (`AQ.Ab8...`), the latter containing `.`. See issue #437.
+    geminiKeyFormat: /^[A-Za-z0-9._-]+$/,
     openaiTestEndpoint: 'https://api.openai.com/v1/models',
     errorMessages: {
         emptyKey: 'API key cannot be empty',
@@ -38,8 +41,18 @@ export class ApiKeyValidator {
         return null;
     }
 
+    /**
+     * Charset check that allows both old AI Studio keys (`AIza...`) and newer
+     * Google keys (`AQ.Ab8...`), the latter containing `.` (see issue #437).
+     */
     static validateGeminiApiKey(key: string): string | null {
-        return ApiKeyValidator.validateStrictFormat(key);
+        if (!key) {
+            return apiValidation.errorMessages.emptyKey;
+        }
+        if (!apiValidation.geminiKeyFormat.test(key)) {
+            return apiValidation.errorMessages.invalidChars;
+        }
+        return null;
     }
 
     static validateCodestralApiKey(key: string): string | null {

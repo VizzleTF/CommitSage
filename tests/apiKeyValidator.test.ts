@@ -24,6 +24,20 @@ describe('ApiKeyValidator.validateStrictFormat (via Gemini/Codestral)', () => {
     }
 });
 
+describe('ApiKeyValidator.validateGeminiApiKey (key shapes)', () => {
+    it('accepts an old AI Studio key (AIza...)', () => {
+        expect(ApiKeyValidator.validateGeminiApiKey('AIzaSyA_test-Key123')).toBeNull();
+    });
+
+    it('accepts a new Google key with dots (AQ.Ab8...)', () => {
+        expect(ApiKeyValidator.validateGeminiApiKey('AQ.Ab8RN6_test.Key-123')).toBeNull();
+    });
+
+    it('still rejects truly invalid characters', () => {
+        expect(ApiKeyValidator.validateGeminiApiKey('AQ.Ab8$bad!')).toBe('API key contains invalid characters');
+    });
+});
+
 describe('ApiKeyValidator.validateNonEmpty (lax providers)', () => {
     it('rejects empty for OpenAI', () => {
         expect(ApiKeyValidator.validateOpenAIApiKey('')).toBe('API key cannot be empty');
