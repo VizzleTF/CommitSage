@@ -41,7 +41,7 @@ jobs:
         run: npx tsc -p tests/e2e/tsconfig.e2e.json
 
       - name: Cache VS Code download
-        uses: actions/cache@v5
+        uses: actions/cache@v6
         with:
           path: .vscode-test
           key: vscode-test-${{ runner.os }}-stable
