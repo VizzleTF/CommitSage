@@ -141,10 +141,15 @@ export function makeCheckbox(
         input,
         el('label', { for: id }, [label]),
     ]);
-    if (opts.hint) {
-        row.appendChild(el('span', { class: 'hint' }, [opts.hint]));
+    if (!opts.hint) {
+        return row;
     }
-    return row;
+    // Hint on its own full-width line below the toggle+label, so a long hint
+    // can't squeeze the label into a narrow, multi-line column.
+    return el('div', { class: 'checkbox-field' }, [
+        row,
+        el('div', { class: 'hint' }, [opts.hint]),
+    ]) as HTMLDivElement;
 }
 
 export function makeTextInput(

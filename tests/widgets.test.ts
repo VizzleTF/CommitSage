@@ -72,10 +72,18 @@ describe('makeCheckbox', () => {
     });
 
     it('renders disabled state and an optional hint', () => {
-        const row = makeCheckbox('c', 'Label', true, () => {}, { disabled: true, hint: 'why' });
-        expect(row.classList.contains('disabled')).toBe(true);
-        expect((row.querySelector('input') as HTMLInputElement).disabled).toBe(true);
-        expect(row.querySelector('.hint')?.textContent).toBe('why');
+        // With a hint, the control is wrapped so the hint sits on its own line
+        // below the toggle+label; `disabled` lives on the inner checkbox-row.
+        const field = makeCheckbox('c', 'Label', true, () => {}, { disabled: true, hint: 'why' });
+        expect(field.querySelector('.checkbox-row')?.classList.contains('disabled')).toBe(true);
+        expect((field.querySelector('input') as HTMLInputElement).disabled).toBe(true);
+        expect(field.querySelector('.hint')?.textContent).toBe('why');
+    });
+
+    it('returns the bare row when no hint is given', () => {
+        const row = makeCheckbox('c', 'Label', false, () => {});
+        expect(row.classList.contains('checkbox-row')).toBe(true);
+        expect(row.querySelector('.hint')).toBeNull();
     });
 });
 

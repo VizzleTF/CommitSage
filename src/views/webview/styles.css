@@ -353,7 +353,10 @@ textarea:disabled {
     color: var(--vscode-foreground, #ccc);
     cursor: pointer;
 }
-.checkbox-row .hint { margin-top: 0; }
+/* Toggle + label + a full-width hint line stacked underneath. */
+.checkbox-field { margin: 9px 0; }
+.checkbox-field .checkbox-row { margin: 0; }
+.checkbox-field .hint { margin-top: 4px; }
 .checkbox-row.disabled label { opacity: 0.55; cursor: default; }
 .checkbox-row.disabled input { cursor: default; }
 
