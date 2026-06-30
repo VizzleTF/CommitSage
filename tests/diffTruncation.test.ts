@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { truncateDiff, splitIntoFileBlocks } from '../src/utils/diffTruncation';
+import { truncateDiff, splitIntoFileBlocks, isNoisyPath, blockPath } from '../src/utils/diffTruncation';
 
 function fileBlock(path: string, bodyLines: number): string {
     const body = Array.from({ length: bodyLines }, (_, i) => `+line ${i} of ${path}`).join('\n');
@@ -70,6 +70,62 @@ describe('truncateDiff', () => {
         // No lone surrogate halves: re-encoding round-trips cleanly.
         expect(out).toBe(Buffer.from(out, 'utf8').toString('utf8'));
         everyLineComplete(out, diff, ['…(diff truncated)']);
+    });
+});
+
+describe('isNoisyPath (cross-language low-value files)', () => {
+    it.each([
+        'package-lock.json', 'yarn.lock', 'pnpm-lock.yaml', 'bun.lockb', 'deno.lock',
+        'Cargo.lock', 'go.sum', 'composer.lock', 'Gemfile.lock', 'poetry.lock',
+        'Pipfile.lock', 'uv.lock', 'pubspec.lock', 'Podfile.lock', 'Package.resolved',
+        'packages.lock.json', 'gradle.lockfile', 'mix.lock', 'flake.lock', 'renv.lock',
+        '.terraform.lock.hcl',
+        'src/app.min.js', 'styles.min.css', 'bundle.js.map', 'Component.test.ts.snap',
+        'api/service.pb.go', 'proto/user_pb2.py', 'models/user.g.dart', 'Foo.designer.cs',
+        'lib/config.generated.ts',
+        'dist/main.js', 'build/output.o', 'target/release/app', 'vendor/lib.go',
+        'node_modules/x/index.js', 'coverage/lcov.info', '.next/static/chunk.js',
+    ])('treats %s as noisy', (path) => {
+        expect(isNoisyPath(path)).toBe(true);
+    });
+
+    it.each([
+        'src/index.ts', 'lib/parser.go', 'app/models/user.rb', 'main.rs',
+        'cmd/server/main.go', 'README.md', 'package.json', 'Cargo.toml',
+        'pyproject.toml', 'src/components/Button.tsx',
+    ])('treats %s as meaningful', (path) => {
+        expect(isNoisyPath(path)).toBe(false);
+    });
+
+    it('extracts the path from a diff --git header', () => {
+        expect(blockPath('diff --git a/src/x.ts b/src/x.ts\n@@\n')).toBe('src/x.ts');
+        expect(blockPath('# Staged changes:\ndiff --git a/go.sum b/go.sum\n@@\n')).toBe('go.sum');
+    });
+});
+
+describe('truncateDiff noisy-file prioritization', () => {
+    it('truncates a large lockfile before a small source file', () => {
+        const source = fileBlock('src/index.ts', 3);          // small, meaningful
+        const lock = fileBlock('package-lock.json', 2000);    // huge, noisy
+        const out = truncateDiff(source + lock, source.length + 500);
+
+        // Meaningful source survives whole even though the lockfile is far bigger.
+        expect(out).toContain('+line 0 of src/index.ts');
+        expect(out).toContain('+line 2 of src/index.ts');
+        // Lockfile is truncated (header kept, body cut).
+        expect(out).toContain('diff --git a/package-lock.json b/package-lock.json');
+        expect(out).toContain('…(file diff truncated)');
+    });
+
+    it('keeps meaningful files whole when only noisy files overflow the budget', () => {
+        const a = fileBlock('src/a.ts', 5);
+        const b = fileBlock('src/b.ts', 5);
+        const lock = fileBlock('Cargo.lock', 3000);
+        const out = truncateDiff(a + b + lock, a.length + b.length + 600);
+
+        expect(out).toContain('+line 4 of src/a.ts');
+        expect(out).toContain('+line 4 of src/b.ts');
+        expect(out).toContain('…(file diff truncated)'); // only the lockfile
     });
 });
 
