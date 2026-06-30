@@ -27,7 +27,14 @@ export const window = {
     showQuickPick: async () => undefined,
     showTextDocument: async () => undefined,
     withProgress: async (_opts: unknown, task: (...a: unknown[]) => unknown) =>
-        task({ report: () => undefined }, { isCancellationRequested: false }),
+        task(
+            { report: () => undefined },
+            {
+                isCancellationRequested: false,
+                onCancellationRequested: () => ({ dispose: () => undefined }),
+            },
+        ),
+    registerUriHandler: (_handler: unknown) => ({ dispose: () => undefined }),
 };
 
 export const workspace = {
@@ -61,6 +68,9 @@ export const env = {
     sessionId: 'test-session',
     language: 'en',
     appName: 'vscode-test',
+    uriScheme: 'vscode',
+    openExternal: async (_uri: unknown) => true,
+    asExternalUri: async (uri: unknown) => uri,
     isTelemetryEnabled: true,
     onDidChangeTelemetryEnabled: () => ({ dispose: () => undefined }),
     createTelemetryLogger: (_sender: unknown, _options?: unknown) => ({
@@ -85,6 +95,22 @@ export const commands = {
 export class Uri {
     static file(p: string) {
         return { fsPath: p };
+    }
+
+    // Minimal URI parse adequate for the OAuth callback round-trip:
+    // splits scheme://authority/path?query and round-trips toString().
+    static parse(value: string) {
+        const [beforeQuery, query = ''] = value.split('?');
+        const schemeIdx = beforeQuery.indexOf('://');
+        const rest = schemeIdx >= 0 ? beforeQuery.slice(schemeIdx + 3) : beforeQuery;
+        const slash = rest.indexOf('/');
+        const path = slash >= 0 ? rest.slice(slash) : '';
+        return {
+            path,
+            query,
+            fsPath: beforeQuery,
+            toString: (_skipEncoding?: boolean) => value,
+        };
     }
 }
 

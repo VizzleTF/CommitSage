@@ -45,7 +45,11 @@ Google's AI models via Google AI Studio.
 
 One API key, 300+ models from OpenAI, Anthropic, Google, xAI, DeepSeek, Meta, Mistral, Qwen, and more.
 
-**Setup:**
+**Setup (one-click sign-in):**
+1. Sidebar → OpenRouter → `Sign in with OpenRouter`
+2. Authorize in the browser; the key is created and stored automatically (OAuth PKCE).
+
+**Setup (manual key):**
 1. Sign up at [openrouter.ai/keys](https://openrouter.ai/keys)
 2. Sidebar → OpenRouter → `Set`
 

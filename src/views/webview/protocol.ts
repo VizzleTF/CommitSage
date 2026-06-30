@@ -38,6 +38,7 @@ export interface WebviewL10n {
     setKey: string;
     removeKey: string;
     getKey: string;
+    loginOpenRouter: string;
     keySet: string;
     keyMissing: string;
     noKey: string;
@@ -140,4 +141,5 @@ export type IncomingMessage =
     | { type: 'refreshModels'; provider: Provider }
     | { type: 'setApiKey'; provider: Provider }
     | { type: 'removeApiKey'; provider: Provider }
+    | { type: 'loginOpenRouter' }
     | { type: 'openExternal'; url: string };

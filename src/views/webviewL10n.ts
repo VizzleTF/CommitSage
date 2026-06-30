@@ -23,6 +23,7 @@ export function buildWebviewL10n(): WebviewL10n {
         setKey: vscode.l10n.t('Set'),
         removeKey: vscode.l10n.t('Remove'),
         getKey: vscode.l10n.t('Get key ↗'),
+        loginOpenRouter: vscode.l10n.t('Sign in with OpenRouter'),
         keySet: vscode.l10n.t('● set'),
         keyMissing: vscode.l10n.t('○ not set'),
         noKey: vscode.l10n.t('Set an API key to load the live model list.'),

@@ -11,6 +11,7 @@
   "command.removeOllamaAuthToken.title": "Remove Ollama Auth Token",
   "command.setOpenRouterApiKey.title": "Set OpenRouter API Key",
   "command.removeOpenRouterApiKey.title": "Remove OpenRouter API Key",
+  "command.loginOpenRouter.title": "Sign in to OpenRouter",
   "command.setGroqApiKey.title": "Set Groq API Key",
   "command.removeGroqApiKey.title": "Remove Groq API Key",
   "command.setAnthropicApiKey.title": "Set Anthropic API Key",

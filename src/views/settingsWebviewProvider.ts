@@ -156,6 +156,13 @@ export class SettingsWebviewProvider implements vscode.WebviewViewProvider {
                     await vscode.commands.executeCommand(providerDef(msg.provider).removeCmd);
                     return;
 
+                case 'loginOpenRouter':
+                    // OAuth PKCE flow; on success it stores the key in SecretStorage,
+                    // which the secret-change listener picks up to refresh the badge.
+                    await vscode.commands.executeCommand('commitsage.loginOpenRouter');
+                    await this.refreshModelsFor('openrouter', true);
+                    return;
+
                 case 'openExternal':
                     // Whitelist against the static map — never trust a URL the
                     // webview hands us back. Prevents the webview from being

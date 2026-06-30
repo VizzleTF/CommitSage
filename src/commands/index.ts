@@ -3,6 +3,7 @@ import { registerGenerateCommitMessageCommand } from './generateCommitMessage';
 import { registerSetApiKeyCommands } from './setApiKeys';
 import { createProjectConfig } from './createProjectConfig';
 import { registerSelectGeminiModelCommand } from './selectGeminiModel';
+import { registerOpenRouterAuthCommands } from './openRouterAuth';
 import { Logger } from '../utils/logger';
 import { toError } from '../utils/errorUtils';
 
@@ -14,6 +15,7 @@ export function registerCommands(context: vscode.ExtensionContext): void {
             registerGenerateCommitMessageCommand(context),
             ...registerSetApiKeyCommands(context),
             registerSelectGeminiModelCommand(context),
+            ...registerOpenRouterAuthCommands(context),
             vscode.commands.registerCommand('commitsage.createProjectConfig', createProjectConfig)
         ];
 

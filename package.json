@@ -18,7 +18,8 @@
     "workspace"
   ],
   "activationEvents": [
-    "onCommand:commitsage.generateCommitMessage"
+    "onCommand:commitsage.generateCommitMessage",
+    "onUri"
   ],
   "categories": [
     "Machine Learning",
@@ -111,6 +112,11 @@
       {
         "command": "commitsage.removeOpenRouterApiKey",
         "title": "%command.removeOpenRouterApiKey.title%",
+        "category": "%command.category%"
+      },
+      {
+        "command": "commitsage.loginOpenRouter",
+        "title": "%command.loginOpenRouter.title%",
         "category": "%command.category%"
       },
       {

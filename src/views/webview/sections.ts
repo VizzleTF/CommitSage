@@ -150,6 +150,13 @@ function appendAuthControls(body: HTMLElement, state: ViewState, p: Provider): v
         }
     } else {
         body.appendChild(fieldLabel(L.apiKey));
+        // OpenRouter supports one-click OAuth login in addition to pasting a key;
+        // surface it as a prominent button above the key controls.
+        if (p === 'openrouter') {
+            const loginBtn = el('button', { class: 'primary' }, [L.loginOpenRouter]) as HTMLButtonElement;
+            loginBtn.addEventListener('click', () => send({ type: 'loginOpenRouter' }));
+            body.appendChild(el('div', { class: 'actions' }, [loginBtn]));
+        }
         body.appendChild(renderApiKeyButtons(state, p));
 
         if (!state.hasApiKey[p]) {
