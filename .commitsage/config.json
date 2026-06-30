@@ -1,6 +1,6 @@
 {
   "provider": {
-    "type": "gemini"
+    "type": "codestral"
   },
   "commit": {
     "commitLanguage": "english"
