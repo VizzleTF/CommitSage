@@ -167,10 +167,11 @@ describe('validateCustomInstructions', () => {
 });
 
 describe('validateRefsWithAutoCommit', () => {
-    const cfg = (autoCommit: boolean, promptForRefs: boolean) =>
+    const cfg = (autoCommit: boolean, refsPrompt: boolean) =>
         mockGet.mockImplementation((k: string) => {
             if (k === 'commit.autoCommit') return autoCommit;
-            if (k === 'commit.promptForRefs') return promptForRefs;
+            if (k === 'commit.refs.enabled') return refsPrompt;
+            if (k === 'commit.refs.source') return 'prompt';
             return undefined;
         });
 
@@ -184,7 +185,7 @@ describe('validateRefsWithAutoCommit', () => {
         cfg(true, true);
         mockShowWarning.mockResolvedValue('Disable Refs Prompt');
         await SettingsValidator.validateRefsWithAutoCommit();
-        expect(mockUpdate).toHaveBeenCalledWith('commit.promptForRefs', false, true);
+        expect(mockUpdate).toHaveBeenCalledWith('commit.refs.enabled', false, true);
     });
 
     it('disables auto commit on that choice', async () => {

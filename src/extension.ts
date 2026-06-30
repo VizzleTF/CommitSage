@@ -9,6 +9,7 @@ import { ApiKeyManager } from './services/apiKeyManager';
 import { toError } from './utils/errorUtils';
 import { validateGeminiModelOnStartup } from './services/geminiModelValidator';
 import { SettingsWebviewProvider } from './views/settingsWebviewProvider';
+import { RefStore } from './services/refStore';
 import { formatSupportsCommitlint } from './views/webview/commitFormatPolicy';
 
 export async function activate(context: vscode.ExtensionContext): Promise<void> {
@@ -16,6 +17,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 
     try {
         await ConfigService.initialize(context);
+        RefStore.init(context);
         ApiKeyManager.initialize(context.secrets, context);
         Logger.initialize();
         await TelemetryService.initialize(context);

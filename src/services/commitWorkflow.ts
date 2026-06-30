@@ -10,6 +10,8 @@ import { ApiKeyManager } from './apiKeyManager';
 import { UserCancelledError, ApiKeyInvalidError } from '../models/errors';
 import { toError, sanitizeErrorForTelemetry } from '../utils/errorUtils';
 import { mapLimit } from '../utils/concurrency';
+import { extractRef } from '../utils/refUtils';
+import { RefStore } from './refStore';
 
 const BLAME_CONCURRENCY = 8;
 const MAX_API_KEY_RETRIES = 3;
@@ -37,8 +39,9 @@ export class CommitWorkflow {
                 await this.ensureApiKey(provider);
             }
 
-            // Prompt for refs before generation so the progress UI stays clean
-            const refs = await this.promptForRefs();
+            // Resolve the ref before generation (may show an input box for the
+            // 'prompt' source) so the progress UI stays clean.
+            const ref = await this.resolveRef(sourceControlRepository);
 
             await this.executeWithProgress(async (progress, token) => {
                 // Check for cancellation
@@ -56,7 +59,7 @@ export class CommitWorkflow {
                         sourceControlRepository!,
                         token,
                         controller.signal,
-                        refs
+                        ref
                     );
                     Logger.log(`Commit message generated: ${commitMessage.message}`);
                 } finally {
@@ -99,23 +102,41 @@ export class CommitWorkflow {
         await ApiKeyManager.getKey(provider);
     }
 
-    private static async promptForRefs(): Promise<string> {
-        if (!ConfigService.get('commit.promptForRefs')) {
+    private static async resolveRef(repository?: vscode.SourceControl): Promise<string> {
+        if (!ConfigService.get('commit.refs.enabled')) {
             return '';
         }
 
-        const refs = await vscode.window.showInputBox({
-            prompt: vscode.l10n.t('Enter refs (e.g., issue or ticket numbers) to append to the commit message'),
+        const source = ConfigService.get('commit.refs.source');
+
+        if (source === 'branch') {
+            const repoPath = repository?.rootUri?.fsPath ?? '';
+            const branch = await GitService.getBranchName(repoPath);
+            return extractRef(branch, ConfigService.get('commit.refs.branchPattern')) ?? '';
+        }
+
+        if (source === 'input') {
+            // Branch-specific saved ref (workspaceState) wins over the
+            // project-wide ref (commit.refs.value) — more specific scope first.
+            const repoPath = repository?.rootUri?.fsPath ?? '';
+            const branch = await GitService.getBranchName(repoPath);
+            const branchRef = branch ? RefStore.getBranchRef(branch) : undefined;
+            return (branchRef ?? ConfigService.get('commit.refs.value')).trim();
+        }
+
+        // source === 'prompt'
+        const ref = await vscode.window.showInputBox({
+            prompt: vscode.l10n.t('Enter a ref (e.g., issue or ticket number) to add to the commit message'),
             placeHolder: vscode.l10n.t('e.g. #123, JIRA-456'),
             ignoreFocusOut: true
         });
 
         // Escape cancels the whole operation
-        if (refs === undefined) {
+        if (ref === undefined) {
             throw new UserCancelledError();
         }
 
-        return refs.trim();
+        return ref.trim();
     }
 
     private static async handleInvalidApiKey(
@@ -164,7 +185,7 @@ export class CommitWorkflow {
         sourceControlRepository: vscode.SourceControl,
         token: vscode.CancellationToken,
         signal: AbortSignal,
-        refs: string
+        ref: string
     ): Promise<CommitMessage> {
         progress.report({ message: vscode.l10n.t('Analyzing changes…'), increment: 10 });
 
@@ -218,9 +239,22 @@ export class CommitWorkflow {
             signal,
         });
 
-        const finalMessage = refs
-            ? `${commitMessage.message}\n\n${refs}`
-            : commitMessage.message;
+        let finalMessage = commitMessage.message;
+        if (ref) {
+            switch (ConfigService.get('commit.refs.placement')) {
+                case 'prefix':
+                    // Same first line, before the subject: "PROJ-1 feat: …"
+                    finalMessage = `${ref} ${finalMessage}`;
+                    break;
+                case 'start':
+                    // Own line above the message.
+                    finalMessage = `${ref}\n\n${finalMessage}`;
+                    break;
+                default:
+                    // 'end' — own line below the message.
+                    finalMessage = `${finalMessage}\n\n${ref}`;
+            }
+        }
 
         sourceControlRepository.inputBox.value = finalMessage;
 

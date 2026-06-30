@@ -12,6 +12,7 @@ import {
     renderProviderPick,
     renderModelAuthSection,
     renderCommitSection,
+    renderRefsSection,
     renderAutomationSection,
     renderCommitlintSection,
     renderAdvancedSection,
@@ -24,6 +25,7 @@ function build(state: ViewState): void {
     fragment.appendChild(renderProviderPick(state));
     fragment.appendChild(renderModelAuthSection(state));
     fragment.appendChild(renderCommitSection(state));
+    fragment.appendChild(renderRefsSection(state));
     fragment.appendChild(renderAutomationSection(state));
     fragment.appendChild(renderCommitlintSection(state));
     fragment.appendChild(renderAdvancedSection(state));

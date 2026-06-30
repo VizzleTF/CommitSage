@@ -367,6 +367,52 @@ describe('ConfigService project-config loading from disk', () => {
     });
 });
 
+describe('ConfigService.setProjectConfigValue', () => {
+    let tmpDir: string;
+
+    beforeEach(() => {
+        tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'commitsage-setpc-'));
+        setWorkspaceFolder(tmpDir);
+    });
+
+    afterEach(() => {
+        fs.rmSync(tmpDir, { recursive: true, force: true });
+    });
+
+    const configPath = () => path.join(tmpDir, '.commitsage', 'config.json');
+
+    it('creates .commitsage/config.json with a nested key and refreshes the cache', async () => {
+        await ConfigService.setProjectConfigValue('commit.refs.value', 'PROJ-1');
+        const written = JSON.parse(fs.readFileSync(configPath(), 'utf8'));
+        expect(written.commit.refs.value).toBe('PROJ-1');
+        expect(ConfigService.get('commit.refs.value')).toBe('PROJ-1');
+    });
+
+    it('merges into an existing config without dropping other keys', async () => {
+        const dir = path.join(tmpDir, '.commitsage');
+        fs.mkdirSync(dir);
+        fs.writeFileSync(configPath(), JSON.stringify({ commit: { autoCommit: true } }));
+        await ConfigService.setProjectConfigValue('commit.refs.value', 'ABC-9');
+        const written = JSON.parse(fs.readFileSync(configPath(), 'utf8'));
+        expect(written.commit.autoCommit).toBe(true);
+        expect(written.commit.refs.value).toBe('ABC-9');
+    });
+
+    it('overwrites a broken existing config rather than throwing', async () => {
+        const dir = path.join(tmpDir, '.commitsage');
+        fs.mkdirSync(dir);
+        fs.writeFileSync(configPath(), '{ not valid json');
+        await ConfigService.setProjectConfigValue('commit.refs.value', 'X-1');
+        const written = JSON.parse(fs.readFileSync(configPath(), 'utf8'));
+        expect(written.commit.refs.value).toBe('X-1');
+    });
+
+    it('throws when no workspace folder is open', async () => {
+        setWorkspaceFolder(undefined);
+        await expect(ConfigService.setProjectConfigValue('commit.refs.value', 'X')).rejects.toThrow();
+    });
+});
+
 describe('parseAndValidateProjectConfig edge cases', () => {
     const parse = (raw: string) =>
         parseAndValidateProjectConfig(raw, 'test-source', SETTING_DEFAULTS) as Record<string, unknown>;

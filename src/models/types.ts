@@ -39,7 +39,13 @@ export interface ProjectConfig {
         onlyStagedChanges?: boolean;
         autoCommit?: boolean;
         autoPush?: boolean;
-        promptForRefs?: boolean;
+        refs?: {
+            enabled?: boolean;
+            source?: string;
+            value?: string;
+            placement?: string;
+            branchPattern?: string;
+        };
         commitlint?: {
             enabled?: boolean;
             maxRetries?: number;

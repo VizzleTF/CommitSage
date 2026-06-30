@@ -51,7 +51,28 @@ export interface WebviewL10n {
     format: string;
     language: string;
     customLanguage: string;
-    promptForRefs: string;
+    refs: string;
+    refsEnabled: string;
+    refsEnabledHint: string;
+    refsSource: string;
+    refsSourcePrompt: string;
+    refsSourceBranch: string;
+    refsSourceInput: string;
+    refsValue: string;
+    refsValuePh: string;
+    refsSaveForBranch: string;
+    refsSaveForProject: string;
+    refsClearBranch: string;
+    refsNoBranch: string;
+    refsActiveBranch: string;
+    refsActiveProject: string;
+    refsActiveNone: string;
+    refsPlacement: string;
+    refsPlacementEnd: string;
+    refsPlacementStart: string;
+    refsPlacementPrefix: string;
+    refsBranchPattern: string;
+    refsBranchPatternHint: string;
     onlyStaged: string;
     automation: string;
     autoCommit: string;
@@ -119,7 +140,15 @@ export interface ViewState {
         format: string;
         language: string;
         customLanguageName: string;
-        promptForRefs: boolean;
+        refsEnabled: boolean;
+        refsSource: string;
+        refsValue: string;
+        refsPlacement: string;
+        refsBranchPattern: string;
+        /** Current git branch ('' when unavailable) — labels the save button. */
+        refsBranch: string;
+        /** Ref saved for the current branch in workspaceState ('' when none). */
+        refsBranchRef: string;
         onlyStagedChanges: boolean;
         autoCommit: boolean;
         autoPush: boolean;
@@ -147,6 +176,9 @@ export interface ViewState {
 export type IncomingMessage =
     | { type: 'getState' }
     | { type: 'setSetting'; key: string; value: string | boolean | number }
+    | { type: 'saveRefForBranch'; value: string }
+    | { type: 'saveRefForProject'; value: string }
+    | { type: 'clearBranchRef' }
     | { type: 'refreshModels'; provider: Provider }
     | { type: 'setApiKey'; provider: Provider }
     | { type: 'removeApiKey'; provider: Provider }

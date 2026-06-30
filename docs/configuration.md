@@ -59,9 +59,28 @@ Settings are resolved in the following order (higher priority wins):
 | `commitSage.commit.onlyStagedChanges` | `boolean` | `false` | When `true`, only analyzes staged changes. When `false`, uses staged if present, otherwise all changes |
 | `commitSage.commit.autoCommit` | `boolean` | `false` | Automatically commit after message generation |
 | `commitSage.commit.autoPush` | `boolean` | `false` | Automatically push after auto-commit (requires `autoCommit` enabled) |
-| `commitSage.commit.promptForRefs` | `boolean` | `false` | Prompt for issue/PR references before generating |
+| `commitSage.commit.refs.enabled` | `boolean` | `false` | Add an issue/ticket ref (e.g. `#123`, `PROJ-456`) to every generated commit |
+| `commitSage.commit.refs.source` | `string` | `"prompt"` | Where the ref comes from: `prompt` (ask each time), `branch` (extract from branch name), `input` (fixed value) |
+| `commitSage.commit.refs.value` | `string` | `""` | Fixed ref used when `refs.source` is `input` |
+| `commitSage.commit.refs.placement` | `string` | `"end"` | Where the ref is added: `end` (separate line at end), `start` (separate line at start), or `prefix` (start of subject line, same line). Never injected into the subject scope |
+| `commitSage.commit.refs.branchPattern` | `string` | `"[A-Z][A-Z0-9]*-[0-9]+"` | Regex extracting the ref from the branch name when `refs.source` is `branch`. First capture group, or whole match, is used |
 | `commitSage.commit.useCustomInstructions` | `boolean` | `false` | Use custom prompt instead of built-in templates |
 | `commitSage.commit.customInstructions` | `string` | `""` | Custom prompt text (used when `useCustomInstructions` is `true`) |
+
+### Saving a ref per branch or per project (`input` source)
+
+With `refs.source` set to `input`, the settings panel shows a **Ref value** field
+with two buttons:
+
+- **Save for this branch** — stores the value for the *current git branch* only,
+  in VS Code's per-workspace state (`workspaceState`). It is personal and never
+  committed to the repo.
+- **Save for project** — writes `commit.refs.value` into `.commitsage/config.json`,
+  so it applies to the whole repo and can be shared via git.
+
+At generation time the **branch ref wins over the project ref** (more specific
+scope first); if neither is set, no ref is added. A **Clear branch ref** button
+removes the current branch's saved value.
 
 ---
 
@@ -102,7 +121,13 @@ CommitSage stores per-project settings in `.commitsage/config.json`.
     "onlyStagedChanges": false,
     "autoCommit": false,
     "autoPush": false,
-    "promptForRefs": false
+    "refs": {
+      "enabled": false,
+      "source": "prompt",
+      "value": "",
+      "placement": "end",
+      "branchPattern": "[A-Z][A-Z0-9]*-[0-9]+"
+    }
   },
   "gemini": {
     "model": "auto"

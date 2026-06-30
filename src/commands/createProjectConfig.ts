@@ -56,7 +56,13 @@ export async function createProjectConfig(): Promise<void> {
                 onlyStagedChanges: false,
                 autoCommit: false,
                 autoPush: false,
-                promptForRefs: false
+                refs: {
+                    enabled: false,
+                    source: 'prompt',
+                    value: '',
+                    placement: 'end',
+                    branchPattern: '[A-Z][A-Z0-9]*-[0-9]+'
+                }
             },
             gemini: {
                 model: 'auto'

@@ -465,7 +465,7 @@
         "commitSage.commit.autoCommit": {
           "type": "boolean",
           "default": false,
-          "markdownDescription": "Automatically commit changes after generating the message. Consider disabling `#commitSage.commit.promptForRefs#` when using this feature.",
+          "markdownDescription": "Automatically commit changes after generating the message. Consider setting `#commitSage.commit.refs.source#` to something other than `prompt` when using this feature.",
           "order": 8
         },
         "commitSage.commit.autoPush": {
@@ -474,11 +474,47 @@
           "markdownDescription": "Automatically push changes after committing. **Requires `#commitSage.commit.autoCommit#` to be enabled — ignored otherwise.**",
           "order": 9
         },
-        "commitSage.commit.promptForRefs": {
+        "commitSage.commit.refs.enabled": {
           "type": "boolean",
           "default": false,
-          "markdownDescription": "Prompt for entering refs (e.g., issue numbers) when generating commit messages. **Note:** this may interrupt automatic flow if `#commitSage.commit.autoCommit#` is enabled.",
+          "markdownDescription": "Add a reference (issue/ticket ID, e.g. `#123` or `PROJ-456`) to every generated commit message. When enabled, configure where the ref comes from with `#commitSage.commit.refs.source#` and where it is placed with `#commitSage.commit.refs.placement#`.",
           "order": 10
+        },
+        "commitSage.commit.refs.source": {
+          "type": "string",
+          "default": "prompt",
+          "enum": ["prompt", "branch", "input"],
+          "enumDescriptions": [
+            "Prompt — a text input is shown before each generation so you type the ref manually.",
+            "Branch — the ref is extracted automatically from the current Git branch name.",
+            "Input — a fixed ref taken from `commitSage.commit.refs.value`."
+          ],
+          "markdownDescription": "Where the reference value comes from. Only used when `#commitSage.commit.refs.enabled#` is on.\n\n- **prompt**: ask before each generation (may interrupt automatic flow if `#commitSage.commit.autoCommit#` is enabled).\n- **branch**: extract from the branch name using `#commitSage.commit.refs.branchPattern#`.\n- **input**: use the fixed value from `#commitSage.commit.refs.value#`.",
+          "order": 11
+        },
+        "commitSage.commit.refs.value": {
+          "type": "string",
+          "default": "",
+          "markdownDescription": "Fixed reference appended to every commit. Used only when `#commitSage.commit.refs.source#` is `input`.",
+          "order": 12
+        },
+        "commitSage.commit.refs.placement": {
+          "type": "string",
+          "default": "end",
+          "enum": ["end", "start", "prefix"],
+          "enumDescriptions": [
+            "End — separate line at the end of the message.",
+            "Start — separate line at the start of the message.",
+            "Prefix — at the start of the subject line (same line)."
+          ],
+          "markdownDescription": "Where the reference is added to the commit message. The ref is never injected into the subject scope.\n\n- **end** (default): own line below the message (e.g. `…\\n\\nCloses #123`).\n- **start**: own line above the message (e.g. `PROJ-123\\n\\nfeat: …`).\n- **prefix**: prepended to the subject line (e.g. `PROJ-123 feat: …`).",
+          "order": 13
+        },
+        "commitSage.commit.refs.branchPattern": {
+          "type": "string",
+          "default": "[A-Z][A-Z0-9]*-[0-9]+",
+          "markdownDescription": "Regular expression used to extract the ref from the branch name when `#commitSage.commit.refs.source#` is `branch`. The first match (or first capture group, if present) is used.\n\nDefault `[A-Z][A-Z0-9]*-[0-9]+` matches Jira/Linear-style IDs (e.g. `feature/PROJ-123-login` → `PROJ-123`). Examples: `[0-9]+` for plain issue numbers, `(?:issue|gh)-?([0-9]+)` to capture a number after a prefix.",
+          "order": 14
         },
         "commitSage.gemini.model": {
           "type": "string",

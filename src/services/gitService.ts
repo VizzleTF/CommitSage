@@ -412,6 +412,14 @@ export class GitService {
     }, signal);
   }
 
+  static async getBranchName(repoPath: string, signal?: AbortSignal): Promise<string> {
+    try {
+      return (await this.executeGitCommand(['rev-parse', '--abbrev-ref', 'HEAD'], repoPath, signal)).trim();
+    } catch {
+      return '';
+    }
+  }
+
   public static async hasHead(repoPath: string, signal?: AbortSignal): Promise<boolean> {
     try {
       await this.execGit(['rev-parse', 'HEAD'], repoPath, { signal });

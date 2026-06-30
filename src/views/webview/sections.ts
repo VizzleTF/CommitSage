@@ -283,12 +283,6 @@ export function renderCommitSection(state: ViewState): HTMLElement {
     }
 
     body.appendChild(makeCheckbox(
-        'prompt-for-refs',
-        L.promptForRefs,
-        state.commit.promptForRefs,
-        v => setSetting(KEYS.promptForRefs, v),
-    ));
-    body.appendChild(makeCheckbox(
         'only-staged',
         L.onlyStaged,
         state.commit.onlyStagedChanges,
@@ -296,6 +290,99 @@ export function renderCommitSection(state: ViewState): HTMLElement {
     ));
 
     return section('commit', L.commit, true, body);
+}
+
+export function renderRefsSection(state: ViewState): HTMLElement {
+    const body = el('div');
+
+    body.appendChild(makeCheckbox(
+        'refs-enabled',
+        L.refsEnabled,
+        state.commit.refsEnabled,
+        v => setSetting(KEYS.refsEnabled, v),
+        { hint: L.refsEnabledHint },
+    ));
+
+    if (state.commit.refsEnabled) {
+        body.appendChild(fieldLabel(L.refsSource));
+        body.appendChild(makeSelect(
+            'refs-source',
+            [
+                { value: 'prompt', label: L.refsSourcePrompt },
+                { value: 'branch', label: L.refsSourceBranch },
+                { value: 'input', label: L.refsSourceInput },
+            ],
+            state.commit.refsSource,
+            v => setSetting(KEYS.refsSource, v),
+        ));
+
+        if (state.commit.refsSource === 'input') {
+            body.appendChild(fieldLabel(L.refsValue));
+            // Draft field: not auto-saved. The two buttons persist its current
+            // value to either the current branch (workspaceState) or the project
+            // (.commitsage/config.json).
+            const refInput = makeTextInput('refs-value', state.commit.refsValue, () => {}, L.refsValuePh);
+            body.appendChild(refInput);
+
+            const branch = state.commit.refsBranch;
+            const saveBranchBtn = el('button', {
+                class: 'primary',
+                disabled: !branch,
+                title: branch ? `${L.refsSaveForBranch}: ${branch}` : L.refsNoBranch,
+            }, [L.refsSaveForBranch]) as HTMLButtonElement;
+            saveBranchBtn.addEventListener('click', () =>
+                send({ type: 'saveRefForBranch', value: refInput.value }));
+
+            const saveProjectBtn = el('button', { class: 'primary' }, [L.refsSaveForProject]) as HTMLButtonElement;
+            saveProjectBtn.addEventListener('click', () =>
+                send({ type: 'saveRefForProject', value: refInput.value }));
+
+            body.appendChild(el('div', { class: 'actions refs-actions' }, [saveBranchBtn, saveProjectBtn]));
+
+            // Status line — which saved ref actually wins (branch over project).
+            let active: string;
+            if (state.commit.refsBranchRef) {
+                active = `${L.refsActiveBranch}: ${state.commit.refsBranchRef}`;
+            } else if (state.commit.refsValue) {
+                active = `${L.refsActiveProject}: ${state.commit.refsValue}`;
+            } else {
+                active = L.refsActiveNone;
+            }
+            const branchNote = branch ? `${branch} · ` : `${L.refsNoBranch} · `;
+            body.appendChild(el('div', { class: 'hint' }, [branchNote + active]));
+
+            if (state.commit.refsBranchRef) {
+                const clearBtn = el('button', { class: 'primary' }, [L.refsClearBranch]) as HTMLButtonElement;
+                clearBtn.addEventListener('click', () => send({ type: 'clearBranchRef' }));
+                body.appendChild(el('div', { class: 'actions' }, [clearBtn]));
+            }
+        }
+
+        if (state.commit.refsSource === 'branch') {
+            body.appendChild(fieldLabel(L.refsBranchPattern));
+            body.appendChild(makeTextInput(
+                'refs-branch-pattern',
+                state.commit.refsBranchPattern,
+                v => setSetting(KEYS.refsBranchPattern, v),
+                '[A-Z][A-Z0-9]*-[0-9]+',
+            ));
+            body.appendChild(el('div', { class: 'hint' }, [L.refsBranchPatternHint]));
+        }
+
+        body.appendChild(fieldLabel(L.refsPlacement));
+        body.appendChild(makeSelect(
+            'refs-placement',
+            [
+                { value: 'end', label: L.refsPlacementEnd },
+                { value: 'start', label: L.refsPlacementStart },
+                { value: 'prefix', label: L.refsPlacementPrefix },
+            ],
+            state.commit.refsPlacement,
+            v => setSetting(KEYS.refsPlacement, v),
+        ));
+    }
+
+    return section('refs', L.refs, false, body);
 }
 
 export function renderCommitlintSection(state: ViewState): HTMLElement {

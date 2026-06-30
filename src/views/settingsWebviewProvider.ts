@@ -19,6 +19,8 @@ import {
 } from './webview/protocol';
 import { buildWebviewL10n } from './webviewL10n';
 import { renderSettingsHtml } from './settingsHtml';
+import { GitService } from '../services/gitService';
+import { RefStore } from '../services/refStore';
 import { Logger } from '../utils/logger';
 import { toError } from '../utils/errorUtils';
 import { getNonce } from '../utils/nonce';
@@ -63,7 +65,11 @@ const SETTING_PATHS = {
     commitLanguage: 'commit.commitLanguage',
     customLanguageName: 'commit.customLanguageName',
     commitFormat: 'commit.commitFormat',
-    promptForRefs: 'commit.promptForRefs',
+    refsEnabled: 'commit.refs.enabled',
+    refsSource: 'commit.refs.source',
+    refsValue: 'commit.refs.value',
+    refsPlacement: 'commit.refs.placement',
+    refsBranchPattern: 'commit.refs.branchPattern',
     onlyStagedChanges: 'commit.onlyStagedChanges',
     autoCommit: 'commit.autoCommit',
     autoPush: 'commit.autoPush',
@@ -154,6 +160,31 @@ export class SettingsWebviewProvider implements vscode.WebviewViewProvider {
                         .getConfiguration()
                         .update(msg.key, msg.value, vscode.ConfigurationTarget.Global);
                     return;
+
+                case 'saveRefForBranch': {
+                    const branch = await this.currentBranch();
+                    if (!branch) {
+                        void Logger.showError(vscode.l10n.t('No git branch detected — cannot save a branch ref.'));
+                        return;
+                    }
+                    await RefStore.setBranchRef(branch, msg.value);
+                    await this.pushState();
+                    return;
+                }
+
+                case 'saveRefForProject':
+                    await ConfigService.setProjectConfigValue('commit.refs.value', msg.value.trim());
+                    await this.pushState();
+                    return;
+
+                case 'clearBranchRef': {
+                    const branch = await this.currentBranch();
+                    if (branch) {
+                        await RefStore.clearBranchRef(branch);
+                    }
+                    await this.pushState();
+                    return;
+                }
 
                 case 'refreshModels':
                     await this.refreshModelsFor(msg.provider, true);
@@ -251,6 +282,13 @@ export class SettingsWebviewProvider implements vscode.WebviewViewProvider {
             PROVIDERS.map(async p => [p, !!(await ApiKeyManager.getOptionalKey(p))] as const),
         );
 
+        // Branch + its saved ref are only needed for the "save for branch" UI,
+        // which shows under the 'input' source — skip the git call otherwise.
+        const refsNeedBranch = ConfigService.get('commit.refs.enabled')
+            && ConfigService.get('commit.refs.source') === 'input';
+        const refsBranch = refsNeedBranch ? await this.currentBranch() : '';
+        const refsBranchRef = refsBranch ? (RefStore.getBranchRef(refsBranch) ?? '') : '';
+
         return {
             trusted: vscode.workspace.isTrusted,
             projectOverrides: (Object.keys(SETTING_PATHS) as (keyof typeof SETTING_PATHS)[])
@@ -279,7 +317,13 @@ export class SettingsWebviewProvider implements vscode.WebviewViewProvider {
                 format: ConfigService.get('commit.commitFormat'),
                 language: ConfigService.get('commit.commitLanguage'),
                 customLanguageName: ConfigService.get('commit.customLanguageName'),
-                promptForRefs: ConfigService.get('commit.promptForRefs'),
+                refsEnabled: ConfigService.get('commit.refs.enabled'),
+                refsSource: ConfigService.get('commit.refs.source'),
+                refsValue: ConfigService.get('commit.refs.value'),
+                refsPlacement: ConfigService.get('commit.refs.placement'),
+                refsBranchPattern: ConfigService.get('commit.refs.branchPattern'),
+                refsBranch,
+                refsBranchRef,
                 onlyStagedChanges: ConfigService.get('commit.onlyStagedChanges'),
                 autoCommit: ConfigService.get('commit.autoCommit'),
                 autoPush: ConfigService.get('commit.autoPush'),
@@ -305,6 +349,11 @@ export class SettingsWebviewProvider implements vscode.WebviewViewProvider {
                 telemetryEnabled: ConfigService.get('telemetry.enabled'),
             },
         };
+    }
+
+    private async currentBranch(): Promise<string> {
+        const root = ConfigService.getProjectRootPath();
+        return root ? GitService.getBranchName(root) : '';
     }
 
     private async pushState(): Promise<void> {

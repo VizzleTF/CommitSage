@@ -25,7 +25,11 @@ export const SETTING_DEFAULTS = {
     'commit.commitFormat': 'conventional',
     'commit.useCustomInstructions': false,
     'commit.customInstructions': '',
-    'commit.promptForRefs': false,
+    'commit.refs.enabled': false,
+    'commit.refs.source': 'prompt',
+    'commit.refs.value': '',
+    'commit.refs.placement': 'end',
+    'commit.refs.branchPattern': '[A-Z][A-Z0-9]*-[0-9]+',
     'commit.onlyStagedChanges': false,
     'commit.autoCommit': false,
     'commit.autoPush': false,
@@ -317,6 +321,11 @@ export class ConfigService {
   private static getNestedProjectValue<T>(
     sections: string[],
   ): T | undefined {
+    // Callers pass [section, leaf] where `leaf` may itself be dotted for
+    // 3+-level keys (e.g. 'commit', 'refs.value'). Flatten so each dot becomes
+    // one descent step; otherwise nested project-config overrides like
+    // commit.refs.value / commit.commitlint.maxRetries never resolve.
+    sections = sections.flatMap((s) => s.split('.'));
     let current: unknown = this.getProjectConfig();
     for (let i = 0; i < sections.length; i++) {
       const section = sections[i];
@@ -443,6 +452,57 @@ export class ConfigService {
 
   static clearCache(): void {
     this.cache.clear();
+  }
+
+  /**
+   * Persist a single dotted key into the project's `.commitsage/config.json`
+   * (creating the file/directory if needed) and refresh the in-memory cache so
+   * subsequent `get()` calls see the new value immediately. Project config has
+   * the highest precedence, so this is how the webview "save for project" action
+   * pins a value for the whole repo. Throws when no workspace folder is open.
+   */
+  static async setProjectConfigValue(
+    dottedKey: string,
+    value: CacheValue,
+  ): Promise<void> {
+    const rootPath = this.getProjectRootPath();
+    if (!rootPath) {
+      throw new Error('No workspace folder open to save project configuration');
+    }
+
+    const dir = path.join(rootPath, '.commitsage');
+    const file = path.join(dir, 'config.json');
+
+    let config: Record<string, unknown> = {};
+    if ((await statOrUndefined(file)) !== undefined) {
+      try {
+        const parsed = JSON.parse(await fs.readFile(file, 'utf8')) as unknown;
+        if (isPlainObject(parsed)) {
+          config = parsed;
+        }
+      } catch (error) {
+        Logger.error('Existing .commitsage/config.json is invalid; rewriting it:', toError(error));
+      }
+    }
+
+    const parts = dottedKey.split('.');
+    let cursor = config;
+    for (let i = 0; i < parts.length - 1; i++) {
+      const next = cursor[parts[i]];
+      if (!isPlainObject(next)) {
+        cursor[parts[i]] = {};
+      }
+      cursor = cursor[parts[i]] as Record<string, unknown>;
+    }
+    cursor[parts[parts.length - 1]] = value;
+
+    await fs.mkdir(dir, { recursive: true });
+    await fs.writeFile(file, JSON.stringify(config, null, 2) + '\n', 'utf8');
+
+    // Refresh now rather than waiting for the file watcher (async, racy with an
+    // immediate state push from the webview handler).
+    this.invalidateProjectConfig();
+    await this.loadProjectConfig();
   }
 
   static dispose(): void {

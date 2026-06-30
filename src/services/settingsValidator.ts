@@ -84,9 +84,12 @@ export class SettingsValidator {
 
     static async validateRefsWithAutoCommit(): Promise<void> {
         const autoCommitEnabled = ConfigService.get('commit.autoCommit');
-        const promptForRefs = ConfigService.get('commit.promptForRefs');
+        // Only the 'prompt' source shows an input box that can interrupt the
+        // automatic commit flow; 'branch' and 'input' are non-interactive.
+        const refsPromptsUser = ConfigService.get('commit.refs.enabled')
+            && ConfigService.get('commit.refs.source') === 'prompt';
 
-        if (autoCommitEnabled && promptForRefs) {
+        if (autoCommitEnabled && refsPromptsUser) {
             const disableRefs = vscode.l10n.t('Disable Refs Prompt');
             const disableAutoCommit = vscode.l10n.t('Disable Auto Commit');
             const keepBoth = vscode.l10n.t('Keep Both');
@@ -99,7 +102,7 @@ export class SettingsValidator {
 
             if (selection === disableRefs) {
                 const config = vscode.workspace.getConfiguration('commitSage');
-                await config.update('commit.promptForRefs', false, true);
+                await config.update('commit.refs.enabled', false, true);
                 Logger.log('Refs prompt has been disabled');
             } else if (selection === disableAutoCommit) {
                 const config = vscode.workspace.getConfiguration('commitSage');

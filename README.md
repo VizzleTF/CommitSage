@@ -105,9 +105,12 @@ Where to get keys:
   - Requires Auto Commit to be enabled
   - Default: `false`
 
-- **References** (`commitSage.commit.promptForRefs`):
-  - Prompts for issue/PR references
-  - Default: `false`
+- **References** (`commitSage.commit.refs.*`):
+  - Adds an issue/ticket ref (e.g. `#123`, `PROJ-456`) to the commit
+  - Source: `prompt` (ask each time), `branch` (extract from branch name), or `input` (fixed value)
+  - With `input`, the panel offers **Save for this branch** (per-branch, local) and **Save for project** (`.commitsage/config.json`); branch ref wins over project ref
+  - Placement: separate line at `end` / `start`, or `prefix` (start of subject line) — never injected into the subject scope
+  - Default: disabled
 
 ### Message Validation
 
