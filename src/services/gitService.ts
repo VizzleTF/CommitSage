@@ -218,7 +218,14 @@ export class GitService {
     deleted: string[];
   }> {
     const hasHead = await this.hasHead(repoPath, signal);
-    const staged = await this.listFiles(['diff', '--cached', '--name-only'], repoPath, signal);
+    // When the caller already knows there are no staged changes (CommitWorkflow
+    // derives this from its single porcelain pass), the staged list can only be
+    // empty — skip the `diff --cached --name-only` call entirely. Otherwise list
+    // it: we need the actual file list to diff, and to derive the flag when the
+    // caller didn't supply it.
+    const staged = knownHasStagedChanges === false
+      ? []
+      : await this.listFiles(['diff', '--cached', '--name-only'], repoPath, signal);
     const hasStagedChanges = knownHasStagedChanges ?? staged.length > 0;
 
     const unstaged = onlyStagedChanges
