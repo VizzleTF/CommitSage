@@ -55,13 +55,16 @@ function resolveGitPath(): string {
 
 // Invalidate the resolved-path cache when the user changes `git.path` mid
 // session, so the next `git` invocation picks up the new binary without a
-// window reload.
-vscode.workspace.onDidChangeConfiguration((event) => {
-  if (event.affectsConfiguration('git.path')) {
-    cachedGitPath = undefined;
-    Logger.log('git.path changed — invalidating cached git path');
-  }
-});
+// window reload. Guarded so importing this module never throws under a
+// minimal `vscode` test stub.
+if (typeof vscode.workspace?.onDidChangeConfiguration === 'function') {
+  vscode.workspace.onDidChangeConfiguration((event) => {
+    if (event.affectsConfiguration('git.path')) {
+      cachedGitPath = undefined;
+      Logger.log('git.path changed — invalidating cached git path');
+    }
+  });
+}
 
 // Hard cap on stdout/stderr accumulation per `git` invocation. The diff is
 // later truncated to MAX_DIFF_LENGTH (100k) by aiService.ts; this cap is the
@@ -656,19 +659,26 @@ export class GitService {
         env: buildGitEnv(),
         timeout: timeoutMs,
       });
+      // Decode stdout/stderr as UTF-8 strings via the stream's StringDecoder so
+      // multibyte sequences split across chunk boundaries aren't corrupted.
+      child.stdout.setEncoding('utf-8');
+      child.stderr.setEncoding('utf-8');
+
       let stdout = '';
       let stderr = '';
       let aborted = false;
+      let killTimer: ReturnType<typeof setTimeout> | undefined;
 
       const onAbort = (): void => {
         aborted = true;
         child.kill('SIGTERM');
         // Hard-kill if still alive after grace period
-        setTimeout(() => {
+        killTimer = setTimeout(() => {
           if (!child.killed) {
             child.kill('SIGKILL');
           }
-        }, 1500).unref?.();
+        }, 1500);
+        killTimer.unref?.();
       };
 
       if (options.signal) {
@@ -680,7 +690,7 @@ export class GitService {
       }
 
       let bufferOverflowed = false;
-      child.stdout.on('data', (data: Buffer) => {
+      child.stdout.on('data', (data: string) => {
         if (stdout.length >= GIT_OUTPUT_BUFFER_CAP) {
           if (!bufferOverflowed) {
             bufferOverflowed = true;
@@ -688,19 +698,22 @@ export class GitService {
           }
           return;
         }
-        stdout += data.toString();
+        stdout += data;
       });
 
-      child.stderr.on('data', (data: Buffer) => {
+      child.stderr.on('data', (data: string) => {
         if (stderr.length >= GIT_OUTPUT_BUFFER_CAP) {
           return;
         }
-        stderr += data.toString();
+        stderr += data;
       });
 
       child.on('error', (err: Error) => {
         if (options.signal) {
           options.signal.removeEventListener('abort', onAbort);
+        }
+        if (killTimer) {
+          clearTimeout(killTimer);
         }
         reject(err);
       });
@@ -708,6 +721,9 @@ export class GitService {
       child.on('close', (code: number | null, signal: NodeJS.Signals | null) => {
         if (options.signal) {
           options.signal.removeEventListener('abort', onAbort);
+        }
+        if (killTimer) {
+          clearTimeout(killTimer);
         }
         if (aborted) {
           reject(new Error('Git command cancelled'));

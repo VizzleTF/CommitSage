@@ -339,12 +339,19 @@ describe('GitService.selectRepository', () => {
 });
 
 /**
- * Fake spawn() child. stdout/stderr are EventEmitters; `close`/`error` are
- * emitted on the child itself. `kill` records the signal and flips `killed`.
+ * Fake spawn() child. stdout/stderr are EventEmitters with a no-op
+ * `setEncoding` (mirroring Readable) so execGit's UTF-8 decode setup works;
+ * `close`/`error` are emitted on the child itself. `kill` records the signal
+ * and flips `killed`.
  */
+class FakeStream extends EventEmitter {
+    setEncoding(): this {
+        return this;
+    }
+}
 class FakeChild extends EventEmitter {
-    stdout = new EventEmitter();
-    stderr = new EventEmitter();
+    stdout = new FakeStream();
+    stderr = new FakeStream();
     killed = false;
     killSignals: string[] = [];
     kill(signal?: string): boolean {

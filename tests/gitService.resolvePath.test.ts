@@ -20,9 +20,14 @@ vi.mock('node:child_process', () => ({
     spawn: (...args: unknown[]) => spawnHolder.fn(...args),
 }));
 
+class FakeStream extends EventEmitter {
+    setEncoding(): this {
+        return this;
+    }
+}
 class FakeChild extends EventEmitter {
-    stdout = new EventEmitter();
-    stderr = new EventEmitter();
+    stdout = new FakeStream();
+    stderr = new FakeStream();
     killed = false;
     kill(): boolean {
         this.killed = true;

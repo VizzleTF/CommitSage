@@ -19,6 +19,8 @@ export function applyAutoFixes(message: string, rules: CommitLintRules): string 
     const c = rules['scope-case'][2];
     if (c === 'lower-case') {
       header = header.replace(/^([a-zA-Z0-9_-]+)\(([^)]*)\)/, (_, t: string, s: string) => `${t}(${s.toLowerCase()})`);
+    } else if (c === 'upper-case') {
+      header = header.replace(/^([a-zA-Z0-9_-]+)\(([^)]*)\)/, (_, t: string, s: string) => `${t}(${s.toUpperCase()})`);
     }
   }
 

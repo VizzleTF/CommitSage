@@ -2,6 +2,7 @@ import * as vscode from 'vscode';
 import { ApiKeyManager } from '../services/apiKeyManager';
 import { Logger } from '../utils/logger';
 import { toError } from '../utils/errorUtils';
+import { UserCancelledError } from '../models/errors';
 
 /**
  * Per-provider command IDs and the friendly display name used in success/error
@@ -34,9 +35,19 @@ export function registerSetApiKeyCommands(_context: vscode.ExtensionContext): vs
 
     for (const spec of PROVIDER_COMMAND_SPECS) {
         disposables.push(
-            vscode.commands.registerCommand(spec.setCommand, () =>
-                ApiKeyManager.promptForKey(spec.provider),
-            ),
+            vscode.commands.registerCommand(spec.setCommand, async () => {
+                try {
+                    await ApiKeyManager.promptForKey(spec.provider);
+                } catch (error) {
+                    if (error instanceof UserCancelledError) {
+                        return;
+                    }
+                    Logger.error(`Error setting ${spec.label} API key:`, toError(error));
+                    await Logger.showError(
+                        vscode.l10n.t('Failed to set API key: {0}', toError(error).message),
+                    );
+                }
+            }),
             vscode.commands.registerCommand(spec.removeCommand, async () => {
                 try {
                     await ApiKeyManager.removeKey(spec.provider);

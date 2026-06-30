@@ -79,29 +79,44 @@ describe('GitBlameAnalyzer.analyzeChanges', () => {
         expect(mockAnalyzeBlame).toHaveBeenCalledWith('BLAME', [1, 2]);
     });
 
-    it('throws fileNotFound when the file is missing', async () => {
+    it('degrades to empty (and logs) when the file is missing', async () => {
         mockAccess.mockRejectedValue(new Error('ENOENT'));
-        await expect(GitBlameAnalyzer.analyzeChanges('/repo', 'gone.ts', 'M'))
-            .rejects.toThrow(/File not found/);
+        const out = await GitBlameAnalyzer.analyzeChanges('/repo', 'gone.ts', 'M');
+        expect(out).toBe('');
         expect(mockError).toHaveBeenCalled();
     });
 
-    it('throws noCommitsYet when the repo has no HEAD', async () => {
+    it('degrades to empty when the repo has no HEAD', async () => {
         mockHasHead.mockResolvedValue(false);
-        await expect(GitBlameAnalyzer.analyzeChanges('/repo', 'a.ts', 'M'))
-            .rejects.toThrow(/no commits yet/i);
+        const out = await GitBlameAnalyzer.analyzeChanges('/repo', 'a.ts', 'M');
+        expect(out).toBe('');
     });
 
-    it('logs and rethrows when execGit fails', async () => {
+    it('logs and degrades to empty when execGit fails', async () => {
         mockExecGit.mockRejectedValue(new Error('git boom'));
-        await expect(GitBlameAnalyzer.analyzeChanges('/repo', 'a.ts', 'M'))
-            .rejects.toThrow('git boom');
+        const out = await GitBlameAnalyzer.analyzeChanges('/repo', 'a.ts', 'M');
+        expect(out).toBe('');
         expect(mockError).toHaveBeenCalledWith('Error analyzing changes:', expect.any(Error));
+    });
+
+    it('rethrows (does not swallow) when the signal is already aborted', async () => {
+        const controller = new AbortController();
+        controller.abort();
+        mockExecGit.mockRejectedValue(new Error('aborted'));
+        await expect(GitBlameAnalyzer.analyzeChanges('/repo', 'a.ts', 'M', false, controller.signal))
+            .rejects.toThrow('aborted');
+    });
+
+    it('uses the staged (--cached) diff when useStagedChanges is true', async () => {
+        await GitBlameAnalyzer.analyzeChanges('/repo', 'src/a.ts', 'M', true);
+        expect(mockExecGit).toHaveBeenCalledWith(
+            ['diff', '--cached', '--unified=0', '--', 'src/a.ts'], '/repo', { signal: undefined },
+        );
     });
 
     it('passes a provided AbortSignal through', async () => {
         const signal = new AbortController().signal;
-        await GitBlameAnalyzer.analyzeChanges('/repo', 'a.ts', 'M', signal);
+        await GitBlameAnalyzer.analyzeChanges('/repo', 'a.ts', 'M', false, signal);
         expect(mockHasHead).toHaveBeenCalledWith('/repo', signal);
         expect(mockExecGit).toHaveBeenCalledWith(expect.anything(), '/repo', { signal });
     });

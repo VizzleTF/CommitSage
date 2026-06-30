@@ -237,9 +237,12 @@ function checkFooterRule(
   switch (ruleName) {
     case 'footer-leading-blank': {
       if (condition === 'always' && footer) {
+        // `footer` is trimmed in the parser, so match against trimmed msgLines
+        // to avoid trailing-whitespace mismatches that would silently skip the
+        // check (indexOf returning -1).
         const firstFooterLine = footer.split('\n')[0];
-        const idx = msgLines.indexOf(firstFooterLine);
-        if (idx > 0 && msgLines[idx - 1] !== '') {
+        const idx = msgLines.findIndex(l => l.trim() === firstFooterLine);
+        if (idx > 0 && msgLines[idx - 1].trim() !== '') {
           return 'footer must have a leading blank line';
         }
       }

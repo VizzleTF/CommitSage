@@ -148,7 +148,13 @@ export class HttpUtils {
       throw new HttpError(response.status, data);
     }
 
-    return (await response.json()) as T;
+    try {
+      return (await response.json()) as T;
+    } catch (error) {
+      // 2xx but the body wasn't valid JSON — surface a typed error instead of
+      // a raw SyntaxError so callers' HttpError/NetworkError handling applies.
+      throw new NetworkError('Invalid JSON in response body.', error);
+    }
   }
 
   private static async readResponseBody(response: Response): Promise<unknown> {
