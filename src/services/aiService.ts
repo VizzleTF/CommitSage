@@ -5,6 +5,7 @@ import { TelemetryService } from './telemetryService';
 import { errorMessages } from '../utils/constants';
 import { removeThinkTags } from '../utils/textProcessing';
 import { AIServiceFactory } from './aiServiceFactory';
+import { truncateDiff } from '../utils/diffTruncation';
 import { Provider } from '../views/webview/protocol';
 import { CommitLintService, CommitLintEngine } from './commitLintService';
 import { Logger } from '../utils/logger';
@@ -50,7 +51,7 @@ export class AIService {
         });
 
         const startTime = Date.now();
-        const truncatedDiff = this.truncateDiff(diff, maxDiffLength);
+        const truncatedDiff = truncateDiff(diff, maxDiffLength);
         const prompt = await PromptService.generatePrompt(repoPath, truncatedDiff, blameAnalysis, progress);
 
         progress.report({ message: 'Generating commit message...', increment: 50 });
@@ -151,12 +152,6 @@ export class AIService {
         }
 
         return { valid, errors };
-    }
-
-    private static truncateDiff(diff: string, maxDiffLength: number): string {
-        return diff.length > maxDiffLength
-            ? `${diff.substring(0, maxDiffLength)}\n...(truncated)`
-            : diff;
     }
 
     /**
