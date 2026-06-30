@@ -5,6 +5,7 @@ import * as path from 'node:path';
 import { Logger } from '../utils/logger';
 
 import { CommitLintResult, CommitLintRules } from '../models/types';
+import { toAbsoluteRulesPath } from './commitlint/configLoader';
 
 // Generous: on Windows-mounted filesystems (WSL /mnt/*) a single CLI run can
 // take 5-10s because cosmiconfig's config search is I/O bound there.
@@ -132,11 +133,8 @@ class CommitLintCliService {
   }
 
   private static configArgs(repoPath: string, rulesPath?: string): string[] {
-    if (rulesPath && rulesPath !== '.') {
-      const abs = path.isAbsolute(rulesPath) ? rulesPath : path.join(repoPath, rulesPath);
-      return ['--config', abs];
-    }
-    return [];
+    const abs = toAbsoluteRulesPath(repoPath, rulesPath);
+    return abs ? ['--config', abs] : [];
   }
 
   private static run(

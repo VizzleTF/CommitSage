@@ -27,10 +27,9 @@ export function getConfiguredTemperature(): number {
  * delegate to `RetryUtils.handleGenerationError` for retry/backoff
  * with `handleHttpError` as the mapper.
  *
- * Used by OpenAI, Codestral, and Gemini's single-model branch. Ollama
- * duplicates the 401 throw outside this helper because its 404/500
- * mapping is structurally different (no `WWW-Authenticate` semantics on
- * a self-hosted server).
+ * Used by OpenAI, Codestral, Gemini's single-model branch, and Ollama. Ollama
+ * passes a custom `errorMapper` for its self-hosted 404/500/network wording;
+ * everyone else gets the default `handleHttpError` mapping.
  */
 export async function withRetryAndApiKeyGuard(
     name: string,
@@ -38,7 +37,8 @@ export async function withRetryAndApiKeyGuard(
     progress: ProgressReporter,
     attempt: number,
     retryFn: (prompt: string, progress: ProgressReporter, attempt: number) => Promise<CommitMessage>,
-    fn: () => Promise<CommitMessage>
+    fn: () => Promise<CommitMessage>,
+    errorMapper?: (err: Error) => ApiErrorResult,
 ): Promise<CommitMessage> {
     try {
         return await fn();
@@ -52,7 +52,7 @@ export async function withRetryAndApiKeyGuard(
             progress,
             attempt,
             retryFn,
-            (err: Error) => handleHttpError(err, `${name} API`)
+            errorMapper ?? ((err: Error) => handleHttpError(err, `${name} API`))
         );
     }
 }

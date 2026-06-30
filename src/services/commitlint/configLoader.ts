@@ -47,11 +47,24 @@ export function hasConfig(repoPath: string): boolean {
     || CONFIG_FILES.some(file => fs.existsSync(path.join(repoPath, file)));
 }
 
+/**
+ * Absolute path for an explicit `rulesPath` setting, or null when it's unset or
+ * the sentinel '.' (meaning "search the repo"). Single home for the
+ * isAbsolute-or-join-repoPath rule shared by config discovery and the CLI's
+ * `--config` argument.
+ */
+export function toAbsoluteRulesPath(repoPath: string, rulesPath?: string): string | null {
+  if (!rulesPath || rulesPath === '.') {
+    return null;
+  }
+  return path.isAbsolute(rulesPath) ? rulesPath : path.join(repoPath, rulesPath);
+}
+
 export function resolveConfigPath(repoPath: string, rulesPath?: string): string | null {
-  if (rulesPath && rulesPath !== '.') {
-    const abs = path.isAbsolute(rulesPath) ? rulesPath : path.join(repoPath, rulesPath);
+  const explicit = toAbsoluteRulesPath(repoPath, rulesPath);
+  if (explicit) {
     try {
-      return fs.statSync(abs).isFile() ? abs : null;
+      return fs.statSync(explicit).isFile() ? explicit : null;
     } catch {
       return null;
     }

@@ -54,6 +54,18 @@ export class PromptService {
         return { template, languagePrompt };
     }
 
+    /**
+     * Resolve the active commitlint rule set as prompt text. Shared by
+     * `generatePrompt` (appends it to the format template) and
+     * `generateRefinementPrompt` (lists it for the fix-up), which previously
+     * each hand-read `rulesPath` + `engine` and called `extractRules`.
+     */
+    private static loadRules(repoPath: string, format: string): Promise<string> {
+        const rulesPath = ConfigService.get('commit.commitlint.rulesPath');
+        const engine = ConfigService.get('commit.commitlint.engine') as CommitLintEngine;
+        return CommitLintService.extractRules(repoPath, rulesPath, { engine, format });
+    }
+
     private static buildPrompt(mainInstructions: string, languagePrompt: string, diff: string, blameAnalysis: string, reminder: string): string {
         return `
 ${mainInstructions}
@@ -101,9 +113,7 @@ Please provide ONLY the commit message, without any additional text or explanati
         // template, so the model sees exactly what the validator will check.
         let mainInstructions = template;
         if (ConfigService.get('commit.commitlint.enabled') && formatSetting !== 'custom') {
-            const rulesPath = ConfigService.get('commit.commitlint.rulesPath');
-            const engine = ConfigService.get('commit.commitlint.engine') as CommitLintEngine;
-            const rules = await CommitLintService.extractRules(repoPath, rulesPath, { engine, format: formatSetting });
+            const rules = await this.loadRules(repoPath, formatSetting);
             mainInstructions = `${template}\n\n${rules}`;
         }
 
@@ -116,9 +126,7 @@ Please provide ONLY the commit message, without any additional text or explanati
         const { languagePrompt } = await this.resolveLanguagePrompt(format, progress);
 
         // Full rule set included so the model doesn't fix one rule while breaking another
-        const rulesPath = ConfigService.get('commit.commitlint.rulesPath');
-        const engine = ConfigService.get('commit.commitlint.engine') as CommitLintEngine;
-        const rules = await CommitLintService.extractRules(repoPath, rulesPath, { engine, format: formatSetting });
+        const rules = await this.loadRules(repoPath, formatSetting);
 
         return `The following commit message failed validation:
 
