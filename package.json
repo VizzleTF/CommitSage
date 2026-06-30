@@ -2,7 +2,7 @@
   "name": "geminicommit",
   "displayName": "Commit Sage",
   "description": "Free AI commit messages using Gemini, OpenRouter, Groq, Claude, DeepSeek, xAI, Ollama, or any OpenAI-compatible LLM",
-  "version": "3.2.6",
+  "version": "3.3.0",
   "publisher": "VizzleTF",
   "repository": {
     "type": "git",
@@ -483,7 +483,11 @@
         "commitSage.commit.refs.source": {
           "type": "string",
           "default": "prompt",
-          "enum": ["prompt", "branch", "input"],
+          "enum": [
+            "prompt",
+            "branch",
+            "input"
+          ],
           "enumDescriptions": [
             "Prompt — a text input is shown before each generation so you type the ref manually.",
             "Branch — the ref is extracted automatically from the current Git branch name.",
@@ -501,7 +505,11 @@
         "commitSage.commit.refs.placement": {
           "type": "string",
           "default": "end",
-          "enum": ["end", "start", "prefix"],
+          "enum": [
+            "end",
+            "start",
+            "prefix"
+          ],
           "enumDescriptions": [
             "End — separate line at the end of the message.",
             "Start — separate line at the start of the message.",
