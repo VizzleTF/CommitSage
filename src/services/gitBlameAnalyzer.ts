@@ -16,6 +16,7 @@ export class GitBlameAnalyzer {
     repoPath: string,
     filePath: string,
     knownStatus: string,
+    useStagedChanges: boolean = false,
     signal?: AbortSignal,
   ): Promise<string> {
     try {
@@ -52,17 +53,25 @@ export class GitBlameAnalyzer {
         { signal },
       );
       const blame = parseBlameOutput(blameOutput);
-      const { stdout: diff } = await GitService.execGit(
-        ['diff', '--unified=0', '--', normalizedPath],
-        repoPath,
-        { signal },
-      );
+      const diffArgs = useStagedChanges
+        ? ['diff', '--cached', '--unified=0', '--', normalizedPath]
+        : ['diff', '--unified=0', '--', normalizedPath];
+      const { stdout: diff } = await GitService.execGit(diffArgs, repoPath, {
+        signal,
+      });
       const changedLines = parseChangedLines(diff);
       const authorChanges = analyzeBlameInfo(blame, changedLines);
       return formatAnalysis(authorChanges);
     } catch (error) {
+      // Cancellation must still bubble up so the workflow aborts.
+      if (signal?.aborted) {
+        throw error;
+      }
+      // Blame is auxiliary context — degrade gracefully instead of killing
+      // the whole commit-message generation when one file can't be analyzed
+      // (binary file, permission issue, no HEAD, etc.).
       Logger.error('Error analyzing changes:', toError(error));
-      throw error;
+      return '';
     }
   }
 }

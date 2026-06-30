@@ -53,6 +53,16 @@ function resolveGitPath(): string {
   return 'git';
 }
 
+// Invalidate the resolved-path cache when the user changes `git.path` mid
+// session, so the next `git` invocation picks up the new binary without a
+// window reload.
+vscode.workspace.onDidChangeConfiguration((event) => {
+  if (event.affectsConfiguration('git.path')) {
+    cachedGitPath = undefined;
+    Logger.log('git.path changed — invalidating cached git path');
+  }
+});
+
 // Hard cap on stdout/stderr accumulation per `git` invocation. The diff is
 // later truncated to MAX_DIFF_LENGTH (100k) by aiService.ts; this cap is the
 // *upstream* guard so a runaway generated file never lets the buffer balloon
@@ -527,9 +537,12 @@ export class GitService {
           const status = line.substring(0, 2);
           let filePath = line.substring(3).trim();
 
-          // Handle renamed files (they have format "R100 old-name -> new-name")
+          // Handle renamed files (they have format "R100 old-name -> new-name").
+          // Fall back to the raw path if the ` -> ` separator is missing so we
+          // never hand `undefined` to unquoteGitPath.
           if (status.startsWith('R')) {
-            filePath = filePath.split(' -> ')[1];
+            const renameParts = filePath.split(' -> ');
+            filePath = renameParts[1] ?? renameParts[0];
           }
 
           // Unquote paths that git quoted due to spaces or special characters

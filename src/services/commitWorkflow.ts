@@ -12,9 +12,13 @@ import { toError, sanitizeErrorForTelemetry } from '../utils/errorUtils';
 import { mapLimit } from '../utils/concurrency';
 
 const BLAME_CONCURRENCY = 8;
+const MAX_API_KEY_RETRIES = 3;
 
 export class CommitWorkflow {
-    static async generateAndSetCommitMessage(sourceControlRepository?: vscode.SourceControl): Promise<void> {
+    static async generateAndSetCommitMessage(
+        sourceControlRepository?: vscode.SourceControl,
+        apiKeyRetryCount: number = 0,
+    ): Promise<void> {
         try {
             await this.initializeAndValidate();
 
@@ -68,8 +72,15 @@ export class CommitWorkflow {
 
             if (error instanceof ApiKeyInvalidError) {
                 Logger.error('Invalid API key', error);
+                if (apiKeyRetryCount >= MAX_API_KEY_RETRIES) {
+                    Logger.error('Max API key retries reached', error);
+                    await this.handleError(new Error(
+                        vscode.l10n.t('Invalid or expired API key. Maximum retry attempts reached.'),
+                    ));
+                    return;
+                }
                 const provider = ConfigService.getProvider();
-                await this.handleInvalidApiKey(provider, sourceControlRepository);
+                await this.handleInvalidApiKey(provider, sourceControlRepository, apiKeyRetryCount);
                 return;
             }
 
@@ -107,7 +118,11 @@ export class CommitWorkflow {
         return refs.trim();
     }
 
-    private static async handleInvalidApiKey(provider: string, sourceControlRepository?: vscode.SourceControl): Promise<void> {
+    private static async handleInvalidApiKey(
+        provider: string,
+        sourceControlRepository?: vscode.SourceControl,
+        apiKeyRetryCount: number = 0,
+    ): Promise<void> {
         await Logger.showError(
             vscode.l10n.t('Invalid or expired API key. Please enter a new one.'),
         );
@@ -117,7 +132,7 @@ export class CommitWorkflow {
             await ApiKeyManager.promptForKey(provider);
 
             Logger.log('API key updated, retrying commit message generation');
-            await this.generateAndSetCommitMessage(sourceControlRepository);
+            await this.generateAndSetCommitMessage(sourceControlRepository, apiKeyRetryCount + 1);
         } catch (error) {
             if (error instanceof UserCancelledError) {
                 Logger.log('User cancelled API key update');
@@ -179,7 +194,7 @@ export class CommitWorkflow {
         const blameAnalyses = await mapLimit(
             changedFiles,
             BLAME_CONCURRENCY,
-            (file) => GitBlameAnalyzer.analyzeChanges(repoPath, file.path, file.status, signal),
+            (file) => GitBlameAnalyzer.analyzeChanges(repoPath, file.path, file.status, useStagedChanges, signal),
             signal,
         );
         const blameAnalysis = blameAnalyses.filter(Boolean).join('\n\n');
