@@ -4,7 +4,8 @@ import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
 
-import { ConfigService } from '../src/utils/configService';
+import { ConfigService, SETTING_DEFAULTS } from '../src/utils/configService';
+import { parseAndValidateProjectConfig } from '../src/utils/projectConfigParser';
 
 /** Point ConfigService at a real temp folder via a single workspace folder. */
 function setWorkspaceFolder(fsPath: string | undefined): void {
@@ -366,13 +367,9 @@ describe('ConfigService project-config loading from disk', () => {
     });
 });
 
-describe('ConfigService.parseAndValidateProjectConfig edge cases', () => {
+describe('parseAndValidateProjectConfig edge cases', () => {
     const parse = (raw: string) =>
-        (
-            ConfigService as unknown as {
-                parseAndValidateProjectConfig: (r: string, s: string) => Record<string, unknown>;
-            }
-        ).parseAndValidateProjectConfig(raw, 'test-source');
+        parseAndValidateProjectConfig(raw, 'test-source', SETTING_DEFAULTS) as Record<string, unknown>;
 
     it('returns {} when the top level is not an object', () => {
         expect(parse(JSON.stringify(['array']))).toEqual({});

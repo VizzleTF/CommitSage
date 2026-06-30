@@ -18,6 +18,7 @@ import {
     InitData,
 } from './webview/protocol';
 import { buildWebviewL10n } from './webviewL10n';
+import { renderSettingsHtml } from './settingsHtml';
 import { Logger } from '../utils/logger';
 import { toError } from '../utils/errorUtils';
 import { getNonce } from '../utils/nonce';
@@ -309,16 +310,7 @@ export class SettingsWebviewProvider implements vscode.WebviewViewProvider {
     }
 
     private renderHtml(webview: vscode.Webview): string {
-        const nonce = getNonce();
-        const scriptUri = webview.asWebviewUri(
-            vscode.Uri.joinPath(this.context.extensionUri, 'dist', 'webview', 'main.js'),
-        );
-        const cspSource = webview.cspSource;
-        const styleUri = webview.asWebviewUri(
-            vscode.Uri.joinPath(this.context.extensionUri, 'dist', 'webview', 'styles.css'),
-        );
-
-        const data: InitData = {
+        const initData: InitData = {
             providers: PROVIDERS,
             languages: LANGUAGES,
             formats: FORMATS,
@@ -329,35 +321,17 @@ export class SettingsWebviewProvider implements vscode.WebviewViewProvider {
             l10n: buildWebviewL10n(),
         };
 
-        return `<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${cspSource}; script-src 'nonce-${nonce}'; img-src ${cspSource} data:;">
-    <link rel="stylesheet" href="${styleUri}">
-    <title>Commit Sage</title>
-</head>
-<body>
-    <div id="root"><div class="loading">${escapeHtml(vscode.l10n.t('Loading…'))}</div></div>
-    <script id="init-data" type="application/json">${escapeForScript(JSON.stringify(data))}</script>
-    <script nonce="${nonce}" src="${scriptUri}"></script>
-</body>
-</html>`;
+        return renderSettingsHtml({
+            scriptUri: webview.asWebviewUri(
+                vscode.Uri.joinPath(this.context.extensionUri, 'dist', 'webview', 'main.js'),
+            ).toString(),
+            styleUri: webview.asWebviewUri(
+                vscode.Uri.joinPath(this.context.extensionUri, 'dist', 'webview', 'styles.css'),
+            ).toString(),
+            cspSource: webview.cspSource,
+            nonce: getNonce(),
+            initData,
+            loadingLabel: vscode.l10n.t('Loading…'),
+        });
     }
-}
-
-function escapeHtml(s: string): string {
-    return s
-        .replaceAll('&', '&amp;')
-        .replaceAll('<', '&lt;')
-        .replaceAll('>', '&gt;');
-}
-
-function escapeForScript(s: string): string {
-    // </script> in JSON would break out of the <script> block. The other two
-    // pairs neutralise HTML comment / CDATA endings just in case.
-    return s
-        .replaceAll(/<\/script>/gi, String.raw`<\/script>`)
-        .replaceAll('<!--', String.raw`<\!--`)
-        .replaceAll(']]>', String.raw`]]\>`);
 }

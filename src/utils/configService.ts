@@ -6,6 +6,7 @@ import { ProjectConfig } from '../models/types';
 import { toError } from './errorUtils';
 import { isProvider } from '../services/providerCatalog';
 import { statOrUndefined } from './fsUtils';
+import { isPlainObject, parseAndValidateProjectConfig } from './projectConfigParser';
 
 type CacheValue = string | boolean | number;
 
@@ -245,7 +246,7 @@ export class ConfigService {
     try {
       const raw = await fs.readFile(configPath, 'utf8');
       const parsed = JSON.parse(raw) as unknown;
-      if (!this.isPlainObject(parsed)) {
+      if (!isPlainObject(parsed)) {
         return {
           valid: false,
           configPath,
@@ -280,9 +281,10 @@ export class ConfigService {
       const dirStats = await statOrUndefined(dirConfigPath);
       if (dirStats !== undefined) {
         const configContent = await fs.readFile(dirConfigPath, 'utf8');
-        this.projectConfigCache = this.parseAndValidateProjectConfig(
+        this.projectConfigCache = parseAndValidateProjectConfig(
           configContent,
           '.commitsage/config.json',
+          SETTING_DEFAULTS,
         );
         Logger.log('Loaded project configuration from .commitsage/config.json');
         return;
@@ -290,9 +292,10 @@ export class ConfigService {
       const legacyStats = await statOrUndefined(legacyConfigPath);
       if (legacyStats?.isFile()) {
         const configContent = await fs.readFile(legacyConfigPath, 'utf8');
-        this.projectConfigCache = this.parseAndValidateProjectConfig(
+        this.projectConfigCache = parseAndValidateProjectConfig(
           configContent,
           '.commitsage',
+          SETTING_DEFAULTS,
         );
         Logger.log('Loaded project configuration from .commitsage file');
         return;
@@ -308,56 +311,6 @@ export class ConfigService {
     return this.projectConfigCache ?? {};
   }
 
-  private static parseAndValidateProjectConfig(
-    raw: string,
-    source: string,
-  ): ProjectConfig {
-    const parsed = JSON.parse(raw) as unknown;
-    if (!this.isPlainObject(parsed)) {
-      Logger.warn(
-        `Project config at ${source} is not an object — ignoring.`,
-      );
-      return {};
-    }
-    // Drop top-level keys that are not plain objects (e.g. `commit: false`),
-    // since downstream code descends through them and would otherwise misread.
-    const validated: Record<string, Record<string, unknown>> = {};
-    for (const [section, value] of Object.entries(parsed)) {
-      if (!this.isPlainObject(value)) {
-        Logger.warn(
-          `Project config at ${source}: section "${section}" is not an object, skipping.`,
-        );
-        continue;
-      }
-      // Per-leaf type check against SETTING_DEFAULTS. Keys not present in
-      // the schema pass through unchanged (forward-compat for new settings
-      // landed in newer extension versions). Wrong-type values are dropped
-      // with a warning so users get feedback instead of silent fallback.
-      const validatedSection: Record<string, unknown> = {};
-      for (const [leaf, leafValue] of Object.entries(value)) {
-        const fullKey = `${section}.${leaf}` as keyof typeof SETTING_DEFAULTS;
-        const expected = SETTING_DEFAULTS[fullKey];
-        if (expected === undefined || typeof leafValue === typeof expected) {
-          validatedSection[leaf] = leafValue;
-        } else {
-          Logger.warn(
-            `Project config at ${source}: "${fullKey}" expected ${typeof expected}, got ${typeof leafValue} — skipping.`,
-          );
-        }
-      }
-      validated[section] = validatedSection;
-    }
-    return validated;
-  }
-
-  private static isPlainObject(value: unknown): value is Record<string, unknown> {
-    return (
-      typeof value === 'object' &&
-      value !== null &&
-      !Array.isArray(value)
-    );
-  }
-
   private static getNestedProjectValue<T>(
     sections: string[],
   ): T | undefined {
@@ -365,7 +318,7 @@ export class ConfigService {
     for (let i = 0; i < sections.length; i++) {
       const section = sections[i];
       const isLeaf = i === sections.length - 1;
-      if (!this.isPlainObject(current)) {
+      if (!isPlainObject(current)) {
         return undefined;
       }
       if (!(section in current)) {
@@ -375,7 +328,7 @@ export class ConfigService {
       // For non-leaf segments we expect an object to descend into; if a
       // primitive sits where a section is expected, treat as missing rather
       // than throwing.
-      if (!isLeaf && !this.isPlainObject(next)) {
+      if (!isLeaf && !isPlainObject(next)) {
         return undefined;
       }
       current = next;

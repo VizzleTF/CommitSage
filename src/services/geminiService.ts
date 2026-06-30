@@ -110,6 +110,30 @@ export class GeminiService {
         }
     }
 
+    /**
+     * One `generateContent` call for a specific model. Single home for the
+     * url + payload + post + extract shared by auto-mode (loop over models) and
+     * the single-model branch — they differ only in surrounding progress
+     * reporting and retry/error policy, which stay at the call sites.
+     */
+    private static async callGemini(
+        model: string,
+        prompt: string,
+        apiKey: string,
+        options?: GenerateOptions,
+    ): Promise<CommitMessage> {
+        const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
+        const payload = {
+            contents: [{ parts: [{ text: prompt }] }],
+            generationConfig: buildGeminiGenerationConfig(options),
+        };
+        const data = await HttpUtils.postJson<GeminiResponse>(apiUrl, payload, {
+            headers: { 'content-type': 'application/json', 'x-goog-api-key': apiKey },
+            signal: options?.signal,
+        });
+        return { message: this.extractCommitMessage(data), model };
+    }
+
     private static async tryGenerateWithModels(
         prompt: string,
         progress: ProgressReporter,
@@ -126,23 +150,11 @@ export class GeminiService {
                     increment: 0
                 });
 
-                const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
-
-                const payload = {
-                    contents: [{ parts: [{ text: prompt }] }],
-                    generationConfig: buildGeminiGenerationConfig(options)
-                };
-
-                const data = await HttpUtils.postJson<GeminiResponse>(apiUrl, payload, {
-                    headers: { 'content-type': 'application/json', 'x-goog-api-key': apiKey },
-                    signal: options?.signal,
-                });
-
-                const message = this.extractCommitMessage(data);
+                const result = await this.callGemini(model, prompt, apiKey, options);
                 Logger.log(`Commit message successfully generated using ${model} model (auto mode)`);
 
                 progress.report({ message: 'Processing generated message...', increment: 100 });
-                return { message, model };
+                return result;
 
             } catch (error) {
                 const status = error instanceof HttpError ? error.status : undefined;
@@ -190,27 +202,11 @@ export class GeminiService {
             attempt,
             (p, pr, a) => this.generateCommitMessage(p, pr, a, options),
             async () => {
-                const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${configuredModel}:generateContent`;
-
-                const payload = {
-                    contents: [{ parts: [{ text: prompt }] }],
-                    generationConfig: buildGeminiGenerationConfig(options)
-                };
-
                 await RetryUtils.updateProgressForAttempt(progress, attempt);
-
-                const data = await HttpUtils.postJson<GeminiResponse>(apiUrl, payload, {
-                    headers: { 'content-type': 'application/json', 'x-goog-api-key': apiKey },
-                    signal: options?.signal,
-                });
+                const result = await this.callGemini(configuredModel, prompt, apiKey, options);
                 progress.report({ message: 'Processing generated message...', increment: 90 });
-
-                const message = extractAndValidateMessage(
-                    data.candidates?.[0]?.content?.parts?.[0]?.text,
-                    'Gemini'
-                );
                 Logger.log(`Commit message generated using ${configuredModel} model`);
-                return { message, model: configuredModel };
+                return result;
             }
         );
     }

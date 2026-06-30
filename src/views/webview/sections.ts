@@ -42,30 +42,22 @@ export function renderProviderPick(state: ViewState): HTMLElement {
     ]);
 }
 
+// A "Base URL" labeled text input wired to a setting. The three providers with
+// a configurable endpoint differ only in element id, state source, and key.
+function appendBaseUrl(body: HTMLElement, id: string, value: string, key: string): void {
+    body.appendChild(fieldLabel(L.baseUrl));
+    body.appendChild(makeTextInput(id, value, v => setSetting(key, v)));
+}
+
 // Provider-specific endpoint config (baseUrl / path) above the model picker.
 // Only providers whose endpoint is configurable get these.
 function appendEndpointConfig(body: HTMLElement, state: ViewState, p: Provider): void {
     if (p === 'openai') {
-        body.appendChild(fieldLabel(L.baseUrl));
-        body.appendChild(makeTextInput(
-            'openai-baseurl',
-            state.openai.baseUrl,
-            v => setSetting(KEYS.openaiBaseUrl, v),
-        ));
+        appendBaseUrl(body, 'openai-baseurl', state.openai.baseUrl, KEYS.openaiBaseUrl);
     } else if (p === 'ollama') {
-        body.appendChild(fieldLabel(L.baseUrl));
-        body.appendChild(makeTextInput(
-            'ollama-baseurl',
-            state.ollama.baseUrl,
-            v => setSetting(KEYS.ollamaBaseUrl, v),
-        ));
+        appendBaseUrl(body, 'ollama-baseurl', state.ollama.baseUrl, KEYS.ollamaBaseUrl);
     } else if (p === 'custom') {
-        body.appendChild(fieldLabel(L.baseUrl));
-        body.appendChild(makeTextInput(
-            'custom-baseurl',
-            state.custom.baseUrl,
-            v => setSetting(KEYS.customBaseUrl, v),
-        ));
+        appendBaseUrl(body, 'custom-baseurl', state.custom.baseUrl, KEYS.customBaseUrl);
         body.appendChild(fieldLabel(L.path));
         body.appendChild(makeTextInput(
             'custom-path',
