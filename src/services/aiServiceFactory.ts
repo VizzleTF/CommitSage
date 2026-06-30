@@ -1,15 +1,12 @@
 import { CommitMessage, ProgressReporter, GenerateOptions } from '../models/types';
 import { Provider } from '../views/webview/protocol';
 import { GeminiService } from './geminiService';
-import { OpenAIService } from './openaiService';
-import { CodestralService } from './codestralService';
 import { OllamaService } from './ollamaService';
-import { GroqService } from './groqService';
-import { OpenRouterService } from './openRouterService';
 import { AnthropicService } from './anthropicService';
-import { DeepSeekService } from './deepSeekService';
-import { XaiService } from './xaiService';
-import { CustomOpenAIService } from './customOpenAIService';
+import {
+    generateViaOpenAICompatibleProvider,
+    isOpenAICompatibleProvider,
+} from './openAICompatibleService';
 
 type AIServiceClass = {
     generateCommitMessage(
@@ -20,28 +17,30 @@ type AIServiceClass = {
     ): Promise<CommitMessage>;
 };
 
+/**
+ * Providers with a bespoke wire format (not OpenAI `/chat/completions`):
+ * Gemini (`generateContent`), Anthropic (`/v1/messages`, `x-api-key`), and
+ * Ollama (`/api/chat`, self-hosted error mapping). Every other provider is
+ * dispatched through `generateViaOpenAICompatibleProvider`, so it needs no
+ * entry here — see `COMPAT_SPECS` in `openAICompatibleService.ts`.
+ */
+const NON_COMPAT_SERVICES: Partial<Record<Provider, AIServiceClass>> = {
+    gemini: GeminiService,
+    ollama: OllamaService,
+    anthropic: AnthropicService,
+};
+
+/**
+ * True when `type` resolves to a generation path — either a dedicated
+ * non-compat service or the shared OpenAI-compatible dispatcher. A provider id
+ * present in the catalog but in neither table would throw at generation time;
+ * the completeness test guards against that drift (the original F2 risk).
+ */
+export function supportsProvider(type: Provider): boolean {
+    return type in NON_COMPAT_SERVICES || isOpenAICompatibleProvider(type);
+}
+
 export class AIServiceFactory {
-    private static readonly services: Record<Provider, AIServiceClass> = {
-        gemini: GeminiService,
-        openai: OpenAIService,
-        codestral: CodestralService,
-        ollama: OllamaService,
-        openrouter: OpenRouterService,
-        groq: GroqService,
-        anthropic: AnthropicService,
-        deepseek: DeepSeekService,
-        xai: XaiService,
-        custom: CustomOpenAIService
-    };
-
-    private static getService(type: Provider): AIServiceClass {
-        const service = this.services[type];
-        if (!service) {
-            throw new Error(`AI service type '${type}' is not supported`);
-        }
-        return service;
-    }
-
     static async generateCommitMessage(
         type: Provider,
         prompt: string,
@@ -49,7 +48,13 @@ export class AIServiceFactory {
         attempt?: number,
         options?: GenerateOptions
     ): Promise<CommitMessage> {
-        const service = this.getService(type);
-        return service.generateCommitMessage(prompt, progress, attempt, options);
+        const service = NON_COMPAT_SERVICES[type];
+        if (service) {
+            return service.generateCommitMessage(prompt, progress, attempt, options);
+        }
+        if (isOpenAICompatibleProvider(type)) {
+            return generateViaOpenAICompatibleProvider(type, prompt, progress, attempt, options);
+        }
+        throw new Error(`AI service type '${type}' is not supported`);
     }
 }

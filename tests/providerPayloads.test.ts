@@ -1,4 +1,9 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, beforeAll } from 'vitest';
+
+// Loaded lazily in beforeAll: a static import would force module resolution
+// during vi.mock hoisting, before the mocked-fn consts below are initialized.
+let generateViaOpenAICompatibleProvider:
+    typeof import('../src/services/openAICompatibleService')['generateViaOpenAICompatibleProvider'];
 
 const mockedPostJson = vi.fn();
 const mockedGetJson = vi.fn();
@@ -52,6 +57,7 @@ const SETTINGS: Record<string, string | number | boolean> = {
 vi.mock('../src/utils/configService', () => ({
     ConfigService: {
         get: (key: string) => SETTINGS[key],
+        getModelFor: (provider: string) => SETTINGS[`${provider}.model`],
     },
 }));
 
@@ -66,6 +72,10 @@ vi.mock('../src/utils/retryUtils', () => ({
 
 const progress = { report: () => undefined };
 
+beforeAll(async () => {
+    ({ generateViaOpenAICompatibleProvider } = await import('../src/services/openAICompatibleService'));
+});
+
 beforeEach(() => {
     mockedPostJson.mockReset();
     mockedGetJson.mockReset();
@@ -73,13 +83,12 @@ beforeEach(() => {
 
 describe('OpenAIService payload', () => {
     it('sends max_tokens (snake_case), not maxTokens', async () => {
-        const { OpenAIService } = await import('../src/services/openaiService');
 
         mockedPostJson.mockResolvedValueOnce({
             choices: [{ message: { content: 'feat: ok' } }],
         });
 
-        await OpenAIService.generateCommitMessage('hello', progress, 1, {
+        await generateViaOpenAICompatibleProvider('openai', 'hello', progress, 1, {
             maxTokens: 4096,
         });
 
@@ -94,13 +103,12 @@ describe('OpenAIService payload', () => {
     });
 
     it('defaults max_tokens to 1024 when no options', async () => {
-        const { OpenAIService } = await import('../src/services/openaiService');
 
         mockedPostJson.mockResolvedValueOnce({
             choices: [{ message: { content: 'ok' } }],
         });
 
-        await OpenAIService.generateCommitMessage('hi', progress, 1);
+        await generateViaOpenAICompatibleProvider('openai', 'hi', progress, 1);
         const [, payload] = mockedPostJson.mock.calls[0];
         expect(payload).toMatchObject({ max_tokens: 1024 });
     });
@@ -108,13 +116,12 @@ describe('OpenAIService payload', () => {
 
 describe('CodestralService payload', () => {
     it('uses Codestral chat completions URL', async () => {
-        const { CodestralService } = await import('../src/services/codestralService');
 
         mockedPostJson.mockResolvedValueOnce({
             choices: [{ message: { content: 'feat: ok' } }],
         });
 
-        await CodestralService.generateCommitMessage('hello', progress, 1);
+        await generateViaOpenAICompatibleProvider('codestral', 'hello', progress, 1);
         expect(mockedPostJson).toHaveBeenCalledTimes(1);
         const [url, payload] = mockedPostJson.mock.calls[0];
         expect(url).toBe('https://codestral.mistral.ai/v1/chat/completions');
@@ -128,13 +135,12 @@ describe('CodestralService payload', () => {
     });
 
     it('forwards maxTokens as max_tokens (snake_case) when provided', async () => {
-        const { CodestralService } = await import('../src/services/codestralService');
 
         mockedPostJson.mockResolvedValueOnce({
             choices: [{ message: { content: 'ok' } }],
         });
 
-        await CodestralService.generateCommitMessage('hi', progress, 1, {
+        await generateViaOpenAICompatibleProvider('codestral', 'hi', progress, 1, {
             maxTokens: 4096,
         });
         const [, payload] = mockedPostJson.mock.calls[0];
@@ -234,13 +240,12 @@ describe('GeminiService request', () => {
 
 describe('AbortSignal propagation (F004)', () => {
     it('forwards options.signal into HttpUtils.postJson for OpenAI', async () => {
-        const { OpenAIService } = await import('../src/services/openaiService');
         mockedPostJson.mockResolvedValueOnce({
             choices: [{ message: { content: 'ok' } }],
         });
 
         const ctrl = new AbortController();
-        await OpenAIService.generateCommitMessage('hi', progress, 1, {
+        await generateViaOpenAICompatibleProvider('openai', 'hi', progress, 1, {
             signal: ctrl.signal,
         });
 
@@ -249,13 +254,12 @@ describe('AbortSignal propagation (F004)', () => {
     });
 
     it('forwards options.signal into HttpUtils.postJson for Codestral', async () => {
-        const { CodestralService } = await import('../src/services/codestralService');
         mockedPostJson.mockResolvedValueOnce({
             choices: [{ message: { content: 'ok' } }],
         });
 
         const ctrl = new AbortController();
-        await CodestralService.generateCommitMessage('hi', progress, 1, {
+        await generateViaOpenAICompatibleProvider('codestral', 'hi', progress, 1, {
             signal: ctrl.signal,
         });
 
@@ -296,13 +300,12 @@ describe('AbortSignal propagation (F004)', () => {
 
 describe('GroqService payload', () => {
     it('targets Groq chat completions URL with Bearer auth', async () => {
-        const { GroqService } = await import('../src/services/groqService');
 
         mockedPostJson.mockResolvedValueOnce({
             choices: [{ message: { content: 'feat: ok' } }],
         });
 
-        await GroqService.generateCommitMessage('hello', progress, 1);
+        await generateViaOpenAICompatibleProvider('groq', 'hello', progress, 1);
 
         const [url, payload, opts] = mockedPostJson.mock.calls[0];
         expect(url).toBe('https://api.groq.com/openai/v1/chat/completions');
@@ -318,13 +321,12 @@ describe('GroqService payload', () => {
 
 describe('OpenRouterService payload', () => {
     it('targets OpenRouter URL with attribution headers and Bearer auth', async () => {
-        const { OpenRouterService } = await import('../src/services/openRouterService');
 
         mockedPostJson.mockResolvedValueOnce({
             choices: [{ message: { content: 'feat: ok' } }],
         });
 
-        await OpenRouterService.generateCommitMessage('hello', progress, 1);
+        await generateViaOpenAICompatibleProvider('openrouter', 'hello', progress, 1);
 
         const [url, payload, opts] = mockedPostJson.mock.calls[0];
         expect(url).toBe('https://openrouter.ai/api/v1/chat/completions');
@@ -340,13 +342,12 @@ describe('OpenRouterService payload', () => {
 
 describe('DeepSeekService payload', () => {
     it('targets DeepSeek chat completions URL', async () => {
-        const { DeepSeekService } = await import('../src/services/deepSeekService');
 
         mockedPostJson.mockResolvedValueOnce({
             choices: [{ message: { content: 'feat: ok' } }],
         });
 
-        await DeepSeekService.generateCommitMessage('hello', progress, 1);
+        await generateViaOpenAICompatibleProvider('deepseek', 'hello', progress, 1);
 
         const [url, payload] = mockedPostJson.mock.calls[0];
         expect(url).toBe('https://api.deepseek.com/chat/completions');
@@ -356,13 +357,12 @@ describe('DeepSeekService payload', () => {
 
 describe('XaiService payload', () => {
     it('targets xAI chat completions URL', async () => {
-        const { XaiService } = await import('../src/services/xaiService');
 
         mockedPostJson.mockResolvedValueOnce({
             choices: [{ message: { content: 'feat: ok' } }],
         });
 
-        await XaiService.generateCommitMessage('hello', progress, 1);
+        await generateViaOpenAICompatibleProvider('xai', 'hello', progress, 1);
 
         const [url, payload] = mockedPostJson.mock.calls[0];
         expect(url).toBe('https://api.x.ai/v1/chat/completions');
@@ -447,13 +447,12 @@ describe('AnthropicService payload', () => {
 describe('CustomOpenAIService payload', () => {
     it('omits Authorization header when custom.useApiKey is false', async () => {
         SETTINGS['custom.useApiKey'] = false;
-        const { CustomOpenAIService } = await import('../src/services/customOpenAIService');
 
         mockedPostJson.mockResolvedValueOnce({
             choices: [{ message: { content: 'feat: ok' } }],
         });
 
-        await CustomOpenAIService.generateCommitMessage('hello', progress, 1);
+        await generateViaOpenAICompatibleProvider('custom', 'hello', progress, 1);
 
         const [url, payload, opts] = mockedPostJson.mock.calls[0];
         expect(url).toBe('http://localhost:1234/v1/chat/completions');
@@ -464,13 +463,12 @@ describe('CustomOpenAIService payload', () => {
 
     it('sends Bearer auth when custom.useApiKey is true', async () => {
         SETTINGS['custom.useApiKey'] = true;
-        const { CustomOpenAIService } = await import('../src/services/customOpenAIService');
 
         mockedPostJson.mockResolvedValueOnce({
             choices: [{ message: { content: 'feat: ok' } }],
         });
 
-        await CustomOpenAIService.generateCommitMessage('hello', progress, 1);
+        await generateViaOpenAICompatibleProvider('custom', 'hello', progress, 1);
 
         const [, , opts] = mockedPostJson.mock.calls[0];
         const headers = (opts as { headers: Record<string, string> }).headers;
@@ -482,13 +480,12 @@ describe('CustomOpenAIService payload', () => {
 
     it('honors custom.chatCompletionsPath override', async () => {
         SETTINGS['custom.chatCompletionsPath'] = '/v1/completions';
-        const { CustomOpenAIService } = await import('../src/services/customOpenAIService');
 
         mockedPostJson.mockResolvedValueOnce({
             choices: [{ message: { content: 'ok' } }],
         });
 
-        await CustomOpenAIService.generateCommitMessage('hi', progress, 1);
+        await generateViaOpenAICompatibleProvider('custom', 'hi', progress, 1);
 
         const [url] = mockedPostJson.mock.calls[0];
         expect(url).toBe('http://localhost:1234/v1/v1/completions');

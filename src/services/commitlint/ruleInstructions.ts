@@ -1,5 +1,6 @@
 import { CommitLintRules } from '../../models/types';
 import { caseStr } from './caseRules';
+import { isError, isErrorWith } from './ruleShape';
 
 export const COMMIT_RULES_DEFAULT = `Conventional Commits format rules:
 - <type>: A noun describing the type of change (e.g., feat, fix, docs, style, refactor, test, chore).
@@ -34,7 +35,7 @@ function appendTypeInstructions(rules: CommitLintRules, lines: string[]): void {
   if (rules['type-case']?.[2]) {
     lines.push(`- Type must be ${caseStr(rules['type-case'][2])}`);
   }
-  if (rules['type-empty']?.[0] === 2 && rules['type-empty']?.[1] === 'never') {
+  if (isErrorWith(rules, 'type-empty', 'never')) {
     lines.push('- Type is required');
   }
   emitLength(rules, 'type', 'Type', lines);
@@ -47,7 +48,7 @@ function appendScopeInstructions(rules: CommitLintRules, lines: string[]): void 
   if (rules['scope-case']?.[2]) {
     lines.push(`- Scope must be ${caseStr(rules['scope-case'][2])}`);
   }
-  if (rules['scope-empty']?.[0] === 2) {
+  if (isError(rules, 'scope-empty')) {
     lines.push(rules['scope-empty'][1] === 'never' ? '- Scope is required' : '- Scope must be omitted');
   }
   emitLength(rules, 'scope', 'Scope', lines);
@@ -58,14 +59,14 @@ function appendSubjectInstructions(rules: CommitLintRules, lines: string[]): voi
     const verb = rules['subject-case'][1] === 'never' ? 'must NOT be' : 'must be';
     lines.push(`- Subject ${verb}: ${caseStr(rules['subject-case'][2])}`);
   }
-  if (rules['subject-empty']?.[0] === 2 && rules['subject-empty']?.[1] === 'never') {
+  if (isErrorWith(rules, 'subject-empty', 'never')) {
     lines.push('- Subject is required');
   }
-  if (rules['subject-full-stop']?.[0] === 2 && rules['subject-full-stop']?.[1] === 'never') {
+  if (isErrorWith(rules, 'subject-full-stop', 'never')) {
     lines.push(`- Subject must not end with "${rules['subject-full-stop'][2] ?? '.'}"`);
   }
   emitLength(rules, 'subject', 'Subject', lines);
-  if (rules['subject-exclamation-mark']?.[0] === 2) {
+  if (isError(rules, 'subject-exclamation-mark')) {
     lines.push(rules['subject-exclamation-mark'][1] === 'never'
       ? '- Never put "!" before the ":" in the header'
       : '- Always put "!" before the ":" in the header');
@@ -74,13 +75,13 @@ function appendSubjectInstructions(rules: CommitLintRules, lines: string[]): voi
 
 function appendHeaderInstructions(rules: CommitLintRules, lines: string[]): void {
   emitLength(rules, 'header', 'Header (first line)', lines);
-  if (rules['header-full-stop']?.[0] === 2 && rules['header-full-stop']?.[1] === 'never') {
+  if (isErrorWith(rules, 'header-full-stop', 'never')) {
     lines.push(`- Header must not end with "${rules['header-full-stop'][2] ?? '.'}"`);
   }
 }
 
 function appendBodyInstructions(rules: CommitLintRules, lines: string[]): void {
-  if (rules['body-leading-blank']?.[0] === 2 && rules['body-leading-blank']?.[1] === 'always') {
+  if (isErrorWith(rules, 'body-leading-blank', 'always')) {
     lines.push('- Leave a blank line before the body');
   }
   if (rules['body-max-line-length']?.[2]) {
@@ -89,13 +90,13 @@ function appendBodyInstructions(rules: CommitLintRules, lines: string[]): void {
   if (rules['body-max-length']?.[2]) {
     lines.push(`- Body max length: ${rules['body-max-length'][2]} characters`);
   }
-  if (rules['body-empty']?.[0] === 2 && rules['body-empty']?.[1] === 'never') {
+  if (isErrorWith(rules, 'body-empty', 'never')) {
     lines.push('- Body is required');
   }
 }
 
 function appendFooterInstructions(rules: CommitLintRules, lines: string[]): void {
-  if (rules['footer-leading-blank']?.[0] === 2 && rules['footer-leading-blank']?.[1] === 'always') {
+  if (isErrorWith(rules, 'footer-leading-blank', 'always')) {
     lines.push('- Leave a blank line before the footer');
   }
   if (rules['footer-max-line-length']?.[2]) {
@@ -104,14 +105,14 @@ function appendFooterInstructions(rules: CommitLintRules, lines: string[]): void
   if (rules['footer-max-length']?.[2]) {
     lines.push(`- Footer max length: ${rules['footer-max-length'][2]} characters`);
   }
-  if (rules['footer-empty']?.[0] === 2 && rules['footer-empty']?.[1] === 'never') {
+  if (isErrorWith(rules, 'footer-empty', 'never')) {
     lines.push('- Footer is required');
   }
 }
 
 function appendTrailerInstructions(rules: CommitLintRules, lines: string[]): void {
   for (const ruleName of ['signed-off-by', 'trailer-exists'] as const) {
-    if (rules[ruleName]?.[0] === 2 && rules[ruleName]?.[1] === 'always') {
+    if (isErrorWith(rules, ruleName, 'always')) {
       lines.push(`- End the message with a "${rules[ruleName][2] ?? 'Signed-off-by:'}" trailer line`);
     }
   }

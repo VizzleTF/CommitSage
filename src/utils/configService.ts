@@ -5,14 +5,7 @@ import { Logger } from './logger';
 import { ProjectConfig } from '../models/types';
 import { toError } from './errorUtils';
 import { isProvider } from '../services/providerCatalog';
-
-async function statOrUndefined(p: string): Promise<import('node:fs').Stats | undefined> {
-  try {
-    return await fs.stat(p);
-  } catch {
-    return undefined;
-  }
-}
+import { statOrUndefined } from './fsUtils';
 
 type CacheValue = string | boolean | number;
 
@@ -478,10 +471,18 @@ export class ConfigService {
    * is for events that fire before resolution (`started`, `failed`).
    */
   static getModel(): string {
-    // The model setting key is always `<provider>.model`, and getProvider()
-    // only ever returns a valid provider id, so this derives the right key
-    // without a per-provider switch.
-    return this.get(`${this.getProvider()}.model` as SettingKey) as string;
+    return this.getModelFor(this.getProvider());
+  }
+
+  /**
+   * Configured model id for an arbitrary provider (`<provider>.model`). The
+   * model key is always `<provider>.model` and every provider id has such an
+   * entry in `SETTING_DEFAULTS`, so this derives the right key without a
+   * per-provider switch. Used by the shared OpenAI-compatible dispatcher and
+   * `getModel()` (active provider).
+   */
+  static getModelFor(provider: string): string {
+    return this.get(`${provider}.model` as SettingKey) as string;
   }
 
   static clearCache(): void {

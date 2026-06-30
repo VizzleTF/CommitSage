@@ -17,6 +17,7 @@ import { makeCombobox } from './combobox';
 import { section } from './section';
 import { init, L, KEYS, COMMITLINT_COMPAT_FORMATS, NO_REFRESH_PROVIDERS } from './init';
 import { send, setSetting } from './vscodeApi';
+import { formatSupportsCommitlint, formatUsesCustomInstructions } from './commitFormatPolicy';
 
 export function renderProviderPick(state: ViewState): HTMLElement {
     const providerPinned = isPinned(state, 'provider');
@@ -218,9 +219,9 @@ export function renderCommitSection(state: ViewState): HTMLElement {
             // `custom` format means "use customInstructions verbatim"; flip the
             // gate that promptService reads in lock-step so the user doesn't
             // have to toggle two checkboxes.
-            setSetting(KEYS.useCustomInstructions, v === 'custom');
+            setSetting(KEYS.useCustomInstructions, formatUsesCustomInstructions(v));
             // Validation doesn't apply to free-form prompts.
-            if (v === 'custom' && state.commit.commitlintEnabled) {
+            if (!formatSupportsCommitlint(v) && state.commit.commitlintEnabled) {
                 setSetting(KEYS.commitlintEnabled, false);
             }
         },
@@ -228,7 +229,7 @@ export function renderCommitSection(state: ViewState): HTMLElement {
     ));
     if (formatPinned) { body.appendChild(pinnedHint()); }
 
-    if (state.commit.format === 'custom') {
+    if (formatUsesCustomInstructions(state.commit.format)) {
         body.appendChild(fieldLabel(L.customInstructions));
         body.appendChild(makeTextarea(
             'custom-text',
@@ -276,7 +277,7 @@ export function renderCommitSection(state: ViewState): HTMLElement {
 
 export function renderCommitlintSection(state: ViewState): HTMLElement {
     const body = el('div');
-    const isCustomFormat = state.commit.format === 'custom';
+    const isCustomFormat = !formatSupportsCommitlint(state.commit.format);
 
     body.appendChild(makeCheckbox(
         'commitlint-enabled',

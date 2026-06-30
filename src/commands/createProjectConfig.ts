@@ -3,14 +3,7 @@ import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
 import { Logger } from '../utils/logger';
 import { toError } from '../utils/errorUtils';
-
-async function statOrUndefined(p: string): Promise<import('node:fs').Stats | undefined> {
-    try {
-        return await fs.stat(p);
-    } catch {
-        return undefined;
-    }
-}
+import { statOrUndefined } from '../utils/fsUtils';
 
 export async function createProjectConfig(): Promise<void> {
     try {

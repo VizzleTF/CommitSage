@@ -1,4 +1,10 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, beforeAll } from 'vitest';
+import type { Provider } from '../src/views/webview/protocol';
+
+// Loaded lazily in beforeAll: a static import would force module resolution
+// during vi.mock hoisting, before the mocked-fn consts below are initialized.
+let generateViaOpenAICompatibleProvider:
+    typeof import('../src/services/openAICompatibleService')['generateViaOpenAICompatibleProvider'];
 
 // ---------------------------------------------------------------------------
 // Shared mocks (mirror tests/providerPayloads.test.ts pattern).
@@ -55,6 +61,7 @@ const SETTINGS: Record<string, string | number | boolean | undefined> = {
 vi.mock('../src/utils/configService', () => ({
     ConfigService: {
         get: (key: string) => SETTINGS[key],
+        getModelFor: (provider: string) => SETTINGS[`${provider}.model`],
     },
 }));
 
@@ -82,6 +89,10 @@ vi.mock('../src/utils/retryUtils', () => ({
 }));
 
 const progress = { report: () => undefined };
+
+beforeAll(async () => {
+    ({ generateViaOpenAICompatibleProvider } = await import('../src/services/openAICompatibleService'));
+});
 
 beforeEach(() => {
     mockedPostJson.mockReset();
@@ -260,53 +271,24 @@ describe('withRetryAndApiKeyGuard error delegation', () => {
 
 interface RetryCase {
     name: string;
-    importFn: () => Promise<{
-        generateCommitMessage: (
-            p: string,
-            pr: typeof progress,
-            a?: number,
-            o?: { maxTokens?: number; signal?: AbortSignal }
-        ) => Promise<{ message: string; model: string }>;
-    }>;
+    provider: Provider;
     model: string;
 }
 
+// All OpenAI-compatible providers now share one dispatcher; the retry closure
+// lives once in `generateViaOpenAICompatibleProvider`. Exercise it per provider
+// id to cover key acquisition + the recursive retry arrow for each.
 const retryCases: RetryCase[] = [
-    {
-        name: 'OpenAIService',
-        importFn: async () => (await import('../src/services/openaiService')).OpenAIService,
-        model: 'gpt-test',
-    },
-    {
-        name: 'GroqService',
-        importFn: async () => (await import('../src/services/groqService')).GroqService,
-        model: 'llama-3.3-70b-versatile',
-    },
-    {
-        name: 'OpenRouterService',
-        importFn: async () => (await import('../src/services/openRouterService')).OpenRouterService,
-        model: 'meta-llama/llama-3.3-70b-instruct:free',
-    },
-    {
-        name: 'DeepSeekService',
-        importFn: async () => (await import('../src/services/deepSeekService')).DeepSeekService,
-        model: 'deepseek-chat',
-    },
-    {
-        name: 'XaiService',
-        importFn: async () => (await import('../src/services/xaiService')).XaiService,
-        model: 'grok-3-mini',
-    },
-    {
-        name: 'CustomOpenAIService',
-        importFn: async () => (await import('../src/services/customOpenAIService')).CustomOpenAIService,
-        model: 'qwen2.5-coder',
-    },
+    { name: 'openai', provider: 'openai', model: 'gpt-test' },
+    { name: 'groq', provider: 'groq', model: 'llama-3.3-70b-versatile' },
+    { name: 'openrouter', provider: 'openrouter', model: 'meta-llama/llama-3.3-70b-instruct:free' },
+    { name: 'deepseek', provider: 'deepseek', model: 'deepseek-chat' },
+    { name: 'xai', provider: 'xai', model: 'grok-3-mini' },
+    { name: 'custom', provider: 'custom', model: 'qwen2.5-coder' },
 ];
 
-describe.each(retryCases)('$name retry closure', ({ importFn, model }) => {
+describe.each(retryCases)('$name retry closure', ({ provider, model }) => {
     it('invokes the retry closure after a transient error then succeeds', async () => {
-        const Service = await importFn();
         retryOnce();
 
         // first call throws (transient 500), second call (the retry closure) succeeds
@@ -316,37 +298,35 @@ describe.each(retryCases)('$name retry closure', ({ importFn, model }) => {
             )
             .mockResolvedValueOnce({ choices: [{ message: { content: 'feat: ok' } }] });
 
-        const result = await Service.generateCommitMessage('hello', progress, 1);
+        const result = await generateViaOpenAICompatibleProvider(provider, 'hello', progress, 1);
         expect(result).toEqual({ message: 'feat: ok', model });
         expect(mockedPostJson).toHaveBeenCalledTimes(2);
     });
 
     it('throws ApiKeyInvalidError on 401', async () => {
-        const Service = await importFn();
         const { ApiKeyInvalidError } = await import('../src/models/errors');
         mockedPostJson.mockRejectedValueOnce(
             new (await import('../src/utils/httpUtils')).HttpError(401, {})
         );
         await expect(
-            Service.generateCommitMessage('hi', progress, 1)
+            generateViaOpenAICompatibleProvider(provider, 'hi', progress, 1)
         ).rejects.toBeInstanceOf(ApiKeyInvalidError);
     });
 });
 
 describe('generateViaOpenAICompatible defaults', () => {
     it('defaults max_tokens to 1024 and forwards provided maxTokens', async () => {
-        const { OpenAIService } = await import('../src/services/openaiService');
 
         mockedPostJson.mockResolvedValueOnce({
             choices: [{ message: { content: 'ok' } }],
         });
-        await OpenAIService.generateCommitMessage('hi', progress, 1);
+        await generateViaOpenAICompatibleProvider('openai', 'hi', progress, 1);
         expect(mockedPostJson.mock.calls[0][1]).toMatchObject({ max_tokens: 1024 });
 
         mockedPostJson.mockResolvedValueOnce({
             choices: [{ message: { content: 'ok' } }],
         });
-        await OpenAIService.generateCommitMessage('hi', progress, 1, { maxTokens: 50 });
+        await generateViaOpenAICompatibleProvider('openai', 'hi', progress, 1, { maxTokens: 50 });
         expect(mockedPostJson.mock.calls[1][1]).toMatchObject({ max_tokens: 50 });
     });
 });
@@ -358,10 +338,9 @@ describe('generateViaOpenAICompatible defaults', () => {
 describe('CustomOpenAIService key handling', () => {
     it('fetches the api key when custom.useApiKey is true', async () => {
         SETTINGS['custom.useApiKey'] = true;
-        const { CustomOpenAIService } = await import('../src/services/customOpenAIService');
         mockedPostJson.mockResolvedValueOnce({ choices: [{ message: { content: 'ok' } }] });
 
-        await CustomOpenAIService.generateCommitMessage('hi', progress, 1);
+        await generateViaOpenAICompatibleProvider('custom', 'hi', progress, 1);
         expect(mockedGetKey).toHaveBeenCalledWith('custom');
         const [, , opts] = mockedPostJson.mock.calls[0];
         const headers = (opts as { headers: Record<string, string> }).headers;
@@ -371,10 +350,9 @@ describe('CustomOpenAIService key handling', () => {
 
     it('does not fetch the api key when custom.useApiKey is false', async () => {
         SETTINGS['custom.useApiKey'] = false;
-        const { CustomOpenAIService } = await import('../src/services/customOpenAIService');
         mockedPostJson.mockResolvedValueOnce({ choices: [{ message: { content: 'ok' } }] });
 
-        await CustomOpenAIService.generateCommitMessage('hi', progress, 1);
+        await generateViaOpenAICompatibleProvider('custom', 'hi', progress, 1);
         expect(mockedGetKey).not.toHaveBeenCalled();
         const [, , opts] = mockedPostJson.mock.calls[0];
         const headers = (opts as { headers: Record<string, string> }).headers;
@@ -415,7 +393,6 @@ describe('AnthropicService coverage', () => {
 
 describe('CodestralService coverage', () => {
     it('invokes the retry closure after a transient error then succeeds', async () => {
-        const { CodestralService } = await import('../src/services/codestralService');
         const { HttpError } = await import('../src/utils/httpUtils');
         retryOnce();
 
@@ -423,7 +400,7 @@ describe('CodestralService coverage', () => {
             .mockRejectedValueOnce(new HttpError(500, {}))
             .mockResolvedValueOnce({ choices: [{ message: { content: 'feat: ok' } }] });
 
-        const result = await CodestralService.generateCommitMessage('hello', progress, 1);
+        const result = await generateViaOpenAICompatibleProvider('codestral', 'hello', progress, 1);
         expect(result.message).toBe('feat: ok');
         expect(mockedPostJson).toHaveBeenCalledTimes(2);
     });

@@ -63,40 +63,11 @@ export class GitService {
       }
 
       if ((hasUntrackedFiles || hasDeletedFiles) && !hasStagedChanges) {
-        const filesToStage: string[] = [];
-        if (hasUntrackedFiles) {
-          const untracked = await this.executeGitCommand(
-            ['ls-files', '--others', '--exclude-standard'],
-            repoPath,
-          );
-          filesToStage.push(
-            ...untracked
-              .split('\n')
-              .filter((f) => f.trim())
-              .map(unquoteGitPath),
-          );
-        }
-        if (hasDeletedFiles) {
-          const deleted = await this.executeGitCommand(
-            ['ls-files', '--deleted'],
-            repoPath,
-          );
-          filesToStage.push(
-            ...deleted
-              .split('\n')
-              .filter((f) => f.trim())
-              .map(unquoteGitPath),
-          );
-        }
-        /* v8 ignore next -- the empty branch is unreachable: filesToStage is
-           populated by the same git ls-files command (+ same filter) that
-           hasChanges() used to decide we get here, so it's always non-empty. */
-        if (filesToStage.length > 0) {
-          await this.executeGitCommand(
-            ['add', '--', ...filesToStage],
-            repoPath,
-          );
-        }
+        await this.stageUntrackedAndDeleted(
+          repoPath,
+          hasUntrackedFiles,
+          hasDeletedFiles,
+        );
       }
 
       await this.executeGitCommand(['commit', '-m', message], repoPath);
@@ -155,6 +126,71 @@ export class GitService {
       });
       throw error;
     }
+  }
+
+  /**
+   * Run a git command that prints one path per line and return the non-empty,
+   * git-unquoted paths. The single home for the
+   * `split('\n').filter(...).map(unquoteGitPath)` pipeline that used to be
+   * copy-pasted across staging, per-file diffing, and change detection.
+   */
+  private static async listFiles(
+    listArgs: string[],
+    repoPath: string,
+    signal?: AbortSignal,
+  ): Promise<string[]> {
+    const output = await this.executeGitCommand(listArgs, repoPath, signal);
+    return output
+      .split('\n')
+      .filter((file) => file.trim())
+      .map(unquoteGitPath);
+  }
+
+  /**
+   * Stage every untracked and/or deleted file so a "nothing staged yet" commit
+   * still captures them. Extracted from `commitChanges`; reuses `listFiles` for
+   * the same enumeration `hasChanges` performed.
+   */
+  private static async stageUntrackedAndDeleted(
+    repoPath: string,
+    hasUntrackedFiles: boolean,
+    hasDeletedFiles: boolean,
+    signal?: AbortSignal,
+  ): Promise<void> {
+    const filesToStage: string[] = [];
+    if (hasUntrackedFiles) {
+      filesToStage.push(
+        ...(await this.listFiles(['ls-files', '--others', '--exclude-standard'], repoPath, signal)),
+      );
+    }
+    if (hasDeletedFiles) {
+      filesToStage.push(
+        ...(await this.listFiles(['ls-files', '--deleted'], repoPath, signal)),
+      );
+    }
+    /* v8 ignore next -- the empty branch is unreachable: filesToStage is
+       populated by the same git ls-files command (+ same filter) that
+       hasChanges() used to decide we get here, so it's always non-empty. */
+    if (filesToStage.length > 0) {
+      await this.executeGitCommand(['add', '--', ...filesToStage], repoPath, signal);
+    }
+  }
+
+  /**
+   * Fan out `perFileDiff` over `files` (bounded concurrency), drop blank
+   * results, and prefix the surviving diffs with `header` — or return '' when
+   * none survive. Shared by `getUntrackedDiff` and `getDeletedDiff`, which
+   * differ only in the per-file git command.
+   */
+  private static async collectPerFileDiffs(
+    files: string[],
+    header: string,
+    perFileDiff: (file: string) => Promise<string>,
+    signal?: AbortSignal,
+  ): Promise<string> {
+    const diffs = await mapLimit(files, GIT_FANOUT_CONCURRENCY, perFileDiff, signal);
+    const validDiffs = diffs.filter((diff) => diff.trim());
+    return validDiffs.length > 0 ? header + validDiffs.join('\n') : '';
   }
 
   private static async detectChanges(
@@ -294,10 +330,7 @@ export class GitService {
     prefix?: string,
     signal?: AbortSignal,
   ): Promise<string[]> {
-    const files = (await this.executeGitCommand(listArgs, repoPath, signal))
-      .split('\n')
-      .filter((file) => file.trim())
-      .map(unquoteGitPath);
+    const files = await this.listFiles(listArgs, repoPath, signal);
 
     const results = await mapLimit(files, GIT_FANOUT_CONCURRENCY, async (file) => {
       if (await this.isSubmodule(file, repoPath, signal)) {
@@ -338,78 +371,42 @@ export class GitService {
   }
 
   private static async getUntrackedDiff(repoPath: string, signal?: AbortSignal): Promise<string> {
-    const untrackedFiles = await this.executeGitCommand(
+    const files = await this.listFiles(
       ['ls-files', '--others', '--exclude-standard'],
       repoPath,
       signal,
     );
-    const untrackedFileList = untrackedFiles
-      .split('\n')
-      .filter((file) => file.trim())
-      .map(unquoteGitPath);
-
-    const untrackedDiff = await mapLimit(
-      untrackedFileList,
-      GIT_FANOUT_CONCURRENCY,
-      async (file) => {
-        try {
-          // `git diff --no-index` always exits with 1 when the two inputs
-          // differ (and 0 when they are identical), so we pass
-          // allowNonZeroExit and use exitCode === 128 (or process error)
-          // as the "real" failure signal.
-          const { stdout, exitCode } = await this.execGit(
-            ['diff', '--no-index', '--', '/dev/null', file],
-            repoPath,
-            { allowNonZeroExit: true, signal },
-          );
-          if (exitCode === 128) {
-            return '';
-          }
-          return stdout;
-        } catch (error) {
-          Logger.error(`Error diffing untracked file ${file}:`, toError(error));
-          return '';
-        }
-      },
-      signal,
-    );
-    const validDiffs = untrackedDiff.filter((diff) => diff.trim());
-    return validDiffs.length > 0 ? '# New files:\n' + validDiffs.join('\n') : '';
+    return this.collectPerFileDiffs(files, '# New files:\n', async (file) => {
+      try {
+        // `git diff --no-index` always exits with 1 when the two inputs
+        // differ (and 0 when they are identical), so we pass
+        // allowNonZeroExit and use exitCode === 128 (or process error)
+        // as the "real" failure signal.
+        const { stdout, exitCode } = await this.execGit(
+          ['diff', '--no-index', '--', '/dev/null', file],
+          repoPath,
+          { allowNonZeroExit: true, signal },
+        );
+        return exitCode === 128 ? '' : stdout;
+      } catch (error) {
+        Logger.error(`Error diffing untracked file ${file}:`, toError(error));
+        return '';
+      }
+    }, signal);
   }
 
   private static async getDeletedDiff(repoPath: string, signal?: AbortSignal): Promise<string> {
-    const deletedFiles = await this.executeGitCommand(
-      ['ls-files', '--deleted'],
-      repoPath,
-      signal,
-    );
-    const deletedFileList = deletedFiles
-      .split('\n')
-      .filter((file) => file.trim())
-      .map(unquoteGitPath);
-
-    const deletedDiff = await mapLimit(
-      deletedFileList,
-      GIT_FANOUT_CONCURRENCY,
-      async (file) => {
-        try {
-          // git diff -- <file> on a deleted file (in the working tree) emits
-          // a proper unified diff against HEAD. No manual header construction.
-          const fileDiff = await this.executeGitCommand(
-            ['diff', '--', file],
-            repoPath,
-            signal,
-          );
-          return fileDiff;
-        } catch (error) {
-          Logger.error(`Error diffing deleted file ${file}:`, toError(error));
-          return '';
-        }
-      },
-      signal,
-    );
-    const validDiffs = deletedDiff.filter((diff) => diff.trim());
-    return validDiffs.length > 0 ? '# Deleted files:\n' + validDiffs.join('\n') : '';
+    const files = await this.listFiles(['ls-files', '--deleted'], repoPath, signal);
+    return this.collectPerFileDiffs(files, '# Deleted files:\n', async (file) => {
+      try {
+        // git diff -- <file> on a deleted file (in the working tree) emits
+        // a proper unified diff against HEAD. No manual header construction.
+        return await this.executeGitCommand(['diff', '--', file], repoPath, signal);
+      } catch (error) {
+        Logger.error(`Error diffing deleted file ${file}:`, toError(error));
+        return '';
+      }
+    }, signal);
   }
 
   public static async hasHead(repoPath: string, signal?: AbortSignal): Promise<boolean> {

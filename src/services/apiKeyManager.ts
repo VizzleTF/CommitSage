@@ -50,18 +50,27 @@ export class ApiKeyManager {
         return providerMeta(provider);
     }
 
+    /**
+     * Shared "Enter your {provider} API Key" input box. Single home for the
+     * prompt so `getKey` and `promptForKey` can't drift — `promptForKey` used
+     * to send a non-localized literal while `getKey` localized it.
+     */
+    private static showApiKeyInputBox(config: ProviderMeta): Thenable<string | undefined> {
+        return vscode.window.showInputBox({
+            prompt: vscode.l10n.t('Enter your {0} API Key', config.displayName),
+            ignoreFocusOut: true,
+            password: true,
+            validateInput: config.validateKey,
+        });
+    }
+
     static async getKey(provider: string): Promise<string> {
         const config = this.getConfig(provider);
         try {
             let key = await this.secretStorage.get(config.secretKey);
 
             if (!key) {
-                key = await vscode.window.showInputBox({
-                    prompt: vscode.l10n.t('Enter your {0} API Key', config.displayName),
-                    ignoreFocusOut: true,
-                    password: true,
-                    validateInput: config.validateKey,
-                });
+                key = await this.showApiKeyInputBox(config);
 
                 if (!key) {
                     throw new UserCancelledError(`${config.displayName} API key input was cancelled`);
@@ -128,12 +137,7 @@ export class ApiKeyManager {
 
     static async promptForKey(provider: string): Promise<void> {
         const config = this.getConfig(provider);
-        const key = await vscode.window.showInputBox({
-            prompt: `Enter your ${config.displayName} API Key`,
-            ignoreFocusOut: true,
-            password: true,
-            validateInput: config.validateKey,
-        });
+        const key = await this.showApiKeyInputBox(config);
 
         if (key) {
             await this.setKey(provider, key);

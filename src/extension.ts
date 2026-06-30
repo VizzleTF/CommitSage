@@ -9,6 +9,7 @@ import { ApiKeyManager } from './services/apiKeyManager';
 import { toError } from './utils/errorUtils';
 import { validateGeminiModelOnStartup } from './services/geminiModelValidator';
 import { SettingsWebviewProvider } from './views/settingsWebviewProvider';
+import { formatSupportsCommitlint } from './views/webview/commitFormatPolicy';
 
 export async function activate(context: vscode.ExtensionContext): Promise<void> {
     Logger.log('Starting extension activation');
@@ -50,7 +51,8 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         vscode.workspace.onDidChangeConfiguration(e => {
             if (!e.affectsConfiguration('commitSage.commit.commitFormat')) { return; }
             const config = vscode.workspace.getConfiguration();
-            if (config.get('commitSage.commit.commitFormat') === 'custom'
+            const format = config.get<string>('commitSage.commit.commitFormat') ?? '';
+            if (!formatSupportsCommitlint(format)
                 && config.get('commitSage.commit.commitlint.enabled')) {
                 void config.update('commitSage.commit.commitlint.enabled', false, vscode.ConfigurationTarget.Global);
             }
