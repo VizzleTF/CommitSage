@@ -90,7 +90,7 @@ export class GeminiService {
                 }
             );
 
-            const models = data.models
+            const models = (data.models ?? [])
                 .filter((model: GeminiModel) =>
                     model.supportedGenerationMethods?.includes('generateContent')
                 )

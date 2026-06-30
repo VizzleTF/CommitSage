@@ -27,18 +27,21 @@ export function fuzzyScore(query: string, target: string): number | null {
         return 1_000_000 - sub;
     }
 
-    // Tier 2: subsequence preserving order.
+    // Tier 2: subsequence preserving order. Iterate over code points (not
+    // UTF-16 code units) so surrogate pairs (emoji) compare correctly.
+    const tChars = [...t];
+    const qChars = [...q];
     let qi = 0;
     let firstMatch = -1;
-    for (let i = 0; i < t.length && qi < q.length; i++) {
-        if (t.codePointAt(i) === q.codePointAt(qi)) {
+    for (let i = 0; i < tChars.length && qi < qChars.length; i++) {
+        if (tChars[i] === qChars[qi]) {
             if (firstMatch < 0) {
                 firstMatch = i;
             }
             qi++;
         }
     }
-    if (qi === q.length) {
+    if (qi === qChars.length) {
         return 100_000 - firstMatch;
     }
 

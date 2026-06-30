@@ -11,15 +11,19 @@ const BEARER_PATTERN = /Bearer\s+[A-Z0-9._-]+/gi;
 const GOOGLE_API_KEY_HEADER = /x-goog-api-key:\s*[^\s'",]+/gi;
 const AUTHORIZATION_HEADER = /Authorization:\s*[^\s'",]+/gi;
 
-export function sanitizeErrorForTelemetry(error: Error): { error: string; errorType: string } {
-    const sanitized = error.message
+/** Strip filesystem paths and API secrets from arbitrary text. */
+export function redactSecrets(text: string): string {
+    return text
         .replace(PATH_PATTERN, '<path>')
         .replace(URL_KEY_PATTERN, '$1key=<redacted>')
         .replace(BEARER_PATTERN, 'Bearer <redacted>')
         .replace(GOOGLE_API_KEY_HEADER, 'x-goog-api-key: <redacted>')
         .replace(AUTHORIZATION_HEADER, 'Authorization: <redacted>');
+}
+
+export function sanitizeErrorForTelemetry(error: Error): { error: string; errorType: string } {
     return {
-        error: sanitized,
+        error: redactSecrets(error.message),
         errorType: error.constructor.name,
     };
 }

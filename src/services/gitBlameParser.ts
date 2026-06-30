@@ -20,8 +20,13 @@ export function parseBlameOutput(blameOutput: string): BlameInfo[] {
         } else if (line.startsWith('author-mail ')) {
             currentBlame.email = line.substring(12).replace(/[<>]/g, '');
         } else if (line.startsWith('author-time ')) {
-            currentBlame.timestamp = Number.parseInt(line.substring(11), 10);
-            currentBlame.date = new Date(currentBlame.timestamp * 1000).toISOString();
+            const ts = Number.parseInt(line.substring(12), 10);
+            // Skip malformed timestamps — `new Date(NaN).toISOString()` throws
+            // RangeError, which would abort the whole blame parse.
+            if (Number.isFinite(ts)) {
+                currentBlame.timestamp = ts;
+                currentBlame.date = new Date(ts * 1000).toISOString();
+            }
         } else if (line.startsWith('\t')) {
             currentBlame.line = line.substring(1);
             if (

@@ -3,6 +3,7 @@ import * as amplitude from '@amplitude/analytics-node';
 import { Logger } from '../utils/logger';
 import { ConfigService } from '../utils/configService';
 import { AMPLITUDE_API_KEY } from '../constants/apiKeys';
+import { redactSecrets } from '../utils/errorUtils';
 import { EventOptions } from '@amplitude/analytics-types';
 
 const FLUSH_QUEUE_SIZE = 30;
@@ -49,15 +50,14 @@ class AmplitudeTelemetrySender implements vscode.TelemetrySender {
     }
 
     sendErrorData(error: Error, data?: Record<string, unknown>): void {
-        // Called by `TelemetryLogger.logError(error, data)`. Forward as-is so
-        // `error.message` / `error.stack` arrive in Amplitude alongside any
-        // caller-supplied properties (including `name` if the caller wants
-        // a specific event name; otherwise default to 'extension_error').
+        // Called by `TelemetryLogger.logError(error, data)` — including for
+        // unhandled errors the logger auto-captures, whose message/stack can
+        // contain API keys, bearer tokens, or file paths. Redact before send.
         const eventName = typeof data?.name === 'string' ? data.name : 'extension_error';
         this.sendEventData(eventName, {
             ...data,
-            errorMessage: error.message,
-            errorStack: error.stack,
+            errorMessage: redactSecrets(error.message),
+            errorStack: error.stack ? redactSecrets(error.stack) : undefined,
         });
     }
 }
