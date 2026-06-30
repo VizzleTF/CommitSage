@@ -1,15 +1,20 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-const { mockGet, mockGetTemplate, mockExtractRules, mockGetCustomTemplate } = vi.hoisted(() => ({
+const { mockGet, mockGetTemplate, mockExtractRules, mockGetCustomTemplate, mockRecent } = vi.hoisted(() => ({
     mockGet: vi.fn(),
     mockGetTemplate: vi.fn(),
     mockExtractRules: vi.fn(),
     mockGetCustomTemplate: vi.fn(),
+    mockRecent: vi.fn(),
 }));
 
 vi.mock('../src/templates', () => ({
     getTemplate: mockGetTemplate,
     CommitFormat: {},
+}));
+
+vi.mock('../src/services/gitService', () => ({
+    GitService: { getRecentCommitMessages: mockRecent },
 }));
 
 vi.mock('../src/utils/configService', () => ({
@@ -34,6 +39,7 @@ beforeEach(() => {
     mockGetTemplate.mockImplementation((_f: string, lang: string) => `TEMPLATE[${lang}]`);
     mockExtractRules.mockResolvedValue('RULES');
     mockGetCustomTemplate.mockResolvedValue('CUSTOM_TEMPLATE');
+    mockRecent.mockResolvedValue([]);
     mockGet.mockReturnValue(undefined);
 });
 
@@ -157,5 +163,59 @@ describe('generateRefinementPrompt', () => {
         expect(mockGetTemplate).toHaveBeenCalledWith('conventional', 'english');
         // but extractRules still gets the raw setting ('custom')
         expect(mockExtractRules).toHaveBeenCalledWith('/repo', undefined, expect.objectContaining({ format: 'custom' }));
+    });
+});
+
+describe('generatePrompt — recent-commit style examples', () => {
+    it('injects examples (format-leads framing) when useRecentCommitsAsContext is on', async () => {
+        cfg({
+            'commit.commitFormat': 'conventional',
+            'commit.commitLanguage': 'english',
+            'commit.useRecentCommitsAsContext': true,
+            'commit.recentCommitsCount': 5,
+            'commit.recentCommitsScope': 'all',
+        });
+        mockRecent.mockResolvedValue(['feat: alpha', 'fix: beta']);
+
+        const out = await PromptService.generatePrompt('/repo', 'DIFF', 'BLAME', progress as never);
+
+        expect(mockRecent).toHaveBeenCalledWith('/repo', 5, 'all');
+        expect(out).toContain('feat: alpha');
+        expect(out).toContain('fix: beta');
+        expect(out).toContain('STYLE reference only'); // format leads
+        expect(mockGetTemplate).toHaveBeenCalledWith('conventional', 'english');
+    });
+
+    it('does not fetch examples when the feature is off and format is not previous', async () => {
+        cfg({ 'commit.commitFormat': 'conventional', 'commit.commitLanguage': 'english' });
+        const out = await PromptService.generatePrompt('/repo', 'DIFF', 'BLAME', progress as never);
+        expect(mockRecent).not.toHaveBeenCalled();
+        expect(out).not.toContain('STYLE reference only');
+    });
+
+    it('previous format: examples LEAD (no "reference only" caveat) and use the previous template', async () => {
+        cfg({
+            'commit.commitFormat': 'previous',
+            'commit.commitLanguage': 'english',
+            'commit.recentCommitsCount': 3,
+            'commit.recentCommitsScope': 'mine',
+        });
+        mockRecent.mockResolvedValue(['feat: alpha', 'fix: beta']);
+
+        const out = await PromptService.generatePrompt('/repo', 'DIFF', 'BLAME', progress as never);
+
+        expect(mockRecent).toHaveBeenCalledWith('/repo', 3, 'mine');
+        expect(mockGetTemplate).toHaveBeenCalledWith('previous', 'english');
+        expect(out).toContain('match their style');
+        expect(out).not.toContain('STYLE reference only');
+    });
+
+    it('previous format with no history falls back to the conventional template', async () => {
+        cfg({ 'commit.commitFormat': 'previous', 'commit.commitLanguage': 'english', 'commit.recentCommitsCount': 5, 'commit.recentCommitsScope': 'all' });
+        mockRecent.mockResolvedValue([]);
+
+        await PromptService.generatePrompt('/repo', 'DIFF', 'BLAME', progress as never);
+
+        expect(mockGetTemplate).toHaveBeenCalledWith('conventional', 'english');
     });
 });

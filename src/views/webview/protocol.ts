@@ -66,6 +66,12 @@ export interface WebviewL10n {
     commitlintRulesPath: string;
     enableCustom: string;
     customInstructionsPh: string;
+    useRecentCommits: string;
+    useRecentCommitsHint: string;
+    recentCommitsCount: string;
+    recentCommitsScope: string;
+    recentCommitsScopeAll: string;
+    recentCommitsScopeMine: string;
     advanced: string;
     apiTimeout: string;
     gitTimeout: string;
@@ -119,6 +125,9 @@ export interface ViewState {
         autoPush: boolean;
         useCustomInstructions: boolean;
         customInstructions: string;
+        useRecentCommitsAsContext: boolean;
+        recentCommitsCount: number;
+        recentCommitsScope: string;
         commitlintEnabled: boolean;
         commitlintMaxRetries: number;
         commitlintRulesPath: string;

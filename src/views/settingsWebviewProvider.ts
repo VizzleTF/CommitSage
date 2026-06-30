@@ -31,7 +31,7 @@ const LANGUAGES = [
 ] as const;
 const FORMATS = [
     'conventional', 'angular', 'karma', 'semantic',
-    'emoji', 'emojiKarma', 'google', 'atom', 'detailed', 'custom',
+    'emoji', 'emojiKarma', 'google', 'atom', 'detailed', 'previous', 'custom',
 ] as const;
 
 // Webview camelCase alias -> dotted setting path (no `commitSage.` prefix).
@@ -69,6 +69,9 @@ const SETTING_PATHS = {
     autoPush: 'commit.autoPush',
     useCustomInstructions: 'commit.useCustomInstructions',
     customInstructions: 'commit.customInstructions',
+    useRecentCommitsAsContext: 'commit.useRecentCommitsAsContext',
+    recentCommitsCount: 'commit.recentCommitsCount',
+    recentCommitsScope: 'commit.recentCommitsScope',
     apiRequestTimeout: 'apiRequestTimeout',
     gitTimeout: 'gitTimeout',
     telemetryEnabled: 'telemetry.enabled',
@@ -282,6 +285,9 @@ export class SettingsWebviewProvider implements vscode.WebviewViewProvider {
                 autoPush: ConfigService.get('commit.autoPush'),
                 useCustomInstructions: ConfigService.get('commit.useCustomInstructions'),
                 customInstructions: ConfigService.get('commit.customInstructions'),
+                useRecentCommitsAsContext: ConfigService.get('commit.useRecentCommitsAsContext'),
+                recentCommitsCount: ConfigService.get('commit.recentCommitsCount'),
+                recentCommitsScope: ConfigService.get('commit.recentCommitsScope'),
                 commitlintEnabled: ConfigService.get('commit.commitlint.enabled'),
                 commitlintMaxRetries: ConfigService.get('commit.commitlint.maxRetries'),
                 commitlintRulesPath: ConfigService.get('commit.commitlint.rulesPath'),

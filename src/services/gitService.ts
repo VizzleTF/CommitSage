@@ -10,6 +10,13 @@ import { GitRepositoryProvider } from './gitRepository';
 
 const GIT_FANOUT_CONCURRENCY = 8;
 
+// Minimum length for a commit message to be useful as a style example; shorter
+// ones (e.g. "fix", "wip") teach the model bad habits.
+const MIN_EXAMPLE_COMMIT_LENGTH = 10;
+
+// Mechanical / low-signal commits whose style would mislead the example set.
+const RECENT_COMMIT_NOISE = /^(?:merge\b|bump version|revert\b|wip\b|chore\(release\))/i;
+
 const GIT_STATUS_CODES = {
   modified: 'M',
   added: 'A',
@@ -485,6 +492,43 @@ export class GitService {
         });
     } catch (error) {
       Logger.error('Error getting changed files:', toError(error));
+      return [];
+    }
+  }
+
+  /**
+   * Recent commit messages for use as style examples in the prompt. Skips merge
+   * commits (`--no-merges`), and filters out version-bump / revert / wip / very
+   * short messages whose style would mislead. `scope: 'mine'` restricts to the
+   * configured `user.email`. Over-fetches (count×3) before filtering so the
+   * requested `count` survives the noise filter. Returns [] on any git error —
+   * examples are best-effort context, never block generation.
+   */
+  static async getRecentCommitMessages(
+    repoPath: string,
+    count: number,
+    scope: 'all' | 'mine' = 'all',
+    signal?: AbortSignal,
+  ): Promise<string[]> {
+    if (count <= 0) {
+      return [];
+    }
+    try {
+      const args = ['log', '-n', String(count * 3), '--no-merges', '--format=%B%x00'];
+      if (scope === 'mine') {
+        const email = (await this.executeGitCommand(['config', 'user.email'], repoPath, signal)).trim();
+        if (email) {
+          args.push(`--author=${email}`);
+        }
+      }
+      const output = await this.executeGitCommand(args, repoPath, signal);
+      return output
+        .split('\0')
+        .map(m => m.trim())
+        .filter(m => m.length >= MIN_EXAMPLE_COMMIT_LENGTH && !RECENT_COMMIT_NOISE.test(m))
+        .slice(0, count);
+    } catch (error) {
+      Logger.error('Error reading recent commit messages:', toError(error));
       return [];
     }
   }

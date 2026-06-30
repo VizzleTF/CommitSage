@@ -68,8 +68,11 @@ export class AIService {
         result.message = removeThinkTags(result.message);
 
         const commitFormat = ConfigService.get('commit.commitFormat');
-        // Validation never applies to free-form custom prompts.
-        const commitlintEnabled = ConfigService.get('commit.commitlint.enabled') && commitFormat !== 'custom';
+        // Validation never applies to free-form custom prompts or the
+        // history-driven `previous` format (neither has a fixed structure).
+        const commitlintEnabled = ConfigService.get('commit.commitlint.enabled')
+            && commitFormat !== 'custom'
+            && commitFormat !== 'previous';
         if (commitlintEnabled) {
             result = await this.applyCommitLint(result, repoPath, commitFormat, serviceType, progress, context);
         }

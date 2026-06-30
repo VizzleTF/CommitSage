@@ -231,6 +231,37 @@ export function renderCommitSection(state: ViewState): HTMLElement {
         body.appendChild(el('div', { class: 'hint' }, [L.customInstructionsPh]));
     }
 
+    // Recent-commits style examples. The `previous` format always uses them
+    // (the examples ARE its style), so the count/scope controls show for it too.
+    const usesExamples = state.commit.useRecentCommitsAsContext || state.commit.format === 'previous';
+    if (state.commit.format !== 'previous') {
+        body.appendChild(makeCheckbox(
+            'use-recent-commits',
+            L.useRecentCommits,
+            state.commit.useRecentCommitsAsContext,
+            v => setSetting(KEYS.useRecentCommitsAsContext, v),
+            { hint: L.useRecentCommitsHint },
+        ));
+    }
+    if (usesExamples) {
+        body.appendChild(fieldLabel(L.recentCommitsCount));
+        body.appendChild(makeNumberInput(
+            'recent-commits-count',
+            state.commit.recentCommitsCount,
+            v => setSetting(KEYS.recentCommitsCount, v),
+        ));
+        body.appendChild(fieldLabel(L.recentCommitsScope));
+        body.appendChild(makeSelect(
+            'recent-commits-scope',
+            [
+                { value: 'all', label: L.recentCommitsScopeAll },
+                { value: 'mine', label: L.recentCommitsScopeMine },
+            ],
+            state.commit.recentCommitsScope,
+            v => setSetting(KEYS.recentCommitsScope, v),
+        ));
+    }
+
     const languagePinned = isPinned(state, 'commitLanguage');
     body.appendChild(fieldLabel(L.language));
     body.appendChild(makeSelect(

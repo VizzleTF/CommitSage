@@ -361,6 +361,7 @@
             "google",
             "atom",
             "detailed",
+            "previous",
             "custom"
           ],
           "enumDescriptions": [
@@ -373,6 +374,7 @@
             "Type: Description\n\nBody\n\nFooter",
             "type(scope): subject\n\nbody\n\nfooter",
             "Summary: ...\n\nDetails:\n- ...\n\nEffects:\n- ...",
+            "Match the style of this repository's recent commit messages.",
             "Use the text in 'Custom Instructions' verbatim instead of a built-in template."
           ],
           "default": "conventional",
@@ -391,6 +393,34 @@
           "markdownDescription": "Custom instructions for commit message generation. Required when `#commitSage.commit.useCustomInstructions#` is enabled.",
           "editPresentation": "multilineText",
           "order": 6
+        },
+        "commitSage.commit.useRecentCommitsAsContext": {
+          "type": "boolean",
+          "default": false,
+          "markdownDescription": "Show the repository's recent commit messages to the model as style examples, so the generated message matches the project's tone and conventions. The selected `#commitSage.commit.commitFormat#` still leads on structure (use the `previous` format to let the examples fully drive the style).",
+          "order": 7
+        },
+        "commitSage.commit.recentCommitsCount": {
+          "type": "number",
+          "default": 5,
+          "minimum": 1,
+          "maximum": 20,
+          "markdownDescription": "How many recent commit messages to use as style examples when `#commitSage.commit.useRecentCommitsAsContext#` is on or the `previous` format is selected. Merge, version-bump and very short commits are skipped.",
+          "order": 8
+        },
+        "commitSage.commit.recentCommitsScope": {
+          "type": "string",
+          "enum": [
+            "all",
+            "mine"
+          ],
+          "enumDescriptions": [
+            "Use the most recent commits from any author (captures the overall project style).",
+            "Use only your own recent commits (matches your personal style)."
+          ],
+          "default": "all",
+          "markdownDescription": "Whose recent commits to use as style examples.",
+          "order": 8
         },
         "commitSage.commit.commitlint.enabled": {
           "type": "boolean",
