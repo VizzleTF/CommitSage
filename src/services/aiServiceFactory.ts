@@ -1,4 +1,5 @@
 import { CommitMessage, ProgressReporter, GenerateOptions } from '../models/types';
+import { Provider } from '../views/webview/protocol';
 import { GeminiService } from './geminiService';
 import { OpenAIService } from './openaiService';
 import { CodestralService } from './codestralService';
@@ -10,19 +11,6 @@ import { DeepSeekService } from './deepSeekService';
 import { XaiService } from './xaiService';
 import { CustomOpenAIService } from './customOpenAIService';
 
-export enum AIServiceType {
-    GEMINI = 'gemini',
-    OPENAI = 'openai',
-    CODESTRAL = 'codestral',
-    OLLAMA = 'ollama',
-    OPENROUTER = 'openrouter',
-    GROQ = 'groq',
-    ANTHROPIC = 'anthropic',
-    DEEPSEEK = 'deepseek',
-    XAI = 'xai',
-    CUSTOM = 'custom'
-}
-
 type AIServiceClass = {
     generateCommitMessage(
         prompt: string,
@@ -33,20 +21,20 @@ type AIServiceClass = {
 };
 
 export class AIServiceFactory {
-    private static readonly services: Record<AIServiceType, AIServiceClass> = {
-        [AIServiceType.GEMINI]: GeminiService,
-        [AIServiceType.OPENAI]: OpenAIService,
-        [AIServiceType.CODESTRAL]: CodestralService,
-        [AIServiceType.OLLAMA]: OllamaService,
-        [AIServiceType.OPENROUTER]: OpenRouterService,
-        [AIServiceType.GROQ]: GroqService,
-        [AIServiceType.ANTHROPIC]: AnthropicService,
-        [AIServiceType.DEEPSEEK]: DeepSeekService,
-        [AIServiceType.XAI]: XaiService,
-        [AIServiceType.CUSTOM]: CustomOpenAIService
+    private static readonly services: Record<Provider, AIServiceClass> = {
+        gemini: GeminiService,
+        openai: OpenAIService,
+        codestral: CodestralService,
+        ollama: OllamaService,
+        openrouter: OpenRouterService,
+        groq: GroqService,
+        anthropic: AnthropicService,
+        deepseek: DeepSeekService,
+        xai: XaiService,
+        custom: CustomOpenAIService
     };
 
-    private static getService(type: AIServiceType): AIServiceClass {
+    private static getService(type: Provider): AIServiceClass {
         const service = this.services[type];
         if (!service) {
             throw new Error(`AI service type '${type}' is not supported`);
@@ -55,7 +43,7 @@ export class AIServiceFactory {
     }
 
     static async generateCommitMessage(
-        type: AIServiceType,
+        type: Provider,
         prompt: string,
         progress: ProgressReporter,
         attempt?: number,

@@ -14,20 +14,17 @@ const apiValidation = {
 export class ApiKeyValidator {
     /**
      * Lax non-empty check used for all OpenAI-compatible providers
-     * (OpenAI, Groq, OpenRouter, DeepSeek, xAI, Anthropic, Codestral).
+     * (OpenAI, Groq, OpenRouter, DeepSeek, xAI, Anthropic, Ollama, Custom).
      * No prefix/charset check: providers update key shapes (e.g. `sk-or-v1-`,
      * `gsk_`, `xai-`, `sk-ant-`) and Azure/OpenRouter/LocalAI use yet other
-     * formats. Trust the server to reject bad keys.
+     * formats. Trust the server to reject bad keys. Referenced once per
+     * provider from `providerCatalog.ts`.
      */
-    private static validateNonEmpty(key: string): string | null {
+    static validateNonEmpty(key: string): string | null {
         if (!key) {
             return apiValidation.errorMessages.emptyKey;
         }
         return null;
-    }
-
-    static validateOpenAIApiKey(key: string): string | null {
-        return ApiKeyValidator.validateNonEmpty(key);
     }
 
     /** Strict charset validation shared by providers with a fixed key shape. */
@@ -57,33 +54,5 @@ export class ApiKeyValidator {
 
     static validateCodestralApiKey(key: string): string | null {
         return ApiKeyValidator.validateStrictFormat(key);
-    }
-
-    static validateOllamaAuthToken(key: string): string | null {
-        return ApiKeyValidator.validateNonEmpty(key);
-    }
-
-    static validateOpenRouterApiKey(key: string): string | null {
-        return ApiKeyValidator.validateNonEmpty(key);
-    }
-
-    static validateGroqApiKey(key: string): string | null {
-        return ApiKeyValidator.validateNonEmpty(key);
-    }
-
-    static validateAnthropicApiKey(key: string): string | null {
-        return ApiKeyValidator.validateNonEmpty(key);
-    }
-
-    static validateDeepSeekApiKey(key: string): string | null {
-        return ApiKeyValidator.validateNonEmpty(key);
-    }
-
-    static validateXaiApiKey(key: string): string | null {
-        return ApiKeyValidator.validateNonEmpty(key);
-    }
-
-    static validateCustomApiKey(key: string): string | null {
-        return ApiKeyValidator.validateNonEmpty(key);
     }
 }

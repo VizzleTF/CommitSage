@@ -4,7 +4,8 @@ import { Logger } from '../utils/logger';
 import { ConfigService } from '../utils/configService';
 import { getTemplate, CommitFormat } from '../templates';
 import { ProgressReporter } from '../models/types';
-import { AIServiceFactory, AIServiceType } from './aiServiceFactory';
+import { AIServiceFactory } from './aiServiceFactory';
+import { Provider } from '../views/webview/protocol';
 import { toError } from '../utils/errorUtils';
 
 type TranslationsFile = Record<string, Partial<Record<CommitFormat, string>>>;
@@ -125,7 +126,7 @@ Rules:
 
 --- ${customLanguageName.toUpperCase()} TRANSLATION ---`;
 
-        const provider = ConfigService.getProvider() as AIServiceType;
+        const provider = ConfigService.getProvider() as Provider;
         const result = await AIServiceFactory.generateCommitMessage(provider, translationPrompt, progress, undefined, { maxTokens: 4096 });
         const translatedTemplate = result.message.trim();
 

@@ -4,6 +4,7 @@ import * as path from 'node:path';
 import { Logger } from './logger';
 import { ProjectConfig } from '../models/types';
 import { toError } from './errorUtils';
+import { isProvider } from '../services/providerCatalog';
 
 async function statOrUndefined(p: string): Promise<import('node:fs').Stats | undefined> {
   try {
@@ -459,11 +460,7 @@ export class ConfigService {
 
   static getProvider(): string {
     const provider = this.get('provider.type');
-    if (
-      !['gemini', 'openai', 'codestral', 'ollama', 'openrouter', 'groq', 'anthropic', 'deepseek', 'xai', 'custom'].includes(
-        provider,
-      )
-    ) {
+    if (!isProvider(provider)) {
       Logger.warn(
         `Invalid provider type: ${provider}, falling back to gemini`,
       );
@@ -481,31 +478,10 @@ export class ConfigService {
    * is for events that fire before resolution (`started`, `failed`).
    */
   static getModel(): string {
-    switch (this.getProvider()) {
-      case 'gemini':
-        return this.get('gemini.model');
-      case 'openai':
-        return this.get('openai.model');
-      case 'codestral':
-        return this.get('codestral.model');
-      case 'ollama':
-        return this.get('ollama.model');
-      case 'openrouter':
-        return this.get('openrouter.model');
-      case 'groq':
-        return this.get('groq.model');
-      case 'anthropic':
-        return this.get('anthropic.model');
-      case 'deepseek':
-        return this.get('deepseek.model');
-      case 'xai':
-        return this.get('xai.model');
-      case 'custom':
-        return this.get('custom.model');
-    }
-    /* v8 ignore next -- unreachable: getProvider() always returns one of the
-       cased provider ids above; TS still requires a fallback return. */
-    return 'unknown';
+    // The model setting key is always `<provider>.model`, and getProvider()
+    // only ever returns a valid provider id, so this derives the right key
+    // without a per-provider switch.
+    return this.get(`${this.getProvider()}.model` as SettingKey) as string;
   }
 
   static clearCache(): void {

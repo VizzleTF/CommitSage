@@ -1,73 +1,14 @@
 import * as vscode from 'vscode';
 import { Logger } from '../utils/logger';
-import { ApiKeyValidator } from '../utils/apiKeyValidator';
 import { AiServiceError, ConfigurationError, UserCancelledError } from '../models/errors';
 import { toError } from '../utils/errorUtils';
 import { ConfigService } from '../utils/configService';
-
-interface ApiKeyConfig {
-    secretKey: string;
-    displayName: string;
-    validator: (key: string) => string | null;
-}
-
-const API_KEY_CONFIGS: Record<string, ApiKeyConfig> = {
-    gemini: {
-        secretKey: 'commitsage.apiKey',
-        displayName: 'Google',
-        validator: ApiKeyValidator.validateGeminiApiKey,
-    },
-    openai: {
-        secretKey: 'commitsage.openaiApiKey',
-        displayName: 'OpenAI',
-        validator: ApiKeyValidator.validateOpenAIApiKey,
-    },
-    codestral: {
-        secretKey: 'commitsage.codestralApiKey',
-        displayName: 'Codestral',
-        validator: ApiKeyValidator.validateCodestralApiKey,
-    },
-    ollama: {
-        secretKey: 'commitsage.ollamaAuthToken',
-        displayName: 'Ollama',
-        validator: ApiKeyValidator.validateOllamaAuthToken,
-    },
-    openrouter: {
-        secretKey: 'commitsage.openrouterApiKey',
-        displayName: 'OpenRouter',
-        validator: ApiKeyValidator.validateOpenRouterApiKey,
-    },
-    groq: {
-        secretKey: 'commitsage.groqApiKey',
-        displayName: 'Groq',
-        validator: ApiKeyValidator.validateGroqApiKey,
-    },
-    anthropic: {
-        secretKey: 'commitsage.anthropicApiKey',
-        displayName: 'Anthropic',
-        validator: ApiKeyValidator.validateAnthropicApiKey,
-    },
-    deepseek: {
-        secretKey: 'commitsage.deepseekApiKey',
-        displayName: 'DeepSeek',
-        validator: ApiKeyValidator.validateDeepSeekApiKey,
-    },
-    xai: {
-        secretKey: 'commitsage.xaiApiKey',
-        displayName: 'xAI',
-        validator: ApiKeyValidator.validateXaiApiKey,
-    },
-    custom: {
-        secretKey: 'commitsage.customApiKey',
-        displayName: 'Custom',
-        validator: ApiKeyValidator.validateCustomApiKey,
-    },
-};
+import { PROVIDER_CATALOG, ProviderMeta, isProvider, providerMeta } from './providerCatalog';
 
 export class ApiKeyManager {
     private static secretStorage: vscode.SecretStorage;
     private static readonly knownSecretKeys: Set<string> = new Set(
-        Object.values(API_KEY_CONFIGS).map(c => c.secretKey),
+        PROVIDER_CATALOG.map(c => c.secretKey),
     );
 
     static initialize(secretStorage: vscode.SecretStorage, context: vscode.ExtensionContext): void {
@@ -90,7 +31,7 @@ export class ApiKeyManager {
      * for self-hosted Ollama.
      */
     static requiresKeyForCurrentConfig(provider: string): boolean {
-        if (!(provider in API_KEY_CONFIGS)) {
+        if (!isProvider(provider)) {
             return false;
         }
         if (provider === 'ollama') {
@@ -102,12 +43,11 @@ export class ApiKeyManager {
         return true;
     }
 
-    private static getConfig(provider: string): ApiKeyConfig {
-        const config = API_KEY_CONFIGS[provider];
-        if (!config) {
+    private static getConfig(provider: string): ProviderMeta {
+        if (!isProvider(provider)) {
             throw new ConfigurationError(`Unknown API key provider: ${provider}`);
         }
-        return config;
+        return providerMeta(provider);
     }
 
     static async getKey(provider: string): Promise<string> {
@@ -120,7 +60,7 @@ export class ApiKeyManager {
                     prompt: vscode.l10n.t('Enter your {0} API Key', config.displayName),
                     ignoreFocusOut: true,
                     password: true,
-                    validateInput: config.validator,
+                    validateInput: config.validateKey,
                 });
 
                 if (!key) {
@@ -145,7 +85,7 @@ export class ApiKeyManager {
     static async setKey(provider: string, key: string): Promise<void> {
         const config = this.getConfig(provider);
         try {
-            const validationError = config.validator(key);
+            const validationError = config.validateKey(key);
             if (validationError) {
                 throw new AiServiceError(validationError);
             }
@@ -192,7 +132,7 @@ export class ApiKeyManager {
             prompt: `Enter your ${config.displayName} API Key`,
             ignoreFocusOut: true,
             password: true,
-            validateInput: config.validator,
+            validateInput: config.validateKey,
         });
 
         if (key) {

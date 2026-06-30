@@ -32,7 +32,8 @@ vi.mock('../src/services/deepSeekService', () => ({ DeepSeekService }));
 vi.mock('../src/services/xaiService', () => ({ XaiService }));
 vi.mock('../src/services/customOpenAIService', () => ({ CustomOpenAIService }));
 
-import { AIServiceFactory, AIServiceType } from '../src/services/aiServiceFactory';
+import { AIServiceFactory } from '../src/services/aiServiceFactory';
+import type { Provider } from '../src/views/webview/protocol';
 
 const progress = { report: () => undefined };
 
@@ -50,17 +51,17 @@ beforeEach(() => {
 });
 
 describe('AIServiceFactory.generateCommitMessage routing', () => {
-    const cases: Array<[AIServiceType, { generateCommitMessage: ReturnType<typeof vi.fn> }, string]> = [
-        [AIServiceType.GEMINI, GeminiService as never, 'gemini'],
-        [AIServiceType.OPENAI, OpenAIService as never, 'openai'],
-        [AIServiceType.CODESTRAL, CodestralService as never, 'codestral'],
-        [AIServiceType.OLLAMA, OllamaService as never, 'ollama'],
-        [AIServiceType.OPENROUTER, OpenRouterService as never, 'openrouter'],
-        [AIServiceType.GROQ, GroqService as never, 'groq'],
-        [AIServiceType.ANTHROPIC, AnthropicService as never, 'anthropic'],
-        [AIServiceType.DEEPSEEK, DeepSeekService as never, 'deepseek'],
-        [AIServiceType.XAI, XaiService as never, 'xai'],
-        [AIServiceType.CUSTOM, CustomOpenAIService as never, 'custom'],
+    const cases: Array<[Provider, { generateCommitMessage: ReturnType<typeof vi.fn> }, string]> = [
+        ['gemini', GeminiService as never, 'gemini'],
+        ['openai', OpenAIService as never, 'openai'],
+        ['codestral', CodestralService as never, 'codestral'],
+        ['ollama', OllamaService as never, 'ollama'],
+        ['openrouter', OpenRouterService as never, 'openrouter'],
+        ['groq', GroqService as never, 'groq'],
+        ['anthropic', AnthropicService as never, 'anthropic'],
+        ['deepseek', DeepSeekService as never, 'deepseek'],
+        ['xai', XaiService as never, 'xai'],
+        ['custom', CustomOpenAIService as never, 'custom'],
     ];
 
     it.each(cases)('routes %s to the right service', async (type, svc, name) => {
@@ -72,7 +73,7 @@ describe('AIServiceFactory.generateCommitMessage routing', () => {
 
     it('throws for an unsupported service type', async () => {
         await expect(
-            AIServiceFactory.generateCommitMessage('bogus' as AIServiceType, 'p', progress),
+            AIServiceFactory.generateCommitMessage('bogus' as Provider, 'p', progress),
         ).rejects.toThrow(/AI service type 'bogus' is not supported/);
     });
 });

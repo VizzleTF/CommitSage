@@ -122,8 +122,9 @@ describe('CodestralService payload', () => {
             model: 'codestral-latest',
             messages: [{ role: 'user', content: 'hello' }],
         });
-        // No maxTokens passed → no max_tokens in payload (default behaviour)
-        expect(payload).not.toHaveProperty('max_tokens');
+        // Codestral now goes through the shared OpenAI-compatible path, which
+        // defaults max_tokens to 1024 (matching its OpenAI-shaped siblings).
+        expect(payload).toMatchObject({ max_tokens: 1024 });
     });
 
     it('forwards maxTokens as max_tokens (snake_case) when provided', async () => {

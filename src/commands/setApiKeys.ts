@@ -3,59 +3,39 @@ import { ApiKeyManager } from '../services/apiKeyManager';
 import { Logger } from '../utils/logger';
 import { toError } from '../utils/errorUtils';
 import { UserCancelledError } from '../models/errors';
+import { PROVIDER_CATALOG } from '../services/providerCatalog';
 
 /**
- * Per-provider command IDs and the friendly display name used in success/error
- * notifications. Order matches the order they appear in the Command Palette.
- * Adding a new provider here is the only change needed to expose its
- * set/remove commands — `registerSetApiKeyCommands` iterates over this list.
+ * Registers the per-provider set/remove API-key commands. Command ids and the
+ * display name in notifications come from `providerCatalog.ts` — adding a
+ * provider there is the only change needed to expose its commands.
  */
-interface ProviderCommandSpec {
-    provider: string;
-    label: string;
-    setCommand: string;
-    removeCommand: string;
-}
-
-const PROVIDER_COMMAND_SPECS: readonly ProviderCommandSpec[] = [
-    { provider: 'gemini',     label: 'Gemini',     setCommand: 'commitsage.setApiKey',              removeCommand: 'commitsage.removeApiKey' },
-    { provider: 'openai',     label: 'OpenAI',     setCommand: 'commitsage.setOpenAIApiKey',        removeCommand: 'commitsage.removeOpenAIApiKey' },
-    { provider: 'codestral',  label: 'Codestral',  setCommand: 'commitsage.setCodestralApiKey',     removeCommand: 'commitsage.removeCodestralApiKey' },
-    { provider: 'ollama',     label: 'Ollama auth token', setCommand: 'commitsage.setOllamaAuthToken', removeCommand: 'commitsage.removeOllamaAuthToken' },
-    { provider: 'openrouter', label: 'OpenRouter', setCommand: 'commitsage.setOpenRouterApiKey',    removeCommand: 'commitsage.removeOpenRouterApiKey' },
-    { provider: 'groq',       label: 'Groq',       setCommand: 'commitsage.setGroqApiKey',          removeCommand: 'commitsage.removeGroqApiKey' },
-    { provider: 'anthropic',  label: 'Anthropic',  setCommand: 'commitsage.setAnthropicApiKey',     removeCommand: 'commitsage.removeAnthropicApiKey' },
-    { provider: 'deepseek',   label: 'DeepSeek',   setCommand: 'commitsage.setDeepSeekApiKey',      removeCommand: 'commitsage.removeDeepSeekApiKey' },
-    { provider: 'xai',        label: 'xAI',        setCommand: 'commitsage.setXaiApiKey',           removeCommand: 'commitsage.removeXaiApiKey' },
-    { provider: 'custom',     label: 'Custom',     setCommand: 'commitsage.setCustomApiKey',        removeCommand: 'commitsage.removeCustomApiKey' },
-];
-
 export function registerSetApiKeyCommands(_context: vscode.ExtensionContext): vscode.Disposable[] {
     const disposables: vscode.Disposable[] = [];
 
-    for (const spec of PROVIDER_COMMAND_SPECS) {
+    for (const meta of PROVIDER_CATALOG) {
         disposables.push(
-            vscode.commands.registerCommand(spec.setCommand, async () => {
+            vscode.commands.registerCommand(meta.setCmd, async () => {
                 try {
-                    await ApiKeyManager.promptForKey(spec.provider);
+                    await ApiKeyManager.promptForKey(meta.id);
                 } catch (error) {
                     if (error instanceof UserCancelledError) {
                         return;
                     }
-                    Logger.error(`Error setting ${spec.label} API key:`, toError(error));
+                    Logger.error(`Error setting ${meta.displayName} API key:`, toError(error));
                     await Logger.showError(
                         vscode.l10n.t('Failed to set API key: {0}', toError(error).message),
                     );
                 }
             }),
-            vscode.commands.registerCommand(spec.removeCommand, async () => {
+            vscode.commands.registerCommand(meta.removeCmd, async () => {
                 try {
-                    await ApiKeyManager.removeKey(spec.provider);
+                    await ApiKeyManager.removeKey(meta.id);
                     await Logger.showInfo(
-                        vscode.l10n.t('{0} API key has been removed', spec.label),
+                        vscode.l10n.t('{0} API key has been removed', meta.displayName),
                     );
                 } catch (error) {
-                    Logger.error(`Error removing ${spec.label} API key:`, toError(error));
+                    Logger.error(`Error removing ${meta.displayName} API key:`, toError(error));
                     await Logger.showError(
                         vscode.l10n.t('Failed to remove API key: {0}', toError(error).message),
                     );

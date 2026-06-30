@@ -4,7 +4,8 @@ import { PromptService } from './promptService';
 import { TelemetryService } from './telemetryService';
 import { errorMessages } from '../utils/constants';
 import { removeThinkTags } from '../utils/textProcessing';
-import { AIServiceFactory, AIServiceType } from './aiServiceFactory';
+import { AIServiceFactory } from './aiServiceFactory';
+import { Provider } from '../views/webview/protocol';
 import { CommitLintService, CommitLintEngine } from './commitLintService';
 import { Logger } from '../utils/logger';
 
@@ -54,7 +55,7 @@ export class AIService {
 
         progress.report({ message: 'Generating commit message...', increment: 50 });
 
-        const serviceType = provider as AIServiceType;
+        const serviceType = provider as Provider;
         let result = await AIServiceFactory.generateCommitMessage(
             serviceType,
             prompt,
@@ -87,7 +88,7 @@ export class AIService {
         result: CommitMessage,
         repoPath: string,
         commitFormat: string,
-        serviceType: AIServiceType,
+        serviceType: Provider,
         progress: ProgressReporter,
         context: GenerateContext
     ): Promise<CommitMessage> {

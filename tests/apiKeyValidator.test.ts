@@ -39,11 +39,11 @@ describe('ApiKeyValidator.validateGeminiApiKey (key shapes)', () => {
 });
 
 describe('ApiKeyValidator.validateNonEmpty (lax providers)', () => {
-    it('rejects empty for OpenAI', () => {
-        expect(ApiKeyValidator.validateOpenAIApiKey('')).toBe('API key cannot be empty');
+    it('rejects an empty key', () => {
+        expect(ApiKeyValidator.validateNonEmpty('')).toBe('API key cannot be empty');
     });
 
-    it('accepts any non-empty key for OpenAI (no charset check)', () => {
-        expect(ApiKeyValidator.validateOpenAIApiKey('sk-or-v1-$weird/chars')).toBeNull();
+    it('accepts any non-empty key (no charset check)', () => {
+        expect(ApiKeyValidator.validateNonEmpty('sk-or-v1-$weird/chars')).toBeNull();
     });
 });
