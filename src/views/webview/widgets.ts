@@ -30,7 +30,7 @@ export function pinnedHint(): HTMLDivElement {
 // adapter that owns the trigger, commit semantics, and keyboard handling.
 export function makeSelect(
     id: string,
-    options: Array<{ value: string; label: string }>,
+    options: Array<{ value: string; label: string; dot?: boolean }>,
     current: string,
     onChange: (value: string) => void,
     opts: { disabled?: boolean } = {},
@@ -44,8 +44,11 @@ export function makeSelect(
     // eslint-disable-next-line @typescript-eslint/naming-convention
     const wrap = el('div', { class: 'select', id, 'data-value': current }) as HTMLDivElement;
 
-    const currentLabel = items.find(o => o.value === current)?.label ?? current ?? '';
-    const valueEl = el('span', { class: 'select-value' }, [currentLabel]);
+    const currentItem = items.find(o => o.value === current);
+    const currentLabel = currentItem?.label ?? current ?? '';
+    const valueEl = el('span', { class: 'select-value' }, currentItem?.dot
+        ? [el('span', { class: 'select-dot' }), currentLabel]
+        : [currentLabel]);
 
     const popup = new ListboxPopup('select', id, item => commit(item.value, item.label));
     popup.setItems(items, current);

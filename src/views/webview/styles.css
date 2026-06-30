@@ -509,6 +509,18 @@ textarea:disabled {
     color: var(--vscode-list-activeSelectionForeground, var(--vscode-foreground, #fff));
 }
 
+/* Green dot marking providers that have an API key configured. */
+.combo-dot,
+.select-dot {
+    display: inline-block;
+    width: 7px;
+    height: 7px;
+    margin-right: 7px;
+    border-radius: 50%;
+    vertical-align: middle;
+    background: var(--vscode-testing-iconPassed, var(--vscode-charts-green, #89d185));
+}
+
 /* ── Scrollbars ──────────────────────────────────────────────────────── */
 /* Chrome 121+ (the engine VS Code's Electron ships) prefers the STANDARD
    scrollbar-width/scrollbar-color over ::-webkit-scrollbar, and renders a

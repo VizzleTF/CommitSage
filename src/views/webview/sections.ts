@@ -20,11 +20,19 @@ import { send, setSetting } from './vscodeApi';
 
 export function renderProviderPick(state: ViewState): HTMLElement {
     const providerPinned = isPinned(state, 'provider');
+    const options = init.providers.map(p => ({
+        value: p,
+        label: L.providerLabels[p],
+        dot: state.hasApiKey[p],
+    }));
+    // Surface providers with a configured key at the top; keep the original
+    // order within each group (stable sort).
+    options.sort((a, b) => Number(b.dot) - Number(a.dot));
     return el('section', { class: 'provider-pick' }, [
         fieldLabel(L.provider),
         makeSelect(
             'provider',
-            init.providers.map(p => ({ value: p, label: L.providerLabels[p] })),
+            options,
             state.provider,
             v => setSetting(KEYS.provider, v),
             { disabled: providerPinned },

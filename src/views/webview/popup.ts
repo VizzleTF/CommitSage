@@ -9,7 +9,7 @@
 
 import { el } from './dom';
 
-export interface PopupItem { value: string; label: string }
+export interface PopupItem { value: string; label: string; dot?: boolean }
 
 export class ListboxPopup {
     /** Outer clipped container — the adapter appends this into its wrapper. */
@@ -57,7 +57,9 @@ export class ListboxPopup {
                 id: `${this.idBase}-opt-${i}`,
                 'data-value': item.value,
                 'aria-selected': item.value === selected ? 'true' : undefined,
-            }, [item.label]) as HTMLLIElement;
+            }, item.dot
+                ? [el('span', { class: `${this.prefix}-dot` }), item.label]
+                : [item.label]) as HTMLLIElement;
             /* eslint-enable @typescript-eslint/naming-convention */
             // mousedown (not click): click fires after the trigger's blur, which
             // would already have closed the list and cancelled the pick.
