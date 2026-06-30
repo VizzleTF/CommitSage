@@ -2,7 +2,7 @@ import * as vscode from 'vscode';
 import { ConfigService } from '../utils/configService';
 import { Logger } from '../utils/logger';
 import { CommitMessage } from '../models/types';
-import { GitService } from './gitService';
+import { GitService, isIndexStaged, isStagedStatus } from './gitService';
 import { GitBlameAnalyzer } from './gitBlameAnalyzer';
 import { TelemetryService } from './telemetryService';
 import { AIService } from './aiService';
@@ -178,7 +178,11 @@ export class CommitWorkflow {
 
         const repoPath = sourceControlRepository.rootUri.fsPath;
         const onlyStagedSetting = ConfigService.get('commit.onlyStagedChanges');
-        const hasStagedChanges = await GitService.hasChanges(repoPath, 'staged', signal);
+        // One `git status --porcelain` pass drives the staged-vs-all decision
+        // AND the per-file blame list, replacing a separate hasChanges('staged')
+        // probe and a second getChangedFiles call.
+        const allChangedFiles = await GitService.getChangedFiles(repoPath, false, signal);
+        const hasStagedChanges = allChangedFiles.some(file => isIndexStaged(file.status));
         const useStagedChanges = onlyStagedSetting || hasStagedChanges;
 
         if (token.isCancellationRequested) {
@@ -190,11 +194,16 @@ export class CommitWorkflow {
             throw new Error('No changes to commit');
         }
 
-        const changedFiles = await GitService.getChangedFiles(repoPath, useStagedChanges, signal);
+        const changedFiles = useStagedChanges
+            ? allChangedFiles.filter(file => isStagedStatus(file.status))
+            : allChangedFiles;
+        // hasHead is constant for the repo this run — resolve once instead of
+        // per blame fan-out call.
+        const hasHead = await GitService.hasHead(repoPath, signal);
         const blameAnalyses = await mapLimit(
             changedFiles,
             BLAME_CONCURRENCY,
-            (file) => GitBlameAnalyzer.analyzeChanges(repoPath, file.path, file.status, useStagedChanges, signal),
+            (file) => GitBlameAnalyzer.analyzeChanges(repoPath, file.path, file.status, useStagedChanges, signal, hasHead),
             signal,
         );
         const blameAnalysis = blameAnalyses.filter(Boolean).join('\n\n');

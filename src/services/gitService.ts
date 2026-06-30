@@ -193,65 +193,76 @@ export class GitService {
     return validDiffs.length > 0 ? header + validDiffs.join('\n') : '';
   }
 
-  private static async detectChanges(
+  /**
+   * Enumerate the files that changed, by category, in a single pass. Each
+   * category is listed at most once and the list is reused for both the
+   * "are there changes?" decision and the subsequent per-file diffing — the
+   * old `detectChanges` + `collectDiffs` split listed every category twice
+   * (once via `hasChanges`, once via the diff collectors). The same git
+   * commands run, so the resulting diff is byte-for-byte identical; only the
+   * redundant second enumeration is gone.
+   *
+   * Category gating matches the previous behavior exactly: untracked/deleted
+   * surface only when there are no staged changes, deleted only when HEAD
+   * exists, and nothing but staged is collected in `onlyStagedChanges` mode.
+   */
+  private static async enumerateChanges(
     repoPath: string,
     onlyStagedChanges: boolean,
     knownHasStagedChanges: boolean | undefined,
     signal?: AbortSignal,
   ): Promise<{
-    hasStagedChanges: boolean;
-    hasUnstagedChanges: boolean;
-    hasUntrackedFiles: boolean;
-    hasDeletedFiles: boolean;
+    staged: string[];
+    unstaged: string[];
+    untracked: string[];
+    deleted: string[];
   }> {
     const hasHead = await this.hasHead(repoPath, signal);
-    const hasStagedChanges = knownHasStagedChanges ?? await this.hasChanges(repoPath, 'staged', signal);
-    const hasUnstagedChanges =
-      !onlyStagedChanges && (await this.hasChanges(repoPath, 'unstaged', signal));
-    const hasUntrackedFiles =
-      !onlyStagedChanges &&
-      !hasStagedChanges &&
-      (await this.hasChanges(repoPath, 'untracked', signal));
-    const hasDeletedFiles =
-      hasHead &&
-      !onlyStagedChanges &&
-      !hasStagedChanges &&
-      (await this.hasChanges(repoPath, 'deleted', signal));
+    const staged = await this.listFiles(['diff', '--cached', '--name-only'], repoPath, signal);
+    const hasStagedChanges = knownHasStagedChanges ?? staged.length > 0;
 
-    return { hasStagedChanges, hasUnstagedChanges, hasUntrackedFiles, hasDeletedFiles };
+    const unstaged = onlyStagedChanges
+      ? []
+      : await this.listFiles(['diff', '--name-only'], repoPath, signal);
+    const untracked = !onlyStagedChanges && !hasStagedChanges
+      ? await this.listFiles(['ls-files', '--others', '--exclude-standard'], repoPath, signal)
+      : [];
+    const deleted = hasHead && !onlyStagedChanges && !hasStagedChanges
+      ? await this.listFiles(['ls-files', '--deleted'], repoPath, signal)
+      : [];
+
+    return { staged, unstaged, untracked, deleted };
   }
 
   private static async collectDiffs(
     repoPath: string,
     changes: {
-      hasStagedChanges: boolean;
-      hasUnstagedChanges: boolean;
-      hasUntrackedFiles: boolean;
-      hasDeletedFiles: boolean;
+      staged: string[];
+      unstaged: string[];
+      untracked: string[];
+      deleted: string[];
     },
     signal?: AbortSignal,
   ): Promise<string[]> {
     const diffs: string[] = [];
 
-    if (changes.hasStagedChanges) {
-      const staged = await this.getStagedDiff(repoPath, '# Staged changes:\n', signal);
-      diffs.push(...staged);
+    if (changes.staged.length > 0) {
+      diffs.push(...await this.diffFiles(changes.staged, repoPath, ['diff', '--cached'], '# Staged changes:\n', signal));
     }
 
-    if (changes.hasUnstagedChanges) {
-      const unstaged = await this.getUnstagedDiff(repoPath, signal);
-      diffs.push(...unstaged);
+    if (changes.unstaged.length > 0) {
+      diffs.push(...await this.diffFiles(changes.unstaged, repoPath, ['diff'], '# Unstaged changes:\n', signal));
     }
 
-    if (changes.hasUntrackedFiles) {
-      const untracked = await this.getUntrackedDiff(repoPath, signal);
+    if (changes.untracked.length > 0) {
+      const untracked = await this.getUntrackedDiff(changes.untracked, repoPath, signal);
       if (untracked) {
         diffs.push(untracked);
       }
     }
 
-    if (changes.hasDeletedFiles) {
-      const deleted = await this.getDeletedDiff(repoPath, signal);
+    if (changes.deleted.length > 0) {
+      const deleted = await this.getDeletedDiff(changes.deleted, repoPath, signal);
       if (deleted) {
         diffs.push(deleted);
       }
@@ -267,7 +278,7 @@ export class GitService {
     signal?: AbortSignal,
   ): Promise<string> {
     try {
-      const changes = await this.detectChanges(
+      const changes = await this.enumerateChanges(
         repoPath,
         onlyStagedChanges,
         knownHasStagedChanges,
@@ -275,16 +286,16 @@ export class GitService {
       );
 
       if (
-        !changes.hasStagedChanges &&
-        !changes.hasUnstagedChanges &&
-        !changes.hasUntrackedFiles &&
-        !changes.hasDeletedFiles
+        changes.staged.length === 0 &&
+        changes.unstaged.length === 0 &&
+        changes.untracked.length === 0 &&
+        changes.deleted.length === 0
       ) {
         throw new NoChangesDetectedError();
       }
 
-      if (onlyStagedChanges && changes.hasStagedChanges) {
-        const staged = await this.getStagedDiff(repoPath, undefined, signal);
+      if (onlyStagedChanges && changes.staged.length > 0) {
+        const staged = await this.diffFiles(changes.staged, repoPath, ['diff', '--cached'], undefined, signal);
         return staged.join('\n\n').trim();
       }
 
@@ -323,15 +334,19 @@ export class GitService {
     }
   }
 
-  private static async getDiffForFiles(
+  /**
+   * Diff each pre-enumerated file (bounded concurrency), skipping submodules
+   * and blank diffs, prefixing surviving diffs with `prefix`. Takes the file
+   * list as input — the caller already enumerated it in `enumerateChanges` —
+   * instead of re-listing it here.
+   */
+  private static async diffFiles(
+    files: string[],
     repoPath: string,
-    listArgs: string[],
     diffArgs: string[],
     prefix?: string,
     signal?: AbortSignal,
   ): Promise<string[]> {
-    const files = await this.listFiles(listArgs, repoPath, signal);
-
     const results = await mapLimit(files, GIT_FANOUT_CONCURRENCY, async (file) => {
       if (await this.isSubmodule(file, repoPath, signal)) {
         return null;
@@ -350,32 +365,7 @@ export class GitService {
     return results.filter((d): d is string => d !== null);
   }
 
-  private static async getStagedDiff(repoPath: string, prefix?: string, signal?: AbortSignal): Promise<string[]> {
-    return this.getDiffForFiles(
-      repoPath,
-      ['diff', '--cached', '--name-only'],
-      ['diff', '--cached'],
-      prefix,
-      signal,
-    );
-  }
-
-  private static async getUnstagedDiff(repoPath: string, signal?: AbortSignal): Promise<string[]> {
-    return this.getDiffForFiles(
-      repoPath,
-      ['diff', '--name-only'],
-      ['diff'],
-      '# Unstaged changes:\n',
-      signal,
-    );
-  }
-
-  private static async getUntrackedDiff(repoPath: string, signal?: AbortSignal): Promise<string> {
-    const files = await this.listFiles(
-      ['ls-files', '--others', '--exclude-standard'],
-      repoPath,
-      signal,
-    );
+  private static async getUntrackedDiff(files: string[], repoPath: string, signal?: AbortSignal): Promise<string> {
     return this.collectPerFileDiffs(files, '# New files:\n', async (file) => {
       try {
         // `git diff --no-index` always exits with 1 when the two inputs
@@ -395,8 +385,7 @@ export class GitService {
     }, signal);
   }
 
-  private static async getDeletedDiff(repoPath: string, signal?: AbortSignal): Promise<string> {
-    const files = await this.listFiles(['ls-files', '--deleted'], repoPath, signal);
+  private static async getDeletedDiff(files: string[], repoPath: string, signal?: AbortSignal): Promise<string> {
     return this.collectPerFileDiffs(files, '# Deleted files:\n', async (file) => {
       try {
         // git diff -- <file> on a deleted file (in the working tree) emits
@@ -464,8 +453,7 @@ export class GitService {
         .filter((line) => line.trim() !== '')
         .filter((line) => {
           if (onlyStaged) {
-            // For staged changes, check first character
-            return STAGED_STATUS_CODES.has(line[0] as GitStatusCode);
+            return isStagedStatus(line);
           }
           // For all changes, check both staged and unstaged status
           const [staged, unstaged] = [line[0], line[1]];
@@ -558,4 +546,26 @@ export function isDeletedStatus(status: string): boolean {
  */
 export function isNewStatus(status: string): boolean {
   return status === '??' || status === 'A ';
+}
+
+/**
+ * The index column (X) shows a change vs HEAD — i.e. the file is staged. Equals
+ * the set `git diff --cached --name-only` would list (any index code that isn't
+ * "unmodified" ' ' or "untracked" '?'), so deriving the staged flag from a
+ * single `git status --porcelain` parse matches the old `hasChanges('staged')`
+ * probe without a second git call.
+ */
+export function isIndexStaged(status: string): boolean {
+  const x = status[0];
+  return x !== ' ' && x !== '?';
+}
+
+/**
+ * Whether the index column (X) is one of the staged codes the changed-files
+ * list keys on (M/A/D/R). This is the same filter `getChangedFiles(_, true)`
+ * applies, exposed so callers can derive the staged subset from an already
+ * fetched all-changes list instead of re-running `git status`.
+ */
+export function isStagedStatus(status: string): boolean {
+  return STAGED_STATUS_CODES.has(status[0] as GitStatusCode);
 }

@@ -18,6 +18,7 @@ export class GitBlameAnalyzer {
     knownStatus: string,
     useStagedChanges: boolean = false,
     signal?: AbortSignal,
+    knownHasHead?: boolean,
   ): Promise<string> {
     try {
       const normalizedPath = path.normalize(filePath.replace(/^\/+/, ''));
@@ -43,7 +44,11 @@ export class GitBlameAnalyzer {
       } catch {
         throw new Error(`${errorMessages.fileNotFound}: ${absoluteFilePath}`);
       }
-      if (!(await GitService.hasHead(repoPath, signal))) {
+      // `hasHead` is constant for the repo across a single commit run, so the
+      // caller (CommitWorkflow) resolves it once and passes it in; fall back to
+      // a per-file probe when called standalone.
+      const headExists = knownHasHead ?? await GitService.hasHead(repoPath, signal);
+      if (!headExists) {
         throw new Error(errorMessages.noCommitsYet);
       }
 

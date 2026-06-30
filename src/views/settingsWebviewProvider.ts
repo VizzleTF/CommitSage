@@ -1,5 +1,5 @@
 import * as vscode from 'vscode';
-import { ConfigService } from '../utils/configService';
+import { ConfigService, SETTING_DEFAULTS } from '../utils/configService';
 import { CommitLintCliService } from '../services/commitLintCliService';
 import { ApiKeyManager } from '../services/apiKeyManager';
 import { COMMITLINT_COMPATIBLE_FORMATS } from '../services/formatRules';
@@ -33,45 +33,53 @@ const FORMATS = [
     'emoji', 'emojiKarma', 'google', 'atom', 'detailed', 'custom',
 ] as const;
 
-const SETTING_KEYS = {
-    provider: 'commitSage.provider.type',
-    geminiModel: 'commitSage.gemini.model',
-    codestralModel: 'commitSage.codestral.model',
-    openaiModel: 'commitSage.openai.model',
-    openaiBaseUrl: 'commitSage.openai.baseUrl',
-    ollamaModel: 'commitSage.ollama.model',
-    ollamaBaseUrl: 'commitSage.ollama.baseUrl',
-    ollamaUseAuthToken: 'commitSage.ollama.useAuthToken',
-    openrouterModel: 'commitSage.openrouter.model',
-    openrouterPreferFreeModels: 'commitSage.openrouter.preferFreeModels',
-    groqModel: 'commitSage.groq.model',
-    anthropicModel: 'commitSage.anthropic.model',
-    deepseekModel: 'commitSage.deepseek.model',
-    xaiModel: 'commitSage.xai.model',
-    customBaseUrl: 'commitSage.custom.baseUrl',
-    customModel: 'commitSage.custom.model',
-    customUseApiKey: 'commitSage.custom.useApiKey',
-    customChatCompletionsPath: 'commitSage.custom.chatCompletionsPath',
-    maxDiffSize: 'commitSage.general.maxDiffSize',
-    temperature: 'commitSage.general.temperature',
-    ollamaNumCtx: 'commitSage.ollama.numCtx',
-    commitLanguage: 'commitSage.commit.commitLanguage',
-    customLanguageName: 'commitSage.commit.customLanguageName',
-    commitFormat: 'commitSage.commit.commitFormat',
-    promptForRefs: 'commitSage.commit.promptForRefs',
-    onlyStagedChanges: 'commitSage.commit.onlyStagedChanges',
-    autoCommit: 'commitSage.commit.autoCommit',
-    autoPush: 'commitSage.commit.autoPush',
-    useCustomInstructions: 'commitSage.commit.useCustomInstructions',
-    customInstructions: 'commitSage.commit.customInstructions',
-    apiRequestTimeout: 'commitSage.apiRequestTimeout',
-    gitTimeout: 'commitSage.gitTimeout',
-    telemetryEnabled: 'commitSage.telemetry.enabled',
-    commitlintEnabled: 'commitSage.commit.commitlint.enabled',
-    commitlintMaxRetries: 'commitSage.commit.commitlint.maxRetries',
-    commitlintRulesPath: 'commitSage.commit.commitlint.rulesPath',
-    commitlintEngine: 'commitSage.commit.commitlint.engine',
-} as const;
+// Webview camelCase alias -> dotted setting path (no `commitSage.` prefix).
+// `satisfies Record<string, keyof typeof SETTING_DEFAULTS>` makes any drift
+// from the real setting schema in configService a compile error, so these
+// can't silently diverge from SETTING_DEFAULTS the way two hand-kept lists do.
+const SETTING_PATHS = {
+    provider: 'provider.type',
+    geminiModel: 'gemini.model',
+    codestralModel: 'codestral.model',
+    openaiModel: 'openai.model',
+    openaiBaseUrl: 'openai.baseUrl',
+    ollamaModel: 'ollama.model',
+    ollamaBaseUrl: 'ollama.baseUrl',
+    ollamaUseAuthToken: 'ollama.useAuthToken',
+    openrouterModel: 'openrouter.model',
+    openrouterPreferFreeModels: 'openrouter.preferFreeModels',
+    groqModel: 'groq.model',
+    anthropicModel: 'anthropic.model',
+    deepseekModel: 'deepseek.model',
+    xaiModel: 'xai.model',
+    customBaseUrl: 'custom.baseUrl',
+    customModel: 'custom.model',
+    customUseApiKey: 'custom.useApiKey',
+    customChatCompletionsPath: 'custom.chatCompletionsPath',
+    maxDiffSize: 'general.maxDiffSize',
+    temperature: 'general.temperature',
+    ollamaNumCtx: 'ollama.numCtx',
+    commitLanguage: 'commit.commitLanguage',
+    customLanguageName: 'commit.customLanguageName',
+    commitFormat: 'commit.commitFormat',
+    promptForRefs: 'commit.promptForRefs',
+    onlyStagedChanges: 'commit.onlyStagedChanges',
+    autoCommit: 'commit.autoCommit',
+    autoPush: 'commit.autoPush',
+    useCustomInstructions: 'commit.useCustomInstructions',
+    customInstructions: 'commit.customInstructions',
+    apiRequestTimeout: 'apiRequestTimeout',
+    gitTimeout: 'gitTimeout',
+    telemetryEnabled: 'telemetry.enabled',
+    commitlintEnabled: 'commit.commitlint.enabled',
+    commitlintMaxRetries: 'commit.commitlint.maxRetries',
+    commitlintRulesPath: 'commit.commitlint.rulesPath',
+    commitlintEngine: 'commit.commitlint.engine',
+} as const satisfies Record<string, keyof typeof SETTING_DEFAULTS>;
+
+const SETTING_KEYS = Object.fromEntries(
+    Object.entries(SETTING_PATHS).map(([alias, path]) => [alias, `commitSage.${path}`]),
+) as { [K in keyof typeof SETTING_PATHS]: `commitSage.${(typeof SETTING_PATHS)[K]}` };
 
 export class SettingsWebviewProvider implements vscode.WebviewViewProvider {
     public static readonly viewId = VIEW_ID;
@@ -241,8 +249,8 @@ export class SettingsWebviewProvider implements vscode.WebviewViewProvider {
 
         return {
             trusted: vscode.workspace.isTrusted,
-            projectOverrides: (Object.keys(SETTING_KEYS) as (keyof typeof SETTING_KEYS)[])
-                .filter(name => ConfigService.isProjectOverridden(SETTING_KEYS[name].replace(/^commitSage\./, ''))),
+            projectOverrides: (Object.keys(SETTING_PATHS) as (keyof typeof SETTING_PATHS)[])
+                .filter(name => ConfigService.isProjectOverridden(SETTING_PATHS[name])),
             provider: ConfigService.get('provider.type') as Provider,
             models: this.models,
             selected: Object.fromEntries(
