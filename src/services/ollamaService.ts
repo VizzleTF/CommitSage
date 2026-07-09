@@ -1,15 +1,18 @@
 import { Logger } from '../utils/logger';
 import { CommitMessage, ProgressReporter, GenerateOptions, ApiErrorResult } from '../models/types';
 import { ConfigService } from '../utils/configService';
-import { extractAndValidateMessage, getConfiguredTemperature, handleHttpError, withRetryAndApiKeyGuard } from './baseAIService';
+import { extractAndValidateMessage, getConfiguredTemperature, handleHttpError, resolveMaxOutputTokens, withRetryAndApiKeyGuard } from './baseAIService';
 import { HttpError, HttpUtils, NetworkError } from '../utils/httpUtils';
 import { RetryUtils } from '../utils/retryUtils';
 import { ApiKeyManager } from './apiKeyManager';
+import { TruncatedResponseError } from '../models/errors';
 
 interface OllamaResponse {
     message: {
         content: string;
     };
+    // eslint-disable-next-line @typescript-eslint/naming-convention
+    done_reason?: string;
 }
 
 export class OllamaService {
@@ -30,17 +33,15 @@ export class OllamaService {
             ],
             stream: false
         };
-        // Ollama nests sampling parameters under `options`. We always send
-        // `temperature`; `num_ctx` and `num_predict` are conditional so
-        // Ollama keeps its own per-model defaults when the user hasn't
-        // overridden them.
+        // Ollama nests sampling parameters under `options`. `num_ctx` stays
+        // conditional so Ollama keeps its own per-model default when the user
+        // hasn't overridden it; `num_predict` carries the shared output budget,
+        // which local reasoning models also draw their thinking from.
         const ollamaOptions: Record<string, unknown> = { temperature: getConfiguredTemperature() };
+        ollamaOptions['num_predict'] = resolveMaxOutputTokens(options, attempt);
         const numCtx = ConfigService.get('ollama.numCtx');
         if (typeof numCtx === 'number' && numCtx > 0) {
             ollamaOptions['num_ctx'] = numCtx;
-        }
-        if (options?.maxTokens !== undefined) {
-            ollamaOptions['num_predict'] = options.maxTokens;
         }
         payload['options'] = ollamaOptions;
 
@@ -100,6 +101,10 @@ export class OllamaService {
     }
 
     private static extractCommitMessage(response: OllamaResponse): string {
+        // Ollama reports `length` when generation stopped at `num_predict`.
+        if (response.done_reason === 'length') {
+            throw new TruncatedResponseError('Ollama', 'generation stopped at num_predict');
+        }
         const content = response.message?.content;
         return extractAndValidateMessage(content, 'Ollama');
     }

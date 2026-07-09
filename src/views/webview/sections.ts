@@ -19,6 +19,9 @@ import { init, L, KEYS, COMMITLINT_COMPAT_FORMATS, NO_REFRESH_PROVIDERS } from '
 import { send, setSetting } from './vscodeApi';
 import { formatSupportsCommitlint, formatUsesCustomInstructions } from './commitFormatPolicy';
 
+/** Mirrors the `commitSage.gemini.thinkingLevel` enum in package.json. */
+const THINKING_LEVELS = ['minimal', 'low', 'medium', 'high'] as const;
+
 export function renderProviderPick(state: ViewState): HTMLElement {
     const providerPinned = isPinned(state, 'provider');
     const options = init.providers.map(p => ({
@@ -506,6 +509,36 @@ export function renderAdvancedSection(state: ViewState): HTMLElement {
         v => setSetting(KEYS.temperature, v),
     ));
     body.appendChild(el('div', { class: 'hint' }, [L.temperatureHint]));
+
+    body.appendChild(fieldLabel(L.maxOutputTokens));
+    body.appendChild(makeNumberInput(
+        'max-output-tokens',
+        state.advanced.maxOutputTokens,
+        v => setSetting(KEYS.maxOutputTokens, v),
+    ));
+    body.appendChild(el('div', { class: 'hint' }, [L.maxOutputTokensHint]));
+
+    // Gemini-only: the two thinking knobs. Both are shown because a single
+    // Gemini install switches between 2.5 and 3.x models (and `auto` picks for
+    // you), and each family only honours one of them.
+    if (state.provider === 'gemini') {
+        body.appendChild(fieldLabel(L.geminiThinkingBudget));
+        body.appendChild(makeNumberInput(
+            'gemini-thinking-budget',
+            state.gemini.thinkingBudget,
+            v => setSetting(KEYS.geminiThinkingBudget, v),
+        ));
+        body.appendChild(el('div', { class: 'hint' }, [L.geminiThinkingBudgetHint]));
+
+        body.appendChild(fieldLabel(L.geminiThinkingLevel));
+        body.appendChild(makeSelect(
+            'gemini-thinking-level',
+            THINKING_LEVELS.map(value => ({ value, label: value })),
+            state.gemini.thinkingLevel,
+            v => setSetting(KEYS.geminiThinkingLevel, v),
+        ));
+        body.appendChild(el('div', { class: 'hint' }, [L.geminiThinkingLevelHint]));
+    }
 
     // Ollama-only: context window override. Surfaced regardless of selected
     // provider since the Advanced section already collects cross-cutting

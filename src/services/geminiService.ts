@@ -1,20 +1,25 @@
 import { Logger } from '../utils/logger';
 import { ConfigService } from '../utils/configService';
 import { ProgressReporter, CommitMessage, GenerateOptions } from '../models/types';
-import { ApiKeyInvalidError } from '../models/errors';
-import { extractAndValidateMessage, getConfiguredTemperature, withRetryAndApiKeyGuard } from './baseAIService';
+import { ApiKeyInvalidError, TruncatedResponseError } from '../models/errors';
+import { extractAndValidateMessage, getConfiguredTemperature, resolveMaxOutputTokens, withRetryAndApiKeyGuard } from './baseAIService';
 import { HttpError, HttpUtils } from '../utils/httpUtils';
 import { RetryUtils } from '../utils/retryUtils';
 import { ApiKeyManager } from './apiKeyManager';
 import { toError } from '../utils/errorUtils';
 
+interface GeminiPart {
+    text?: string;
+    /** Set on the reasoning summary a thinking model emits ahead of its answer. */
+    thought?: boolean;
+}
+
 interface GeminiResponse {
-    candidates: Array<{
-        content: {
-            parts: Array<{
-                text: string;
-            }>;
+    candidates?: Array<{
+        content?: {
+            parts?: GeminiPart[];
         };
+        finishReason?: string;
     }>;
 }
 
@@ -31,16 +36,69 @@ interface GeminiModelsResponse {
 const GEMINI_GENERATION_CONFIG_BASE = {
     topK: 40,
     topP: 0.95,
-    maxOutputTokens: 1024
 } as const;
 
-function buildGeminiGenerationConfig(options?: GenerateOptions): Record<string, unknown> {
+/** Gemini 2.5 Pro is the one 2.5 model that cannot switch thinking off. */
+const GEMINI_PRO_MIN_THINKING_BUDGET = 128;
+
+const THINKING_LEVELS = ['minimal', 'low', 'medium', 'high'];
+const DEFAULT_THINKING_LEVEL = 'low';
+
+// `.commitsage/config.json` is parsed leniently, so both knobs are sanitized
+// here rather than trusted — a bad value would otherwise reach the API as
+// `NaN` or an unknown enum and come back as a 400.
+function readThinkingBudget(): number {
+    const raw = ConfigService.get('gemini.thinkingBudget');
+    return typeof raw === 'number' && Number.isFinite(raw) ? Math.trunc(raw) : 0;
+}
+
+function readThinkingLevel(): string {
+    const raw = ConfigService.get('gemini.thinkingLevel');
+    return THINKING_LEVELS.includes(raw) ? raw : DEFAULT_THINKING_LEVEL;
+}
+
+/**
+ * `thinkingConfig` is family-specific and the API rejects the wrong knob with
+ * HTTP 400 ("Thinking level is not supported for this model"), so gate on the
+ * model version rather than sending both:
+ *   - Gemini 3.x         → `thinkingLevel` (thinking cannot be disabled)
+ *   - Gemini 2.5         → `thinkingBudget` (`0` disables, `-1` = model decides)
+ *   - Gemini 2.0, Gemma  → no thinking support, send nothing
+ *
+ * This exists because thinking tokens are drawn from `maxOutputTokens`. Left
+ * unbounded, the model spends the whole budget reasoning and its commit message
+ * comes back cut off mid-line, or the reasoning summary is returned in place of
+ * the message (#447).
+ */
+function buildThinkingConfig(model: string): Record<string, unknown> | undefined {
+    if (!model.startsWith('gemini-')) {
+        return undefined;
+    }
+    const version = geminiVersionScore(model);
+
+    if (version >= 3) {
+        return { thinkingLevel: readThinkingLevel() };
+    }
+    if (version >= 2.5) {
+        const budget = readThinkingBudget();
+        if (budget < 0) {
+            return { thinkingBudget: -1 };
+        }
+        const floor = model.includes('pro') ? GEMINI_PRO_MIN_THINKING_BUDGET : 0;
+        return { thinkingBudget: Math.max(budget, floor) };
+    }
+    return undefined;
+}
+
+function buildGeminiGenerationConfig(model: string, options?: GenerateOptions, attempt: number = 1): Record<string, unknown> {
     const cfg: Record<string, unknown> = {
         ...GEMINI_GENERATION_CONFIG_BASE,
         temperature: getConfiguredTemperature(),
+        maxOutputTokens: resolveMaxOutputTokens(options, attempt),
     };
-    if (options?.maxTokens) {
-        cfg.maxOutputTokens = options.maxTokens;
+    const thinkingConfig = buildThinkingConfig(model);
+    if (thinkingConfig) {
+        cfg.thinkingConfig = thinkingConfig;
     }
     return cfg;
 }
@@ -63,6 +121,18 @@ function geminiQualityTier(name: string): number {
 function geminiVersionScore(name: string): number {
     const match = /gemini-(\d+(?:\.\d+)?)/.exec(name);
     return match ? Number.parseFloat(match[1]) : 0;
+}
+
+/**
+ * Models Google's `/v1/models` advertises for `generateContent` that still can't
+ * write a commit message: image/audio/TTS/embedding variants, plus the Gemma and
+ * LearnLM families (which also reject `thinkingConfig`). A denylist of markers
+ * rather than an allowlist of names, so new Gemini text models appear on their own.
+ */
+const NON_TEXT_MODEL_MARKER = /image|audio|tts|live|vision|embedding|imagen|veo/;
+
+function isCommitCapableGeminiModel(name: string): boolean {
+    return name.startsWith('gemini-') && !NON_TEXT_MODEL_MARKER.test(name);
 }
 
 function sortGeminiModelsByQuality(models: string[]): string[] {
@@ -94,7 +164,8 @@ export class GeminiService {
                 .filter((model: GeminiModel) =>
                     model.supportedGenerationMethods?.includes('generateContent')
                 )
-                .map((model: GeminiModel) => model.name.replace('models/', ''));
+                .map((model: GeminiModel) => model.name.replace('models/', ''))
+                .filter(isCommitCapableGeminiModel);
 
             const sorted = sortGeminiModelsByQuality(models);
             Logger.log(`Found ${sorted.length} available Gemini models (sorted by quality): ${sorted.join(', ')}`);
@@ -121,17 +192,18 @@ export class GeminiService {
         prompt: string,
         apiKey: string,
         options?: GenerateOptions,
+        attempt: number = 1,
     ): Promise<CommitMessage> {
         const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
         const payload = {
             contents: [{ parts: [{ text: prompt }] }],
-            generationConfig: buildGeminiGenerationConfig(options),
+            generationConfig: buildGeminiGenerationConfig(model, options, attempt),
         };
         const data = await HttpUtils.postJson<GeminiResponse>(apiUrl, payload, {
             headers: { 'content-type': 'application/json', 'x-goog-api-key': apiKey },
             signal: options?.signal,
         });
-        return { message: this.extractCommitMessage(data), model };
+        return { message: this.extractCommitMessage(data, model), model };
     }
 
     private static async tryGenerateWithModels(
@@ -203,7 +275,7 @@ export class GeminiService {
             (p, pr, a) => this.generateCommitMessage(p, pr, a, options),
             async () => {
                 await RetryUtils.updateProgressForAttempt(progress, attempt);
-                const result = await this.callGemini(configuredModel, prompt, apiKey, options);
+                const result = await this.callGemini(configuredModel, prompt, apiKey, options, attempt);
                 progress.report({ message: 'Processing generated message...', increment: 90 });
                 Logger.log(`Commit message generated using ${configuredModel} model`);
                 return result;
@@ -211,8 +283,23 @@ export class GeminiService {
         );
     }
 
-    private static extractCommitMessage(response: GeminiResponse): string {
-        const content = response.candidates?.[0]?.content?.parts?.[0]?.text;
+    private static extractCommitMessage(response: GeminiResponse, model: string): string {
+        const candidate = response.candidates?.[0];
+
+        // A truncated message reads as a valid one — the last line is simply cut
+        // off — so this has to be checked before the text, not after it fails.
+        if (candidate?.finishReason === 'MAX_TOKENS') {
+            throw new TruncatedResponseError('Gemini', `${model} exhausted maxOutputTokens`);
+        }
+
+        // Thinking models return their reasoning summary as its own part ahead of
+        // the answer. Reading `parts[0]` blindly surfaced that summary as the
+        // commit message (#447); take every part that isn't a thought.
+        const content = (candidate?.content?.parts ?? [])
+            .filter(part => !part.thought)
+            .map(part => part.text ?? '')
+            .join('');
+
         return extractAndValidateMessage(content, 'Gemini');
     }
 

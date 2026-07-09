@@ -1,18 +1,21 @@
 import { Logger } from '../utils/logger';
 import type { CommitMessage, ProgressReporter, GenerateOptions } from '../models/types';
-import { extractAndValidateMessage, getConfiguredTemperature, withRetryAndApiKeyGuard } from './baseAIService';
+import { extractAndValidateMessage, getConfiguredTemperature, resolveMaxOutputTokens, withRetryAndApiKeyGuard } from './baseAIService';
 import { HttpUtils } from '../utils/httpUtils';
 import { RetryUtils } from '../utils/retryUtils';
 import { ConfigService } from '../utils/configService';
 import { ApiKeyManager } from './apiKeyManager';
 import { providerMeta } from './providerCatalog';
 import { Provider } from '../views/webview/protocol';
+import { TruncatedResponseError } from '../models/errors';
 
 interface OpenAIResponse {
     choices: Array<{
         message: {
             content: string;
         };
+        // eslint-disable-next-line @typescript-eslint/naming-convention
+        finish_reason?: string;
     }>;
 }
 
@@ -60,7 +63,7 @@ export async function generateViaOpenAICompatible(
                 messages: [{ role: 'user', content: prompt }],
                 temperature: getConfiguredTemperature(),
                 // eslint-disable-next-line @typescript-eslint/naming-convention
-                max_tokens: options?.maxTokens ?? 1024,
+                max_tokens: resolveMaxOutputTokens(options, attempt),
             };
 
             await RetryUtils.updateProgressForAttempt(progress, attempt);
@@ -79,8 +82,19 @@ export async function generateViaOpenAICompatible(
 
             progress.report({ message: 'Processing generated message...', increment: 90 });
 
+            const choice = data.choices?.[0];
+            // `length` means the model ran out of `max_tokens` mid-message. Reasoning
+            // models (DeepSeek `reasoner`, OpenAI o-series) spend that budget on
+            // reasoning tokens, so they hit it long before the answer is finished.
+            if (choice?.finish_reason === 'length') {
+                throw new TruncatedResponseError(
+                    request.providerLabel,
+                    `${request.model} exhausted max_tokens`,
+                );
+            }
+
             const message = extractAndValidateMessage(
-                data.choices?.[0]?.message?.content,
+                choice?.message?.content,
                 request.providerLabel,
             );
             Logger.log(`Commit message generated using ${request.model} model`);

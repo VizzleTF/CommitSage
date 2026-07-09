@@ -1,6 +1,6 @@
-import { ApiErrorResult, CommitMessage, ProgressReporter } from '../models/types';
+import { ApiErrorResult, CommitMessage, GenerateOptions, ProgressReporter } from '../models/types';
 import { errorMessages } from '../utils/constants';
-import { ApiKeyInvalidError } from '../models/errors';
+import { ApiKeyInvalidError, TruncatedResponseError } from '../models/errors';
 import { RetryUtils } from '../utils/retryUtils';
 import { toError } from '../utils/errorUtils';
 import { HttpError, NetworkError } from '../utils/httpUtils';
@@ -18,6 +18,39 @@ export function getConfiguredTemperature(): number {
         return 0.7;
     }
     return Math.max(0, Math.min(2, raw));
+}
+
+/** Absolute cap on the output budget, so a hand-edited config can't ask a provider for millions of tokens. */
+export const MAX_OUTPUT_TOKENS_CEILING = 32768;
+const DEFAULT_MAX_OUTPUT_TOKENS = 4096;
+/** Doubling past this many retries would only burn quota — the budget is not the problem by then. */
+const MAX_BUDGET_DOUBLINGS = 3;
+
+/**
+ * Shared output-token budget (`general.maxOutputTokens`, default 4096).
+ *
+ * A commit message is ~40-60 tokens, so this is a runaway guard, not a length
+ * limit. It has to be generous because reasoning models bill their thinking
+ * against the same budget: Gemini 2.5 Pro cannot disable thinking at all, and
+ * the old hardcoded 1024 left ~40 tokens for the answer, truncating it (#447).
+ */
+export function getConfiguredMaxOutputTokens(): number {
+    const raw = ConfigService.get('general.maxOutputTokens');
+    if (typeof raw !== 'number' || !Number.isFinite(raw) || raw <= 0) {
+        return DEFAULT_MAX_OUTPUT_TOKENS;
+    }
+    return Math.min(Math.floor(raw), MAX_OUTPUT_TOKENS_CEILING);
+}
+
+/**
+ * Output budget for a single attempt, doubled on each retry. Truncation is the
+ * one failure a retry can fix only by asking for more room — replaying the same
+ * budget would truncate at exactly the same place.
+ */
+export function resolveMaxOutputTokens(options?: GenerateOptions, attempt: number = 1): number {
+    const base = options?.maxTokens ?? getConfiguredMaxOutputTokens();
+    const doublings = Math.min(Math.max(attempt - 1, 0), MAX_BUDGET_DOUBLINGS);
+    return Math.min(base * 2 ** doublings, MAX_OUTPUT_TOKENS_CEILING);
 }
 
 /**
@@ -161,6 +194,11 @@ function handleHttpStatus(
 }
 
 export function handleHttpError(error: Error, serviceName: string): ApiErrorResult {
+    // Retryable, and worth retrying: the next attempt gets double the budget.
+    if (error instanceof TruncatedResponseError) {
+        return { errorMessage: error.message, shouldRetry: true };
+    }
+
     if (error instanceof HttpError) {
         // Provider error bodies are inconsistent: some use `{error: {message}}`,
         // some `{error: "..."}` (a string), some bare strings. Normalize.

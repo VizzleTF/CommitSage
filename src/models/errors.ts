@@ -53,3 +53,18 @@ export class ApiKeyInvalidError extends Error {
         this.name = 'ApiKeyInvalidError';
     }
 }
+
+/**
+ * The provider stopped mid-message because it ran out of output tokens, so the
+ * commit message we got back is cut off (#447). Retryable: `resolveMaxOutputTokens`
+ * doubles the budget on each attempt, so the retry is not a repeat of the same call.
+ */
+export class TruncatedResponseError extends Error {
+    constructor(provider: string, detail: string) {
+        super(
+            `${provider} stopped generating before the message was complete (${detail}). ` +
+            'Raise `commitSage.general.maxOutputTokens` if this keeps happening.'
+        );
+        this.name = 'TruncatedResponseError';
+    }
+}

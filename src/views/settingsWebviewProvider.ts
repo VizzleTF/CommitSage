@@ -61,6 +61,9 @@ const SETTING_PATHS = {
     customChatCompletionsPath: 'custom.chatCompletionsPath',
     maxDiffSize: 'general.maxDiffSize',
     temperature: 'general.temperature',
+    maxOutputTokens: 'general.maxOutputTokens',
+    geminiThinkingBudget: 'gemini.thinkingBudget',
+    geminiThinkingLevel: 'gemini.thinkingLevel',
     ollamaNumCtx: 'ollama.numCtx',
     commitLanguage: 'commit.commitLanguage',
     customLanguageName: 'commit.customLanguageName',
@@ -300,6 +303,10 @@ export class SettingsWebviewProvider implements vscode.WebviewViewProvider {
             ) as Record<Provider, string>,
             hasApiKey: Object.fromEntries(hasApiKeyEntries) as Record<Provider, boolean>,
             openai: { baseUrl: ConfigService.get('openai.baseUrl') },
+            gemini: {
+                thinkingBudget: ConfigService.get('gemini.thinkingBudget'),
+                thinkingLevel: ConfigService.get('gemini.thinkingLevel'),
+            },
             ollama: {
                 baseUrl: ConfigService.get('ollama.baseUrl'),
                 useAuthToken: ConfigService.get('ollama.useAuthToken'),
@@ -346,6 +353,7 @@ export class SettingsWebviewProvider implements vscode.WebviewViewProvider {
                 gitTimeout: ConfigService.get('gitTimeout'),
                 maxDiffSize: ConfigService.get('general.maxDiffSize'),
                 temperature: ConfigService.get('general.temperature'),
+                maxOutputTokens: ConfigService.get('general.maxOutputTokens'),
                 telemetryEnabled: ConfigService.get('telemetry.enabled'),
             },
         };

@@ -101,6 +101,12 @@ export interface WebviewL10n {
     maxDiffSizeHint: string;
     temperature: string;
     temperatureHint: string;
+    maxOutputTokens: string;
+    maxOutputTokensHint: string;
+    geminiThinkingBudget: string;
+    geminiThinkingBudgetHint: string;
+    geminiThinkingLevel: string;
+    geminiThinkingLevelHint: string;
     ollamaNumCtx: string;
     ollamaNumCtxHint: string;
     telemetry: string;
@@ -133,6 +139,7 @@ export interface ViewState {
     selected: Record<Provider, string>;
     hasApiKey: Record<Provider, boolean>;
     openai: { baseUrl: string };
+    gemini: { thinkingBudget: number; thinkingLevel: string };
     ollama: { baseUrl: string; useAuthToken: boolean; numCtx: number };
     openrouter: { preferFreeModels: boolean };
     custom: { baseUrl: string; useApiKey: boolean; chatCompletionsPath: string };
@@ -168,6 +175,7 @@ export interface ViewState {
         gitTimeout: number;
         maxDiffSize: number;
         temperature: number;
+        maxOutputTokens: number;
         telemetryEnabled: boolean;
     };
 }

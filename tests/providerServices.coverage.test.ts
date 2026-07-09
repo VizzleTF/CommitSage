@@ -159,6 +159,52 @@ describe('getConfiguredTemperature', () => {
     });
 });
 
+describe('resolveMaxOutputTokens', () => {
+    it('reads general.maxOutputTokens, falling back to 4096 on junk', async () => {
+        const { resolveMaxOutputTokens } = await import('../src/services/baseAIService');
+        SETTINGS['general.maxOutputTokens'] = 2048;
+        expect(resolveMaxOutputTokens()).toBe(2048);
+
+        SETTINGS['general.maxOutputTokens'] = 'plenty' as unknown as number;
+        expect(resolveMaxOutputTokens()).toBe(4096);
+        SETTINGS['general.maxOutputTokens'] = 0;
+        expect(resolveMaxOutputTokens()).toBe(4096);
+        SETTINGS['general.maxOutputTokens'] = 4096;
+    });
+
+    it('an explicit maxTokens option wins over the setting', async () => {
+        const { resolveMaxOutputTokens } = await import('../src/services/baseAIService');
+        expect(resolveMaxOutputTokens({ maxTokens: 50 })).toBe(50);
+    });
+
+    it('doubles the budget per retry, since replaying it would truncate identically', async () => {
+        const { resolveMaxOutputTokens } = await import('../src/services/baseAIService');
+        SETTINGS['general.maxOutputTokens'] = 1024;
+        expect(resolveMaxOutputTokens(undefined, 1)).toBe(1024);
+        expect(resolveMaxOutputTokens(undefined, 2)).toBe(2048);
+        expect(resolveMaxOutputTokens(undefined, 3)).toBe(4096);
+        SETTINGS['general.maxOutputTokens'] = 4096;
+    });
+
+    it('never exceeds the ceiling, however many retries or however large the setting', async () => {
+        const { resolveMaxOutputTokens, MAX_OUTPUT_TOKENS_CEILING } = await import('../src/services/baseAIService');
+        SETTINGS['general.maxOutputTokens'] = 1_000_000;
+        expect(resolveMaxOutputTokens()).toBe(MAX_OUTPUT_TOKENS_CEILING);
+        expect(resolveMaxOutputTokens(undefined, 9)).toBe(MAX_OUTPUT_TOKENS_CEILING);
+        SETTINGS['general.maxOutputTokens'] = 4096;
+    });
+});
+
+describe('handleHttpError on a truncated response', () => {
+    it('is retryable — the retry asks for a bigger budget', async () => {
+        const { handleHttpError } = await import('../src/services/baseAIService');
+        const { TruncatedResponseError } = await import('../src/models/errors');
+        const r = handleHttpError(new TruncatedResponseError('Gemini', 'ran out'), 'Gemini');
+        expect(r.shouldRetry).toBe(true);
+        expect(r.errorMessage).toContain('maxOutputTokens');
+    });
+});
+
 describe('isInvalidApiKeyError', () => {
     it('true for 401', async () => {
         const { isInvalidApiKeyError } = await import('../src/services/baseAIService');
@@ -315,13 +361,13 @@ describe.each(retryCases)('$name retry closure', ({ provider, model }) => {
 });
 
 describe('generateViaOpenAICompatible defaults', () => {
-    it('defaults max_tokens to 1024 and forwards provided maxTokens', async () => {
+    it('defaults max_tokens to general.maxOutputTokens and forwards provided maxTokens', async () => {
 
         mockedPostJson.mockResolvedValueOnce({
             choices: [{ message: { content: 'ok' } }],
         });
         await generateViaOpenAICompatibleProvider('openai', 'hi', progress, 1);
-        expect(mockedPostJson.mock.calls[0][1]).toMatchObject({ max_tokens: 1024 });
+        expect(mockedPostJson.mock.calls[0][1]).toMatchObject({ max_tokens: 4096 });
 
         mockedPostJson.mockResolvedValueOnce({
             choices: [{ message: { content: 'ok' } }],
@@ -537,18 +583,18 @@ describe('GeminiService coverage', () => {
 
     it('geminiVersionScore returns 0 for names without a version (branch 65)', async () => {
         const { GeminiService } = await import('../src/services/geminiService');
-        // "custom-model" has no gemini-<num> prefix → versionScore 0 for that one.
+        // "gemini-experimental" carries no gemini-<num> version → versionScore 0.
         // Pair it with a real flash model so the sort comparator hits the
         // versionDiff path where one side scored 0.
         mockedGetJson.mockResolvedValueOnce({
             models: [
                 { name: 'models/gemini-2.5-flash', supportedGenerationMethods: ['generateContent'] },
-                { name: 'models/custom-model', supportedGenerationMethods: ['generateContent'] },
+                { name: 'models/gemini-experimental', supportedGenerationMethods: ['generateContent'] },
             ],
         });
         const models = await GeminiService.getAvailableModels('k');
-        // custom-model (tier 1, version 0) sorts after gemini-2.5-flash (tier 1, version 2.5)
-        expect(models).toEqual(['gemini-2.5-flash', 'custom-model']);
+        // gemini-experimental (tier 1, version 0) sorts after gemini-2.5-flash (tier 1, version 2.5)
+        expect(models).toEqual(['gemini-2.5-flash', 'gemini-experimental']);
     });
 
     it('getAvailableModels filters out models without generateContent', async () => {

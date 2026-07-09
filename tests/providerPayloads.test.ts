@@ -102,7 +102,7 @@ describe('OpenAIService payload', () => {
         expect(payload).not.toHaveProperty('maxTokens');
     });
 
-    it('defaults max_tokens to 1024 when no options', async () => {
+    it('defaults max_tokens to general.maxOutputTokens when no options', async () => {
 
         mockedPostJson.mockResolvedValueOnce({
             choices: [{ message: { content: 'ok' } }],
@@ -110,7 +110,7 @@ describe('OpenAIService payload', () => {
 
         await generateViaOpenAICompatibleProvider('openai', 'hi', progress, 1);
         const [, payload] = mockedPostJson.mock.calls[0];
-        expect(payload).toMatchObject({ max_tokens: 1024 });
+        expect(payload).toMatchObject({ max_tokens: 4096 });
     });
 });
 
@@ -130,8 +130,9 @@ describe('CodestralService payload', () => {
             messages: [{ role: 'user', content: 'hello' }],
         });
         // Codestral now goes through the shared OpenAI-compatible path, which
-        // defaults max_tokens to 1024 (matching its OpenAI-shaped siblings).
-        expect(payload).toMatchObject({ max_tokens: 1024 });
+        // defaults max_tokens to `general.maxOutputTokens` (matching its
+        // OpenAI-shaped siblings).
+        expect(payload).toMatchObject({ max_tokens: 4096 });
     });
 
     it('forwards maxTokens as max_tokens (snake_case) when provided', async () => {
@@ -164,12 +165,11 @@ describe('OllamaService payload', () => {
         expect(payload).toMatchObject({
             model: 'llama3.2',
             stream: false,
-            options: { temperature: 0.7 },
+            // num_predict always carries the shared output budget
+            options: { temperature: 0.7, num_predict: 4096 },
         });
         // num_ctx omitted when general default (0)
         expect((payload as { options: Record<string, unknown> }).options).not.toHaveProperty('num_ctx');
-        // num_predict omitted when no maxTokens passed
-        expect((payload as { options: Record<string, unknown> }).options).not.toHaveProperty('num_predict');
     });
 
     it('forwards maxTokens as options.num_predict when provided (F009)', async () => {
@@ -312,7 +312,7 @@ describe('GroqService payload', () => {
         expect(payload).toMatchObject({
             model: 'llama-3.3-70b-versatile',
             messages: [{ role: 'user', content: 'hello' }],
-            max_tokens: 1024,
+            max_tokens: 4096,
         });
         const headers = (opts as { headers: Record<string, string> }).headers;
         expect(headers['Authorization']).toBe('Bearer test-key');
@@ -410,7 +410,7 @@ describe('AnthropicService payload', () => {
         expect(url).toBe('https://api.anthropic.com/v1/messages');
         expect(payload).toMatchObject({
             model: 'claude-sonnet-4-5-20250929',
-            max_tokens: 1024,
+            max_tokens: 4096,
             messages: [{ role: 'user', content: 'hello' }],
         });
         const headers = (opts as { headers: Record<string, string> }).headers;
@@ -491,5 +491,67 @@ describe('CustomOpenAIService payload', () => {
         expect(url).toBe('http://localhost:1234/v1/v1/completions');
 
         SETTINGS['custom.chatCompletionsPath'] = '/chat/completions';
+    });
+});
+
+// A message that stopped at the token cap is cut off mid-line but otherwise
+// looks valid, so every provider has to recognize its own "ran out of budget"
+// signal rather than committing the fragment (#447).
+describe('truncated responses are rejected, not committed', () => {
+    it('OpenAI-compatible: finish_reason "length"', async () => {
+        const { TruncatedResponseError } = await import('../src/models/errors');
+        mockedPostJson.mockResolvedValueOnce({
+            choices: [{ message: { content: 'fix(auth): wrap reset form in' }, finish_reason: 'length' }],
+        });
+
+        await expect(
+            generateViaOpenAICompatibleProvider('openai', 'hi', progress, 1)
+        ).rejects.toBeInstanceOf(TruncatedResponseError);
+    });
+
+    it('OpenAI-compatible: finish_reason "stop" is accepted', async () => {
+        mockedPostJson.mockResolvedValueOnce({
+            choices: [{ message: { content: 'feat: ok' }, finish_reason: 'stop' }],
+        });
+
+        const result = await generateViaOpenAICompatibleProvider('openai', 'hi', progress, 1);
+        expect(result.message).toBe('feat: ok');
+    });
+
+    it('Anthropic: stop_reason "max_tokens"', async () => {
+        const { AnthropicService } = await import('../src/services/anthropicService');
+        const { TruncatedResponseError } = await import('../src/models/errors');
+        mockedPostJson.mockResolvedValueOnce({
+            content: [{ type: 'text', text: 'fix(auth): wrap reset form in' }],
+            stop_reason: 'max_tokens',
+        });
+
+        await expect(
+            AnthropicService.generateCommitMessage('hi', progress, 1)
+        ).rejects.toBeInstanceOf(TruncatedResponseError);
+    });
+
+    it('Ollama: done_reason "length"', async () => {
+        const { OllamaService } = await import('../src/services/ollamaService');
+        const { TruncatedResponseError } = await import('../src/models/errors');
+        mockedPostJson.mockResolvedValueOnce({
+            message: { content: 'fix(auth): wrap reset form in' },
+            done_reason: 'length',
+        });
+
+        await expect(
+            OllamaService.generateCommitMessage('hi', progress, 1)
+        ).rejects.toBeInstanceOf(TruncatedResponseError);
+    });
+
+    it('Ollama: done_reason "stop" is accepted', async () => {
+        const { OllamaService } = await import('../src/services/ollamaService');
+        mockedPostJson.mockResolvedValueOnce({
+            message: { content: 'feat: ok' },
+            done_reason: 'stop',
+        });
+
+        const result = await OllamaService.generateCommitMessage('hi', progress, 1);
+        expect(result.message).toBe('feat: ok');
     });
 });

@@ -1,10 +1,11 @@
 import { Logger } from '../utils/logger';
 import { ConfigService } from '../utils/configService';
 import type { CommitMessage, ProgressReporter, GenerateOptions } from '../models/types';
-import { extractAndValidateMessage, getConfiguredTemperature, withRetryAndApiKeyGuard } from './baseAIService';
+import { extractAndValidateMessage, getConfiguredTemperature, resolveMaxOutputTokens, withRetryAndApiKeyGuard } from './baseAIService';
 import { HttpUtils } from '../utils/httpUtils';
 import { RetryUtils } from '../utils/retryUtils';
 import { ApiKeyManager } from './apiKeyManager';
+import { TruncatedResponseError } from '../models/errors';
 
 /**
  * Anthropic Messages API. NOT OpenAI-compatible:
@@ -24,6 +25,8 @@ interface AnthropicResponse {
         type?: string;
         text?: string;
     }>;
+    // eslint-disable-next-line @typescript-eslint/naming-convention
+    stop_reason?: string;
 }
 
 const ANTHROPIC_API_URL = 'https://api.anthropic.com/v1/messages';
@@ -49,7 +52,7 @@ export class AnthropicService {
                 const payload = {
                     model,
                     // eslint-disable-next-line @typescript-eslint/naming-convention
-                    max_tokens: options?.maxTokens ?? 1024,
+                    max_tokens: resolveMaxOutputTokens(options, attempt),
                     temperature: getConfiguredTemperature(),
                     messages: [{ role: 'user', content: prompt }],
                 };
@@ -71,6 +74,10 @@ export class AnthropicService {
                 );
 
                 progress.report({ message: 'Processing generated message...', increment: 90 });
+
+                if (data.stop_reason === 'max_tokens') {
+                    throw new TruncatedResponseError('Anthropic', `${model} exhausted max_tokens`);
+                }
 
                 // First text block — Anthropic can interleave `text` and `tool_use`
                 // blocks in `content[]`; we only ask for plain completion so
