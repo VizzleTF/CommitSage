@@ -2,7 +2,7 @@
   "name": "geminicommit",
   "displayName": "Commit Sage",
   "description": "Free AI commit messages using Gemini, OpenRouter, Groq, Claude, DeepSeek, xAI, Ollama, or any OpenAI-compatible LLM",
-  "version": "3.3.0",
+  "version": "3.3.1",
   "publisher": "VizzleTF",
   "repository": {
     "type": "git",
@@ -663,6 +663,32 @@
           "default": true,
           "description": "Enable telemetry for Commit Sage",
           "order": 22
+        },
+        "commitSage.general.maxOutputTokens": {
+          "type": "number",
+          "default": 4096,
+          "minimum": 1,
+          "markdownDescription": "Maximum number of tokens the model may generate for one commit message, applied to every provider (Gemini `generationConfig.maxOutputTokens`, Anthropic/OpenAI-compatible `max_tokens`, Ollama `options.num_predict`).\n\nA commit message is only ~40-60 tokens, so this is a runaway guard rather than a length limit. It must stay generous because **reasoning models bill their thinking against this same budget** — with too low a value the model spends the budget thinking and its answer is cut off mid-line. On truncation Commit Sage retries with double the budget, up to `32768`.",
+          "order": 23
+        },
+        "commitSage.gemini.thinkingBudget": {
+          "type": "number",
+          "default": 0,
+          "minimum": -1,
+          "markdownDescription": "Thinking token budget for **Gemini 2.5** models. `0` disables thinking (fastest, cheapest, and plenty for commit messages), `-1` lets the model decide, any positive number caps it.\n\nIgnored for Gemini 3.x (use `#commitSage.gemini.thinkingLevel#`) and for models without thinking support (Gemini 2.0 and older, Gemma). **Gemini 2.5 Pro cannot disable thinking** — a `0` here is raised to its minimum of `128`.",
+          "order": 24
+        },
+        "commitSage.gemini.thinkingLevel": {
+          "type": "string",
+          "enum": [
+            "minimal",
+            "low",
+            "medium",
+            "high"
+          ],
+          "default": "low",
+          "markdownDescription": "Thinking depth for **Gemini 3.x** models, which cannot turn thinking off entirely. `low` is the default and is ample for commit messages; higher levels spend more tokens and time.\n\nIgnored for Gemini 2.5 and older (use `#commitSage.gemini.thinkingBudget#`) — those models reject this field with HTTP 400.",
+          "order": 25
         }
       }
     }
