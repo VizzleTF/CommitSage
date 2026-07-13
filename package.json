@@ -716,7 +716,7 @@
   "devDependencies": {
     "@eslint/js": "^10.0.1",
     "@types/mocha": "^10.0.10",
-    "@types/node": "^26.1.0",
+    "@types/node": "^26.1.1",
     "@types/sinon": "^22.0.0",
     "@types/vscode": "^1.93.0",
     "@typescript-eslint/eslint-plugin": "^8.61.1",
