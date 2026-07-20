@@ -740,7 +740,7 @@
     "vitest": "^4.1.10"
   },
   "dependencies": {
-    "@amplitude/analytics-node": "^1.5.63",
+    "@amplitude/analytics-node": "^1.5.66",
     "@amplitude/analytics-types": "^2.11.1"
   },
   "overrides": {
