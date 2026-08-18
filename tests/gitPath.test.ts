@@ -30,6 +30,17 @@ describe('unquoteGitPath', () => {
         expect(unquoteGitPath('"a\\\\b.ts"')).toBe('a\\b.ts');
     });
 
+    it('decodes C escapes for tab, newline and carriage return (B9)', () => {
+        expect(unquoteGitPath(String.raw`"a\tb.ts"`)).toBe('a\tb.ts');
+        expect(unquoteGitPath(String.raw`"a\nb.ts"`)).toBe('a\nb.ts');
+        expect(unquoteGitPath(String.raw`"a\rb.ts"`)).toBe('a\rb.ts');
+    });
+
+    it('keeps a literal backslash followed by t as two characters', () => {
+        // git quotes the backslash itself, so `\\t` is `\` + `t`, not a tab.
+        expect(unquoteGitPath(String.raw`"a\\tb.ts"`)).toBe(String.raw`a\tb.ts`);
+    });
+
     it('does not unquote unbalanced quotes', () => {
         expect(unquoteGitPath('"foo')).toBe('"foo');
         expect(unquoteGitPath('foo"')).toBe('foo"');

@@ -62,6 +62,18 @@ export class CommitWorkflow {
                         ref
                     );
                     Logger.log(`Commit message generated: ${commitMessage.message}`);
+                } catch (error) {
+                    // Anything that fails *after* the user hit Cancel is a
+                    // symptom of the abort, not a real failure: git spawns and
+                    // fetch both reject with AbortError, and Gemini's auto mode
+                    // walks the rest of its fallback list first. Left as-is the
+                    // user gets an error popup ("operation was aborted") plus a
+                    // message_generation_failed telemetry event for their own
+                    // cancellation.
+                    if (controller.signal.aborted && !(error instanceof UserCancelledError)) {
+                        throw new UserCancelledError();
+                    }
+                    throw error;
                 } finally {
                     cancelSubscription.dispose();
                 }
@@ -259,7 +271,9 @@ export class CommitWorkflow {
         sourceControlRepository.inputBox.value = finalMessage;
 
         if (ConfigService.get('commit.autoCommit')) {
-            await this.handleAutoCommit(sourceControlRepository);
+            // Nothing was staged when the message was generated, so the commit
+            // has to stage the whole worktree to match what the message says.
+            await this.handleAutoCommit(sourceControlRepository, !useStagedChanges);
         }
 
         return { ...commitMessage, message: finalMessage };
@@ -270,7 +284,10 @@ export class CommitWorkflow {
         await vscode.window.showErrorMessage(vscode.l10n.t('Commit Sage: {0}', error.message));
     }
 
-    private static async handleAutoCommit(repository: vscode.SourceControl): Promise<void> {
+    private static async handleAutoCommit(
+        repository: vscode.SourceControl,
+        stageAll: boolean = false,
+    ): Promise<void> {
         // Last line of defense for the "a repo turns on auto-commit for you"
         // case. `restrictedConfigurations` covers the settings store and
         // `ConfigService` gates `.commitsage/config.json`, but writing to the
@@ -286,7 +303,7 @@ export class CommitWorkflow {
                 throw new Error('No commit message available');
             }
 
-            await GitService.commitChanges(repository.inputBox.value, repository);
+            await GitService.commitChanges(repository.inputBox.value, repository, stageAll);
 
             if (ConfigService.get('commit.autoPush')) {
                 await GitService.pushChanges(repository);

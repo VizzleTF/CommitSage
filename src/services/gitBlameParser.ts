@@ -62,6 +62,11 @@ export function parseChangedLines(diff: string): Set<number> {
         const match = /^@@ -\d+(?:,\d+)? \+(\d+)(?:,\d+)? @@/.exec(line);
         if (match) {
             currentLine = Number.parseInt(match[1], 10);
+        } else if (line.startsWith('\\ ')) {
+            // `\ No newline at end of file` is a diff marker, not content —
+            // counting it shifted every following line of the hunk by one and
+            // attributed the changes to the wrong blame entries.
+            continue;
         } else if (line.startsWith('+') && !line.startsWith('+++')) {
             changedLines.add(currentLine);
             currentLine++;

@@ -1,3 +1,13 @@
+const C_ESCAPES: Record<string, string> = {
+    a: '\u0007',
+    b: '\b',
+    f: '\f',
+    n: '\n',
+    r: '\r',
+    t: '\t',
+    v: '\v',
+};
+
 /**
  * Unquotes a file path returned by git.
  * Git quotes paths containing spaces or special characters (including Unicode).
@@ -22,7 +32,13 @@ export function unquoteGitPath(filePath: string): string {
         // Caller logs; we still return best-effort result
     }
 
-    unquoted = unquoted.replaceAll(String.raw`\"`, '"');
-    unquoted = unquoted.replaceAll(String.raw`\\`, '\\');
+    // Remaining C-style escapes, in one pass so that a literal backslash
+    // (`\\t`) unescapes to `\t` instead of a tab. Paths with a tab or newline
+    // in the name used to keep the raw `\t` / `\n` text, which then failed to
+    // match as a pathspec and silently dropped that file from the diff.
+    unquoted = unquoted.replaceAll(
+        /\\(.)/g,
+        (_, ch: string) => C_ESCAPES[ch] ?? ch,
+    );
     return unquoted;
 }

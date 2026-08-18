@@ -364,3 +364,56 @@ describe('GitService.getDiff (detectChanges / collectDiffs)', () => {
         expect(diff).not.toContain('# Deleted files:');
     });
 });
+
+describe('GitService.getDiff staged renames (B3)', () => {
+    it('diffs a renamed file as a rename pair instead of a new file', async () => {
+        const calls: string[][] = [];
+        installExecGit((args) => {
+            calls.push(args);
+            const key = args.join(' ');
+            switch (key) {
+                case 'rev-parse HEAD':
+                    return 'deadbeef';
+                case 'diff --cached --name-only':
+                    return 'new.txt\n';
+                case 'diff --cached --name-status -M -z':
+                    return 'R100\0old.txt\0new.txt\0';
+                case 'ls-files --stage -- new.txt':
+                    return '100644 hash 0\tnew.txt';
+                case 'diff --cached -M -- old.txt new.txt':
+                    return 'diff --git a/old.txt b/new.txt\nrename from old.txt\nrename to new.txt';
+                default:
+                    return '';
+            }
+        });
+
+        const diff = await GitService.getDiff(REPO, true);
+
+        expect(diff).toContain('rename from old.txt');
+        // The single-pathspec form would have shown the whole file as new.
+        expect(calls.some((c) => c.join(' ') === 'diff --cached -- new.txt')).toBe(false);
+    });
+
+    it('falls back to the plain per-file diff when the rename probe fails', async () => {
+        installExecGit((args) => {
+            const key = args.join(' ');
+            if (key === 'diff --cached --name-status -M -z') {
+                throw new Error('git exploded');
+            }
+            switch (key) {
+                case 'rev-parse HEAD':
+                    return 'deadbeef';
+                case 'diff --cached --name-only':
+                    return 'a.txt\n';
+                case 'ls-files --stage -- a.txt':
+                    return '100644 hash 0\ta.txt';
+                case 'diff --cached -- a.txt':
+                    return 'diff --git a/a.txt b/a.txt\n+line';
+                default:
+                    return '';
+            }
+        });
+
+        await expect(GitService.getDiff(REPO, true)).resolves.toContain('+line');
+    });
+});

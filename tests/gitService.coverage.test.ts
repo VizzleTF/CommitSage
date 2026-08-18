@@ -769,6 +769,43 @@ describe('GitService.commitChanges staging branch coverage', () => {
     });
 });
 
+describe('GitService.commitChanges stageAll (B1)', () => {
+    it('stages the whole worktree with `add -A` before committing', async () => {
+        const calls: string[][] = [];
+        installExecGit((args) => {
+            calls.push(args);
+            // After `add -A` everything the message was generated from is staged.
+            return args.join(' ') === 'diff --cached --name-only' ? 'edited.txt\n' : '';
+        });
+
+        await GitService.commitChanges('msg', fakeRepo('/repo'), true);
+
+        expect(calls[0]).toEqual(['add', '-A']);
+        // The untracked/deleted-only staging path must not run on top of it.
+        expect(calls.filter((c) => c[0] === 'add')).toEqual([['add', '-A']]);
+        expect(calls.some((c) => c[0] === 'commit')).toBe(true);
+    });
+
+    it('does not touch the index when stageAll is false', async () => {
+        const calls: string[][] = [];
+        installExecGit((args) => {
+            calls.push(args);
+            return args.join(' ') === 'diff --cached --name-only' ? 'staged.txt\n' : '';
+        });
+
+        await GitService.commitChanges('msg', fakeRepo('/repo'));
+
+        expect(calls.some((c) => c[0] === 'add')).toBe(false);
+    });
+
+    it('still reports NoChangesDetectedError when `add -A` stages nothing', async () => {
+        installExecGit(() => '');
+        await expect(
+            GitService.commitChanges('msg', fakeRepo('/repo'), true),
+        ).rejects.toBeInstanceOf(NoChangesDetectedError);
+    });
+});
+
 describe('GitService.pushChanges resolves repo via getActiveRepository (branch 179)', () => {
     it('uses getActiveRepository when no repository argument is passed', async () => {
         const repo = fakeRepo('/repo');

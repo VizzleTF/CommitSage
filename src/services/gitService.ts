@@ -47,9 +47,17 @@ export class GitService {
     }
   }
 
+  /**
+   * `stageAll` is set by the workflow when the commit message was generated
+   * from the *unstaged* worktree diff (nothing was staged at generation time).
+   * Without it the commit only picks up untracked and deleted files, so a repo
+   * with unstaged edits either fails with `NoChangesDetectedError` or — worse,
+   * silently — commits a subset that does not match the generated message.
+   */
   static async commitChanges(
     message: string,
     repository?: vscode.SourceControl,
+    stageAll: boolean = false,
   ): Promise<void> {
     try {
       const repo = repository || (await this.getActiveRepository());
@@ -61,6 +69,11 @@ export class GitService {
       }
 
       const repoPath = repo.rootUri.fsPath;
+      if (stageAll) {
+        // `-A` = modified + deleted + untracked, i.e. exactly the set the
+        // unstaged diff was built from (the index equals HEAD in this branch).
+        await this.executeGitCommand(['add', '-A'], repoPath);
+      }
       const hasStagedChanges = await this.hasChanges(repoPath, 'staged');
       const hasUntrackedFiles = await this.hasChanges(repoPath, 'untracked');
       const hasDeletedFiles = await this.hasChanges(repoPath, 'deleted');
@@ -257,11 +270,12 @@ export class GitService {
       deleted: string[];
     },
     signal?: AbortSignal,
+    renames?: Map<string, string>,
   ): Promise<string[]> {
     const diffs: string[] = [];
 
     if (changes.staged.length > 0) {
-      diffs.push(...await this.diffFiles(changes.staged, repoPath, ['diff', '--cached'], '# Staged changes:\n', signal));
+      diffs.push(...await this.diffFiles(changes.staged, repoPath, ['diff', '--cached'], '# Staged changes:\n', signal, renames));
     }
 
     if (changes.unstaged.length > 0) {
@@ -308,12 +322,16 @@ export class GitService {
         throw new NoChangesDetectedError();
       }
 
+      const renames = changes.staged.length > 0
+        ? await this.getStagedRenameMap(repoPath, signal)
+        : undefined;
+
       if (onlyStagedChanges && changes.staged.length > 0) {
-        const staged = await this.diffFiles(changes.staged, repoPath, ['diff', '--cached'], undefined, signal);
+        const staged = await this.diffFiles(changes.staged, repoPath, ['diff', '--cached'], undefined, signal, renames);
         return staged.join('\n\n').trim();
       }
 
-      const diffs = await this.collectDiffs(repoPath, changes, signal);
+      const diffs = await this.collectDiffs(repoPath, changes, signal, renames);
 
       const combinedDiff = diffs.join('\n\n').trim();
       if (!combinedDiff) {
@@ -354,19 +372,63 @@ export class GitService {
    * list as input — the caller already enumerated it in `enumerateChanges` —
    * instead of re-listing it here.
    */
+  /**
+   * `newPath -> oldPath` for staged renames. The per-file diff below passes a
+   * single pathspec, which git cannot pair with the deletion side, so a rename
+   * reaches the model as a whole "new file" blob — misleading context, and for
+   * a large file enough to eat the entire diff size budget. `-z` keeps paths
+   * with spaces/Unicode intact (no C-quoting to undo).
+   */
+  private static async getStagedRenameMap(
+    repoPath: string,
+    signal?: AbortSignal,
+  ): Promise<Map<string, string>> {
+    const renames = new Map<string, string>();
+    try {
+      const output = await this.executeGitCommand(
+        ['diff', '--cached', '--name-status', '-M', '-z'],
+        repoPath,
+        signal,
+      );
+      const fields = output.split('\0');
+      for (let i = 0; i < fields.length; i++) {
+        const status = fields[i];
+        if (!status) { continue; }
+        // R/C records carry two paths (old, new); every other status carries one.
+        if (status.startsWith('R') || status.startsWith('C')) {
+          const from = fields[i + 1];
+          const to = fields[i + 2];
+          if (from && to) { renames.set(to, from); }
+          i += 2;
+        } else {
+          i += 1;
+        }
+      }
+    } catch (error) {
+      if (signal?.aborted) { throw error; }
+      // Rename pairing is an optimization; fall back to plain per-file diffs.
+      Logger.warn(`Failed to read staged renames: ${toError(error).message}`);
+    }
+    return renames;
+  }
+
   private static async diffFiles(
     files: string[],
     repoPath: string,
     diffArgs: string[],
     prefix?: string,
     signal?: AbortSignal,
+    renames?: Map<string, string>,
   ): Promise<string[]> {
     const results = await mapLimit(files, GIT_FANOUT_CONCURRENCY, async (file) => {
       if (await this.isSubmodule(file, repoPath, signal)) {
         return null;
       }
+      const renamedFrom = renames?.get(file);
       const fileDiff = await this.executeGitCommand(
-        [...diffArgs, '--', file],
+        renamedFrom
+          ? [...diffArgs, '-M', '--', renamedFrom, file]
+          : [...diffArgs, '--', file],
         repoPath,
         signal,
       );
@@ -593,10 +655,15 @@ interface ChangedFile {
 
 /**
  * Decode whether the porcelain status code corresponds to a deleted file.
- * Matches the git status semantics: 'D ' (staged delete), ' D' (unstaged delete).
+ * The file is gone from the worktree when the worktree column (Y) is 'D' —
+ * that covers ' D' (unstaged delete) and the combined codes 'AD' / 'MD' / 'RD'
+ * (staged, then deleted on disk) — or when the code is exactly 'D ' (staged
+ * delete). Missing the combined ones made `analyzeChanges` try to `fs.access`
+ * a file that no longer exists. 'DM' stays false: the index deletion is staged
+ * but the path is back on disk.
  */
 export function isDeletedStatus(status: string): boolean {
-  return status === ' D' || status === 'D ';
+  return status === 'D ' || status[1] === 'D';
 }
 
 /**

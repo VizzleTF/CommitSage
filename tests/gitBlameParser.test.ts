@@ -108,6 +108,20 @@ describe('parseChangedLines', () => {
         expect(Array.from(lines).sort((a, b) => a - b)).toEqual([2, 12]);
     });
 
+    it('ignores the no-newline marker instead of counting it as a line (B6)', () => {
+        const diff = [
+            '@@ -1,2 +1,3 @@',
+            ' a',
+            '-b',
+            '\\ No newline at end of file',
+            '+b2',
+            '+c',
+        ].join('\n');
+
+        // Without the marker skip everything after it shifted by one line.
+        expect(Array.from(parseChangedLines(diff)).sort((a, b) => a - b)).toEqual([2, 3]);
+    });
+
     it('does not advance line counter for removed lines', () => {
         const diff = [
             '@@ -1,3 +1,2 @@',

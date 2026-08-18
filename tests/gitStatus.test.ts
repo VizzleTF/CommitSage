@@ -7,7 +7,11 @@ describe('git porcelain status decoding (F043)', () => {
             [' D', true],
             ['D ', true],
             ['DM', false],
-            ['MD', false],
+            // 'MD'/'AD'/'RD': staged, then deleted on disk — the worktree
+            // column decides, so blame must treat these as deleted (B2).
+            ['MD', true],
+            ['AD', true],
+            ['RD', true],
             ['??', false],
             ['M ', false],
             [' M', false],
