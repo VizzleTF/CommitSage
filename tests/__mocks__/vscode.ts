@@ -55,6 +55,7 @@ export const workspace = {
         } | undefined => undefined,
     }),
     onDidChangeConfiguration: () => ({ dispose: () => undefined }),
+    onDidGrantWorkspaceTrust: () => ({ dispose: () => undefined }),
     createFileSystemWatcher: () => ({
         onDidChange: () => ({ dispose: () => undefined }),
         onDidCreate: () => ({ dispose: () => undefined }),

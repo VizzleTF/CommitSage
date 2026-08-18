@@ -69,6 +69,48 @@ export const SETTING_DEFAULTS = {
 } as const satisfies Record<string, CacheValue>;
 /* eslint-enable @typescript-eslint/naming-convention */
 
+/**
+ * Settings a repository must not be allowed to set for itself while the
+ * workspace is untrusted.
+ *
+ * `.commitsage/config.json` ships inside the repo and has the highest
+ * precedence in `getConfig`, so without this gate any cloned repo could
+ * redirect the diff (i.e. the user's private source) to an arbitrary endpoint
+ * by pinning `provider.type` + `custom.baseUrl`, or silently commit and push
+ * by pinning `commit.autoCommit`/`autoPush`. VS Code's
+ * `capabilities.untrustedWorkspaces.restrictedConfigurations` only guards the
+ * settings store, never a file we read ourselves — hence this list.
+ *
+ * Values are not dropped, only ignored: user/workspace settings still apply,
+ * and granting trust re-reads the project value (see the
+ * `onDidGrantWorkspaceTrust` listener in `initialize`).
+ */
+const TRUST_SENSITIVE_KEYS: ReadonlySet<string> = new Set<string>([
+    // Network egress — where the diff is sent.
+    'provider.type',
+    'custom.baseUrl',
+    'custom.chatCompletionsPath',
+    'custom.useApiKey',
+    'openai.baseUrl',
+    'ollama.baseUrl',
+    'ollama.useAuthToken',
+    // Repo-write side effects.
+    'commit.autoCommit',
+    'commit.autoPush',
+    // Code execution: `project` engine spawns the repo's commitlint CLI and
+    // `require()`s its config.
+    'commit.commitlint.enabled',
+    'commit.commitlint.engine',
+    'commit.commitlint.rulesPath',
+]);
+
+/** Key segments that would reach `Object.prototype` instead of a plain field. */
+const UNSAFE_KEY_SEGMENTS: ReadonlySet<string> = new Set([
+    '__proto__',
+    'constructor',
+    'prototype',
+]);
+
 type SettingKey = keyof typeof SETTING_DEFAULTS;
 // Widen the literal-type defaults (e.g. `30`) back to their general types
 // (`number`) so that `ConfigService.get('apiRequestTimeout') === -1` and
@@ -161,7 +203,14 @@ export class ConfigService {
 
     this.initializeProjectConfigWatcher(context);
 
-    this.disposables.push(configListener);
+    // `untrustedWorkspaces.supported: "limited"` keeps this extension running
+    // when trust is granted (no host reload), so the cache would otherwise
+    // keep serving the values resolved while the workspace was untrusted.
+    const trustListener = vscode.workspace.onDidGrantWorkspaceTrust(() => {
+      this.clearCache();
+    });
+
+    this.disposables.push(configListener, trustListener);
     context.subscriptions.push(...this.disposables);
   }
 
@@ -321,6 +370,24 @@ export class ConfigService {
     return this.projectConfigCache ?? {};
   }
 
+  /**
+   * Whether the project config is allowed to decide this key right now.
+   * Trust-sensitive keys (see `TRUST_SENSITIVE_KEYS`) are ignored in an
+   * untrusted workspace so a hostile repo cannot configure the extension
+   * against its own user; everything else always passes.
+   */
+  private static isProjectValueAllowed(configKey: string): boolean {
+    if (!TRUST_SENSITIVE_KEYS.has(configKey) || vscode.workspace.isTrusted) {
+      return true;
+    }
+    if (this.getNestedProjectValue(configKey.split('.')) !== undefined) {
+      Logger.warn(
+        `Ignoring project config "${configKey}": the workspace is not trusted.`,
+      );
+    }
+    return false;
+  }
+
   private static getNestedProjectValue<T>(
     sections: string[],
   ): T | undefined {
@@ -379,6 +446,9 @@ export class ConfigService {
    * silently reverting them. Key uses the same dotted form as `get`.
    */
   static isProjectOverridden(key: string): boolean {
+    if (!this.isProjectValueAllowed(key)) {
+      return false;
+    }
     const dot = key.indexOf('.');
     const sections = dot >= 0 ? [key.slice(0, dot), key.slice(dot + 1)] : [key];
     return this.getNestedProjectValue(sections) !== undefined;
@@ -392,9 +462,9 @@ export class ConfigService {
     const configKey = section ? `${section}.${key}` : key;
     try {
       if (!this.cache.has(configKey)) {
-        const projectValue = this.getNestedProjectValue<T>(
-          section ? [section, key] : [key],
-        );
+        const projectValue = this.isProjectValueAllowed(configKey)
+          ? this.getNestedProjectValue<T>(section ? [section, key] : [key])
+          : undefined;
 
         if (projectValue !== undefined) {
           this.cache.set(configKey, projectValue);
@@ -489,6 +559,13 @@ export class ConfigService {
     }
 
     const parts = dottedKey.split('.');
+    // Every caller passes a literal key today, but this walk assigns through a
+    // dotted path into a plain object — the classic prototype-pollution shape.
+    // Refusing the three magic segments keeps it that way regardless of who
+    // calls it next (flagged by CodeQL js/prototype-pollution-utility).
+    if (parts.some((part) => UNSAFE_KEY_SEGMENTS.has(part))) {
+      throw new Error(`Refusing to write unsafe config key: ${dottedKey}`);
+    }
     let cursor = config;
     for (let i = 0; i < parts.length - 1; i++) {
       const next = cursor[parts[i]];

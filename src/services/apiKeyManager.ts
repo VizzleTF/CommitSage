@@ -68,6 +68,7 @@ export class ApiKeyManager {
         const config = this.getConfig(provider);
         try {
             let key = await this.secretStorage.get(config.secretKey);
+            Logger.registerSecret(key);
 
             if (!key) {
                 key = await this.showApiKeyInputBox(config);
@@ -100,6 +101,7 @@ export class ApiKeyManager {
             }
 
             await this.secretStorage.store(config.secretKey, key);
+            Logger.registerSecret(key);
             Logger.log(`${config.displayName} API key has been validated and set`);
         } catch (error) {
             if (error instanceof AiServiceError) {
@@ -117,6 +119,7 @@ export class ApiKeyManager {
     static async removeKey(provider: string): Promise<void> {
         const config = this.getConfig(provider);
         try {
+            Logger.forgetSecret(await this.secretStorage.get(config.secretKey));
             await this.secretStorage.delete(config.secretKey);
             Logger.log(`${config.displayName} API key has been removed`);
         } catch (error) {
@@ -128,7 +131,9 @@ export class ApiKeyManager {
     static async getOptionalKey(provider: string): Promise<string | undefined> {
         const config = this.getConfig(provider);
         try {
-            return await this.secretStorage.get(config.secretKey) ?? undefined;
+            const key = await this.secretStorage.get(config.secretKey) ?? undefined;
+            Logger.registerSecret(key);
+            return key;
         } catch (error) {
             Logger.error(`Error getting ${config.displayName} auth token:`, toError(error));
             return undefined;

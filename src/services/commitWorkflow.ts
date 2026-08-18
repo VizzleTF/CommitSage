@@ -271,6 +271,16 @@ export class CommitWorkflow {
     }
 
     private static async handleAutoCommit(repository: vscode.SourceControl): Promise<void> {
+        // Last line of defense for the "a repo turns on auto-commit for you"
+        // case. `restrictedConfigurations` covers the settings store and
+        // `ConfigService` gates `.commitsage/config.json`, but writing to the
+        // user's repo without their click is the one action worth checking at
+        // the sink as well.
+        if (!vscode.workspace.isTrusted) {
+            Logger.warn('Auto-commit skipped: the workspace is not trusted.');
+            return;
+        }
+
         try {
             if (!repository.inputBox.value) {
                 throw new Error('No commit message available');

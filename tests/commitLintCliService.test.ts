@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
@@ -160,5 +161,31 @@ describe('CommitLintService format gating for the project engine', () => {
             format: 'emoji',
         });
         expect(result.valid).toBe(true);
+    });
+});
+
+describe('CommitLintCliService workspace-trust guard (V3)', () => {
+    afterEach(() => {
+        (vscode.workspace as unknown as { isTrusted: boolean }).isTrusted = true;
+    });
+
+    it('refuses to run the repo CLI when the workspace is not trusted', async () => {
+        installFakeCli(tmpDir);
+        (vscode.workspace as unknown as { isTrusted: boolean }).isTrusted = false;
+
+        // Both entry points spawn `node <repo>/node_modules/...` and let it
+        // require() the repo's config — the check belongs at the sink, not only
+        // in CommitLintService.useProjectEngine.
+        await expect(CommitLintCliService.validate('feat: x', tmpDir)).resolves.toBeNull();
+        await expect(CommitLintCliService.resolvedRules(tmpDir)).resolves.toBeNull();
+    });
+
+    it('runs the repo CLI again once the workspace is trusted', async () => {
+        installFakeCli(tmpDir);
+        (vscode.workspace as unknown as { isTrusted: boolean }).isTrusted = true;
+
+        await expect(CommitLintCliService.resolvedRules(tmpDir)).resolves.toEqual({
+            'type-enum': [2, 'always', ['feat', 'cli-only-rule']],
+        });
     });
 });

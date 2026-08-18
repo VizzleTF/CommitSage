@@ -1,3 +1,4 @@
+import * as vscode from 'vscode';
 import { spawn } from 'node:child_process';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
@@ -28,6 +29,19 @@ interface CliRunResult {
  * can fall back to the builtin static engine.
  */
 class CommitLintCliService {
+  /**
+   * Both public entry points spawn `node <repo>/node_modules/.../commitlint`
+   * and let it `require()` the repo's own config — arbitrary code execution by
+   * design. The caller (`CommitLintService.useProjectEngine`) checks trust
+   * already; this repeats the check at the sink so a future caller cannot
+   * reintroduce RCE by forgetting it.
+   */
+  private static isExecutionAllowed(): boolean {
+    if (vscode.workspace.isTrusted) { return true; }
+    Logger.warn('CommitLint: refusing to run the project CLI — the workspace is not trusted.');
+    return false;
+  }
+
   /**
    * Walks up from repoPath looking for an installed commitlint CLI
    * (`commitlint` or `@commitlint/cli`). Manual node_modules walk instead of
@@ -80,6 +94,8 @@ class CommitLintCliService {
     rulesPath?: string,
     signal?: AbortSignal,
   ): Promise<CommitLintResult | null> {
+    if (!this.isExecutionAllowed()) { return null; }
+
     const cliPath = this.detect(repoPath);
     if (!cliPath) { return null; }
 
@@ -117,6 +133,8 @@ class CommitLintCliService {
     rulesPath?: string,
     signal?: AbortSignal,
   ): Promise<CommitLintRules | null> {
+    if (!this.isExecutionAllowed()) { return null; }
+
     const cliPath = this.detect(repoPath);
     if (!cliPath) { return null; }
 

@@ -9,6 +9,9 @@ import { ProjectConfig } from '../models/types';
  * `ConfigService`.
  */
 
+/** Key names that address the prototype chain rather than a plain field. */
+const UNSAFE_KEYS: ReadonlySet<string> = new Set(['__proto__', 'constructor', 'prototype']);
+
 export function isPlainObject(value: unknown): value is Record<string, unknown> {
     return (
         typeof value === 'object' &&
@@ -38,6 +41,13 @@ export function parseAndValidateProjectConfig(
     // since downstream code descends through them and would otherwise misread.
     const validated: Record<string, Record<string, unknown>> = {};
     for (const [section, value] of Object.entries(parsed)) {
+        // `__proto__` as a section name would set the prototype of the object
+        // we hand back instead of adding a field. No real setting is named
+        // this, so dropping it costs nothing.
+        if (UNSAFE_KEYS.has(section)) {
+            Logger.warn(`Project config at ${source}: ignoring reserved section "${section}".`);
+            continue;
+        }
         if (!isPlainObject(value)) {
             Logger.warn(
                 `Project config at ${source}: section "${section}" is not an object, skipping.`,

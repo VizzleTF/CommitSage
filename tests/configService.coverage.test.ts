@@ -398,6 +398,16 @@ describe('ConfigService.setProjectConfigValue', () => {
         expect(written.commit.refs.value).toBe('ABC-9');
     });
 
+    it('refuses prototype-polluting key segments', async () => {
+        for (const key of ['__proto__.polluted', 'commit.constructor', 'prototype.x']) {
+            await expect(ConfigService.setProjectConfigValue(key, 'x')).rejects.toThrow(
+                /unsafe config key/,
+            );
+        }
+        expect(({} as Record<string, unknown>).polluted).toBeUndefined();
+        expect(fs.existsSync(configPath())).toBe(false);
+    });
+
     it('overwrites a broken existing config rather than throwing', async () => {
         const dir = path.join(tmpDir, '.commitsage');
         fs.mkdirSync(dir);
@@ -420,6 +430,13 @@ describe('parseAndValidateProjectConfig edge cases', () => {
     it('returns {} when the top level is not an object', () => {
         expect(parse(JSON.stringify(['array']))).toEqual({});
         expect(parse(JSON.stringify('a string'))).toEqual({});
+    });
+
+    it('drops reserved prototype-chain section names', () => {
+        const out = parse('{"__proto__": {"polluted": true}, "commit": {"autoCommit": true}}');
+        expect(out.commit).toEqual({ autoCommit: true });
+        expect(Object.getPrototypeOf(out)).toBe(Object.prototype);
+        expect(({} as Record<string, unknown>).polluted).toBeUndefined();
     });
 
     it('skips a section whose value is not an object', () => {
