@@ -133,6 +133,17 @@ export const PROVIDER_CATALOG: readonly ProviderMeta[] = [
         validateKey: ApiKeyValidator.validateCodestralApiKey,
     },
     {
+        id: 'mistral',
+        label: 'Mistral',
+        displayName: 'Mistral',
+        secretKey: 'commitsage.mistralApiKey',
+        setCmd: 'commitsage.setMistralApiKey',
+        removeCmd: 'commitsage.removeMistralApiKey',
+        apiKeyUrl: 'https://console.mistral.ai/api-keys',
+        liveSource: 'Mistral La Plateforme',
+        validateKey: lax,
+    },
+    {
         id: 'ollama',
         label: 'Ollama',
         displayName: 'Ollama',

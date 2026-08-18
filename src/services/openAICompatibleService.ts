@@ -128,6 +128,10 @@ const COMPAT_SPECS: Partial<Record<Provider, CompatProviderSpec>> = {
     xai: { baseUrl: () => 'https://api.x.ai/v1' },
     deepseek: { baseUrl: () => 'https://api.deepseek.com' },
     codestral: { baseUrl: () => 'https://codestral.mistral.ai/v1' },
+    // La Plateforme — the full Mistral catalog (mistral-large/medium/small,
+    // magistral, ministral, …). Distinct from `codestral`, which is the
+    // code-only endpoint with its own free-tier key.
+    mistral: { baseUrl: () => 'https://api.mistral.ai/v1' },
     openrouter: {
         baseUrl: () => 'https://openrouter.ai/api/v1',
         extraHeaders: {

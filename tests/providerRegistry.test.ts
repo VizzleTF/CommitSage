@@ -76,7 +76,7 @@ describe('providerRegistry derived exports', () => {
     it('PROVIDERS lists ids in display order', () => {
         expect(PROVIDERS).toEqual([
             'gemini', 'openrouter', 'groq', 'anthropic', 'openai',
-            'deepseek', 'xai', 'codestral', 'ollama', 'custom',
+            'deepseek', 'xai', 'codestral', 'mistral', 'ollama', 'custom',
         ]);
     });
 

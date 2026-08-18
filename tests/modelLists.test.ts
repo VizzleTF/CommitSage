@@ -25,6 +25,7 @@ import {
     fetchXaiModels,
     fetchAnthropicModels,
     fetchCodestralModels,
+    fetchMistralModels,
 } from '../src/services/modelLists';
 
 describe('modelLists trailing-slash handling', () => {
@@ -76,5 +77,47 @@ describe('modelLists static fallbacks', () => {
     it('fetchCodestralModels returns the static known-models list', async () => {
         const result = await fetchCodestralModels('key');
         expect(result).toContain('codestral-latest');
+    });
+});
+
+describe('fetchMistralModels', () => {
+    beforeEach(() => {
+        mockedGetJson.mockReset();
+    });
+
+    it('lists chat models from La Plateforme, sorted and deduped', async () => {
+        mockedGetJson.mockResolvedValue({
+            data: [
+                { id: 'mistral-small-latest', capabilities: { completion_chat: true } },
+                { id: 'mistral-large-latest', capabilities: { completion_chat: true } },
+                { id: 'mistral-small-latest', capabilities: { completion_chat: true } },
+                // No capabilities block at all — kept, so a payload change can't
+                // empty the picker.
+                { id: 'magistral-medium-latest' },
+            ],
+        });
+
+        await expect(fetchMistralModels('key')).resolves.toEqual([
+            'magistral-medium-latest',
+            'mistral-large-latest',
+            'mistral-small-latest',
+        ]);
+
+        const [url, opts] = mockedGetJson.mock.calls[0];
+        expect(url).toBe('https://api.mistral.ai/v1/models');
+        expect(opts.headers.Authorization).toBe('Bearer key');
+    });
+
+    it('drops non-chat and archived models', async () => {
+        mockedGetJson.mockResolvedValue({
+            data: [
+                { id: 'mistral-small-latest', capabilities: { completion_chat: true } },
+                { id: 'mistral-embed', capabilities: { completion_chat: false } },
+                { id: 'codestral-2405', capabilities: { completion_chat: true }, archived: true },
+                { id: '' },
+            ],
+        });
+
+        await expect(fetchMistralModels('key')).resolves.toEqual(['mistral-small-latest']);
     });
 });

@@ -4,6 +4,7 @@ import {
     fetchGeminiModels,
     fetchOpenAIModels,
     fetchCodestralModels,
+    fetchMistralModels,
     fetchOllamaModels,
     fetchOpenRouterModels,
     fetchGroqModels,
@@ -83,6 +84,10 @@ const PROVIDER_BEHAVIOR: Record<Provider, Pick<ProviderDef, 'selectedModel' | 'f
     codestral: {
         selectedModel: () => ConfigService.get('codestral.model'),
         fetchModels: async () => fetchCodestralModels(await requireKey('codestral', 'Codestral')),
+    },
+    mistral: {
+        selectedModel: () => ConfigService.get('mistral.model'),
+        fetchModels: async () => fetchMistralModels(await requireKey('mistral', 'Mistral')),
     },
     ollama: {
         selectedModel: () => ConfigService.get('ollama.model'),

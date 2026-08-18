@@ -44,6 +44,7 @@ const SETTING_PATHS = {
     provider: 'provider.type',
     geminiModel: 'gemini.model',
     codestralModel: 'codestral.model',
+    mistralModel: 'mistral.model',
     openaiModel: 'openai.model',
     openaiBaseUrl: 'openai.baseUrl',
     ollamaModel: 'ollama.model',

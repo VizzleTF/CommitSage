@@ -39,6 +39,12 @@ Settings are resolved in the following order (higher priority wins):
 |---------|------|---------|-------------|
 | `commitSage.codestral.model` | `string` | `"codestral-latest"` | `codestral-2405` or `codestral-latest` |
 
+### Mistral
+
+| Setting | Type | Default | Description |
+|---------|------|---------|-------------|
+| `commitSage.mistral.model` | `string` | `"mistral-small-latest"` | Any chat model from La Plateforme (`mistral-large-latest`, `magistral-medium-latest`, …) |
+
 ### Ollama
 
 | Setting | Type | Default | Description |
@@ -200,4 +206,5 @@ Available commands:
 - `Commit Sage: Set Gemini API Key` / `Remove Gemini API Key`
 - `Commit Sage: Set OpenAI API Key` / `Remove OpenAI API Key`
 - `Commit Sage: Set Codestral API Key` / `Remove Codestral API Key`
+- `Commit Sage: Set Mistral API Key` / `Remove Mistral API Key`
 - `Commit Sage: Set Ollama Authentication Token` / `Remove Ollama Authentication Token`

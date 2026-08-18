@@ -1,6 +1,6 @@
 # AI Providers
 
-CommitSage supports 10 AI providers — 6 cloud, 1 aggregator, 1 local, plus a generic OpenAI-compatible adapter that closes any self-hosted endpoint. This guide covers setup, features, and trade-offs.
+CommitSage supports 11 AI providers — 7 cloud, 1 aggregator, 1 local, plus a generic OpenAI-compatible adapter that closes any self-hosted endpoint. This guide covers setup, features, and trade-offs.
 
 ---
 
@@ -16,6 +16,7 @@ CommitSage supports 10 AI providers — 6 cloud, 1 aggregator, 1 local, plus a g
 | DeepSeek | Paid (cheap) | No | Yes | **Works without VPN** |
 | xAI | Paid | No | Yes | VPN required |
 | Codestral | Free | No | Yes | Works |
+| Mistral | Paid (free trial) | No | Yes | Works |
 | Ollama | Free | **Yes** | No | Works (local) |
 | Custom | Depends | Depends | Optional | Depends |
 
@@ -199,6 +200,35 @@ Mistral AI's code-specialized model on the dedicated Codestral subdomain. Free t
 
 ---
 
+## Mistral
+
+The full Mistral catalog via La Plateforme (`api.mistral.ai`) — general-purpose
+models, not only code. Use this when you want `mistral-small`, `mistral-large`,
+`magistral` or `ministral`; use Codestral when you want the free code-only
+endpoint.
+
+**Setup:**
+1. Create an API key at [console.mistral.ai/api-keys](https://console.mistral.ai/api-keys)
+2. Sidebar → Mistral → `Set`
+3. Press `⟳` to load the live model list
+
+The La Plateforme key is **not** the same as the Codestral key: they are issued
+in different sections of the console and are not interchangeable.
+
+**Models:** fetched live from `GET /v1/models`, filtered to chat-capable,
+non-archived models (the raw list also contains embedding, OCR, moderation and
+FIM models that cannot answer `/chat/completions`). Default `mistral-small-latest`.
+
+**Settings:**
+```json
+{
+  "commitSage.provider.type": "mistral",
+  "commitSage.mistral.model": "mistral-small-latest"
+}
+```
+
+---
+
 ## Ollama
 
 Run models locally. No API key, no data leaves your machine.
@@ -270,3 +300,4 @@ Any OpenAI-compatible `chat/completions` endpoint — local or remote, with or w
 - **OpenAI** — when you specifically want GPT models
 - **xAI** — when you specifically want Grok
 - **Codestral** — free code-specialized fallback
+- **Mistral** — the rest of the Mistral catalog (general-purpose models, paid)

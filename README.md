@@ -13,6 +13,7 @@ Commit Sage is a VSCode extension that automatically generates commit messages u
 - **DeepSeek** (works without VPN in restricted regions)
 - **xAI Grok** (requires API key)
 - **Codestral** (requires API key, free tier)
+- **Mistral** (La Plateforme — the full Mistral catalog, requires API key)
 - **Ollama** (local, free, no key)
 - **Custom OpenAI-compatible** — LM Studio, vLLM, llama.cpp, LocalAI, Together AI, Fireworks, any self-hosted endpoint
 
@@ -43,6 +44,7 @@ Where to get keys:
 - **DeepSeek** — [platform.deepseek.com/api_keys](https://platform.deepseek.com/api_keys)
 - **xAI** — [console.x.ai](https://console.x.ai/)
 - **Codestral** — [Mistral AI Console](https://console.mistral.ai/codestral)
+- **Mistral** — [console.mistral.ai/api-keys](https://console.mistral.ai/api-keys) (a La Plateforme key, not the Codestral one)
 - **Ollama** — no key needed (local)
 - **Custom** — depends on your endpoint; key is optional
 
@@ -67,6 +69,8 @@ Where to get keys:
 - **xAI** — Model (`commitSage.xai.model`): default `grok-2-1212`.
 
 - **Codestral** — Model (`commitSage.codestral.model`): default `codestral-latest`.
+
+- **Mistral** — Model (`commitSage.mistral.model`): default `mistral-small-latest`; the sidebar fetches the live list from La Plateforme.
 
 - **Ollama**:
   - Base URL (`commitSage.ollama.baseUrl`): default `http://localhost:11434`
@@ -248,7 +252,7 @@ For troubleshooting common problems, see [docs/troubleshooting.md](docs/troubles
 
 # Commit Sage (на русском)
 
-Commit Sage — расширение VSCode для автоматической генерации commit-сообщений через AI-провайдеров: Gemini, OpenRouter, Groq, Anthropic Claude, OpenAI, DeepSeek, xAI Grok, Codestral, локальный Ollama или любой OpenAI-совместимый endpoint (LM Studio, vLLM, llama.cpp, Together, Fireworks).
+Commit Sage — расширение VSCode для автоматической генерации commit-сообщений через AI-провайдеров: Gemini, OpenRouter, Groq, Anthropic Claude, OpenAI, DeepSeek, xAI Grok, Codestral, Mistral, локальный Ollama или любой OpenAI-совместимый endpoint (LM Studio, vLLM, llama.cpp, Together, Fireworks).
 
 Для пользователей из РФ без VPN рабочие варианты: **DeepSeek**, **Ollama** локально, **Custom** (свой self-hosted endpoint).
 
@@ -265,6 +269,7 @@ Commit Sage — расширение VSCode для автоматической 
    - `Commit Sage: Set xAI API Key`
    - `Commit Sage: Set OpenAI API Key`
    - `Commit Sage: Set Codestral API Key`
+   - `Commit Sage: Set Mistral API Key`
    - `Commit Sage: Set Ollama Auth Token`
    - `Commit Sage: Set Custom API Key`
 
@@ -277,6 +282,7 @@ Commit Sage — расширение VSCode для автоматической 
 - DeepSeek → [platform.deepseek.com/api_keys](https://platform.deepseek.com/api_keys)
 - xAI → [console.x.ai](https://console.x.ai/)
 - Codestral → [console.mistral.ai/codestral](https://console.mistral.ai/codestral)
+- Mistral → [console.mistral.ai/api-keys](https://console.mistral.ai/api-keys)
 
 ## Использование
 

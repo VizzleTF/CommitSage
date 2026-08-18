@@ -8,6 +8,7 @@
 export type Provider =
     | 'gemini'
     | 'codestral'
+    | 'mistral'
     | 'openai'
     | 'ollama'
     | 'openrouter'

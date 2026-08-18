@@ -90,6 +90,47 @@ export async function fetchCodestralModels(
     return [...CODESTRAL_KNOWN_MODELS];
 }
 
+interface MistralModelsResponse {
+    data?: Array<{
+        id?: string;
+        archived?: boolean;
+        capabilities?: {
+            // eslint-disable-next-line @typescript-eslint/naming-convention
+            completion_chat?: boolean;
+        };
+    }>;
+}
+
+/**
+ * Mistral La Plateforme (`api.mistral.ai`) — the full catalog, unlike the
+ * `codestral` provider whose dedicated subdomain serves code models only and
+ * has no listing endpoint. Chat-only: the response also carries embedding,
+ * OCR, moderation and FIM models, which cannot answer `/chat/completions`.
+ * Archived (deprecated) models are dropped for the same reason.
+ */
+export async function fetchMistralModels(
+    apiKey: string,
+    signal?: AbortSignal,
+): Promise<string[]> {
+    const data = await HttpUtils.getJson<MistralModelsResponse>(
+        'https://api.mistral.ai/v1/models',
+        {
+            headers: { Authorization: `Bearer ${apiKey}` },
+            signal,
+        },
+    );
+
+    const ids = (data.data ?? [])
+        // `!== false` rather than `=== true`: a model entry without the
+        // capabilities block is kept instead of silently vanishing from the
+        // picker if Mistral changes the payload.
+        .filter(m => m.capabilities?.completion_chat !== false && m.archived !== true)
+        .map(m => m.id ?? '')
+        .filter(id => id !== '');
+
+    return [...new Set(ids)].sort((a, b) => a.localeCompare(b));
+}
+
 interface OllamaTagsResponse {
     models?: Array<{ name?: string }>;
 }

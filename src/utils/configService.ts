@@ -37,6 +37,7 @@ export const SETTING_DEFAULTS = {
     'commit.recentCommitsCount': 5,
     'commit.recentCommitsScope': 'all',
     'codestral.model': 'codestral-latest',
+    'mistral.model': 'mistral-small-latest',
     'provider.type': 'gemini',
     'ollama.baseUrl': 'http://localhost:11434',
     'ollama.model': 'llama3.2',

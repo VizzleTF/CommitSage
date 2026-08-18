@@ -80,6 +80,11 @@
         "category": "%command.category%"
       },
       {
+        "command": "commitsage.setMistralApiKey",
+        "title": "%command.setMistralApiKey.title%",
+        "category": "%command.category%"
+      },
+      {
         "command": "commitsage.removeApiKey",
         "title": "%command.removeApiKey.title%",
         "category": "%command.category%"
@@ -92,6 +97,11 @@
       {
         "command": "commitsage.removeCodestralApiKey",
         "title": "%command.removeCodestralApiKey.title%",
+        "category": "%command.category%"
+      },
+      {
+        "command": "commitsage.removeMistralApiKey",
+        "title": "%command.removeMistralApiKey.title%",
         "category": "%command.category%"
       },
       {
@@ -257,6 +267,7 @@
               "onCommand:commitsage.setApiKey",
               "onCommand:commitsage.setOpenAIApiKey",
               "onCommand:commitsage.setCodestralApiKey",
+              "onCommand:commitsage.setMistralApiKey",
               "onCommand:commitsage.setOllamaAuthToken",
               "onCommand:commitsage.setOpenRouterApiKey",
               "onCommand:commitsage.setGroqApiKey",
@@ -288,6 +299,7 @@
           "enum": [
             "gemini",
             "codestral",
+            "mistral",
             "openai",
             "ollama",
             "openrouter",
@@ -300,6 +312,7 @@
           "enumDescriptions": [
             "Google Gemini (free tier via AI Studio)",
             "Mistral Codestral (free tier)",
+            "Mistral La Plateforme (mistral-large, mistral-medium, mistral-small, magistral, ministral)",
             "OpenAI GPT models",
             "Ollama (local, self-hosted)",
             "OpenRouter (300+ models via single API key, includes free models)",
@@ -534,6 +547,12 @@
           "type": "string",
           "default": "codestral-latest",
           "markdownDescription": "Codestral model for commit message generation. The canonical UI is the [Commit Sage sidebar](command:commitsage.settings.focus) — it fetches Mistral's live model list and updates this setting on selection. Only used when Codestral provider is selected.",
+          "order": 12
+        },
+        "commitSage.mistral.model": {
+          "type": "string",
+          "default": "mistral-small-latest",
+          "markdownDescription": "Mistral model for commit message generation, served by La Plateforme (`api.mistral.ai`) — the full catalog, unlike the code-only Codestral endpoint. The canonical UI is the [Commit Sage sidebar](command:commitsage.settings.focus): it fetches Mistral's live model list and updates this setting on selection. Needs a [La Plateforme API key](https://console.mistral.ai/api-keys), which is different from the Codestral key. Only used when Mistral provider is selected.",
           "order": 12
         },
         "commitSage.openai.model": {
