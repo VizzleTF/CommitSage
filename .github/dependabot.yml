@@ -6,6 +6,11 @@ updates:
       interval: "weekly"
     ignore:
       - dependency-name: "@types/vscode"
+      # typescript-eslint peers on `typescript >=4.8.4 <6.1.0`; TypeScript 7
+      # breaks `npm ci` (ERESOLVE) and stops eslint from loading at all.
+      # Drop this once typescript-eslint ships TypeScript 7 support.
+      - dependency-name: "typescript"
+        versions: [">=7"]
     versioning-strategy: increase
     groups:
       typescript-eslint:
