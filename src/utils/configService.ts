@@ -105,13 +105,6 @@ const TRUST_SENSITIVE_KEYS: ReadonlySet<string> = new Set<string>([
     'commit.commitlint.rulesPath',
 ]);
 
-/** Key segments that would reach `Object.prototype` instead of a plain field. */
-const UNSAFE_KEY_SEGMENTS: ReadonlySet<string> = new Set([
-    '__proto__',
-    'constructor',
-    'prototype',
-]);
-
 type SettingKey = keyof typeof SETTING_DEFAULTS;
 // Widen the literal-type defaults (e.g. `30`) back to their general types
 // (`number`) so that `ConfigService.get('apiRequestTimeout') === -1` and
@@ -560,22 +553,27 @@ export class ConfigService {
     }
 
     const parts = dottedKey.split('.');
-    // Every caller passes a literal key today, but this walk assigns through a
-    // dotted path into a plain object — the classic prototype-pollution shape.
-    // Refusing the three magic segments keeps it that way regardless of who
-    // calls it next (flagged by CodeQL js/prototype-pollution-utility).
-    if (parts.some((part) => UNSAFE_KEY_SEGMENTS.has(part))) {
-      throw new Error(`Refusing to write unsafe config key: ${dottedKey}`);
-    }
     let cursor = config;
     for (let i = 0; i < parts.length - 1; i++) {
-      const next = cursor[parts[i]];
-      if (!isPlainObject(next)) {
-        cursor[parts[i]] = {};
+      const part = parts[i];
+      // Every caller passes a literal key today, but this walk assigns through
+      // a dotted path into a plain object — the classic prototype-pollution
+      // shape. Rejecting the three magic segments keeps it that way whoever
+      // calls it next (CodeQL js/prototype-pollution-utility).
+      if (part === '__proto__' || part === 'constructor' || part === 'prototype') {
+        throw new Error(`Refusing to write unsafe config key: ${dottedKey}`);
       }
-      cursor = cursor[parts[i]] as Record<string, unknown>;
+      const next = cursor[part];
+      if (!isPlainObject(next)) {
+        cursor[part] = {};
+      }
+      cursor = cursor[part] as Record<string, unknown>;
     }
-    cursor[parts[parts.length - 1]] = value;
+    const leaf = parts[parts.length - 1];
+    if (leaf === '__proto__' || leaf === 'constructor' || leaf === 'prototype') {
+      throw new Error(`Refusing to write unsafe config key: ${dottedKey}`);
+    }
+    cursor[leaf] = value;
 
     await fs.mkdir(dir, { recursive: true });
     await fs.writeFile(file, JSON.stringify(config, null, 2) + '\n', 'utf8');
