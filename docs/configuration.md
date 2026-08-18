@@ -12,6 +12,18 @@ Settings are resolved in the following order (higher priority wins):
 2. **VS Code workspace settings** — medium priority
 3. **VS Code global (user) settings** — lowest priority
 
+Two known limitations:
+
+- **Folder-scoped settings are ignored.** In a multi-root workspace, values set
+  per folder (`.vscode/settings.json` inside one root) do not apply; only
+  workspace and user scope are read. The project config is taken from the folder
+  of the active editor, falling back to the first folder.
+- **Untrusted workspaces ignore part of the project config.** While a workspace
+  is not trusted, `.commitsage/config.json` cannot set the provider, any
+  endpoint URL, auto-commit/auto-push, or the commitlint engine and rules path —
+  a repository must not be able to redirect your diff or commit on your behalf.
+  Trusting the workspace applies those values immediately.
+
 ---
 
 ## Provider Settings

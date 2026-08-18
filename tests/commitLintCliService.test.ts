@@ -6,6 +6,7 @@ import * as path from 'path';
 
 import { CommitLintCliService } from '../src/services/commitLintCliService';
 import { CommitLintService } from '../src/services/commitLintService';
+import { UserCancelledError } from '../src/models/errors';
 
 let tmpDir: string;
 
@@ -148,6 +149,36 @@ describe('CommitLintService engine selection', () => {
         }));
         const rules = await CommitLintService.extractRules(tmpDir, undefined, { engine: 'project' });
         expect(rules).toContain('static-rule');
+    });
+});
+
+describe('CommitLintService cancellation (B11)', () => {
+    it('aborts instead of degrading to the builtin validator', async () => {
+        installFakeCli(tmpDir);
+        const controller = new AbortController();
+        controller.abort();
+
+        // Builtin rules accept this message, so a swallowed abort would return
+        // `{valid: true}` and the workflow would carry on after the cancel.
+        await expect(
+            CommitLintService.validate('feat: contains bad word', tmpDir, undefined, {
+                engine: 'project',
+                signal: controller.signal,
+            }),
+        ).rejects.toBeInstanceOf(UserCancelledError);
+    });
+
+    it('aborts rule extraction as well', async () => {
+        installFakeCli(tmpDir);
+        const controller = new AbortController();
+        controller.abort();
+
+        await expect(
+            CommitLintService.extractRules(tmpDir, undefined, {
+                engine: 'project',
+                signal: controller.signal,
+            }),
+        ).rejects.toBeInstanceOf(UserCancelledError);
     });
 });
 

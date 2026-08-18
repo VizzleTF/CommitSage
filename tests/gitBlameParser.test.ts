@@ -74,6 +74,38 @@ describe('parseBlameOutput', () => {
     });
 });
 
+describe('parseBlameOutput presence checks (B8)', () => {
+    const entry = (sha: string, line: number, time: string, content: string) => [
+        `${sha} ${line} ${line} 1`,
+        'author Alice',
+        'author-mail <alice@example.com>',
+        `author-time ${time}`,
+        'author-tz +0000',
+        `\t${content}`,
+    ].join('\n');
+
+    it('keeps blank lines and epoch-0 commits', () => {
+        const sha = 'a'.repeat(40);
+        const out = parseBlameOutput([
+            entry(sha, 1, '1700000000', 'const a = 1;'),
+            // Blank line in the file -> empty content, previously dropped.
+            entry(sha, 2, '1700000000', ''),
+            // Commit authored at the Unix epoch -> timestamp 0, also dropped.
+            entry('b'.repeat(40), 3, '0', 'const c = 3;'),
+        ].join('\n'));
+
+        expect(out.map(b => b.lineNumber)).toEqual([1, 2, 3]);
+        expect(out[1].line).toBe('');
+        expect(out[2].timestamp).toBe(0);
+        expect(out[2].date).toBe('1970-01-01T00:00:00.000Z');
+    });
+
+    it('still drops an entry whose timestamp could not be parsed', () => {
+        const out = parseBlameOutput(entry('c'.repeat(40), 1, 'not-a-number', 'x'));
+        expect(out).toEqual([]);
+    });
+});
+
 describe('parseChangedLines', () => {
     it('returns empty set when no hunks', () => {
         expect(parseChangedLines('').size).toBe(0);

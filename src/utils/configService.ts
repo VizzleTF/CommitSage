@@ -467,6 +467,11 @@ export class ConfigService {
 
         const config = vscode.workspace.getConfiguration('commitSage');
         const value = config.inspect<T>(configKey);
+        // `workspaceFolderValue` is deliberately not consulted: resolving it
+        // needs a resource-scoped `getConfiguration(section, uri)`, which would
+        // make the result depend on the active editor and invalidate this
+        // key-only cache on every editor switch. Folder-scoped settings being
+        // ignored is a documented limitation (docs/configuration.md).
 
         const effectiveValue =
           value?.workspaceValue ??

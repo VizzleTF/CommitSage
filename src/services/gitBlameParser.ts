@@ -29,12 +29,16 @@ export function parseBlameOutput(blameOutput: string): BlameInfo[] {
             }
         } else if (line.startsWith('\t')) {
             currentBlame.line = line.substring(1);
+            // Presence checks, not truthiness: a blank line in the file is an
+            // empty `line`, and a commit authored at the Unix epoch has
+            // `timestamp === 0`. Both are falsy and used to be dropped, so the
+            // per-author line counts came out short.
             if (
-                currentBlame.author &&
-                currentBlame.email &&
-                currentBlame.date &&
-                currentBlame.timestamp &&
-                currentBlame.line &&
+                currentBlame.author !== undefined &&
+                currentBlame.email !== undefined &&
+                currentBlame.date !== undefined &&
+                currentBlame.timestamp !== undefined &&
+                currentBlame.line !== undefined &&
                 currentBlame.lineNumber !== undefined
             ) {
                 blameInfos.push(currentBlame as BlameInfo);

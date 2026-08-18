@@ -6,6 +6,7 @@ import * as path from 'node:path';
 import { Logger } from '../utils/logger';
 
 import { CommitLintResult, CommitLintRules } from '../models/types';
+import { UserCancelledError } from '../models/errors';
 import { toAbsoluteRulesPath } from './commitlint/configLoader';
 
 // Generous: on Windows-mounted filesystems (WSL /mnt/*) a single CLI run can
@@ -102,6 +103,12 @@ class CommitLintCliService {
     const args = ['--color', 'false', ...this.configArgs(repoPath, rulesPath)];
     const res = await this.run(cliPath, args, message, repoPath, signal);
 
+    if (signal?.aborted) {
+      // The abort killed the child, which surfaces as exitCode === null — the
+      // same shape as "no usable CLI". Without this the run would degrade to
+      // the builtin validator and keep going after the user cancelled.
+      throw new UserCancelledError('CommitLint validation was cancelled');
+    }
     if (res.timedOut || res.exitCode === null) {
       Logger.warn(`CommitLint: project CLI ${res.timedOut ? 'timed out' : 'failed to run'} — falling back to builtin validator`);
       return null;
@@ -140,6 +147,9 @@ class CommitLintCliService {
 
     const args = ['--print-config=json', '--color', 'false', ...this.configArgs(repoPath, rulesPath)];
     const res = await this.run(cliPath, args, undefined, repoPath, signal);
+    if (signal?.aborted) {
+      throw new UserCancelledError('CommitLint rule resolution was cancelled');
+    }
     if (res.timedOut || res.exitCode !== 0) { return null; }
 
     try {
@@ -165,6 +175,10 @@ class CommitLintCliService {
     return new Promise(resolve => {
       // process.execPath is the Electron binary inside the extension host;
       // ELECTRON_RUN_AS_NODE turns it into a plain Node — no system Node needed.
+      // The child inherits the full environment on purpose: it only runs in a
+      // trusted workspace (see isExecutionAllowed), and commitlint configs
+      // legitimately read env vars, so an allowlist would break presets for no
+      // gain in trust level.
       /* eslint-disable @typescript-eslint/naming-convention */
       const env: NodeJS.ProcessEnv = { ...process.env, ELECTRON_RUN_AS_NODE: '1', NO_COLOR: '1' };
       /* eslint-enable @typescript-eslint/naming-convention */

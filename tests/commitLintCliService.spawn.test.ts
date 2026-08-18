@@ -33,6 +33,7 @@ class FakeChild extends EventEmitter {
 }
 
 import { CommitLintCliService } from '../src/services/commitLintCliService';
+import { UserCancelledError } from '../src/models/errors';
 
 let tmpDir: string;
 
@@ -98,9 +99,22 @@ describe('CommitLintCliService.run via spawn mock', () => {
         await Promise.resolve();
         controller.abort(); // -> the signal 'abort' listener calls child.kill('SIGKILL')
         expect(child.killed).toBe(true);
-        // Let the run settle so the promise resolves and is awaited.
         child.emit('close', null);
-        await p;
+        // B11: the kill surfaces as exitCode === null, which looks exactly like
+        // "no usable CLI". Reporting that would silently continue with the
+        // builtin validator after the user cancelled, so the abort propagates.
+        await expect(p).rejects.toBeInstanceOf(UserCancelledError);
+    });
+
+    it('propagates cancellation from resolvedRules too (B11)', async () => {
+        const child = new FakeChild();
+        spawnHolder.fn = () => child;
+        const controller = new AbortController();
+        const p = CommitLintCliService.resolvedRules(tmpDir, undefined, controller.signal);
+        await Promise.resolve();
+        controller.abort();
+        child.emit('close', null);
+        await expect(p).rejects.toBeInstanceOf(UserCancelledError);
     });
 
     it('swallows a stdin "error" event (EPIPE handler, line 183)', async () => {

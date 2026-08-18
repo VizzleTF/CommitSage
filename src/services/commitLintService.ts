@@ -4,6 +4,7 @@ import { CommitLintCliService } from './commitLintCliService';
 import { FORMAT_RULE_SETS, COMMITLINT_COMPATIBLE_FORMATS, CONFIG_DRIVEN_FORMATS } from './formatRules';
 import * as vscode from 'vscode';
 import { CommitLintResult, CommitLintRules } from '../models/types';
+import { UserCancelledError } from '../models/errors';
 
 import { hasConfig as detectConfig, resolveConfigPath, loadConfig } from './commitlint/configLoader';
 import { rulesToInstructions, COMMIT_RULES_DEFAULT } from './commitlint/ruleInstructions';
@@ -54,6 +55,12 @@ class CommitLintService {
           return rulesToInstructions(resolved);
         }
       } catch (error) {
+        // A cancelled run must abort, not quietly fall through to the builtin
+        // engine: the CLI is killed on abort and that is indistinguishable from
+        // "no usable CLI" by exit code alone.
+        if (error instanceof UserCancelledError) {
+          throw error;
+        }
         Logger.log(`CommitLint: project CLI rule extraction failed: ${error instanceof Error ? error.message : String(error)}`);
       }
       Logger.warn('CommitLint: project engine requested but commitlint CLI is unavailable — using builtin rule extraction');
@@ -110,6 +117,9 @@ class CommitLintService {
           return cliResult;
         }
       } catch (error) {
+        if (error instanceof UserCancelledError) {
+          throw error;
+        }
         Logger.log(`CommitLint: project CLI validation failed: ${error instanceof Error ? error.message : String(error)}`);
       }
       Logger.warn('CommitLint: project engine requested but commitlint CLI is unavailable — using builtin validator');
