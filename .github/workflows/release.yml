@@ -159,7 +159,7 @@ jobs:
 
       - name: Send Telegram Notification
         continue-on-error: true
-        uses: appleboy/telegram-action@d600df785afe8648bc23cbcf4495d9d30075dcba # v1.0.2
+        uses: appleboy/telegram-action@214f06cfa3d3a588c1472116889437e7c6fd29b1 # v1.1.1
         with:
           to: ${{ secrets.TELEGRAM_CHAT_ID }}
           token: ${{ secrets.TELEGRAM_BOT_TOKEN }}
