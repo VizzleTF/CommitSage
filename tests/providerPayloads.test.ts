@@ -82,7 +82,7 @@ beforeEach(() => {
 });
 
 describe('OpenAIService payload', () => {
-    it('sends max_tokens (snake_case), not maxTokens', async () => {
+    it('sends max_completion_tokens (snake_case), not max_tokens/maxTokens', async () => {
 
         mockedPostJson.mockResolvedValueOnce({
             choices: [{ message: { content: 'feat: ok' } }],
@@ -97,12 +97,15 @@ describe('OpenAIService payload', () => {
         expect(payload).toMatchObject({
             model: 'gpt-test',
             // F001 regression guard
-            max_tokens: 4096,
+            max_completion_tokens: 4096,
+            temperature: 0.7,
         });
         expect(payload).not.toHaveProperty('maxTokens');
+        // #539: gpt-5 rejects legacy max_tokens
+        expect(payload).not.toHaveProperty('max_tokens');
     });
 
-    it('defaults max_tokens to general.maxOutputTokens when no options', async () => {
+    it('defaults max_completion_tokens to general.maxOutputTokens when no options', async () => {
 
         mockedPostJson.mockResolvedValueOnce({
             choices: [{ message: { content: 'ok' } }],
@@ -110,7 +113,48 @@ describe('OpenAIService payload', () => {
 
         await generateViaOpenAICompatibleProvider('openai', 'hi', progress, 1);
         const [, payload] = mockedPostJson.mock.calls[0];
-        expect(payload).toMatchObject({ max_tokens: 4096 });
+        expect(payload).toMatchObject({ max_completion_tokens: 4096 });
+    });
+
+    it('adapts to a reasoning model rejecting max_tokens and temperature, then remembers it', async () => {
+        const { HttpError } = await import('../src/utils/httpUtils');
+        // Any provider: a custom proxy in front of gpt-5 starts with max_tokens.
+        SETTINGS['custom.model'] = 'gpt-5-mini';
+        try {
+            mockedPostJson
+                .mockRejectedValueOnce(new HttpError(400, { error: {
+                    message: "Unsupported parameter: 'max_tokens' is not supported with this model. Use 'max_completion_tokens' instead.",
+                    param: 'max_tokens',
+                } }))
+                .mockRejectedValueOnce(new HttpError(400, { error: {
+                    message: "Unsupported value: 'temperature' does not support 0.7 with this model. Only the default (1) value is supported.",
+                } }))
+                .mockResolvedValue({ choices: [{ message: { content: 'feat: ok' } }] });
+
+            const result = await generateViaOpenAICompatibleProvider('custom', 'hi', progress, 1);
+            expect(result.message).toBe('feat: ok');
+            const payloads = mockedPostJson.mock.calls.map((c) => c[1]);
+            expect(payloads).toHaveLength(3);
+            expect(payloads[0]).toMatchObject({ max_tokens: 4096, temperature: 0.7 });
+            expect(payloads[1]).toMatchObject({ max_completion_tokens: 4096, temperature: 0.7 });
+            expect(payloads[1]).not.toHaveProperty('max_tokens');
+            expect(payloads[2]).toMatchObject({ max_completion_tokens: 4096 });
+            expect(payloads[2]).not.toHaveProperty('temperature');
+
+            // Learned shape is reused: next request goes through in one call.
+            await generateViaOpenAICompatibleProvider('custom', 'hi', progress, 1);
+            expect(mockedPostJson).toHaveBeenCalledTimes(4);
+            expect(mockedPostJson.mock.calls[3][1]).toEqual(payloads[2]);
+        } finally {
+            SETTINGS['custom.model'] = 'qwen2.5-coder';
+        }
+    });
+
+    it('does not loop on an unrelated 400', async () => {
+        const { HttpError } = await import('../src/utils/httpUtils');
+        mockedPostJson.mockRejectedValueOnce(new HttpError(400, { error: { message: 'bad prompt' } }));
+        await expect(generateViaOpenAICompatibleProvider('openai', 'hi', progress, 1)).rejects.toBeInstanceOf(HttpError);
+        expect(mockedPostJson).toHaveBeenCalledTimes(1);
     });
 });
 
