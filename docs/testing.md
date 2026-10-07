@@ -36,6 +36,8 @@ On Linux without a display (CI, WSL, SSH), prefix the E2E scripts and `verify` w
 
 `pretest:e2e` compiles the suite with `tsc -p tests/e2e/tsconfig.e2e.json` and builds the bundle with `npm run compile` before VS Code starts.
 
+Both E2E scripts run `vscode-test` through `tests/e2e/run.mjs`. It fails the run when the output has no `N passing` line: VS Code can exit 0 without running the suite.
+
 `pretest:e2e:vsix` packages the extension to `.vscode-test/commitsage.vsix`, unpacks it to `.vscode-test/vsix/extension` and copies the compiled suite into that folder. The copy is required: VS Code gives each extension its own `vscode` API object by file path, so stubs on `vscode.window` reach the extension only when the tests live inside its folder.
 
 The first E2E run downloads VS Code stable into `.vscode-test/` and caches it there.
