@@ -138,7 +138,7 @@ The mock server cannot intercept providers without a `baseUrl` setting, because 
 
 ## CI
 
-The reusable workflow `.github/workflows/test.yml` runs the tests. `pr-check.yml` calls it for pull requests to `main`, `release.yml` for `v*` tags, and `security-release.yml` for Dependabot pull requests that change `package.json` or `package-lock.json` when its security check reports a critical advisory. On Node.js 22 it runs:
+The reusable workflow `.github/workflows/test.yml` runs the tests. `pr-check.yml` calls it for pull requests to `main`, `release.yml` for `v*` tags, and `security-release.yml` for Dependabot pull requests that change `package.json` or `package-lock.json` when its security check reports a critical advisory. On Node.js 24 it runs:
 
 1. `npm ci`.
 2. Writes a stub `src/constants/apiKeys.ts`; the real file is gitignored.

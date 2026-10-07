@@ -4,7 +4,7 @@ This page shows how to set up a checkout, check a change and open a pull request
 
 ## Set up
 
-Use Node.js 22 with its bundled npm 10, the versions CI uses. `package-lock.json` is generated with npm 10; a lock file rewritten by npm 11 breaks `npm ci` in CI.
+Use Node.js 24 with its bundled npm 11, the versions CI uses. A lock file rewritten by an older npm can break `npm ci` in CI.
 
 1. Fork the repository on GitHub and clone your fork:
 
