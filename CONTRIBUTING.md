@@ -1,83 +1,71 @@
 # Contributing to Commit Sage
 
-We're thrilled that you're interested in contributing to Commit Sage! This document provides guidelines for contributing to the project.
+This page shows how to set up a checkout, check a change and open a pull request.
 
-## Getting Started
+## Set up
 
-1. Fork the repository
-2. Clone your fork:
+Use Node.js 24 with its bundled npm 11, the versions CI uses. A lock file rewritten by an older npm can break `npm ci` in CI.
+
+1. Fork the repository on GitHub and clone your fork:
+
+   ```bash
+   git clone https://github.com/<YOUR_USERNAME>/CommitSage.git
+   cd CommitSage
+   ```
+
+2. Install the dependencies from the lock file:
+
+   ```bash
+   npm ci
+   ```
+
+3. Create `src/constants/apiKeys.ts`. The file is gitignored, and the build, type check and lint fail without it. An empty key turns telemetry off.
+
+   ```bash
+   mkdir -p src/constants
+   echo "export const AMPLITUDE_API_KEY = '';" > src/constants/apiKeys.ts
+   ```
+
+4. Create a branch:
+
+   ```bash
+   git checkout -b <BRANCH_NAME>
+   ```
+
+## Develop
+
+- `npm run compile` builds the bundle in `dist/` once with esbuild. It does not type-check.
+- `npm run watch` rebuilds the bundle on every change.
+- To open an Extension Development Host, start the `Run Extension` launch configuration. It runs `npm run compile` first.
+
+## Check a change before the pull request
+
 ```bash
-git clone https://github.com/your-username/CommitSage.git
-```
-3. Install dependencies:
-```bash
-npm install
-```
-4. Create a branch for your changes:
-```bash
-git checkout -b feature/your-feature-name
+npm run verify      # typecheck, eslint, unit tests, E2E against the dev bundle and the packaged .vsix
 ```
 
-## Development
+On Linux without a display, run `xvfb-run -a npm run verify`. Test layers, single-test runs and the CI steps are in [docs/testing.md](docs/testing.md).
 
-1. Make your changes
-2. Build the extension:
-```bash
-npm run compile
-```
-3. Run the linter:
-```bash
-npm run lint
-```
+## Commit messages
 
-## Submitting Changes
+Commit messages follow [Conventional Commits](https://www.conventionalcommits.org/): `<TYPE>(<SCOPE>): <SUMMARY>`, for example `fix(openai-compat): adapt payload when model rejects max_tokens or temperature`.
 
-1. Push your changes to your fork
-2. Submit a pull request to the main Commit Sage repository.
+## Pull requests
 
-## Pull Request Guidelines
+Push the branch to your fork and open a pull request against `main`. A pull request:
 
-- Follow the existing code style
-- Include tests for new features
-- Update documentation as needed
-- Keep changes focused and atomic
-- Describe your changes in detail
+- holds one change;
+- adds or updates tests for changed behavior;
+- updates `README.md` and the pages in `docs/` that describe changed behavior;
+- describes what changed and why.
 
-## Code Style
+## Contributor guides
 
-- Use TypeScript
-- Follow ESLint rules
-- Write clear commit messages
-- Add JSDoc comments for public APIs
-
-## Contributor Guides
-
-Detailed guides for common contribution tasks are available in the `docs/` directory:
-
-- [Adding a new language](docs/adding-languages.md)
-- [Adding a new commit format](docs/adding-formats.md)
-- [Adding a new AI provider](docs/adding-providers.md)
+- [Add a language](docs/adding-languages.md)
+- [Add a commit format](docs/adding-formats.md)
+- [Add an AI provider](docs/adding-providers.md)
 - [Testing](docs/testing.md)
 
-## Testing
+## Questions
 
-- Test your changes in VS Code by pressing F5 to launch the Extension Development Host
-- Verify the extension compiles without errors (`npm run compile`)
-- Run the automated test suites:
-  - `npm run test:unit` — fast vitest suite (~1s)
-  - `npm run test:e2e` — full E2E in headless VS Code (~5s after first download)
-  - `npm test` — both
-- See [docs/testing.md](docs/testing.md) for E2E architecture, the mock LLM server, and how to add new E2E tests
-
-## Documentation
-
-- Update README.md for user-facing changes
-- Add JSDoc comments for new functions
-- Keep documentation clear and concise
-
-## Need Help?
-
-- Join our [Telegram Group](https://t.me/gemini_commit)
-- Ask questions in GitHub Issues
-
-Thank you for contributing to Commit Sage!
+Ask in [GitHub Issues](https://github.com/VizzleTF/CommitSage/issues) or in the [Telegram group](https://t.me/gemini_commit).

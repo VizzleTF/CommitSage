@@ -5,7 +5,6 @@
         }
     ],
     "settings": {
-        "git.path": "/opt/homebrew/bin/git",
         "git.autoRepositoryDetection": false,
         "git.openRepositoryInParentFolders": "never",
         "commitSage.provider.type": "openai",

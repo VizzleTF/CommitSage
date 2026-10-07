@@ -1,16 +1,16 @@
-# Custom Language
+# Set up a custom commit language
 
-CommitSage supports generating commit messages in any language via the **custom language** option. Unlike the built-in languages (English, Russian, etc.), a custom language is not bundled — the format template is translated on-demand by the LLM on first use and cached locally in your project.
+Use a custom language when Commit Sage has no built-in template for the language you want. The built-in languages are English, Russian, Chinese, Japanese, Korean, German, French, Spanish and Portuguese.
 
----
+Prerequisites: a configured provider with a working API key. Setup: [providers.md](providers.md).
 
-## Setup
+## Steps
 
-1. Open VS Code Settings → **Commit Sage**
-2. Set **Commit Language** to `custom`
-3. Set **Custom Language Name** to the language you want (e.g. `Ukrainian`, `Italian`, `Arabic`, `Thai`)
+1. Set `commitSage.commit.commitLanguage` to `custom`.
+2. Set `commitSage.commit.customLanguageName` to the language name, for example `Ukrainian`.
+3. Generate a commit message.
 
-Or add to your project's `.commitsage/config.json`:
+To set the language for one project only, put both keys in `.commitsage/config.json`:
 
 ```json
 {
@@ -21,74 +21,33 @@ Or add to your project's `.commitsage/config.json`:
 }
 ```
 
----
+## Verification
 
-## How It Works
+The first generation shows the progress message `Translating commit format to <LANGUAGE>...`. After it, `.commitsage/translations.json` holds an entry for the language and the current format, and the message is in that language.
 
-### First commit after selecting a custom language
+## How the translation works
 
-1. CommitSage checks `.commitsage/translations.json` for a cached template matching the current language + format
-2. If not found, sends a translation request to your configured LLM provider
-3. Saves the translated template to `.commitsage/translations.json`
-4. Uses the translated template to generate the commit message
+Commit Sage asks the configured provider to translate the English template of the current `commitSage.commit.commitFormat`. Commit type names, emoji codes and format patterns stay in English. The result is cached, and later generations read the cache without a translation request.
 
-### Subsequent commits
+- The cache key is the language name, case-sensitive: `Ukrainian` and `ukrainian` are separate entries.
+- Each language entry holds one template per format. A new format adds a key under the existing language.
+- A missing entry is translated again. To redo a translation, delete its entry or the whole file.
+- If `customLanguageName` is empty, the English template is used and nothing is translated.
+- With `useCustomInstructions` on and non-empty `customInstructions`, the prompt comes from `customInstructions` and nothing is translated, whatever the format. With `commitFormat` set to `custom` and without `useCustomInstructions`, the conventional template is translated and cached under the `custom` key.
 
-CommitSage reads the cached template from `.commitsage/translations.json` — no second translation request is made.
+## Cache file
 
----
-
-## Cache File
-
-All translated templates are stored in a single file: `.commitsage/translations.json`.
+The cache is `.commitsage/translations.json` in the project root. Commit it to share translations with your team.
 
 ```json
 {
   "Ukrainian": {
-    "conventional": "<translated template>",
-    "angular": "<translated template>"
-  },
-  "Italian": {
-    "google": "<translated template>"
+    "conventional": "<TRANSLATED_TEMPLATE>",
+    "angular": "<TRANSLATED_TEMPLATE>"
   }
 }
 ```
 
-Each top-level key is a language name; each nested key is a commit format. When you switch to a new format, the new translation is added under the existing language entry — other languages and formats are not touched.
+## If it did not work
 
-The translation for a specific language + format is regenerated only if its key is missing (e.g. after deleting the entry or the whole file).
-
-You can commit `.commitsage/translations.json` to share all translated templates with your team.
-
----
-
-## Project Directory Layout
-
-When the custom language feature writes `translations.json`, CommitSage uses `.commitsage/` as a directory. If your project has a legacy `.commitsage` file (single JSON config), it is automatically migrated at extension startup:
-
-```
-.commitsage          →   .commitsage/
-                             config.json   (your existing config)
-                             translations.json (custom language cache)
-```
-
-The migration happens transparently — no manual action required. The existing config contents are preserved.
-
----
-
-## Notes
-
-- **Custom Language Name is case-sensitive** in the cache key — `Ukrainian` and `ukrainian` are stored as separate entries.
-- **Technical terms** (type names like `feat`, `fix`, `docs`, format patterns like `type(scope): description`) are kept in English in the translated template.
-- If **Custom Language Name** is left empty while `commitLanguage` is `custom`, CommitSage falls back to the English template.
-- The translation quality depends on your LLM provider and model. If the result is poor, delete the relevant entry from `.commitsage/translations.json` to trigger a fresh translation.
-
----
-
-## Troubleshooting
-
-**Translation request fails** — The same LLM provider and API key configured for commit generation is used. Check that your API key is valid and the provider is reachable. See [troubleshooting.md](troubleshooting.md).
-
-**Commit message is in the wrong language** — Delete the relevant entry from `.commitsage/translations.json` (or delete the whole file) and try again. The file may contain a stale translation.
-
-**`.commitsage` is a file, not a directory** — This migration is handled automatically at extension startup. If you see filesystem errors, check that your project root is writable.
+See [troubleshooting.md](troubleshooting.md). Setting details: [configuration.md](configuration.md).
