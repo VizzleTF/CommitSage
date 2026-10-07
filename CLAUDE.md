@@ -11,3 +11,4 @@ Follow [docs/issue-response-guide.md](docs/issue-response-guide.md) for replies 
 - `CONTRIBUTING.md`: setup, checks before a pull request, commit convention.
 - `docs/adding-providers.md`, `docs/adding-formats.md`, `docs/adding-languages.md`: how to add a provider, format or language.
 - `docs/testing.md`: unit and E2E test layers, CI steps.
+- `docs/releasing.md`: release steps: version bump, tag, marketplace check.
