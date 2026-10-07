@@ -85,4 +85,22 @@ describe('LLM errors and recovery', () => {
         // Cleanup: drop the test key so the next test re-installs cleanly.
         await clearOpenAIKey();
     });
+
+    it('drops temperature and retries when the model rejects it (#539)', async () => {
+        await ensureOpenAIKey();
+        mock.enqueue({
+            status: 400,
+            body: { error: {
+                message: "Unsupported value: 'temperature' does not support 0.7 with this model. Only the default (1) value is supported.",
+                param: 'temperature',
+            } },
+        });
+
+        await vscode.commands.executeCommand('commitsage.generateCommitMessage');
+
+        assert.equal(mock.requests.length, 2, `expected 2 requests, got ${mock.requests.length}`);
+        assert.ok('temperature' in (mock.requests[0].body as object));
+        assert.ok(!('temperature' in (mock.requests[1].body as object)));
+        assert.equal(getRepository(repo.path).inputBox.value, 'feat: test commit message');
+    });
 });
