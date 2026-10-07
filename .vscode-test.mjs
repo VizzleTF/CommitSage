@@ -1,9 +1,19 @@
 import { defineConfig } from '@vscode/test-cli';
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+
+// Tests write settings with ConfigurationTarget.Workspace, which VS Code saves
+// into the .code-workspace file. Run against a gitignored copy so the tracked
+// sample stays clean.
+const sample = JSON.parse(readFileSync('tests/e2e/sample.code-workspace', 'utf8'));
+sample.folders = sample.folders.map((f) => ({ path: resolve('tests/e2e', f.path) }));
+mkdirSync('.vscode-test', { recursive: true });
+writeFileSync('.vscode-test/e2e.code-workspace', JSON.stringify(sample, null, 4));
 
 const shared = {
     files: 'tests/e2e/out/suite/**/*.e2e.js',
     version: 'stable',
-    workspaceFolder: 'tests/e2e/sample.code-workspace',
+    workspaceFolder: '.vscode-test/e2e.code-workspace',
     launchArgs: [
         '--disable-extensions',
         '--disable-workspace-trust',

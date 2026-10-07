@@ -29,10 +29,8 @@ npm run test:unit      # vitest
 npm run test:e2e       # E2E against the dev bundle; downloads VS Code on the first run
 npm run test:e2e:vsix  # E2E against the packaged .vsix (production bundle)
 npm test               # test:unit, then test:e2e
-npm run verify         # eslint, test:unit, test:e2e, test:e2e:vsix
+npm run verify         # typecheck, eslint, test:unit, test:e2e, test:e2e:vsix
 ```
-
-None of these scripts type-checks `src/`. Run `npm run typecheck` as well.
 
 On Linux without a display (CI, WSL, SSH), prefix the E2E scripts and `verify` with `xvfb-run -a`.
 
@@ -112,7 +110,7 @@ For cancellation tests, `stubWithProgressCancellable(50)` replaces `vscode.windo
 
 ### Workspace setup
 
-`@vscode/test-cli` opens `tests/e2e/sample.code-workspace` (see `.vscode-test.mjs`). Its settings turn off Git auto-detection (`git.autoRepositoryDetection: false`, `git.openRepositoryInParentFolders: never`), so `vscode.git` sees only the repositories the tests open. Without them, the parent Commit Sage repository is also detected and every generation opens a repository QuickPick.
+`.vscode-test.mjs` copies `tests/e2e/sample.code-workspace` to `.vscode-test/e2e.code-workspace` and `@vscode/test-cli` opens the copy, because the tests write workspace settings into that file. The settings turn off Git auto-detection (`git.autoRepositoryDetection: false`, `git.openRepositoryInParentFolders: never`), so `vscode.git` sees only the repositories the tests open. Without them, the parent Commit Sage repository is also detected and every generation opens a repository QuickPick.
 
 VS Code writes provider settings into this file during a run. `setProviderToMockOpenAI` overwrites `commitSage.openai.baseUrl` with the current mock port on every run.
 
@@ -144,9 +142,10 @@ The reusable workflow `.github/workflows/test.yml` runs the tests. `pr-check.yml
 
 1. `npm ci`.
 2. Writes a stub `src/constants/apiKeys.ts`; the real file is gitignored.
-3. `npx eslint 'src/**/*.ts'`.
-4. `npm run test:unit`.
-5. `npx tsc -p tests/e2e/tsconfig.e2e.json`.
-6. Restores the `.vscode-test` cache.
-7. `xvfb-run -a npm run test:e2e`.
-8. `xvfb-run -a npm run test:e2e:vsix`.
+3. `npm run typecheck`.
+4. `npx eslint 'src/**/*.ts'`.
+5. `npm run test:unit`.
+6. `npx tsc -p tests/e2e/tsconfig.e2e.json`.
+7. Restores the `.vscode-test` cache.
+8. `xvfb-run -a npm run test:e2e`.
+9. `xvfb-run -a npm run test:e2e:vsix`.

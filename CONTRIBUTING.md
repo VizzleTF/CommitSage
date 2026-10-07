@@ -36,16 +36,15 @@ Use Node.js 22 with its bundled npm 10, the versions CI uses. `package-lock.json
 
 - `npm run compile` builds the bundle in `dist/` once with esbuild. It does not type-check.
 - `npm run watch` rebuilds the bundle on every change.
-- To open an Extension Development Host, run `npm run compile` or `npm run watch` first, then start the `Run Extension` launch configuration. Its `preLaunchTask` expects a default build task that the repository does not define, so VS Code reports a missing task before it starts.
+- To open an Extension Development Host, start the `Run Extension` launch configuration. It runs `npm run compile` first.
 
 ## Check a change before the pull request
 
 ```bash
-npm run typecheck   # tsc --noEmit
-npm run verify      # eslint, unit tests, E2E against the dev bundle and the packaged .vsix
+npm run verify      # typecheck, eslint, unit tests, E2E against the dev bundle and the packaged .vsix
 ```
 
-`npm run verify` does not type-check, so run both. On Linux without a display, run `xvfb-run -a npm run verify`. Test layers, single-test runs and the CI steps are in [docs/testing.md](docs/testing.md).
+On Linux without a display, run `xvfb-run -a npm run verify`. Test layers, single-test runs and the CI steps are in [docs/testing.md](docs/testing.md).
 
 ## Commit messages
 

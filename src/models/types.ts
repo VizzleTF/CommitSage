@@ -58,6 +58,9 @@ export interface ProjectConfig {
     codestral?: {
         model?: string;
     };
+    mistral?: {
+        model?: string;
+    };
     openai?: {
         model?: string;
         baseUrl?: string;

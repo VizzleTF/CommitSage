@@ -31,6 +31,9 @@ jobs:
           mkdir -p src/constants
           echo "export const AMPLITUDE_API_KEY = 'e2e-test-stub';" > src/constants/apiKeys.ts
 
+      - name: Typecheck
+        run: npm run typecheck
+
       - name: Lint
         run: npx eslint 'src/**/*.ts'
 

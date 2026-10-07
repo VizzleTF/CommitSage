@@ -733,7 +733,7 @@
     "test:e2e": "vscode-test --label dev",
     "pretest:e2e:vsix": "tsc -p tests/e2e/tsconfig.e2e.json && vsce package --no-dependencies -o .vscode-test/commitsage.vsix && rm -rf .vscode-test/vsix && unzip -q .vscode-test/commitsage.vsix -d .vscode-test/vsix && cp -r tests/e2e/out .vscode-test/vsix/extension/e2e",
     "test:e2e:vsix": "vscode-test --label vsix",
-    "verify": "eslint 'src/**/*.ts' && npm run test:unit && npm run test:e2e && npm run test:e2e:vsix"
+    "verify": "npm run typecheck && eslint 'src/**/*.ts' && npm run test:unit && npm run test:e2e && npm run test:e2e:vsix"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
