@@ -1,303 +1,174 @@
 # AI Providers
 
-CommitSage supports 11 AI providers — 7 cloud, 1 aggregator, 1 local, plus a generic OpenAI-compatible adapter that closes any self-hosted endpoint. This guide covers setup, features, and trade-offs.
+Commit Sage supports 11 providers: 8 cloud APIs (Gemini, Codestral, Mistral, OpenAI, Groq, Anthropic, DeepSeek, xAI), the OpenRouter aggregator, local Ollama, and a Custom adapter for any OpenAI-compatible endpoint. This page shows how to set up each one. Every setting with its type and default is in [configuration.md](configuration.md).
 
----
+Setting keys on this page omit the `commitSage.` prefix: `provider.type` means `commitSage.provider.type`.
 
-## Provider Comparison
+## Provider comparison
 
-| Provider | Cost | Runs Locally | API Key | Region notes (RU) |
-|----------|------|-------------|---------|-------------------|
-| Gemini | Free tier | No | Yes | VPN required |
-| OpenRouter | Free + paid | No | Yes | Works |
-| Groq | Free tier | No | Yes | Works |
-| Anthropic | Paid | No | Yes | VPN required |
-| OpenAI | Paid | No | Yes | Blocked, VPN required |
-| DeepSeek | Paid (cheap) | No | Yes | **Works without VPN** |
-| xAI | Paid | No | Yes | VPN required |
-| Codestral | Free | No | Yes | Works |
-| Mistral | Paid (free trial) | No | Yes | Works |
-| Ollama | Free | **Yes** | No | Works (local) |
-| Custom | Depends | Depends | Optional | Depends |
+| Provider | `provider.type` | Runs | API key | Model list in the sidebar |
+|----------|-----------------|------|---------|---------------------------|
+| Gemini (default) | `gemini` | Cloud | Required | Fetched from the Google Generative Language API |
+| OpenRouter | `openrouter` | Cloud | Required | Fetched from `openrouter.ai/api/v1/models` |
+| Groq | `groq` | Cloud | Required | Fetched from `api.groq.com/openai/v1/models` |
+| Anthropic Claude | `anthropic` | Cloud | Required | Built-in list |
+| OpenAI | `openai` | Cloud | Required | Fetched from `<openai.baseUrl>/models` |
+| DeepSeek | `deepseek` | Cloud | Required | Fetched from `api.deepseek.com/models` |
+| xAI Grok | `xai` | Cloud | Required | Fetched from `api.x.ai/v1/models`; built-in list if the request fails |
+| Codestral | `codestral` | Cloud | Required | Built-in list |
+| Mistral | `mistral` | Cloud | Required | Fetched from `api.mistral.ai/v1/models` |
+| Ollama | `ollama` | Local or self-hosted | Optional auth token | Fetched from `<ollama.baseUrl>/api/tags` |
+| Custom (OpenAI-compatible) | `custom` | Any | Optional | None; type the model ID |
 
----
+## Set up a provider
 
-## Gemini (Default)
+1. Open the Commit Sage sidebar and pick the provider.
+2. Press `Get key ↗` to open the provider's key page, and create a key.
+3. Press `Set` and paste the key, or run the command listed in the provider's section.
+4. If the provider fetches its model list, press `Refresh` and pick a model.
 
-Google's AI models via Google AI Studio.
+Ollama and Custom skip steps 2–3 unless the server needs a key. The sidebar shows `● set` next to a stored key. Keys are kept in VS Code SecretStorage. Commands that remove a key or pick a Gemini model are listed in [configuration.md](configuration.md#commands).
 
-**Setup:**
-1. Get a free API key from [Google AI Studio](https://makersuite.google.com/app/apikey)
-2. Sidebar → pick Gemini → `Set` → paste key — or Command Palette → `Commit Sage: Set Gemini API Key`
+## Gemini
 
-**Models:** `auto` (default) — fetches available models and tries each until one succeeds. Robust to model deprecations.
+Google Gemini models through the Gemini API. This is the default provider.
 
-**Settings:**
-```json
-{
-  "commitSage.provider.type": "gemini",
-  "commitSage.gemini.model": "auto"
-}
-```
+- Key: [aistudio.google.com/app/apikey](https://aistudio.google.com/app/apikey)
+- Command: `Commit Sage: Set Gemini API Key`
+- Settings:
+  - `gemini.model`: default `auto`.
+  - `gemini.thinkingBudget`: default `0`. Thinking token budget for Gemini 2.5 models; `0` disables thinking, `-1` lets the model decide.
+  - `gemini.thinkingLevel`: default `low`. Thinking depth for Gemini 3.x models: `minimal`, `low`, `medium` or `high`.
 
----
+With `auto`, the extension fetches the models that support `generateContent` and keeps names that start with `gemini-`, which drops Gemma and LearnLM. It also drops image, audio, TTS, embedding and other non-text variants. It sorts the rest `pro` first, then `flash`, then `flash-lite`, newer versions first within each group, and tries each model in that order until one returns a message. If the model list cannot be fetched, it uses a built-in list of four models.
+
+Gemini 3.x models cannot turn thinking off and ignore `gemini.thinkingBudget`. Gemini 2.5 Pro cannot disable thinking either: a budget of `0` is raised to `128` for that model.
 
 ## OpenRouter
 
-One API key, 300+ models from OpenAI, Anthropic, Google, xAI, DeepSeek, Meta, Mistral, Qwen, and more.
+One key for models from many vendors, routed through `openrouter.ai`.
 
-**Setup (one-click sign-in):**
-1. Sidebar → OpenRouter → `Sign in with OpenRouter`
-2. Authorize in the browser; the key is created and stored automatically (OAuth PKCE).
-
-**Setup (manual key):**
-1. Sign up at [openrouter.ai/keys](https://openrouter.ai/keys)
-2. Sidebar → OpenRouter → `Set`
-
-**Free tier:** 25+ models with `:free` suffix (Llama 3.3 70B, DeepSeek V3, GPT-OSS 120B, Qwen3 Coder, etc.). 20 RPM / 50 RPD at $0 balance; 1000 RPD after a $10 top-up.
-
-**Free models filter:** `commitSage.openrouter.preferFreeModels` (default `true`) restricts the model dropdown to free models only. Toggle off to browse all 300+.
-
-**Settings:**
-```json
-{
-  "commitSage.provider.type": "openrouter",
-  "commitSage.openrouter.model": "meta-llama/llama-3.3-70b-instruct:free",
-  "commitSage.openrouter.preferFreeModels": true
-}
-```
-
----
+- Key: [openrouter.ai/keys](https://openrouter.ai/keys), or press `Sign in with OpenRouter` in the sidebar. The sign-in uses OAuth with PKCE and stores the created key.
+- Commands: `Commit Sage: Set OpenRouter API Key`, `Commit Sage: Sign in to OpenRouter`
+- Settings:
+  - `openrouter.model`: default `meta-llama/llama-3.3-70b-instruct:free`.
+  - `openrouter.preferFreeModels`: default `false`. When `true`, the model list shows only free models: IDs ending in `:free` or with zero prompt and completion pricing. In the sidebar this is `Show free models only`.
 
 ## Groq
 
-Fastest commercial inference on the market (~200–500 ms for Llama 3.3 70B).
+Open-weight models served by Groq.
 
-**Setup:**
-1. Get a key from [console.groq.com/keys](https://console.groq.com/keys) (email + phone, no card)
-2. Sidebar → Groq → `Set`
-
-**Free tier:** 30 RPM / 1000 RPD on 70B; up to 14 400 RPD on `llama-3.1-8b-instant` (effectively unlimited for commit messages).
-
-**Recommended models:** `llama-3.1-8b-instant` (max throughput), `llama-3.3-70b-versatile` (quality, default), `mixtral-8x7b-32768`.
-
-**Settings:**
-```json
-{
-  "commitSage.provider.type": "groq",
-  "commitSage.groq.model": "llama-3.3-70b-versatile"
-}
-```
-
----
+- Key: [console.groq.com/keys](https://console.groq.com/keys)
+- Command: `Commit Sage: Set Groq API Key`
+- Settings: `groq.model`, default `llama-3.3-70b-versatile`.
 
 ## Anthropic Claude
 
-Claude models directly from Anthropic.
+Claude models from the Anthropic API.
 
-**Setup:**
-1. Get an API key from [console.anthropic.com/settings/keys](https://console.anthropic.com/settings/keys)
-2. Sidebar → Anthropic Claude → `Set`
+- Key: [console.anthropic.com/settings/keys](https://console.anthropic.com/settings/keys)
+- Command: `Commit Sage: Set Anthropic API Key`
+- Settings: `anthropic.model`, default `claude-sonnet-4-5-20250929`.
 
-**Models (curated static list — Anthropic has no public `/models` endpoint):**
-- `claude-opus-4-1-20250805` — highest quality
-- `claude-sonnet-4-5-20250929` — default, balanced
-- `claude-haiku-4-5-20251001` — fastest, cheapest
-- `claude-3-5-sonnet-20241022`, `claude-3-5-haiku-20241022` — previous generation
+The extension does not fetch the Anthropic model list; it uses a built-in list: `claude-opus-4-1-20250805`, `claude-sonnet-4-5-20250929`, `claude-haiku-4-5-20251001`, `claude-3-5-sonnet-20241022`, `claude-3-5-haiku-20241022`.
 
-Keep the list in sync with [docs.anthropic.com/en/docs/about-claude/models](https://docs.anthropic.com/en/docs/about-claude/models).
-
-**Note:** Pro/Max subscription OAuth tokens are not usable here — Anthropic's Usage Policy restricts those to native Anthropic clients. Use an API key from the console.
-
-**Settings:**
-```json
-{
-  "commitSage.provider.type": "anthropic",
-  "commitSage.anthropic.model": "claude-sonnet-4-5-20250929"
-}
-```
-
----
+Pro and Max subscription OAuth tokens are not supported; use an API key from the Anthropic Console.
 
 ## OpenAI
 
-OpenAI models (GPT-4o, GPT-4.1, o-series).
+OpenAI models from the OpenAI API.
 
-**Setup:**
-1. Get an API key from [platform.openai.com/api-keys](https://platform.openai.com/api-keys)
-2. Sidebar → OpenAI → `Set`
+- Key: [platform.openai.com/api-keys](https://platform.openai.com/api-keys)
+- Command: `Commit Sage: Set OpenAI API Key`
+- Settings:
+  - `openai.model`: default `gpt-3.5-turbo`. To pick a current model, press `Refresh` in the sidebar and choose from the list.
+  - `openai.baseUrl`: default `https://api.openai.com/v1`. Change it for Azure OpenAI or another OpenAI-compatible endpoint.
 
-**Custom endpoint:** `commitSage.openai.baseUrl` accepts any OpenAI-compatible URL (Azure OpenAI, LocalAI). For self-hosted setups prefer the dedicated **Custom** provider instead — it doesn't conflate official OpenAI defaults with self-hosted overrides.
-
-**Settings:**
-```json
-{
-  "commitSage.provider.type": "openai",
-  "commitSage.openai.model": "gpt-4o-mini",
-  "commitSage.openai.baseUrl": "https://api.openai.com/v1"
-}
-```
-
----
+The model list keeps only IDs that start with `gpt-`, `chatgpt-`, `o1`, `o3` or `o4`. For a self-hosted server, use the Custom provider: it has its own base URL, path and optional key, and leaves the OpenAI settings unchanged.
 
 ## DeepSeek
 
-DeepSeek's flagship models. **Works without VPN in restricted regions.**
+DeepSeek models from the DeepSeek API.
 
-**Setup:**
-1. Get a key from [platform.deepseek.com/api_keys](https://platform.deepseek.com/api_keys)
-2. Sidebar → DeepSeek → `Set`
-
-**Models:** `deepseek-chat` (default), `deepseek-reasoner`.
-
-**Settings:**
-```json
-{
-  "commitSage.provider.type": "deepseek",
-  "commitSage.deepseek.model": "deepseek-chat"
-}
-```
-
----
+- Key: [platform.deepseek.com/api_keys](https://platform.deepseek.com/api_keys)
+- Command: `Commit Sage: Set DeepSeek API Key`
+- Settings: `deepseek.model`, default `deepseek-chat`.
 
 ## xAI Grok
 
-xAI's Grok models.
+Grok models from the xAI API.
 
-**Setup:**
-1. Get a key from [console.x.ai](https://console.x.ai/)
-2. Sidebar → xAI Grok → `Set`
+- Key: [console.x.ai](https://console.x.ai/)
+- Command: `Commit Sage: Set xAI API Key`
+- Settings: `xai.model`, default `grok-3-mini`.
 
-**Models:** `grok-2-1212` (default, stable), `grok-3-mini`, others as released.
-
-**Settings:**
-```json
-{
-  "commitSage.provider.type": "xai",
-  "commitSage.xai.model": "grok-2-1212"
-}
-```
-
----
+If the request to `/v1/models` fails or returns no models, the sidebar shows a built-in list: `grok-4-1-fast`, `grok-4-fast`, `grok-4-fast-non-reasoning`, `grok-3`, `grok-3-mini`, `grok-code-fast-1`. One cause is an account without credits or a license, where xAI rejects the request. Generating a message still needs credits.
 
 ## Codestral
 
-Mistral AI's code-specialized model on the dedicated Codestral subdomain. Free tier.
+Mistral's code models on the dedicated endpoint `codestral.mistral.ai`.
 
-**Setup:**
-1. Get a free API key from [console.mistral.ai/codestral](https://console.mistral.ai/codestral)
-2. Sidebar → Codestral → `Set`
+- Key: [console.mistral.ai/codestral](https://console.mistral.ai/codestral)
+- Command: `Commit Sage: Set Codestral API Key`
+- Settings: `codestral.model`, default `codestral-latest`. The built-in list also has `codestral-2508`, `codestral-2501` and `codestral-2405`.
 
-**Models:** `codestral-latest` (default), `codestral-2508`, `codestral-2501`, `codestral-2405`.
-
-**Settings:**
-```json
-{
-  "commitSage.provider.type": "codestral",
-  "commitSage.codestral.model": "codestral-latest"
-}
-```
-
----
+The Codestral key and the Mistral (La Plateforme) key are issued in different sections of the console. One does not work in place of the other.
 
 ## Mistral
 
-The full Mistral catalog via La Plateforme (`api.mistral.ai`) — general-purpose
-models, not only code. Use this when you want `mistral-small`, `mistral-large`,
-`magistral` or `ministral`; use Codestral when you want the free code-only
-endpoint.
+Mistral models on La Plateforme (`api.mistral.ai`), including models outside the Codestral family.
 
-**Setup:**
-1. Create an API key at [console.mistral.ai/api-keys](https://console.mistral.ai/api-keys)
-2. Sidebar → Mistral → `Set`
-3. Press `⟳` to load the live model list
+- Key: [console.mistral.ai/api-keys](https://console.mistral.ai/api-keys)
+- Command: `Commit Sage: Set Mistral API Key`
+- Settings: `mistral.model`, default `mistral-small-latest`.
 
-The La Plateforme key is **not** the same as the Codestral key: they are issued
-in different sections of the console and are not interchangeable.
-
-**Models:** fetched live from `GET /v1/models`, filtered to chat-capable,
-non-archived models (the raw list also contains embedding, OCR, moderation and
-FIM models that cannot answer `/chat/completions`). Default `mistral-small-latest`.
-
-**Settings:**
-```json
-{
-  "commitSage.provider.type": "mistral",
-  "commitSage.mistral.model": "mistral-small-latest"
-}
-```
-
----
+The model list keeps chat-capable, non-archived models. Embedding, OCR, moderation and FIM models are dropped because they do not answer `/chat/completions`.
 
 ## Ollama
 
-Run models locally. No API key, no data leaves your machine.
+Models run by an Ollama server, on your machine or on another host.
 
-**Setup:**
-1. Install Ollama from [ollama.com](https://ollama.com)
-2. Pull a model: `ollama pull llama3.2` (or `qwen2.5-coder:7b` for code-specialized)
-3. Sidebar → Ollama (default base URL `http://localhost:11434`)
+- Key: none for a local server. Install Ollama from [ollama.com](https://ollama.com), pull a model with `ollama pull llama3.2`, then press `Refresh` in the sidebar.
+- Command: `Commit Sage: Set Ollama Auth Token`, for a server that needs a token.
+- Settings:
+  - `ollama.baseUrl`: default `http://localhost:11434`.
+  - `ollama.model`: default `llama3.2`.
+  - `ollama.numCtx`: default `0`. Context window sent to Ollama as `options.num_ctx`; `0` keeps the model's own default.
+  - `ollama.useAuthToken`: default `false`. When `true`, the extension sends the stored token as a Bearer token.
 
-**Recommended models:** `qwen2.5-coder:7b` (code), `llama3.2:3b` (fits 4 GB RAM), `deepseek-coder-v2:16b` (powerful hardware).
+## Custom (OpenAI-compatible)
 
-**Auth token:** For hosted Ollama instances behind auth, enable `commitSage.ollama.useAuthToken` and set the token via `Commit Sage: Set Ollama Auth Token`.
+Any server that speaks the OpenAI `chat/completions` format.
 
-**Settings:**
-```json
-{
-  "commitSage.provider.type": "ollama",
-  "commitSage.ollama.baseUrl": "http://localhost:11434",
-  "commitSage.ollama.model": "llama3.2"
-}
-```
+- Key: only if the server needs one; see the table below.
+- Command: `Commit Sage: Set Custom API Key`
+- Settings:
+  - `custom.baseUrl`: default `http://localhost:1234/v1`.
+  - `custom.model`: default empty. Required: the extension sends this ID as is.
+  - `custom.useApiKey`: default `false`. When `true`, the extension sends the stored key. In the sidebar this is `Send API key`.
+  - `custom.chatCompletionsPath`: default `/chat/completions`. Appended to the base URL.
 
----
+| Server | Base URL | Key |
+|--------|----------|-----|
+| LM Studio | `http://localhost:1234/v1` | Not needed by default |
+| vLLM | `http://localhost:8000/v1` | Depends on server config |
+| llama.cpp server | `http://localhost:8080/v1` | Not needed by default |
+| LocalAI | `http://localhost:8080/v1` | Depends on server config |
+| Ollama (OpenAI mode) | `http://localhost:11434/v1` | Not needed for a local server |
+| TGI | `http://<TGI_HOST>/v1` | Depends on server config |
+| NVIDIA NIM | `https://integrate.api.nvidia.com/v1` | Required: [build.nvidia.com/settings/api-keys](https://build.nvidia.com/settings/api-keys) |
+| Together AI | `https://api.together.xyz/v1` | Required |
+| Fireworks | `https://api.fireworks.ai/inference/v1` | Required |
 
-## Custom OpenAI-compatible
+Example for a server that needs a key:
 
-Any OpenAI-compatible `chat/completions` endpoint — local or remote, with or without auth.
-
-**Common targets:**
-- **LM Studio** — `http://localhost:1234/v1`
-- **Ollama (OpenAI-compat mode)** — `http://localhost:11434/v1` (alternative to the native Ollama provider above)
-- **vLLM** — `http://localhost:8000/v1` (any self-hosted Mistral/Llama/Qwen/etc. served via vLLM)
-- **TGI (HuggingFace Text Generation Inference)** — `http://your-tgi-host/v1`
-- **llama.cpp server** — `http://localhost:8080/v1`
-- **LocalAI** — `http://localhost:8080/v1`
-- **NVIDIA NIM (free hosted models)** — `https://integrate.api.nvidia.com/v1` + key from <https://build.nvidia.com/settings/api-keys>; covers free coding models like `meta/llama-3.3-70b-instruct`, `qwen/qwen2.5-coder-32b-instruct`
-- **Together AI** — `https://api.together.xyz/v1` (needs key)
-- **Fireworks** — `https://api.fireworks.ai/inference/v1` (needs key)
-- **Cerebras**, **DeepInfra**, **private deployments** — any URL exposing OpenAI wire format
-
-**Setup:**
-1. Sidebar → Custom (OpenAI-compatible)
-2. Set **Base URL** to your endpoint
-3. Set **Model** to whatever model ID your endpoint exposes (free-form text — no listing available)
-4. If your endpoint requires auth: enable `Send API key`, then `Set` to paste the key
-
-**Settings:**
 ```json
 {
   "commitSage.provider.type": "custom",
-  "commitSage.custom.baseUrl": "http://localhost:1234/v1",
-  "commitSage.custom.model": "qwen2.5-coder",
-  "commitSage.custom.useApiKey": false,
-  "commitSage.custom.chatCompletionsPath": "/chat/completions"
+  "commitSage.custom.baseUrl": "https://api.together.xyz/v1",
+  "commitSage.custom.model": "<MODEL_ID>",
+  "commitSage.custom.useApiKey": true
 }
 ```
 
----
-
-## Choosing a Provider
-
-- **Gemini** — best free starting point, auto-mode handles model rotation
-- **OpenRouter** — one key, access to almost everything (incl. 25+ free models)
-- **Groq** — fastest replies + the most generous free tier
-- **Anthropic** — best output quality at higher cost
-- **DeepSeek** — works from regions where US providers are blocked
-- **Ollama** — best for privacy / offline / sensitive repos
-- **Custom** — any self-hosted server (LM Studio, vLLM, llama.cpp) without per-vendor wiring
-- **OpenAI** — when you specifically want GPT models
-- **xAI** — when you specifically want Grok
-- **Codestral** — free code-specialized fallback
-- **Mistral** — the rest of the Mistral catalog (general-purpose models, paid)
+Then run `Commit Sage: Set Custom API Key` and paste the key.

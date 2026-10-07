@@ -4,362 +4,91 @@
 [![Open VSX Version](https://img.shields.io/open-vsx/v/VizzleTF/geminicommit?label=Open%20VSX)](https://open-vsx.org/extension/VizzleTF/geminicommit) [![Open VSX Downloads](https://img.shields.io/open-vsx/dt/VizzleTF/geminicommit?label=Open%20VSX%20downloads)](https://open-vsx.org/extension/VizzleTF/geminicommit) [![Open VSX Rating](https://img.shields.io/open-vsx/rating/VizzleTF/geminicommit?label=Open%20VSX%20rating)](https://open-vsx.org/extension/VizzleTF/geminicommit)<br>
 [![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=VizzleTF_CommitSage&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=VizzleTF_CommitSage) [![Security Rating](https://sonarcloud.io/api/project_badges/measure?project=VizzleTF_CommitSage&metric=security_rating)](https://sonarcloud.io/summary/new_code?id=VizzleTF_CommitSage) [![Vulnerabilities](https://sonarcloud.io/api/project_badges/measure?project=VizzleTF_CommitSage&metric=vulnerabilities)](https://sonarcloud.io/summary/new_code?id=VizzleTF_CommitSage) [![CodeQL](https://github.com/VizzleTF/CommitSage/actions/workflows/codeql.yml/badge.svg)](https://github.com/VizzleTF/CommitSage/actions/workflows/codeql.yml)
 
-Commit Sage is a VSCode extension that automatically generates commit messages using various AI providers:
-- **Gemini** (default, requires API key, free tier)
-- **OpenRouter** (300+ models behind one key, free-tier models available)
-- **Groq** (fast inference, generous free tier)
-- **Anthropic Claude** (requires API key)
-- **OpenAI** (requires API key)
-- **DeepSeek** (works without VPN in restricted regions)
-- **xAI Grok** (requires API key)
-- **Codestral** (requires API key, free tier)
-- **Mistral** (La Plateforme — the full Mistral catalog, requires API key)
-- **Ollama** (local, free, no key)
-- **Custom OpenAI-compatible** — LM Studio, vLLM, llama.cpp, LocalAI, Together AI, Fireworks, any self-hosted endpoint
+Commit Sage is a VS Code extension that writes Git commit messages from your changes with an AI provider of your choice.
 
 ![Commit Sage in action](example.gif)
 
-## Features
+## Install
 
-- 🤖 AI-powered commit message generation
-- 🔄 Auto model selection for Gemini (tries available models until success)
-- 🌍 Multiple language support (English, Russian, Chinese, Japanese, Korean, German, French, Spanish, Portuguese)
-- 📝 Various commit formats (Conventional, Angular, Karma, Semantic, Emoji, EmojiKarma, Google, Atom)
-- 🔄 Smart handling of staged/unstaged changes
-- ✅ Commitlint validation with auto-fix and retries — built-in rules for every format, or your project's own commitlint for exact CI parity
-- 🚀 Auto-commit and auto-push capabilities
-- 🎯 Custom instructions support
-- ⚡ Fast and efficient processing
+Requires VS Code 1.93.0 or later and Git. Cloud providers need internet access; Ollama and a self-hosted Custom endpoint do not.
 
-## Configuration
+Install from the [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=VizzleTF.geminicommit), from [Open VSX](https://open-vsx.org/extension/VizzleTF/geminicommit), or from the command line:
 
-The fastest way is the **Commit Sage sidebar** (Activity Bar icon): pick a provider, paste an API key, and the model dropdown is populated live from each provider's `/models` endpoint.
-
-Where to get keys:
-- **Gemini** — [Google AI Studio](https://makersuite.google.com/app/apikey)
-- **OpenRouter** — [openrouter.ai/keys](https://openrouter.ai/keys) (one key → 300+ models)
-- **Groq** — [console.groq.com/keys](https://console.groq.com/keys)
-- **Anthropic** — [console.anthropic.com/settings/keys](https://console.anthropic.com/settings/keys)
-- **OpenAI** — [platform.openai.com/api-keys](https://platform.openai.com/api-keys)
-- **DeepSeek** — [platform.deepseek.com/api_keys](https://platform.deepseek.com/api_keys)
-- **xAI** — [console.x.ai](https://console.x.ai/)
-- **Codestral** — [Mistral AI Console](https://console.mistral.ai/codestral)
-- **Mistral** — [console.mistral.ai/api-keys](https://console.mistral.ai/api-keys) (a La Plateforme key, not the Codestral one)
-- **Ollama** — no key needed (local)
-- **Custom** — depends on your endpoint; key is optional
-
-### AI Provider Settings
-
-- **Provider Selection** (`commitSage.provider.type`):
-  - Choose between: `gemini`, `openrouter`, `groq`, `anthropic`, `openai`, `deepseek`, `xai`, `codestral`, `ollama`, `custom`
-  - Default: `gemini`
-
-- **Gemini** — Model (`commitSage.gemini.model`): default `auto` (recommended). Auto mode fetches the live model list from the API and tries each sequentially until one succeeds — robust to model deprecations.
-
-- **OpenRouter** — Model (`commitSage.openrouter.model`): default `meta-llama/llama-3.3-70b-instruct:free`. Toggle `commitSage.openrouter.preferFreeModels` to filter the model picker to free models only (default `true`).
-
-- **Groq** — Model (`commitSage.groq.model`): default `llama-3.3-70b-versatile`. Free tier covers ~14 400 RPD on `llama-3.1-8b-instant`.
-
-- **Anthropic** — Model (`commitSage.anthropic.model`): default `claude-sonnet-4-5-20250929`. Anthropic has no public `/models` endpoint, so the dropdown is a curated static list — see [docs/providers.md](docs/providers.md) for current options.
-
-- **OpenAI** — Model (`commitSage.openai.model`) + Base URL (`commitSage.openai.baseUrl`, change only for Azure or another OpenAI-compatible deployment).
-
-- **DeepSeek** — Model (`commitSage.deepseek.model`): default `deepseek-chat`.
-
-- **xAI** — Model (`commitSage.xai.model`): default `grok-2-1212`.
-
-- **Codestral** — Model (`commitSage.codestral.model`): default `codestral-latest`.
-
-- **Mistral** — Model (`commitSage.mistral.model`): default `mistral-small-latest`; the sidebar fetches the live list from La Plateforme.
-
-- **Ollama**:
-  - Base URL (`commitSage.ollama.baseUrl`): default `http://localhost:11434`
-  - Model (`commitSage.ollama.model`): default `llama3.2`
-  - Auth token (`commitSage.ollama.useAuthToken`): off by default; enable for hosted Ollama instances behind auth.
-
-- **Custom OpenAI-compatible**:
-  - Base URL (`commitSage.custom.baseUrl`): e.g. `http://localhost:1234/v1` (LM Studio), `http://localhost:8000/v1` (vLLM), `https://api.together.xyz/v1`
-  - Model (`commitSage.custom.model`): free-form ID your endpoint exposes
-  - Send API key (`commitSage.custom.useApiKey`): off by default; enable for endpoints that require auth
-  - Path (`commitSage.custom.chatCompletionsPath`): default `/chat/completions`
-
-### Commit Settings
-
-- **Language** (`commitSage.commit.commitLanguage`):
-  - Options: `english`, `russian`, `chinese`, `japanese`, `korean`, `german`, `french`, `spanish`, `portuguese`
-  - Default: `english`
-
-- **Format** (`commitSage.commit.commitFormat`):
-  - Options: `conventional`, `angular`, `karma`, `semantic`, `emoji`, `emojiKarma`, `google`, `atom`
-  - Default: `conventional`
-
-- **Staged Changes** (`commitSage.commit.onlyStagedChanges`):
-  - When enabled: Only analyzes staged changes
-  - When disabled: 
-    - Uses staged changes if present
-    - Uses all changes if no staged changes
-  - Default: `false`
-
-- **Auto Commit** (`commitSage.commit.autoCommit`):
-  - Automatically commits after message generation
-  - Default: `false`
-
-- **Auto Push** (`commitSage.commit.autoPush`):
-  - Automatically pushes after auto-commit
-  - Requires Auto Commit to be enabled
-  - Default: `false`
-
-- **References** (`commitSage.commit.refs.*`):
-  - Adds an issue/ticket ref (e.g. `#123`, `PROJ-456`) to the commit
-  - Source: `prompt` (ask each time), `branch` (extract from branch name), or `input` (fixed value)
-  - With `input`, the panel offers **Save for this branch** (per-branch, local) and **Save for project** (`.commitsage/config.json`); branch ref wins over project ref
-  - Placement: separate line at `end` / `start`, or `prefix` (start of subject line) — never injected into the subject scope
-  - Default: disabled
-
-### Message Validation
-
-- **Enable** (`commitSage.commit.commitlint.enabled`):
-  - Validates the generated message against the rules of the selected commit format, auto-fixes mechanical violations (type/scope casing, trailing full stop, missing blank line) in code, and asks the LLM to rewrite when needed.
-  - Every format has its own built-in rule set: conventional, angular, atom, karma, semantic, google, emoji, emojiKarma and detailed are all checked (emoji formats by header pattern, detailed by its Summary/Details/Effects structure).
-  - Not available for the `custom` format — the checkbox switches off automatically when `custom` is selected.
-  - The rules in force are also appended to the generation prompt, so the model sees exactly what the validator will check.
-  - Default: `false`
-
-- **Validator** (`commitSage.commit.commitlint.engine`):
-  - `builtin` (default): the bundled static validator, no project code is executed. For `conventional`/`angular` it reads the repo's commitlint config when present (JSON, YAML, CJS, `package.json` field, local `extends`); other formats use their static rule sets.
-  - `project`: the repo's **own commitlint CLI** from node_modules runs in a child process — exact parity with your CI: shareable presets (gitmoji, jira, lerna-scopes, …), `extends` chains, plugins and custom `parserPreset` work on any commitlint version. Applies to commitlint-compatible formats (conventional, angular, atom, karma, semantic, google); requires a trusted workspace; falls back to builtin when unavailable. The sidebar shows this choice only when commitlint is detected in the repo.
-
-- **Max Retries** (`commitSage.commit.commitlint.maxRetries`):
-  - Maximum number of validation + refinement cycles.
-  - Range: 1–10. Default: `3`
-
-- **Rules Path** (`commitSage.commit.commitlint.rulesPath`):
-  - Custom path to the commitlint config file (e.g. `./config/commitlint.config.js`). Used by the `conventional` and `angular` formats.
-  - Leave empty to auto-discover the `commitlint` field in `package.json` or `commitlint.config.{js,cjs,json,yml,yaml}` in the repository root.
-  - Default: (empty — auto-discover)
-
-### Custom Instructions
-
-- **Enable** (`commitSage.commit.useCustomInstructions`):
-  - Default: `false`
-
-- **Instructions** (`commitSage.commit.customInstructions`):
-  - Custom prompt instructions
-  - Used when enabled
-
-### Telemetry
-
-- **Enable** (`commitSage.telemetry.enabled`):
-  - Collects anonymous usage data
-  - Default: `true`
-
-## Project Configuration (.commitsage/config.json)
-
-You can override extension settings for individual projects by creating a `.commitsage/config.json` file in your project root. This allows different projects to have different AI providers, commit formats, or other settings.
-
-> Legacy single-file `.commitsage` configurations are still loaded and are automatically migrated to `.commitsage/config.json` on next activation.
-
-### Creating Project Configuration
-
-1. Open Command Palette (`Ctrl+Shift+P` / `Cmd+Shift+P`)
-2. Run "Commit Sage: Create Project Config (.commitsage)"
-3. Edit the generated `.commitsage/config.json` with your project-specific settings
-
-### Example `.commitsage/config.json`:
-
-```json
-{
-  "provider": {
-    "type": "gemini"
-  },
-  "commit": {
-    "commitLanguage": "russian",
-    "commitFormat": "conventional",
-    "autoCommit": false,
-    "autoPush": false
-  },
-  "gemini": {
-    "model": "auto"
-  },
-  "telemetry": {
-    "enabled": false
-  }
-}
+```bash
+code --install-extension VizzleTF.geminicommit
 ```
 
-### Settings Priority
+## Quick start
 
-Settings are loaded in the following order (higher priority overrides lower):
-1. **Project settings** (`.commitsage/config.json`) - Highest priority
-2. **VS Code workspace settings** - Medium priority  
-3. **VS Code global settings** - Lowest priority
+1. Open the **Commit Sage** view in the Activity Bar and pick a provider. The default is `gemini`.
+2. In the same view, click the button to set the API key for that provider. The view links to the page where you get the key. Or run `Commit Sage: Set <PROVIDER> API Key` from the Command Palette.
 
-### Notes
+   Ollama and Custom need no key by default.
+3. Stage your changes and click the Commit Sage icon in the Source Control header, press `Ctrl+G` (`Cmd+G` on macOS) in the Source Control view, or run `Commit Sage: Generate Commit Message`.
 
-- The `.commitsage/config.json` file is automatically watched for changes
-- Invalid JSON syntax will show an error notification
-- API keys are still managed through VS Code's secure storage (not stored in project files)
-- You can override any setting available in the extension configuration
+The message appears in the Source Control input box. Review it and commit.
 
-## Usage
+## Features
 
-1. Stage your changes in Git
-2. Open the Source Control view (Ctrl+Shift+G / Cmd+Shift+G), then press `Ctrl+G` (Windows/Linux) / `Cmd+G` (Mac) — the keybinding is scoped to the SCM view to avoid clashing with editor shortcuts
-3. Or click the Commit Sage icon in the Source Control view
-4. Or run "Commit Sage: Generate Commit Message" from the Command Palette (works from anywhere)
-5. Wait for the AI to analyze changes and generate a message
-6. Review and edit the message if needed
-7. Commit as usual
+- 11 providers: Gemini, OpenRouter, Groq, Anthropic, OpenAI, DeepSeek, xAI, Codestral, Mistral, Ollama and Custom (any OpenAI-compatible endpoint). Setup per provider: [docs/providers.md](docs/providers.md).
+- Commit formats: `conventional`, `angular`, `karma`, `semantic`, `emoji`, `emojiKarma`, `google`, `atom`, `detailed`, `previous` and `custom`. See [docs/commit-formats.md](docs/commit-formats.md).
+- Message languages: English, Russian, Chinese, Japanese, Korean, German, French, Spanish, Portuguese, and `custom` ([docs/custom-language.md](docs/custom-language.md)).
+- Commitlint validation with auto-fix and retries. It can read the repository's commitlint config; see [Commit settings](docs/configuration.md#commit).
+- Optional auto-commit and auto-push, issue references, and custom instructions.
+- Per-project settings in `.commitsage/config.json`, created with `Commit Sage: Create Project Config (.commitsage)`.
+- In an untrusted workspace, Commit Sage ignores trust-sensitive keys in `.commitsage/config.json` and skips auto-commit. See [Workspace trust](docs/configuration.md#workspace-trust).
 
-## Requirements
+## Privacy
 
-- VSCode 1.93.0 or higher
-- Git installed and configured
-- Internet connection (except for Ollama and self-hosted Custom endpoints)
-- API key for the selected cloud provider (none for Ollama, optional for Custom)
+- API keys are stored in VS Code SecretStorage, not in settings or project files.
+- Your diff is sent to the selected provider. Do not use a cloud provider on a repository that contains secrets. Ollama and a self-hosted Custom endpoint keep the diff on your network.
+- Telemetry is on by default. Turn it off with `commitSage.telemetry.enabled: false`; details in [docs/telemetry.md](docs/telemetry.md).
 
 ## Documentation
 
-Detailed guides are available in the [`docs/`](docs/) directory:
+- [Configuration](docs/configuration.md): every setting, its default, commands and project config
+- [Providers](docs/providers.md): setup for each provider
+- [Commit formats](docs/commit-formats.md)
+- [Custom language](docs/custom-language.md)
+- [Telemetry](docs/telemetry.md)
+- [Troubleshooting](docs/troubleshooting.md)
+- Contributors: [Adding a provider](docs/adding-providers.md), [Adding a language](docs/adding-languages.md), [Adding a format](docs/adding-formats.md), [Testing](docs/testing.md)
 
-- [Providers](docs/providers.md) — setup and comparison of all AI providers
-- [Configuration Reference](docs/configuration.md) — all settings with defaults
-- [Commit Formats](docs/commit-formats.md) — format descriptions and examples
-- [Troubleshooting](docs/troubleshooting.md) — common errors and solutions
-- [Adding a Provider](docs/adding-providers.md) — contributor guide
-- [Adding a Language](docs/adding-languages.md) — contributor guide
-- [Adding a Format](docs/adding-formats.md) — contributor guide
-- [Testing](docs/testing.md) — running unit + E2E tests, mock LLM, adding new tests
+## Support and license
 
-## Privacy & Security
-
-- **API keys** are stored in VS Code's secure storage (OS keychain), never in plain text files
-- **Code changes** are sent to the selected AI provider for analysis — do not use cloud providers on repositories containing secrets
-- **Ollama** runs locally — no data leaves your machine
-- **Telemetry** collects anonymous usage events (provider type, errors) to help improve the extension; disable via `commitSage.telemetry.enabled: false`
-
-## License
-
-MIT
-
-## Support
-
-If you encounter any issues or have suggestions, please [open an issue](https://github.com/VizzleTF/CommitSage/issues).
-
-For troubleshooting common problems, see [docs/troubleshooting.md](docs/troubleshooting.md).
+Report bugs and ideas in [GitHub issues](https://github.com/VizzleTF/CommitSage/issues). License: MIT.
 
 ---
 
 # Commit Sage (на русском)
 
-Commit Sage — расширение VSCode для автоматической генерации commit-сообщений через AI-провайдеров: Gemini, OpenRouter, Groq, Anthropic Claude, OpenAI, DeepSeek, xAI Grok, Codestral, Mistral, локальный Ollama или любой OpenAI-совместимый endpoint (LM Studio, vLLM, llama.cpp, Together, Fireworks).
-
-Для пользователей из РФ без VPN рабочие варианты: **DeepSeek**, **Ollama** локально, **Custom** (свой self-hosted endpoint).
+Commit Sage — расширение VS Code, которое пишет commit-сообщения по вашим изменениям через выбранного AI-провайдера.
 
 ## Установка
 
-1. Установите из [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=VizzleTF.commitsage)
-2. Откройте sidebar **Commit Sage** (иконка в Activity Bar) — там выбор провайдера, ввод ключа и live-список моделей в одном окне
-3. Альтернатива через палитру команд:
-   - `Commit Sage: Set Gemini API Key`
-   - `Commit Sage: Set OpenRouter API Key`
-   - `Commit Sage: Set Groq API Key`
-   - `Commit Sage: Set Anthropic API Key`
-   - `Commit Sage: Set DeepSeek API Key`
-   - `Commit Sage: Set xAI API Key`
-   - `Commit Sage: Set OpenAI API Key`
-   - `Commit Sage: Set Codestral API Key`
-   - `Commit Sage: Set Mistral API Key`
-   - `Commit Sage: Set Ollama Auth Token`
-   - `Commit Sage: Set Custom API Key`
+Нужны VS Code 1.93.0 или новее и Git. Облачным провайдерам нужен интернет; Ollama и self-hosted Custom работают без него. Установите расширение из [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=VizzleTF.geminicommit), из [Open VSX](https://open-vsx.org/extension/VizzleTF/geminicommit) или командой:
 
-Где получить ключи:
-- Gemini → [Google AI Studio](https://makersuite.google.com/app/apikey)
-- OpenRouter → [openrouter.ai/keys](https://openrouter.ai/keys)
-- Groq → [console.groq.com/keys](https://console.groq.com/keys)
-- Anthropic → [console.anthropic.com/settings/keys](https://console.anthropic.com/settings/keys)
-- OpenAI → [platform.openai.com/api-keys](https://platform.openai.com/api-keys)
-- DeepSeek → [platform.deepseek.com/api_keys](https://platform.deepseek.com/api_keys)
-- xAI → [console.x.ai](https://console.x.ai/)
-- Codestral → [console.mistral.ai/codestral](https://console.mistral.ai/codestral)
-- Mistral → [console.mistral.ai/api-keys](https://console.mistral.ai/api-keys)
-
-## Использование
-
-1. Добавьте изменения в Git (git add)
-2. Откройте палитру команд (Ctrl+Shift+P / Cmd+Shift+P)
-3. Введите "Commit Sage: Generate Commit Message"
-4. Проверьте и подтвердите сгенерированное сообщение
-
-## Настройка
-
-Все настройки доступны через:
-- Палитра команд → "Preferences: Open Settings (UI)"
-- Поиск "Commit Sage"
-
-## Валидация сообщений (commitlint)
-
-Секция **Commitlint** в сайдбаре включает проверку сгенерированного сообщения с автоисправлением и повторными попытками (`commitSage.commit.commitlint.enabled`).
-
-Как это работает:
-
-- Без какой-либо настройки сообщение проверяется встроенными правилами выбранного формата — у каждого формата свой набор (conventional, angular, karma, semantic, google, emoji, emojiKarma, detailed). Механические нарушения (регистр типа, точка в конце, пустая строка перед телом) исправляются кодом без лишнего запроса к модели, остальное уходит модели на переписывание (до `maxRetries` раз).
-- Если в репозитории есть commitlint-конфиг, форматы conventional/angular читают его: `.commitlintrc.*`, `commitlint.config.*`, поле `commitlint` в `package.json`, локальные `extends` (JSON/YAML/CJS). Нестандартный путь задаётся через `commitlint.rulesPath`.
-- Если в репозитории установлен пакет commitlint, в сайдбаре появляется выбор валидатора: можно отдать проверку **проектному commitlint CLI** — полный паритет с CI (любые пресеты, плагины, цепочки `extends`, кастомные парсеры, любая версия commitlint). Ошибки CLI дословно попадают в промпт переписывания.
-
-Действующие правила также добавляются в промпт генерации, поэтому обычно сообщение проходит с первой попытки. Вердикты движков пишутся в Output-канал Commit Sage. Для формата `custom` валидация недоступна и выключается автоматически.
-
-## Конфигурация проекта (.commitsage/config.json)
-
-Вы можете переопределить настройки расширения для отдельных проектов, создав файл `.commitsage/config.json` в корне проекта. Это позволяет разным проектам иметь разные провайдеры ИИ, форматы коммитов или другие настройки.
-
-> Старый одиночный файл `.commitsage` всё ещё поддерживается и автоматически мигрируется в `.commitsage/config.json` при следующей активации расширения.
-
-### Создание конфигурации проекта
-
-1. Откройте палитру команд (`Ctrl+Shift+P` / `Cmd+Shift+P`)
-2. Выполните "Commit Sage: Create Project Config (.commitsage)"
-3. Отредактируйте созданный `.commitsage/config.json` с настройками для вашего проекта
-
-### Пример `.commitsage/config.json`:
-
-```json
-{
-  "provider": {
-    "type": "gemini"
-  },
-  "commit": {
-    "commitLanguage": "russian",
-    "commitFormat": "conventional",
-    "autoCommit": false,
-    "autoPush": false
-  },
-  "gemini": {
-    "model": "auto"
-  },
-  "telemetry": {
-    "enabled": false
-  }
-}
+```bash
+code --install-extension VizzleTF.geminicommit
 ```
 
-### Приоритет настроек
+## Быстрый старт
 
-Настройки загружаются в следующем порядке (более высокий приоритет переопределяет низкий):
-1. **Настройки проекта** (файл `.commitsage/config.json`) - Наивысший приоритет
-2. **Настройки рабочей области VS Code** - Средний приоритет
-3. **Глобальные настройки VS Code** - Низший приоритет
+1. Откройте панель **Commit Sage** в Activity Bar и выберите провайдера. По умолчанию — `gemini`.
+2. Там же нажмите кнопку ввода API-ключа; панель даёт ссылку на страницу получения ключа. Или выполните `Commit Sage: Set <PROVIDER> API Key` из палитры команд.
 
-### Примечания
+   Ollama и Custom по умолчанию работают без ключа.
+3. Добавьте изменения в индекс и нажмите иконку Commit Sage в заголовке Source Control, `Ctrl+G` (`Cmd+G` на macOS) в панели Source Control или выполните `Commit Sage: Generate Commit Message`.
 
-- Файл `.commitsage/config.json` автоматически отслеживается на изменения
-- Неверный JSON синтаксис покажет уведомление об ошибке
-- API ключи по-прежнему управляются через защищенное хранилище VS Code (не хранятся в файлах проекта)
-- Вы можете переопределить любую настройку, доступную в конфигурации расширения
+Сообщение появится в поле ввода Source Control. Проверьте его и закоммитьте.
+
+## Документация
+
+Документация на английском: [настройки](docs/configuration.md), [провайдеры](docs/providers.md), [форматы](docs/commit-formats.md), [свой язык](docs/custom-language.md), [телеметрия](docs/telemetry.md), [решение проблем](docs/troubleshooting.md).
 
 ## Поддержка
 
-- [Telegram Канал](https://t.me/geminicommit) - Анонсы обновлений
-- [Telegram Группа](https://t.me/gemini_commit) - Обсуждения и поддержка сообщества
+- [Telegram-канал](https://t.me/geminicommit): анонсы обновлений
+- [Telegram-группа](https://t.me/gemini_commit): обсуждения и поддержка
 
 <a href="https://www.buymeacoffee.com/vizzletf" target="_blank"><img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" alt="Buy Me a Coffee" height="60" width="217"></a>

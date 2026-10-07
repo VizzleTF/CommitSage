@@ -1,110 +1,108 @@
 # Testing
 
-CommitSage has two layers of automated tests. Both run in CI on every PR and can be run locally.
+Commit Sage has two layers of automated tests: unit tests in vitest and end-to-end (E2E) tests in a real VS Code. CI runs both on every pull request, and both run locally.
 
 ## Test layers
 
-### Unit tests — `vitest`
+### Unit tests: vitest
 
-Fast, in-process tests of utilities and services. Live in `tests/*.test.ts` (95+ tests, < 1s).
+In-process tests of utilities and services, in `tests/*.test.ts`.
 
-The `vscode` API is replaced by a minimal mock at `tests/__mocks__/vscode.ts`, so unit tests cannot exercise activation, command registration, or anything that depends on the Git extension.
+A minimal mock at `tests/__mocks__/vscode.ts` replaces the `vscode` API, so unit tests cannot exercise activation, command registration or anything that depends on the Git extension.
 
 Use them for:
-- Pure logic (parsers, validators, retry math, prompt construction)
-- Provider request payloads (`tests/providerPayloads.test.ts` covers all four)
-- Configuration defaults and project-config validation
 
-### End-to-end tests — `@vscode/test-electron` + `mocha`
+- pure logic: parsers, validators, retry math, prompt construction;
+- provider request payloads (`tests/providerPayloads.test.ts`);
+- configuration defaults and project config validation.
 
-Run the **packaged extension inside a real headless VS Code** with the real built-in `vscode.git`. Live in `tests/e2e/suite/*.e2e.ts` (13 tests, ~5s).
+### E2E tests: `@vscode/test-electron` and mocha
 
-Use them for anything that touches `vscode` API surfaces, command registration, the Git extension, or the full commit-message flow.
+E2E tests run the extension inside a headless VS Code with the built-in `vscode.git` extension. They live in `tests/e2e/suite/*.e2e.ts`.
 
-## Running locally
+Use them for anything that touches the `vscode` API, command registration, the Git extension or the full commit message flow.
+
+## Run the tests locally
 
 ```bash
-npm run test:unit      # vitest only — fastest feedback loop
-npm run test:e2e       # E2E only — downloads VS Code on first run
+npm run test:unit      # vitest
+npm run test:e2e       # E2E against the dev bundle; downloads VS Code on the first run
 npm run test:e2e:vsix  # E2E against the packaged .vsix (production bundle)
-npm test               # both, sequentially
-npm run verify         # lint + unit + E2E dev + E2E vsix — run before tagging a release
+npm test               # test:unit, then test:e2e
+npm run verify         # eslint, test:unit, test:e2e, test:e2e:vsix
 ```
 
-On Linux without a display (CI, WSL, SSH), prefix E2E and `verify` with `xvfb-run -a`.
+None of these scripts type-checks `src/`. Run `npm run typecheck` as well.
 
-`test:e2e:vsix` packages the extension, unpacks it to `.vscode-test/vsix/extension` and copies the compiled suite inside it. The copy is required: VS Code gives each extension its own `vscode` API object by file path, so stubs on `vscode.window` reach the extension only when the tests live inside its folder.
+On Linux without a display (CI, WSL, SSH), prefix the E2E scripts and `verify` with `xvfb-run -a`.
 
-`pretest:e2e` automatically runs `tsc -p tests/e2e/tsconfig.e2e.json` and `npm run compile` (esbuild bundle) before launching test-electron.
+`pretest:e2e` compiles the suite with `tsc -p tests/e2e/tsconfig.e2e.json` and builds the bundle with `npm run compile` before VS Code starts.
 
-The first E2E run downloads VS Code stable into `.vscode-test/` (~200 MB, cached). On macOS no extra setup is needed; Linux CI uses `xvfb-run`.
+`pretest:e2e:vsix` packages the extension to `.vscode-test/commitsage.vsix`, unpacks it to `.vscode-test/vsix/extension` and copies the compiled suite into that folder. The copy is required: VS Code gives each extension its own `vscode` API object by file path, so stubs on `vscode.window` reach the extension only when the tests live inside its folder.
 
-### Targeting a single test
+The first E2E run downloads VS Code stable into `.vscode-test/` and caches it there.
+
+### Run a single test
 
 ```bash
-npm run test:e2e -- --grep "auto-commit"
+npm run test:e2e -- --grep "Auto-commit"
 npm run test:e2e -- --grep "Multi-repository"
 ```
 
-### Debugging E2E failures
+### Debug E2E failures
 
-- `COMMITSAGE_E2E_KEEP=1 npm run test:e2e` — keeps temporary git repos around after teardown; their paths are logged.
-- The log line `Repository not initialized` from the `vscode.git` extension is normal noise when VS Code is winding down a watcher; ignore unless tests actually fail.
-- Use F5 with `.vscode/launch.json` "Extension Tests" config for breakpoint debugging.
+- `COMMITSAGE_E2E_KEEP=1 npm run test:e2e` keeps the temporary git repositories after teardown and logs their paths.
+- The `vscode.git` log line `Repository not initialized` appears when VS Code shuts down a watcher. It is not a failure unless a test fails.
 
 ## E2E architecture
 
 ### Mock LLM server
 
-`tests/e2e/helpers/mockLlmServer.ts` boots a `node:http` server on a random port. It impersonates the OpenAI Chat Completions endpoint (and Ollama on `/api/chat`).
+`tests/e2e/helpers/mockLlmServer.ts` starts a `node:http` server on a random port. It answers in the OpenAI Chat Completions format, and in the Ollama format for paths that contain `/api/chat`.
 
 ```ts
 const mock = new MockLlmServer();
 const { baseUrl } = await mock.start();
-// baseUrl → http://127.0.0.1:<port>/v1
-// Configure CommitSage to point at it:
-await vscode.workspace.getConfiguration('commitSage')
-    .update('openai.baseUrl', baseUrl, vscode.ConfigurationTarget.Workspace);
+// baseUrl → http://127.0.0.1:<PORT>/v1
+await setProviderToMockOpenAI(baseUrl); // tests/e2e/helpers/settings.ts
 ```
 
-Queue per-request behaviour for error scenarios:
+Queue per-request responses for error scenarios. A request with no queued step gets a 200 with a default message.
 
 ```ts
-mock.enqueue({ status: 429 }, { status: 429 });   // 1st & 2nd attempts fail; 3rd hits default 200
-mock.enqueue({ status: 401 });                    // 401 → ApiKeyInvalidError → reprompt flow
-mock.enqueue({ delayMs: 5_000 });                 // slow response — used for cancellation tests
-mock.enqueue({ rawBody: 'not json' });            // malformed body
+mock.enqueue({ status: 429 }, { status: 429 }); // 1st and 2nd attempts fail, the 3rd gets the default 200
+mock.enqueue({ status: 401 });                  // ApiKeyInvalidError → prompt for a new key
+mock.enqueue({ delayMs: 5_000 });               // slow response for cancellation tests
+mock.enqueue({ rawBody: 'not json' });          // malformed body
 ```
 
-Captured requests are available as `mock.requests` for assertions on the prompt or `Authorization` header.
+`mock.requests` holds the captured requests for assertions on the prompt or the `Authorization` header.
 
 ### Temporary git repositories
 
-`tests/e2e/helpers/tempRepo.ts` creates throwaway repos **inside** `tests/e2e/sampleWorkspace`, registers them with `vscode.git` via `api.openRepository`, and closes them with `git.close` on teardown.
+`tests/e2e/helpers/tempRepo.ts` creates throwaway repositories inside `tests/e2e/sampleWorkspace` and registers them with `vscode.git` through `api.openRepository`.
 
 ```ts
 const repo = await makeTempRepo({ initialCommit: true });
-// repo.path is auto-detected by vscode.git — no updateWorkspaceFolders calls.
 await git(repo.path, 'add', 'README.md');
 await vscode.commands.executeCommand('commitsage.generateCommitMessage');
-await cleanupRepo(repo);   // closes the repo in vscode.git, then rm -rf
+await cleanupRepo(repo);
 ```
 
-Bare-remote scenarios (auto-push) get `bareRemote: true`. The remote is also under `sampleWorkspace` and cleaned up automatically.
+`cleanupRepo` calls `closeAllOpenRepos()`, which runs `git.close` for every repository open in `vscode.git`, then deletes the folder. Bare-remote scenarios (auto-push) pass `bareRemote: true`; `cleanupRepo` deletes the remote too.
 
 ### UI stubs
 
-`tests/e2e/helpers/vscodeStubs.ts` wraps `sinon` so that any modal popup never blocks the run.
+`tests/e2e/helpers/vscodeStubs.ts` wraps `sinon` so that a modal popup never blocks the run.
 
 ```ts
 beforeEach(() => {
     installDefaultUiStubs({ inputBox: 'e2e-test-key' });
-    // Any unstubbed showQuickPick/showInputBox now resolves to undefined / 'e2e-test-key'
+    // unstubbed showQuickPick resolves to undefined, showInputBox to 'e2e-test-key'
 });
 
 it('selects the second repo', () => {
-    stubQuickPick({ label: '...', repository: realRepoB });   // overrides the default
-    // ...
+    stubQuickPick({ label: '...', repository: realRepoB }); // overrides the default
 });
 
 afterEach(() => restoreStubs());
@@ -114,40 +112,41 @@ For cancellation tests, `stubWithProgressCancellable(50)` replaces `vscode.windo
 
 ### Workspace setup
 
-`tests/e2e/sample.code-workspace` is opened by `@vscode/test-cli`. The settings disable Git auto-detection (`git.autoRepositoryDetection: false`, `git.openRepositoryInParentFolders: never`) so only repos we explicitly open via `api.openRepository` show up — otherwise the parent CommitSage repo would always be picked up too and force a QuickPick.
+`@vscode/test-cli` opens `tests/e2e/sample.code-workspace` (see `.vscode-test.mjs`). Its settings turn off Git auto-detection (`git.autoRepositoryDetection: false`, `git.openRepositoryInParentFolders: never`), so `vscode.git` sees only the repositories the tests open. Without them, the parent Commit Sage repository is also detected and every generation opens a repository QuickPick.
 
-VS Code rewrites this file with provider settings during a run; that's expected. The persisted `commitSage.openai.baseUrl` is overwritten on every test boot with the current mock port.
+VS Code writes provider settings into this file during a run. `setProviderToMockOpenAI` overwrites `commitSage.openai.baseUrl` with the current mock port on every run.
 
-## What's covered
+## What the E2E suites cover
 
-| Suite                       | Scenarios                                                                 |
-|-----------------------------|---------------------------------------------------------------------------|
-| `activation.e2e.ts`         | extension activates; all 10 contributed commands registered; `vscode.git` available |
-| `generateCommit.e2e.ts`     | modified+staged → message in inputBox; untracked → auto-stage; deleted; staged-only ignores unstaged |
-| `multiRepo.e2e.ts`          | 2 repos in workspace, QuickPick stub routes generation to the chosen one  |
-| `autoCommit.e2e.ts`         | real `git commit` when `autoCommit=true`; push to bare remote when `autoPush=true` |
-| `llmErrors.e2e.ts`          | 429 retry chain (3 attempts, ~3 s of backoff); 401 reprompt for new key   |
-| `cancellation.e2e.ts`       | progress token cancellation aborts the in-flight fetch and prevents retries |
+| Suite | Scenarios |
+|---|---|
+| `activation.e2e.ts` | extension activates; the commands in `EXPECTED_COMMANDS` and the settings view focus command are registered; `vscode.git` is available |
+| `generateCommit.e2e.ts` | modified and staged file → message in the input box; untracked file auto-staged and committed; deleted file; staged-only mode ignores unstaged files |
+| `multiRepo.e2e.ts` | two repositories in the workspace; the QuickPick stub routes generation to the chosen one |
+| `autoCommit.e2e.ts` | real `git commit` when `autoCommit` is on; push to a bare remote when `autoPush` is on |
+| `llmErrors.e2e.ts` | 429 retry chain; 401 prompts for a new key; a 400 rejecting `temperature` → retry without it |
+| `cancellation.e2e.ts` | progress token cancellation aborts the request and prevents retries |
 
-## What's NOT covered (and why)
+## What the E2E suites do not cover
 
-- **Gemini and Codestral provider transport** — both use hard-coded URLs without a `baseUrl` setting, so the local mock server can't intercept them. Their request shapes are covered by `tests/providerPayloads.test.ts` (unit).
-- **Smoke-installing the packaged `.vsix`** — E2E already runs the full extension; a separate `.vsix` install only matters for the release pipeline, not PRs.
+The mock server cannot intercept providers without a `baseUrl` setting, because their endpoints are hard-coded. Only `openai`, `ollama` and `custom` have that setting. Unit tests in `tests/providerPayloads.test.ts` cover the request shape of the other providers.
 
-## Adding a new E2E test
+## Add an E2E test
 
-1. Create `tests/e2e/suite/<name>.e2e.ts`.
-2. Boilerplate `before`/`after` from `tests/e2e/suite/generateCommit.e2e.ts` is the simplest template — it activates the extension, starts the mock server, sets the provider to mock-OpenAI, and seeds an API key.
-3. Use `installDefaultUiStubs({ inputBox: 'e2e-test-key' })` in `beforeEach` so any forgotten UI path doesn't block the run.
-4. `npm run test:e2e -- --grep "<your describe text>"` while iterating.
+1. Create `tests/e2e/suite/<NAME>.e2e.ts`.
+2. Copy the `before`/`after` hooks from `tests/e2e/suite/generateCommit.e2e.ts`. They activate the extension, start the mock server, point the `openai` provider at it and store an API key.
+3. Call `installDefaultUiStubs({ inputBox: 'e2e-test-key' })` in `beforeEach`, so a UI path without a stub does not block the run.
+4. Run `npm run test:e2e -- --grep "<DESCRIBE_TEXT>"` while you iterate.
 
 ## CI
 
-`.github/workflows/pr-check.yml` runs both layers on every PR:
+The reusable workflow `.github/workflows/test.yml` runs the tests. `pr-check.yml` calls it for pull requests to `main`, `release.yml` for `v*` tags, and `security-release.yml` for Dependabot pull requests that change `package.json` or `package-lock.json` when its security check reports a critical advisory. On Node.js 22 it runs:
 
-1. `npm run test:unit` (vitest)
-2. `tsc -p tests/e2e/tsconfig.e2e.json` (E2E compile)
-3. `actions/cache` for `.vscode-test/` (avoids re-downloading VS Code)
-4. `xvfb-run -a npm run test:e2e`
-
-Total CI time after warm cache: ~1 min for the test job. If E2E starts dominating the build, split it into a separate job with `needs: [test]` and add a matrix over `os`.
+1. `npm ci`.
+2. Writes a stub `src/constants/apiKeys.ts`; the real file is gitignored.
+3. `npx eslint 'src/**/*.ts'`.
+4. `npm run test:unit`.
+5. `npx tsc -p tests/e2e/tsconfig.e2e.json`.
+6. Restores the `.vscode-test` cache.
+7. `xvfb-run -a npm run test:e2e`.
+8. `xvfb-run -a npm run test:e2e:vsix`.

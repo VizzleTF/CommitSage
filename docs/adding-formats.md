@@ -1,104 +1,70 @@
-# Adding a New Commit Format to CommitSage
+# Add a commit format
 
-Currently supported: `conventional`, `angular`, `karma`, `semantic`, `emoji`, `emojiKarma`, `google`, `atom`.
+This guide is for contributors who add a new commit message format to Commit Sage. The shipped formats are described in [commit-formats.md](commit-formats.md).
 
-Adding a new format requires changes in **5 files**. The examples below use `gitmoji`.
+A format is a prompt template with one translation per bundled language, registered under a format id. The steps use `<FORMAT_ID>` for the id (`gitmoji`) and `<FORMAT_NAME>` for the template constant prefix.
 
----
+**Prerequisites:** a working checkout (see [CONTRIBUTING.md](../CONTRIBUTING.md)).
 
-## 1. `src/templates/formats/<format>.ts` — format template
+## Steps
 
-Create a new template file with translations for all supported languages:
+1. Create `src/templates/formats/<FORMAT_ID>.ts` with a plain object that has one key per language in `SUPPORTED_LANGUAGES` (`src/utils/constants.ts`), except `custom`. Existing templates declare no type: `src/templates/index.ts` checks the object when it registers it.
 
-```typescript
-import type { CommitTemplate } from '../index';
+   ```typescript
+   export const <FORMAT_NAME>Template = {
+       english: `Generate a commit message following the <FORMAT_NAME> format:
+   ...rules, type guidance, examples...`,
+       russian: `...`,
+       // one key per remaining language
+   };
+   ```
 
-export const gitmojiTemplate: CommitTemplate = {
-    english: `Generate a commit message following the Gitmoji format:
-...your prompt instructions...
+   Each translation holds the full instructions for the model: format rules, commit type guidance, examples and constraints. Keep the section structure of an existing template such as `src/templates/formats/conventional.ts`.
 
-Example:
-:sparkles: add new feature`,
+2. Register the template in `src/templates/index.ts`: import it, add `'<FORMAT_ID>'` to the `CommitFormat` union and add `<FORMAT_ID>: <FORMAT_NAME>Template` to the `templates` record.
 
-    russian: `Создайте сообщение коммита в формате Gitmoji:
-...`,
+3. Add `'<FORMAT_ID>'` to the `FORMATS` array in `src/views/settingsWebviewProvider.ts`, before `'custom'`. The array fills the format dropdown in the Commit Sage sidebar.
 
-    chinese: `...`,
-    japanese: `...`,
-    korean: `...`,
-    german: `...`,
-    french: `...`,
-    spanish: `...`,
-    portuguese: `...`,
-};
+4. If the builtin commitlint engine should validate messages in the new format, add an entry to `FORMAT_RULE_SETS` in `src/services/formatRules.ts`. A format without an entry is not validated. If the repository's own commitlint config can check the format (the `project` engine), also add the id to `COMMITLINT_COMPATIBLE_FORMATS`.
+
+5. In `package.json`, add the id to `contributes.configuration.properties["commitSage.commit.commitFormat"].enum` before `"custom"`, and a line to `enumDescriptions` at the same position:
+
+   ```json
+   "commitSage.commit.commitFormat": {
+       "type": "string",
+       "enum": [
+           "conventional",
+           "angular",
+           "karma",
+           "semantic",
+           "emoji",
+           "emojiKarma",
+           "google",
+           "atom",
+           "detailed",
+           "previous",
+           "<FORMAT_ID>",
+           "custom"
+       ]
+   }
+   ```
+
+   If you added the id to `COMMITLINT_COMPATIBLE_FORMATS`, also add it to the format list in `enumDescriptions` of `commitSage.commit.commitlint.engine`.
+
+6. Add the template to the `allTemplates` object in `tests/templates.test.ts`.
+
+7. Update the user docs:
+   - [commit-formats.md](commit-formats.md): a section for the format;
+   - [configuration.md](configuration.md): the `commitFormat` values, and the `project` engine format list if you changed `COMMITLINT_COMPATIBLE_FORMATS`;
+   - `README.md`: the format line.
+
+## Verify
+
+```bash
+npm run typecheck
+npm run test:unit
 ```
 
-Each template contains detailed instructions for the AI model in the target language. When writing translations, preserve the structure from existing templates (e.g., `conventional.ts`).
+`npm run typecheck` fails when the template misses a language or `CommitFormat` and `templates` disagree. `npm run compile` only bundles with esbuild and does not type-check.
 
-The `CommitTemplate` type requires entries for **all 9 languages**: `english`, `russian`, `chinese`, `japanese`, `korean`, `german`, `french`, `spanish`, `portuguese`. The TypeScript compiler will flag any missing translations — `npm run compile` will fail until every language key is present.
-
-A complete template is not just one line — it includes format rules, commit type guidance, examples, and constraints written in the target language. Look at `src/templates/formats/conventional.ts` for a realistic example of the level of detail expected.
-
-## 2. `src/templates/index.ts` — register the template
-
-Import the template and add it to the `templates` record and `CommitFormat` type:
-
-```typescript
-import { gitmojiTemplate } from './formats/gitmoji';
-
-export type CommitFormat = 'conventional' | 'angular' | ... | 'gitmoji';
-
-const templates: Record<CommitFormat, CommitTemplate> = {
-    // ...existing formats...
-    gitmoji: gitmojiTemplate,
-};
-```
-
-## 3. `src/models/types.ts` — update `ProjectConfig`
-
-Add the format to the `commitFormat` union in the `ProjectConfig` interface:
-
-```typescript
-export interface ProjectConfig {
-    commit?: {
-        commitFormat?: 'conventional' | 'angular' | ... | 'gitmoji';
-        // ...
-    };
-}
-```
-
-## 4. `package.json` — VS Code Settings UI enum
-
-Add the value to `contributes.configuration` → `commitSage.commit.commitFormat` → `enum`:
-
-```json
-"commitSage.commit.commitFormat": {
-    "type": "string",
-    "enum": [
-        "conventional",
-        "angular",
-        "karma",
-        "semantic",
-        "emoji",
-        "emojiKarma",
-        "google",
-        "atom",
-        "gitmoji"
-    ],
-    "default": "conventional"
-}
-```
-
-## 5. `README.md` — update documentation
-
-Add the new format to the features list and commit format options in README.md so users can discover it.
-
----
-
-## Verification
-
-After making all changes:
-
-1. `npm run compile` — the TypeScript compiler will verify that the template satisfies `CommitTemplate` (all languages present) and `CommitFormat` is consistent across files.
-2. Open VS Code Settings → CommitSage → confirm the new format appears in the dropdown.
-3. Select the new format and generate a commit — verify the message follows the expected structure.
+Then start the extension, select the new format in the Commit Sage sidebar and generate a message. The message follows the structure from the template.

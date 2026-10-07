@@ -1,104 +1,45 @@
-# Adding a New Language to CommitSage
+# Add a language
 
-Currently supported: `english`, `russian`, `chinese`, `japanese`, `korean`, `german`, `french`, `spanish`, `portuguese`.
+This guide is for contributors who add a bundled language for generated commit messages. The `custom` language value is a different feature: it translates templates at runtime through the LLM and needs no code change (see [custom-language.md](custom-language.md)).
 
-There is also a special `custom` value — it is not a bundled language but a runtime feature that translates templates on-demand via the LLM. See [custom-language.md](custom-language.md) for that.
+The `SUPPORTED_LANGUAGES` array in `src/utils/constants.ts` defines the bundled languages. The `CommitLanguage` type derives from it. The template type `Record<Exclude<CommitLanguage, 'custom'>, string>` in `src/templates/index.ts` and `LANGUAGE_PROMPTS` in `src/services/promptService.ts` then require a translation for each language, so `npm run typecheck` lists every place that misses one.
 
-The single source of truth for bundled languages is the `SUPPORTED_LANGUAGES` array in `src/utils/constants.ts`. The `CommitLanguage` type and `CommitTemplate` interface are derived from it automatically, so the TypeScript compiler enforces translation completeness across all templates.
+The steps use `<LANGUAGE_ID>` for the language id in lowercase English (`italian`).
 
-> **Note:** `CommitTemplate` is typed as `Record<Exclude<CommitLanguage, 'custom'>, string>` — the `custom` value is intentionally excluded from template objects since it has no static translation.
+**Prerequisites:** a working checkout (see [CONTRIBUTING.md](../CONTRIBUTING.md)).
 
-Adding a new language requires changes in **5 files**. The examples below use `italian`.
+## Steps
 
----
+1. Add `'<LANGUAGE_ID>'` to `SUPPORTED_LANGUAGES` in `src/utils/constants.ts`, before `'custom'`:
 
-## 1. `src/utils/constants.ts` — language list
+   ```typescript
+   export const SUPPORTED_LANGUAGES = ['english', 'russian', 'chinese', 'japanese', 'korean', 'german', 'french', 'spanish', 'portuguese', '<LANGUAGE_ID>', 'custom'] as const;
+   ```
 
-Add the value to the `SUPPORTED_LANGUAGES` array:
+2. Add a `<LANGUAGE_ID>` key with a translated template to each file in `src/templates/formats/`: `angular.ts`, `atom.ts`, `conventional.ts`, `detailed.ts`, `emoji.ts`, `emojiKarma.ts`, `google.ts`, `karma.ts`, `previous.ts` and `semantic.ts`. Keep the sections and examples of the `english` template.
 
-```typescript
-export const SUPPORTED_LANGUAGES = ['english', 'russian', 'chinese', 'japanese', 'korean', 'german', 'french', 'spanish', 'portuguese', 'italian'] as const;
+3. Add an entry to `LANGUAGE_PROMPTS` in `src/services/promptService.ts`:
+
+   ```typescript
+   const LANGUAGE_PROMPTS: Record<Exclude<CommitLanguage, 'custom'>, string> = {
+       // ...existing languages...
+       <LANGUAGE_ID>: '<INSTRUCTION_IN_THE_LANGUAGE>',
+   };
+   ```
+
+4. Add `'<LANGUAGE_ID>'` to the `LANGUAGES` array in `src/views/settingsWebviewProvider.ts`, before `'custom'`. The array fills the language dropdown in the Commit Sage sidebar.
+
+5. In `package.json`, add the id to `contributes.configuration.properties["commitSage.commit.commitLanguage"].enum` before `"custom"`, and the language name to `enumDescriptions` at the same position.
+
+6. Add the language to the user docs: the language line in `README.md`, the `commitLanguage` values in [configuration.md](configuration.md) and the built-in language list in [custom-language.md](custom-language.md).
+
+## Verify
+
+```bash
+npm run typecheck
+npm run test:unit
 ```
 
-The `CommitLanguage` type updates automatically. The compiler will immediately flag all places missing the new language (format templates and `LANGUAGE_PROMPTS`).
+`npm run typecheck` fails until every template and `LANGUAGE_PROMPTS` have the new key. `npm run compile` only bundles with esbuild and does not type-check.
 
-## 2. `src/templates/formats/*.ts` — format templates (8 files)
-
-Add a translated template with the new language key in each file:
-
-- `angular.ts`
-- `atom.ts`
-- `conventional.ts`
-- `emoji.ts`
-- `emojiKarma.ts`
-- `google.ts`
-- `karma.ts`
-- `semantic.ts`
-
-Example for `conventional.ts`:
-
-```typescript
-export const conventionalTemplate = {
-    english: `...`,
-    russian: `...`,
-    // ...existing languages...
-    italian: `Genera un messaggio di commit nel formato Conventional Commits:
-<tipo>[ambito opzionale]: <descrizione>
-
-[corpo opzionale con elenco puntato]
-
-Regole:
-1. Prima riga: tipo(ambito): descrizione (max 50 caratteri)
-...`,
-};
-```
-
-Each template contains detailed instructions for the AI model in the target language: format rules, commit type selection, and examples. When translating, preserve the structure and number of sections from the existing templates (e.g. `english`).
-
-## 3. `src/services/promptService.ts` — language prompt
-
-Add an entry to `LANGUAGE_PROMPTS`:
-
-```typescript
-const LANGUAGE_PROMPTS: Record<CommitLanguage, string> = {
-    // ...existing languages...
-    italian: 'Per favore, scrivi il messaggio del commit in italiano.',
-};
-```
-
-## 4. `package.json` — VS Code Settings UI enum
-
-Add the value to `contributes.configuration` → `commitSage.commit.commitLanguage` → `enum`:
-
-```json
-"commitSage.commit.commitLanguage": {
-    "type": "string",
-    "enum": [
-        "english",
-        "russian",
-        "chinese",
-        "japanese",
-        "korean",
-        "german",
-        "french",
-        "spanish",
-        "portuguese",
-        "italian"
-    ],
-    "default": "english"
-}
-```
-
-## 5. `README.md` — update documentation
-
-Add the new language to the features list and the language options in README.md so users can discover it. Update both the English and Russian sections of the README.
-
----
-
-## Verification
-
-After making all changes:
-
-1. `npm run compile` — the TypeScript compiler will verify that the new language field is present in all templates and in `LANGUAGE_PROMPTS`.
-2. Open VS Code Settings → CommitSage → confirm the new language appears in the dropdown.
-3. Select the new language and generate a commit — verify the message is generated in the correct language.
+Then start the extension, select the new language in the Commit Sage sidebar and generate a message. The message is in the new language.

@@ -1,10 +1,16 @@
 ## Pick an AI provider
 
-Commit Sage supports four backends:
+Commit Sage supports 11 providers: Gemini (default), OpenRouter, Groq, Anthropic, OpenAI, DeepSeek, xAI, Codestral, Mistral, Ollama and Custom.
 
-- **Gemini** — Google's API. Free tier available; recommended for getting started.
-- **OpenAI** — GPT models. Requires an OpenAI key and works with any OpenAI-compatible endpoint (Azure, custom).
-- **Codestral** — Mistral's coding model. Requires a Codestral key.
-- **Ollama** — Local self-hosted models. No API key by default; enable `ollama.useAuthToken` if your Ollama instance is gated.
+Pick one in either place:
 
-Open Settings and set `commitSage.provider.type` to your choice.
+- The **Commit Sage** view in the Activity Bar.
+- Settings: set `commitSage.provider.type`.
+
+Some setups need one more setting:
+
+- **Azure OpenAI**: provider `openai`, with `commitSage.openai.baseUrl` set to your Azure endpoint.
+- **Other OpenAI-compatible endpoints** (LM Studio, vLLM and similar): provider `custom`, with `commitSage.custom.baseUrl`.
+- **Ollama**: no API key by default. If your Ollama instance requires auth, enable `commitSage.ollama.useAuthToken`.
+
+Setup for each provider: [docs/providers.md](https://github.com/VizzleTF/CommitSage/blob/main/docs/providers.md).

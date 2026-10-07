@@ -1,25 +1,26 @@
-# Issue & PR Response Guide
+# Issue and PR response guide
 
-How to reply to users on GitHub issues and pull requests, in the maintainer's
-voice. Keep it friendly, direct, and English.
+How to reply to users on GitHub issues and pull requests in the maintainer's voice. Replies are in English.
 
-## Tone
+## Rules
 
-- Greet by handle: `Hello, @username!`
-- Thank the user (for using the extension and/or for the report).
-- Be honest: if it's a bug, say "You're right — this was a bug."
-- Be concise. State the cause in one or two sentences.
-- State the fix and the version it landed in.
+- Greet the user by handle: `Hello, @<USERNAME>!`
+- Thank the user for using the extension or for the report.
+- If it is a bug, say so: "You're right, this was a bug."
+- State the cause in one sentence, in plain language.
+- State the fix and the version it shipped in. Confirm the released version before you name it. If the fix is not released yet, say it will be in the next release and offer to ping the user when it is published.
 - Ask the user to update and give feedback.
-- Close with `Thank you for using CommitSage!` (optional for short replies).
-- Exclamation marks and the occasional emoji are fine. No corporate fluff.
+- Name settings by their exact key, for example `commitSage.ollama.useAuthToken`.
+- For model or provider questions, point to the Gemini `auto` model mode or the `.commitsage` project config instead of adding a new option.
+- Exclamation marks and an occasional emoji are fine. Leave out corporate phrasing.
+- `Thank you for using CommitSage!` closes the reply; a short reply may skip it.
 
 ## Structure
 
-1. Greeting + thanks
-2. Root cause (short, plain language)
-3. The fix + version (`I fixed this in X.Y.Z version.`)
-4. Call to action (update, give feedback)
+1. Greeting and thanks
+2. Cause
+3. Fix and version: `I fixed this in <VERSION> version.`
+4. Call to action: update, give feedback
 5. Sign-off
 
 ## Templates
@@ -27,51 +28,49 @@ voice. Keep it friendly, direct, and English.
 ### Bug fixed
 
 ```md
-Hello, @username!
+Hello, @<USERNAME>!
 Thanks for the detailed report.
 
-You're right — this was a bug. <one-line cause>.
+You're right, this was a bug. <CAUSE>.
 
-I fixed this in X.Y.Z version. <one-line what changed>.
+I fixed this in <VERSION> version. <WHAT_CHANGED>.
 
 Please update and let me know if it works on your side.
 
 Thank you for using CommitSage!
 ```
 
-### Not a bug / workaround
+### Not a bug, with a workaround
 
 ```md
-Hello, @username!
+Hello, @<USERNAME>!
 Thanks for reaching out.
 
-<short explanation of why it behaves this way>.
+<WHY_IT_BEHAVES_THIS_WAY>.
 
-You can <workaround / setting to use>.
+You can <WORKAROUND_OR_SETTING>. Please let me know if it works for you.
+
+Thank you for using CommitSage!
 ```
 
 ### Will investigate later
 
 ```md
-Looks like a bug. Will try to check it soon.
+Hello, @<USERNAME>!
+Thanks for the report. Looks like a bug. I will try to check it soon.
 ```
 
-### Provider overloaded (Gemini/OpenRouter free models)
+### Gemini models overloaded
 
 ```md
-Hello, @username!
+Hello, @<USERNAME>!
+Thanks for the report.
 
-<provider> models are overloaded sometimes.
+Gemini models are overloaded sometimes.
 
-You can try "auto" in the models select setting to avoid this error — it
-fetches available models and tries each until one succeeds.
+You can set `commitSage.gemini.model` to "auto" to avoid this error. It fetches
+the available models and tries each one until one succeeds. Please let me know
+if it helps.
+
+Thank you for using CommitSage!
 ```
-
-## Notes
-
-- Always confirm the version the fix shipped in before promising it.
-- If the fix isn't released yet, say "will be in the next release" and offer
-  to ping the user once it's published.
-- Link settings by their exact key (e.g. `commitSage.ollama.useAuthToken`).
-- For model/provider questions, point to the `auto` mode or the `.commitsage`
-  project config instead of adding bespoke options.

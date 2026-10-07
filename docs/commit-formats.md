@@ -1,163 +1,155 @@
-# Commit Message Formats
+# Commit message formats
 
-CommitSage supports 8 commit message formats. Choose the one that matches your team's conventions.
+Commit Sage writes commit messages in one of 11 formats, set by `commitSage.commit.commitFormat` (default `conventional`). Each format sends the model a prompt template. The skeletons, limits and examples below come from the English templates.
 
----
+| Value | Skeleton |
+|---|---|
+| `conventional` | `type(scope): description` + optional bullet body |
+| `angular` | `type(scope): short summary` + optional bullet body |
+| `karma` | `type(scope): message` |
+| `semantic` | `type: message` |
+| `emoji` | `:emoji: message` |
+| `emojiKarma` | `:emoji: type(scope): message` |
+| `google` | `Type: Description`, body, footer |
+| `atom` | `type(scope): subject`, body, footer |
+| `detailed` | `Summary:`, `Details:`, `Effects:` sections |
+| `previous` | The style of the repository's recent commits |
+| `custom` | The text of `commitSage.commit.customInstructions` |
 
 ## Conventional
 
-The most widely adopted format. Supports optional scope and multi-line body.
-
 ```
-type(scope): description
+<type>[optional scope]: <description>
 
-- bullet point 1
-- bullet point 2
+[optional body with bullet points]
 ```
 
-**Example:**
+- First line: at most 50 characters.
+- Small changes get the first line only.
+- Body: up to 5 lines, each starts with `- ` and has at most 50 characters.
+- Documentation-only changes get the `docs` type.
 
 ```
-feat(auth): add OAuth2 login flow
+feat(auth): add user authentication
 
-- Add Google and GitHub providers
-- Store tokens in secure storage
+- Implemented OAuth2 provider integration
+- Created auth service module
+- Added session management
 ```
-
----
 
 ## Angular
 
-Based on the Angular project's commit conventions. Very similar to Conventional but follows Angular-specific rules.
-
 ```
-type(scope): short summary
-```
+<type>(<scope>): <short summary>
 
-**Example:**
-
-```
-fix(router): resolve navigation guard race condition
-
-- Add mutex lock for concurrent navigations
-- Clear pending state on route cancel
+[optional body with bullet points]
 ```
 
----
+- First line: at most 50 characters.
+- Small changes get the first line only.
+- Body lines start with `- ` and have at most 50 characters.
+
+```
+refactor(core): optimize database queries
+
+- Implement query caching
+- Add connection pooling
+- Update error handling
+```
 
 ## Karma
 
-Single-line format used by the Karma test runner project. No body or footer.
-
 ```
-type(scope): message
+<type>(<scope>): <message>
 ```
-
-**Example:**
 
 ```
 chore(ci): update deployment script to Node 16
 ```
 
----
-
 ## Semantic
-
-Minimal format without scope. Just type and message.
 
 ```
 type: message
 ```
 
-**Example:**
-
 ```
 feat: add user avatar upload functionality
 ```
 
----
-
 ## Emoji
 
-Uses Gitmoji-style emoji prefixes instead of text types.
-
 ```
-:emoji: message
+:emoji: commit message
 ```
 
-**Common emojis:**
+The template gives the model this list:
 
 | Emoji | Code | Meaning |
-|-------|------|---------|
+|---|---|---|
 | ✨ | `:sparkles:` | New feature |
 | 🐛 | `:bug:` | Bug fix |
-| 📝 | `:memo:` | Documentation |
-| 🎨 | `:art:` | Code style/formatting |
-| ♻️ | `:recycle:` | Refactoring |
-| ⚡️ | `:zap:` | Performance |
-| 🧪 | `:test_tube:` | Tests |
-| 🛠️ | `:hammer_and_wrench:` | Build/dependencies |
-| 🔒 | `:lock:` | Security fix |
-
-**Example:**
+| 📝 | `:memo:` | Documentation updates |
+| 🎨 | `:art:` | Code style/formatting changes |
+| ♻️ | `:recycle:` | Refactoring without functionality changes |
+| 🧪 | `:test_tube:` | Adding or changing tests |
+| 🛠️ | `:hammer_and_wrench:` | Build/tools/dependencies |
+| 🤖 | `:robot:` | CI/CD configuration |
+| ⚡️ | `:zap:` | Performance optimization |
+| 🔧 | `:wrench:` | Maintenance/chores |
+| 🔒 | `:lock:` | Security fixes |
+| 🚀 | `:rocket:` | Release/deployment |
+| 🔥 | `:fire:` | Remove code or files |
+| ⬆️ | `:arrow_up:` | Upgrade dependencies |
+| ⬇️ | `:arrow_down:` | Downgrade dependencies |
+| ✅ | `:white_check_mark:` | Fix CI build |
 
 ```
 ✨ add real-time collaboration feature
 ```
 
----
-
 ## EmojiKarma
-
-Combines Emoji and Karma formats — emoji prefix followed by type, scope, and message.
 
 ```
 :emoji: type(scope): message
 ```
 
-**Example:**
+The emoji comes from the [Emoji](#emoji) list; the type comes from the [types table](#types-per-format).
 
 ```
-✨ feat(editor): add real-time collaboration
+✨ feat(auth): add user authentication system
 ```
-
----
 
 ## Google
 
-Follows Google's commit message style with optional body and footer sections.
-
 ```
-Type: Description
+<Type>: <Description>
 
-Body
+<Body>
 
-Footer
+<Footer>
 ```
-
-**Example:**
 
 ```
 feat: Add user authentication system
 
 Implemented OAuth2 integration with Google and GitHub providers.
-```
+Added JWT token management and refresh mechanism.
 
----
+Closes #123
+```
 
 ## Atom
 
-Based on the Atom editor's conventions. Includes scope, body, and footer.
-
 ```
-type(scope): subject
+<type>(<scope>): <subject>
 
-body
+<body>
 
-footer
+<footer>
 ```
 
-**Example:**
+The scope is optional and names the affected part of the code, such as `auth`, `ui`, `api` or `core`.
 
 ```
 feat(auth): add OAuth2 integration with Google provider
@@ -165,35 +157,76 @@ feat(auth): add OAuth2 integration with Google provider
 Implemented complete OAuth2 flow including:
 - Authorization code exchange
 - Token refresh mechanism
-- User profile retrieval
+
+Closes #123
 ```
 
----
+## Detailed
 
-## Commit Types Reference
+```
+Summary: <one-line imperative summary>
 
-All formats (except Emoji) use the same set of types:
+Details:
+- <changed file/module>: <what changed>
 
-| Type | Description |
-|------|-------------|
-| `feat` | New feature |
-| `fix` | Bug fix |
-| `docs` | Documentation changes |
-| `style` | Formatting, no code change |
-| `refactor` | Code change without fixing bugs or adding features |
-| `perf` | Performance improvement |
-| `test` | Adding or updating tests |
-| `build` | Build system or dependencies |
-| `ci` | CI/CD changes |
-| `chore` | Other maintenance tasks |
-| `revert` | Revert a previous commit (Google, Atom only) |
+Effects:
+- <impact on behaviour, performance, or compatibility>
+```
 
-## Choosing a Format
+- `Summary:` text: at most 72 characters after `Summary: `.
+- `Details:`: up to 6 bullets, each at most 80 characters. Left out when the change is one trivial edit.
+- `Effects:`: up to 4 bullets, each at most 80 characters. Left out when the change has no runtime impact.
 
-- **Conventional** — best default choice, widely supported by tooling (changelogs, versioning)
-- **Angular** — if your project follows Angular conventions
-- **Karma** — when you want simple, single-line messages
-- **Semantic** — when scope is unnecessary and you want minimal format
-- **Emoji** — for visual commit logs, popular in open-source projects
-- **EmojiKarma** — when you want both emoji visual cues and structured types
-- **Google/Atom** — when your project follows these specific conventions
+The built-in validator requires both `Details:` and `Effects:` sections, so a message without them fails validation.
+
+```
+Summary: Refactor user authentication to token-based flow
+
+Details:
+- src/auth.js: replace session storage with JWT issuance and verification
+- src/userModel.js: remove deprecated password-hash helpers
+
+Effects:
+- Session storage no longer required server-side
+```
+
+## Previous
+
+The model gets the repository's recent commit messages and copies their style: type prefixes, scope, capitalization and body. `commitSage.commit.recentCommitsCount` (default `5`) sets how many messages it gets, and `commitSage.commit.recentCommitsScope` (`all` or `mine`) sets whose. When the repository has no usable commits, Commit Sage uses the Conventional template. Commitlint validation does not apply to this format.
+
+## Custom
+
+The text of `commitSage.commit.customInstructions` replaces the template. Selecting `custom` in the Commit Sage sidebar also turns on `commitSage.commit.useCustomInstructions`. With `useCustomInstructions` off, or with empty instructions, Commit Sage uses the Conventional template. Commitlint validation does not apply to this format.
+
+`useCustomInstructions` with non-empty instructions replaces the template for every other format as well. The prompt then gets no language instruction and no recent-commit examples.
+
+## Types per format
+
+The table lists the types each prompt template names. `emoji`, `detailed`, `previous` and `custom` have no types.
+
+| Type | conventional | angular | karma | semantic | emojiKarma | google | atom |
+|---|---|---|---|---|---|---|---|
+| `feat` | yes | yes | yes | yes | yes | yes | yes |
+| `fix` | yes | yes | yes | yes | yes | yes | yes |
+| `docs` | yes | yes | yes | yes | yes | yes | yes |
+| `style` | yes | | yes | yes | yes | yes | yes |
+| `refactor` | yes | yes | yes | yes | yes | yes | yes |
+| `test` | yes | yes | yes | yes | yes | yes | yes |
+| `chore` | yes | | yes | yes | yes | yes | yes |
+| `perf` | yes | yes | | | | yes | yes |
+| `build` | yes | yes | | | | yes | yes |
+| `ci` | yes | yes | | | | yes | yes |
+| `revert` | | | | | | yes | yes |
+
+With `commitSage.commit.commitlint.enabled` and the `builtin` engine, the validator accepts a different set for some formats:
+
+| Format | Types the validator accepts | Header limit |
+|---|---|---|
+| `conventional` | the 11 types above | 72 |
+| `angular` | the 11 types above except `chore`; no `!` breaking marker | 72 |
+| `karma`, `semantic`, `atom`, `emojiKarma` | `feat`, `fix`, `docs`, `style`, `refactor`, `test`, `chore`; `semantic` allows no scope | 72; `emojiKarma` 80 |
+| `google` | `Feat`, `Fix`, `Docs`, `Style`, `Refactor`, `Test`, `Chore` | 72 |
+| `emoji` | any message after an emoji | 72 |
+| `detailed` | no types; requires the `Summary:`, `Details:` and `Effects:` sections | 72 after `Summary: ` |
+
+For `conventional` and `angular`, the `builtin` engine also reads the repository's commitlint config. Validator settings are described in [configuration.md](configuration.md).

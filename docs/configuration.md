@@ -1,188 +1,126 @@
-# Configuration Reference
+# Configuration reference
 
-All settings are under the `commitSage.*` namespace in VS Code settings.
+Every Commit Sage setting lives under the `commitSage.*` namespace in VS Code settings. A project can override most of them in `.commitsage/config.json`.
 
----
+## Settings priority
 
-## Settings Priority
+The extension resolves each key in this order; the first value found wins:
 
-Settings are resolved in the following order (higher priority wins):
+1. Project config: `.commitsage/config.json`.
+2. VS Code workspace settings.
+3. VS Code user (global) settings.
+4. The default listed in the tables below.
 
-1. **Project settings** (`.commitsage/config.json`) — highest priority
-2. **VS Code workspace settings** — medium priority
-3. **VS Code global (user) settings** — lowest priority
+Folder-scoped settings (`.vscode/settings.json` inside one root of a multi-root workspace) are not read.
 
-Two known limitations:
-
-- **Folder-scoped settings are ignored.** In a multi-root workspace, values set
-  per folder (`.vscode/settings.json` inside one root) do not apply; only
-  workspace and user scope are read. The project config is taken from the folder
-  of the active editor, falling back to the first folder.
-- **Untrusted workspaces ignore part of the project config.** While a workspace
-  is not trusted, `.commitsage/config.json` cannot set the provider, any
-  endpoint URL, auto-commit/auto-push, or the commitlint engine and rules path —
-  a repository must not be able to redirect your diff or commit on your behalf.
-  Trusting the workspace applies those values immediately.
-
----
-
-## Provider Settings
+## Provider
 
 | Setting | Type | Default | Description |
-|---------|------|---------|-------------|
-| `commitSage.provider.type` | `string` | `"gemini"` | AI provider: `gemini`, `openai`, `codestral`, `ollama` |
+|---|---|---|---|
+| `commitSage.provider.type` | `string` | `"gemini"` | Provider that generates the message. One of `gemini`, `codestral`, `mistral`, `openai`, `ollama`, `openrouter`, `groq`, `anthropic`, `deepseek`, `xai`, `custom`. Setup per provider: [providers.md](providers.md). |
 
-### Gemini
-
-| Setting | Type | Default | Description |
-|---------|------|---------|-------------|
-| `commitSage.gemini.model` | `string` | `"auto"` | Model name or `auto` for automatic selection |
-
-### OpenAI
+## General
 
 | Setting | Type | Default | Description |
-|---------|------|---------|-------------|
-| `commitSage.openai.model` | `string` | `"gpt-3.5-turbo"` | Model name |
-| `commitSage.openai.baseUrl` | `string` | `"https://api.openai.com/v1"` | API base URL (for custom endpoints) |
+|---|---|---|---|
+| `commitSage.general.temperature` | `number` | `0.7` | Sampling temperature for every provider. Range `0`–`2`. |
+| `commitSage.general.maxDiffSize` | `number` | `100000` | Maximum diff size in characters sent to the model. A longer diff is truncated with a `...(truncated)` marker. `-1` disables truncation. Other values are clamped to `1000`–`1000000`. |
+| `commitSage.general.maxOutputTokens` | `number` | `4096` | Maximum tokens the model may generate for one message, thinking tokens included. Minimum `1`. On truncation each retry doubles the budget (at most 3 times), capped at `32768`. |
+| `commitSage.apiRequestTimeout` | `number` | `30` | Timeout for provider HTTP requests, in seconds. `-1` disables the timeout. |
+| `commitSage.gitTimeout` | `number` | `120` | Timeout for `git` subprocesses (diff, blame, push), in seconds. Increase for slow pushes or large diffs. `-1` disables the timeout. |
 
-### Codestral
-
-| Setting | Type | Default | Description |
-|---------|------|---------|-------------|
-| `commitSage.codestral.model` | `string` | `"codestral-latest"` | `codestral-2405` or `codestral-latest` |
-
-### Mistral
+## Commit
 
 | Setting | Type | Default | Description |
-|---------|------|---------|-------------|
-| `commitSage.mistral.model` | `string` | `"mistral-small-latest"` | Any chat model from La Plateforme (`mistral-large-latest`, `magistral-medium-latest`, …) |
+|---|---|---|---|
+| `commitSage.commit.commitLanguage` | `string` | `"english"` | Message language. One of `english`, `russian`, `chinese`, `japanese`, `korean`, `german`, `french`, `spanish`, `portuguese`, `custom`. For `custom`, see [custom-language.md](custom-language.md). |
+| `commitSage.commit.customLanguageName` | `string` | `""` | Language name used when `commitLanguage` is `custom`, for example `Ukrainian`. |
+| `commitSage.commit.commitFormat` | `string` | `"conventional"` | Message format. One of `conventional`, `angular`, `karma`, `semantic`, `emoji`, `emojiKarma`, `google`, `atom`, `detailed`, `previous`, `custom`. `previous` matches the style of recent commits. `custom`: with `useCustomInstructions` on, `customInstructions` is the whole prompt; otherwise the `conventional` template is used. Formats: [commit-formats.md](commit-formats.md). |
+| `commitSage.commit.useCustomInstructions` | `boolean` | `false` | Uses `customInstructions` in place of the built-in template. `customInstructions` must not be empty. |
+| `commitSage.commit.customInstructions` | `string` | `""` | Prompt text used when `useCustomInstructions` is `true`. |
+| `commitSage.commit.useRecentCommitsAsContext` | `boolean` | `false` | Sends recent commit messages to the model as style examples. The selected format still sets the structure. |
+| `commitSage.commit.recentCommitsCount` | `number` | `5` | Number of recent commits used as examples, with `useRecentCommitsAsContext` on or the `previous` format. Range `1`–`20`. Merge, version-bump, revert and WIP commits and messages under 10 characters are skipped. |
+| `commitSage.commit.recentCommitsScope` | `string` | `"all"` | Whose commits are used as examples: `all` (any author) or `mine` (only yours). |
+| `commitSage.commit.commitlint.enabled` | `boolean` | `false` | Validates the message against the rules of the selected format, fixes mechanical violations and retries with the model. Has no effect with the `custom` format. |
+| `commitSage.commit.commitlint.maxRetries` | `number` | `3` | Maximum validation and refinement cycles. Range `1`–`10`. |
+| `commitSage.commit.commitlint.rulesPath` | `string` | `""` | Path to a commitlint rules file, used by the `conventional` and `angular` formats. Empty: `commitlint.config.{js,cjs,json,yml,yaml}` in the repository root is used. |
+| `commitSage.commit.commitlint.engine` | `string` | `"builtin"` | Validator. `builtin`: the bundled validator, runs no project code. `project`: the repository's commitlint CLI from `node_modules`, for `conventional`, `angular`, `atom`, `karma`, `semantic` and `google`; falls back to `builtin` when the CLI is unavailable. |
+| `commitSage.commit.onlyStagedChanges` | `boolean` | `false` | `true`: only staged changes are analyzed. `false`: staged changes if any, otherwise all tracked changes. |
+| `commitSage.commit.autoCommit` | `boolean` | `false` | Commits after the message is generated. |
+| `commitSage.commit.autoPush` | `boolean` | `false` | Pushes after the auto-commit. Ignored unless `autoCommit` is `true`. |
+| `commitSage.commit.refs.enabled` | `boolean` | `false` | Adds an issue or ticket ref, such as `#123` or `PROJ-456`, to every generated message. |
+| `commitSage.commit.refs.source` | `string` | `"prompt"` | Where the ref comes from. `prompt`: asked before each generation. `branch`: extracted from the branch name with `branchPattern`. `input`: the fixed `refs.value`. |
+| `commitSage.commit.refs.value` | `string` | `""` | Fixed ref used when `refs.source` is `input`. The settings panel buttons **Save for this branch**, **Save for project** and **Clear branch ref** manage it; a branch ref, kept in VS Code workspace state, wins over the project value. |
+| `commitSage.commit.refs.placement` | `string` | `"end"` | Where the ref goes. `end`: own line after the message. `start`: own line before the message. `prefix`: start of the subject line. The ref is never placed in the subject scope. |
+| `commitSage.commit.refs.branchPattern` | `string` | `"[A-Z][A-Z0-9]*-[0-9]+"` | Regular expression that extracts the ref from the branch name when `refs.source` is `branch`. The first capture group is used if present, otherwise the whole match. |
 
-### Ollama
+## Per provider
 
-| Setting | Type | Default | Description |
-|---------|------|---------|-------------|
-| `commitSage.ollama.baseUrl` | `string` | `"http://localhost:11434"` | Ollama server URL |
-| `commitSage.ollama.model` | `string` | `"llama3.2"` | Model name |
-| `commitSage.ollama.useAuthToken` | `boolean` | `false` | Enable if Ollama requires authentication |
-
----
-
-## Commit Settings
-
-| Setting | Type | Default | Description |
-|---------|------|---------|-------------|
-| `commitSage.commit.commitLanguage` | `string` | `"english"` | Language for generated messages: `english`, `russian`, `chinese`, `japanese`, `korean`, `german`, `french`, `spanish`, `portuguese`, `custom` |
-| `commitSage.commit.customLanguageName` | `string` | `""` | Language name used when `commitLanguage` is `custom` (e.g. `"Ukrainian"`, `"Italian"`). The format template is translated by the LLM and cached in `.commitsage/translations.json`. See [custom-language.md](custom-language.md) |
-| `commitSage.commit.commitFormat` | `string` | `"conventional"` | Commit format: `conventional`, `angular`, `karma`, `semantic`, `emoji`, `emojiKarma`, `google`, `atom` |
-| `commitSage.commit.onlyStagedChanges` | `boolean` | `false` | When `true`, only analyzes staged changes. When `false`, uses staged if present, otherwise all changes |
-| `commitSage.commit.autoCommit` | `boolean` | `false` | Automatically commit after message generation |
-| `commitSage.commit.autoPush` | `boolean` | `false` | Automatically push after auto-commit (requires `autoCommit` enabled) |
-| `commitSage.commit.refs.enabled` | `boolean` | `false` | Add an issue/ticket ref (e.g. `#123`, `PROJ-456`) to every generated commit |
-| `commitSage.commit.refs.source` | `string` | `"prompt"` | Where the ref comes from: `prompt` (ask each time), `branch` (extract from branch name), `input` (fixed value) |
-| `commitSage.commit.refs.value` | `string` | `""` | Fixed ref used when `refs.source` is `input` |
-| `commitSage.commit.refs.placement` | `string` | `"end"` | Where the ref is added: `end` (separate line at end), `start` (separate line at start), or `prefix` (start of subject line, same line). Never injected into the subject scope |
-| `commitSage.commit.refs.branchPattern` | `string` | `"[A-Z][A-Z0-9]*-[0-9]+"` | Regex extracting the ref from the branch name when `refs.source` is `branch`. First capture group, or whole match, is used |
-| `commitSage.commit.useCustomInstructions` | `boolean` | `false` | Use custom prompt instead of built-in templates |
-| `commitSage.commit.customInstructions` | `string` | `""` | Custom prompt text (used when `useCustomInstructions` is `true`) |
-
-### Saving a ref per branch or per project (`input` source)
-
-With `refs.source` set to `input`, the settings panel shows a **Ref value** field
-with two buttons:
-
-- **Save for this branch** — stores the value for the *current git branch* only,
-  in VS Code's per-workspace state (`workspaceState`). It is personal and never
-  committed to the repo.
-- **Save for project** — writes `commit.refs.value` into `.commitsage/config.json`,
-  so it applies to the whole repo and can be shared via git.
-
-At generation time the **branch ref wins over the project ref** (more specific
-scope first); if neither is set, no ref is added. A **Clear branch ref** button
-removes the current branch's saved value.
-
----
-
-## Other Settings
+Each key applies only when `commitSage.provider.type` selects that provider.
 
 | Setting | Type | Default | Description |
-|---------|------|---------|-------------|
-| `commitSage.apiRequestTimeout` | `number` | `30` | LLM provider HTTP request timeout in seconds (`-1` for no timeout) |
-| `commitSage.gitTimeout` | `number` | `120` | `git` subprocess timeout in seconds (`-1` for no timeout). Raise if pushes over a slow remote or diffs over huge files time out. |
-| `commitSage.telemetry.enabled` | `boolean` | `true` | Enable anonymous usage telemetry |
+|---|---|---|---|
+| `commitSage.gemini.model` | `string` | `"auto"` | Gemini model ID. `auto` tries the available models and prefers the best quality. |
+| `commitSage.gemini.thinkingBudget` | `number` | `0` | Thinking token budget for Gemini 2.5 models. `0` disables thinking, `-1` lets the model decide, a positive number caps it. Minimum `-1`. Gemini 2.5 Pro raises `0` to `128`. Ignored by Gemini 3.x. |
+| `commitSage.gemini.thinkingLevel` | `string` | `"low"` | Thinking depth for Gemini 3.x models. One of `minimal`, `low`, `medium`, `high`. Ignored by Gemini 2.5 and older. |
+| `commitSage.codestral.model` | `string` | `"codestral-latest"` | Codestral model ID. |
+| `commitSage.mistral.model` | `string` | `"mistral-small-latest"` | Mistral La Plateforme model ID. |
+| `commitSage.openai.model` | `string` | `"gpt-3.5-turbo"` | OpenAI model ID. |
+| `commitSage.openai.baseUrl` | `string` | `"https://api.openai.com/v1"` | OpenAI API base URL, for example an Azure OpenAI endpoint. |
+| `commitSage.ollama.baseUrl` | `string` | `"http://localhost:11434"` | Ollama server URL. |
+| `commitSage.ollama.model` | `string` | `"llama3.2"` | Ollama model name. The model must be installed on the server. |
+| `commitSage.ollama.useAuthToken` | `boolean` | `false` | Sends the auth token set with `Set Ollama Auth Token`. |
+| `commitSage.ollama.numCtx` | `number` | `0` | Context window passed to Ollama as `options.num_ctx`. `0` keeps the model's default. |
+| `commitSage.openrouter.model` | `string` | `"meta-llama/llama-3.3-70b-instruct:free"` | OpenRouter model ID. |
+| `commitSage.openrouter.preferFreeModels` | `boolean` | `false` | Limits the model picker to free models (`:free` suffix or zero pricing). |
+| `commitSage.groq.model` | `string` | `"llama-3.3-70b-versatile"` | Groq model ID. |
+| `commitSage.anthropic.model` | `string` | `"claude-sonnet-4-5-20250929"` | Anthropic model ID. |
+| `commitSage.deepseek.model` | `string` | `"deepseek-chat"` | DeepSeek model ID. |
+| `commitSage.xai.model` | `string` | `"grok-3-mini"` | xAI model ID. |
+| `commitSage.custom.baseUrl` | `string` | `"http://localhost:1234/v1"` | Base URL of an OpenAI-compatible `chat/completions` endpoint. |
+| `commitSage.custom.model` | `string` | `""` | Model ID sent to the custom endpoint. |
+| `commitSage.custom.useApiKey` | `boolean` | `false` | Sends the key set with `Set Custom API Key`. |
+| `commitSage.custom.chatCompletionsPath` | `string` | `"/chat/completions"` | Path appended to `custom.baseUrl` for chat requests. |
 
----
+## Telemetry
 
-## Project Configuration (`.commitsage/config.json`)
+| Setting | Type | Default | Description |
+|---|---|---|---|
+| `commitSage.telemetry.enabled` | `boolean` | `true` | Sends anonymous usage telemetry. Details: [telemetry.md](telemetry.md). |
 
-CommitSage stores per-project settings in `.commitsage/config.json`.
+## Commands
 
-| Layout | When used |
-|--------|-----------|
-| `.commitsage/config.json` (directory) | **Current** layout. Created by the `Create Project Config` command and read on every activation |
-| `.commitsage` (single JSON file) | Legacy. Still loaded for backwards compatibility, and automatically migrated to `.commitsage/config.json` on next activation |
+All commands are in the Command Palette under the `Commit Sage:` category. API keys and tokens are stored in VS Code secret storage, not in settings files.
 
-**Create via Command Palette:** "Commit Sage: Create Project Config (.commitsage)"
+| Command | Title |
+|---|---|
+| `commitsage.generateCommitMessage` | Generate Commit Message |
+| `commitsage.createProjectConfig` | Create Project Config (.commitsage) |
+| `commitsage.selectGeminiModel` | Select Gemini Model |
+| `commitsage.loginOpenRouter` | Sign in to OpenRouter |
+| `commitsage.setApiKey` / `commitsage.removeApiKey` | Set Gemini API Key / Remove Gemini API Key |
+| `commitsage.setOpenAIApiKey` / `commitsage.removeOpenAIApiKey` | Set OpenAI API Key / Remove OpenAI API Key |
+| `commitsage.setCodestralApiKey` / `commitsage.removeCodestralApiKey` | Set Codestral API Key / Remove Codestral API Key |
+| `commitsage.setMistralApiKey` / `commitsage.removeMistralApiKey` | Set Mistral API Key / Remove Mistral API Key |
+| `commitsage.setOllamaAuthToken` / `commitsage.removeOllamaAuthToken` | Set Ollama Auth Token / Remove Ollama Auth Token |
+| `commitsage.setOpenRouterApiKey` / `commitsage.removeOpenRouterApiKey` | Set OpenRouter API Key / Remove OpenRouter API Key |
+| `commitsage.setGroqApiKey` / `commitsage.removeGroqApiKey` | Set Groq API Key / Remove Groq API Key |
+| `commitsage.setAnthropicApiKey` / `commitsage.removeAnthropicApiKey` | Set Anthropic API Key / Remove Anthropic API Key |
+| `commitsage.setDeepSeekApiKey` / `commitsage.removeDeepSeekApiKey` | Set DeepSeek API Key / Remove DeepSeek API Key |
+| `commitsage.setXaiApiKey` / `commitsage.removeXaiApiKey` | Set xAI API Key / Remove xAI API Key |
+| `commitsage.setCustomApiKey` / `commitsage.removeCustomApiKey` | Set Custom API Key / Remove Custom API Key |
 
-### Full Example
+## Project config (`.commitsage/config.json`)
 
-```json
-{
-  "provider": {
-    "type": "gemini"
-  },
-  "commit": {
-    "commitLanguage": "english",
-    "customLanguageName": "",
-    "commitFormat": "conventional",
-    "useCustomInstructions": false,
-    "customInstructions": "",
-    "onlyStagedChanges": false,
-    "autoCommit": false,
-    "autoPush": false,
-    "refs": {
-      "enabled": false,
-      "source": "prompt",
-      "value": "",
-      "placement": "end",
-      "branchPattern": "[A-Z][A-Z0-9]*-[0-9]+"
-    }
-  },
-  "gemini": {
-    "model": "auto"
-  },
-  "openai": {
-    "model": "gpt-3.5-turbo",
-    "baseUrl": "https://api.openai.com/v1"
-  },
-  "codestral": {
-    "model": "codestral-latest"
-  },
-  "ollama": {
-    "baseUrl": "http://localhost:11434",
-    "model": "llama3.2"
-  },
-  "telemetry": {
-    "enabled": false
-  }
-}
-```
+The project config holds the same keys as VS Code settings, without the `commitSage.` prefix and nested by section. Keys left out fall through to workspace and user settings. API keys are never read from this file.
 
-### Custom Language Example
+- **Location.** `.commitsage/config.json` in the project root. `Create Project Config (.commitsage)` creates it in the first workspace folder. In a multi-root workspace the config and `translations.json` are read from the folder of the active editor, or from the first folder when no editor is open. Only the first folder is watched, migrated and used by `Create Project Config`.
+- **Reload.** Changes to the file apply without reloading VS Code (first folder only in multi-root).
+- **Invalid JSON.** The extension shows an error dialog and ignores the file. Fixes: [troubleshooting.md](troubleshooting.md).
+- **Legacy file.** A single `.commitsage` JSON file is still read. On every startup, if the file holds valid JSON, the extension moves its content to `.commitsage/config.json`, unchanged. If the JSON is invalid, the file stays in place and is not migrated.
+- **Custom language cache.** `.commitsage/translations.json` stores translated templates; see [custom-language.md](custom-language.md).
 
-```json
-{
-  "commit": {
-    "commitLanguage": "custom",
-    "customLanguageName": "Ukrainian"
-  }
-}
-```
-
-On first use, this generates `.commitsage/translations.json` with the translated template. See [custom-language.md](custom-language.md) for details.
-
-### Partial Override Example
-
-You only need to include the keys you want to override. Omitted keys fall through to VS Code settings (workspace → global). For example, to switch a single project to Ollama with emoji commits:
+### Example
 
 ```json
 {
@@ -190,33 +128,27 @@ You only need to include the keys you want to override. Omitted keys fall throug
     "type": "ollama"
   },
   "commit": {
-    "commitFormat": "emoji"
+    "commitFormat": "emoji",
+    "refs": {
+      "enabled": true,
+      "source": "branch"
+    }
+  },
+  "ollama": {
+    "model": "llama3.2"
   }
 }
 ```
 
-### Notes
+## Workspace trust
 
-- Config is automatically watched — changes take effect immediately without reloading VS Code
-- Invalid JSON will show an error notification (check for trailing commas or missing quotes)
-- API keys are **not** stored in this file — they are managed via VS Code's secure storage
-- You only need to include the settings you want to override; omitted settings fall through to VS Code settings
+In an untrusted workspace, the project config cannot set these keys:
 
-For troubleshooting configuration problems, see [troubleshooting.md](troubleshooting.md).
+- `provider.type`
+- `custom.baseUrl`, `custom.chatCompletionsPath`, `custom.useApiKey`
+- `openai.baseUrl`
+- `ollama.baseUrl`, `ollama.useAuthToken`
+- `commit.autoCommit`, `commit.autoPush`
+- `commit.commitlint.enabled`, `commit.commitlint.engine`, `commit.commitlint.rulesPath`
 
----
-
-## API Key Management
-
-API keys are stored in VS Code's secure storage (OS keychain), not in settings files.
-
-**Set keys:** Command Palette → "Commit Sage: Set \<Provider\> API Key"
-
-**Remove keys:** Command Palette → "Commit Sage: Remove \<Provider\> API Key"
-
-Available commands:
-- `Commit Sage: Set Gemini API Key` / `Remove Gemini API Key`
-- `Commit Sage: Set OpenAI API Key` / `Remove OpenAI API Key`
-- `Commit Sage: Set Codestral API Key` / `Remove Codestral API Key`
-- `Commit Sage: Set Mistral API Key` / `Remove Mistral API Key`
-- `Commit Sage: Set Ollama Authentication Token` / `Remove Ollama Authentication Token`
+The extension logs a warning for each ignored key and uses the workspace or user value instead. VS Code also ignores workspace values of `commitSage.commit.autoCommit` and `commitSage.commit.autoPush`. Auto-commit and auto-push are skipped in an untrusted workspace whatever the settings say. Granting trust applies the ignored project values without a reload.
