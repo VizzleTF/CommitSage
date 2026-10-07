@@ -48,3 +48,6 @@ jobs:
 
       - name: E2E tests (xvfb)
         run: xvfb-run -a npm run test:e2e
+
+      - name: E2E tests against packaged VSIX (xvfb)
+        run: xvfb-run -a npm run test:e2e:vsix

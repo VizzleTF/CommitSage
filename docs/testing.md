@@ -26,8 +26,14 @@ Use them for anything that touches `vscode` API surfaces, command registration, 
 ```bash
 npm run test:unit      # vitest only — fastest feedback loop
 npm run test:e2e       # E2E only — downloads VS Code on first run
+npm run test:e2e:vsix  # E2E against the packaged .vsix (production bundle)
 npm test               # both, sequentially
+npm run verify         # lint + unit + E2E dev + E2E vsix — run before tagging a release
 ```
+
+On Linux without a display (CI, WSL, SSH), prefix E2E and `verify` with `xvfb-run -a`.
+
+`test:e2e:vsix` packages the extension, unpacks it to `.vscode-test/vsix/extension` and copies the compiled suite inside it. The copy is required: VS Code gives each extension its own `vscode` API object by file path, so stubs on `vscode.window` reach the extension only when the tests live inside its folder.
 
 `pretest:e2e` automatically runs `tsc -p tests/e2e/tsconfig.e2e.json` and `npm run compile` (esbuild bundle) before launching test-electron.
 

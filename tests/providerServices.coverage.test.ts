@@ -366,13 +366,13 @@ describe('generateViaOpenAICompatible defaults', () => {
         mockedPostJson.mockResolvedValueOnce({
             choices: [{ message: { content: 'ok' } }],
         });
-        await generateViaOpenAICompatibleProvider('openai', 'hi', progress, 1);
+        await generateViaOpenAICompatibleProvider('groq', 'hi', progress, 1);
         expect(mockedPostJson.mock.calls[0][1]).toMatchObject({ max_tokens: 4096 });
 
         mockedPostJson.mockResolvedValueOnce({
             choices: [{ message: { content: 'ok' } }],
         });
-        await generateViaOpenAICompatibleProvider('openai', 'hi', progress, 1, { maxTokens: 50 });
+        await generateViaOpenAICompatibleProvider('groq', 'hi', progress, 1, { maxTokens: 50 });
         expect(mockedPostJson.mock.calls[1][1]).toMatchObject({ max_tokens: 50 });
     });
 });

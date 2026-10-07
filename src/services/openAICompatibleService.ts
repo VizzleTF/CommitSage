@@ -1,7 +1,7 @@
 import { Logger } from '../utils/logger';
 import type { CommitMessage, ProgressReporter, GenerateOptions } from '../models/types';
 import { extractAndValidateMessage, getConfiguredTemperature, resolveMaxOutputTokens, withRetryAndApiKeyGuard } from './baseAIService';
-import { HttpUtils } from '../utils/httpUtils';
+import { HttpError, HttpUtils } from '../utils/httpUtils';
 import { RetryUtils } from '../utils/retryUtils';
 import { ConfigService } from '../utils/configService';
 import { ApiKeyManager } from './apiKeyManager';
@@ -34,6 +34,49 @@ export interface OpenAICompatibleRequest {
     model: string;
     chatCompletionsPath?: string;
     extraHeaders?: Record<string, string>;
+    /** Initial output-budget field name; a 400 naming it flips it (see `fixPayloadFromError`). */
+    maxTokensParam?: TokenParam;
+}
+
+type TokenParam = 'max_tokens' | 'max_completion_tokens';
+
+interface PayloadShape {
+    tokenParam: TokenParam;
+    omitTemperature: boolean;
+}
+
+/**
+ * Payload shape learned per `baseUrl|model` from 400s, kept for the session so
+ * only the first request to e.g. gpt-5 pays the extra round-trips.
+ */
+const learnedShapes = new Map<string, PayloadShape>();
+
+/**
+ * Reasoning models (OpenAI gpt-5/o-series, also behind Azure, OpenRouter or a
+ * custom proxy) reject `max_tokens` and any non-default `temperature` with a
+ * 400 whose OpenAI-style body names the offending field:
+ *   `{"error":{"param":"max_tokens","message":"Unsupported parameter: 'max_tokens' ..."}}`
+ *   `{"error":{"param":"temperature","message":"Unsupported value: 'temperature' ..."}}`
+ * Model names are unreliable (Azure deployments, proxies), so the error itself
+ * decides. Returns the corrected shape, or undefined when the error is something else.
+ */
+function fixPayloadFromError(error: unknown, shape: PayloadShape): PayloadShape | undefined {
+    if (!(error instanceof HttpError) || error.status !== 400) {
+        return undefined;
+    }
+    const body = error.data as { error?: { param?: unknown; message?: unknown } } | string | undefined;
+    const err = typeof body === 'object' ? body?.error : undefined;
+    const message = typeof body === 'string' ? body : String(err?.message ?? '');
+    const param = typeof err?.param === 'string' ? err.param : /'(\w+)'/.exec(message)?.[1];
+
+    if (param === shape.tokenParam) {
+        const other = shape.tokenParam === 'max_tokens' ? 'max_completion_tokens' : 'max_tokens';
+        return { ...shape, tokenParam: other };
+    }
+    if (param === 'temperature' && !shape.omitTemperature) {
+        return { ...shape, omitTemperature: true };
+    }
+    return undefined;
 }
 
 export async function generateViaOpenAICompatible(
@@ -58,27 +101,46 @@ export async function generateViaOpenAICompatible(
             const path = request.chatCompletionsPath ?? '/chat/completions';
             const baseUrl = HttpUtils.stripTrailingSlashes(request.baseUrl);
 
-            const payload = {
-                model: request.model,
-                messages: [{ role: 'user', content: prompt }],
-                temperature: getConfiguredTemperature(),
-                // eslint-disable-next-line @typescript-eslint/naming-convention
-                max_tokens: resolveMaxOutputTokens(options, attempt),
+            const shapeKey = `${baseUrl}|${request.model}`;
+            let shape: PayloadShape = learnedShapes.get(shapeKey) ?? {
+                tokenParam: request.maxTokensParam ?? 'max_tokens',
+                omitTemperature: false,
             };
 
             await RetryUtils.updateProgressForAttempt(progress, attempt);
 
-            const data = await HttpUtils.postJson<OpenAIResponse>(
-                `${baseUrl}${path}`,
-                payload,
-                {
-                    headers: HttpUtils.createRequestHeaders(
-                        request.apiKey,
-                        request.extraHeaders,
-                    ),
-                    signal: options?.signal,
-                },
-            );
+            let data: OpenAIResponse;
+            // At most two corrections (token field + temperature), then the error stands.
+            for (let fixes = 0; ; fixes++) {
+                const payload = {
+                    model: request.model,
+                    messages: [{ role: 'user', content: prompt }],
+                    ...(shape.omitTemperature ? {} : { temperature: getConfiguredTemperature() }),
+                    [shape.tokenParam]: resolveMaxOutputTokens(options, attempt),
+                };
+                try {
+                    data = await HttpUtils.postJson<OpenAIResponse>(
+                        `${baseUrl}${path}`,
+                        payload,
+                        {
+                            headers: HttpUtils.createRequestHeaders(
+                                request.apiKey,
+                                request.extraHeaders,
+                            ),
+                            signal: options?.signal,
+                        },
+                    );
+                    break;
+                } catch (error) {
+                    const fixed = fixes < 2 ? fixPayloadFromError(error, shape) : undefined;
+                    if (!fixed) {
+                        throw error;
+                    }
+                    Logger.log(`${request.model} rejected request parameters, retrying with ${JSON.stringify(fixed)}`);
+                    shape = fixed;
+                    learnedShapes.set(shapeKey, shape);
+                }
+            }
 
             progress.report({ message: 'Processing generated message...', increment: 90 });
 
@@ -89,7 +151,7 @@ export async function generateViaOpenAICompatible(
             if (choice?.finish_reason === 'length') {
                 throw new TruncatedResponseError(
                     request.providerLabel,
-                    `${request.model} exhausted max_tokens`,
+                    `${request.model} exhausted ${shape.tokenParam}`,
                 );
             }
 
@@ -120,10 +182,16 @@ interface CompatProviderSpec {
     chatCompletionsPath?: () => string;
     /** Override key acquisition (e.g. Custom's optional `useApiKey` toggle). */
     getApiKey?: () => Promise<string | undefined>;
+    maxTokensParam?: TokenParam;
 }
 
 const COMPAT_SPECS: Partial<Record<Provider, CompatProviderSpec>> = {
-    openai: { baseUrl: () => ConfigService.get('openai.baseUrl') },
+    openai: {
+        baseUrl: () => ConfigService.get('openai.baseUrl'),
+        // `max_tokens` is deprecated on OpenAI and rejected by gpt-5/o-series;
+        // `max_completion_tokens` works for every current OpenAI chat model.
+        maxTokensParam: 'max_completion_tokens',
+    },
     groq: { baseUrl: () => 'https://api.groq.com/openai/v1' },
     xai: { baseUrl: () => 'https://api.x.ai/v1' },
     deepseek: { baseUrl: () => 'https://api.deepseek.com' },
@@ -191,6 +259,7 @@ export async function generateViaOpenAICompatibleProvider(
             model: ConfigService.getModelFor(provider),
             chatCompletionsPath: spec.chatCompletionsPath?.(),
             extraHeaders: spec.extraHeaders,
+            maxTokensParam: spec.maxTokensParam,
         },
         prompt,
         progress,

@@ -2,7 +2,7 @@
   "name": "geminicommit",
   "displayName": "Commit Sage",
   "description": "Free AI commit messages using Gemini, OpenRouter, Groq, Claude, DeepSeek, xAI, Ollama, or any OpenAI-compatible LLM",
-  "version": "3.3.3",
+  "version": "3.3.4",
   "publisher": "VizzleTF",
   "repository": {
     "type": "git",
@@ -730,7 +730,10 @@
     "test:unit:coverage": "vitest run --coverage",
     "test:unit:watch": "vitest",
     "pretest:e2e": "tsc -p tests/e2e/tsconfig.e2e.json && npm run compile",
-    "test:e2e": "vscode-test"
+    "test:e2e": "vscode-test --label dev",
+    "pretest:e2e:vsix": "tsc -p tests/e2e/tsconfig.e2e.json && vsce package --no-dependencies -o .vscode-test/commitsage.vsix && rm -rf .vscode-test/vsix && unzip -q .vscode-test/commitsage.vsix -d .vscode-test/vsix && cp -r tests/e2e/out .vscode-test/vsix/extension/e2e",
+    "test:e2e:vsix": "vscode-test --label vsix",
+    "verify": "eslint 'src/**/*.ts' && npm run test:unit && npm run test:e2e && npm run test:e2e:vsix"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
