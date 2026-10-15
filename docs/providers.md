@@ -20,6 +20,25 @@ Setting keys on this page omit the `commitSage.` prefix: `provider.type` means `
 | Ollama | `ollama` | Local or self-hosted | Optional auth token | Fetched from `<ollama.baseUrl>/api/tags` |
 | Custom (OpenAI-compatible) | `custom` | Any | Optional | None; type the model ID |
 
+## Data use
+
+Commit Sage sends your diff and prompt to the provider you pick. What happens to them next is set by the provider's terms, not by Commit Sage. The table summarizes those terms for API use as checked in October 2026. Terms change, so read the linked page before you send private code. "Not stated" means the linked page does not say.
+
+| Provider | Trains on your data | Retention | Human review | Notes | Terms |
+|----------|---------------------|-----------|--------------|-------|-------|
+| Gemini (default) | Free tier: yes, to "provide, improve, and develop" Google products. Paid tier: no. | Paid tier: logged for a limited period to detect abuse and meet legal requirements. Free tier: not stated. | Free tier: yes, reviewers may read and annotate inputs and outputs. Paid tier: not stated. | Google asks not to send sensitive, confidential or personal data to the free tier. In the EEA, Switzerland and the UK the paid-tier data terms apply to free use too. | [Gemini API terms](https://ai.google.dev/gemini-api/terms) |
+| OpenAI | No, unless you opt in. | Abuse-monitoring logs for up to 30 days. Zero Data Retention needs OpenAI's approval. | Not stated | Data residency is set per project: US, Europe and other regions. | [Your data](https://developers.openai.com/api/docs/guides/your-data) |
+| Anthropic | No by default. Feedback you send, such as a thumbs rating, and an explicit opt-in can be used. | Deleted within 30 days. Inputs flagged for a usage policy violation are kept for up to 2 years. | Not stated | | [Training](https://privacy.claude.com/en/articles/7996868-is-my-data-used-for-training), [retention](https://privacy.claude.com/en/articles/7996866-how-long-does-anthropic-store-my-organizations-data) |
+| Groq | Not stated; the Groq Services Agreement governs it. | Not retained by default. Reliability and abuse logs for up to 30 days. Zero Data Retention is a toggle in Data Controls. | Not stated | | [Your data](https://console.groq.com/docs/your-data) |
+| xAI | No, without your explicit permission. | 30 days for auditing. Zero Data Retention is available. | Not stated | | [Security FAQ](https://docs.x.ai/developers/faq/security) |
+| Mistral, Codestral | Free mode: yes, unless you opt out. Pay-as-you-go: you can opt out. | Not stated | Not stated | Opt out in the Mistral Admin panel under Privacy > Anonymous improvement data. The pages do not name Codestral separately. | [Training](https://help.mistral.ai/en/articles/347617-do-you-use-my-user-data-to-train-your-artificial-intelligence-models), [opt out](https://help.mistral.ai/en/articles/455207-can-i-opt-out-of-my-input-or-output-data-being-used-for-training) |
+| DeepSeek | Yes, to train and improve its models. You can opt out by email to privacy@deepseek.com. | As long as you have an account. | Not stated | Data is processed and stored in the People's Republic of China. | [Privacy policy](https://cdn.deepseek.com/policies/en-US/deepseek-privacy-policy.html) |
+| OpenRouter | Depends on the provider the request is routed to. By default, routing includes providers that store data and may train on it. | Depends on the provider. | Depends on the provider. | Commit Sage sends no routing preference. To skip providers that train on data, change your [OpenRouter privacy settings](https://openrouter.ai/settings/privacy); free models have a separate setting. The default model `openrouter/free` routes to free models. | [Provider selection](https://openrouter.ai/docs/guides/routing/provider-selection), [provider logging](https://openrouter.ai/docs/guides/privacy/provider-logging) |
+| Ollama, Custom on your own server | No | Your machine or server only. | No | No third party receives the data. | |
+| Custom on a hosted service | Set by that service. | Set by that service. | Set by that service. | For example Together AI, Fireworks or NVIDIA NIM. | That service's terms |
+
+Whatever the provider, Commit Sage sends only the path of `.env`, key and certificate files and masks known secret formats in the rest of the diff. See [Sensitive files and secrets](configuration.md#sensitive-files-and-secrets).
+
 ## Set up a provider
 
 1. Open the Commit Sage sidebar and pick the provider.

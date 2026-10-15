@@ -44,6 +44,7 @@ To steer the message, type a draft in the input box first, for example `fix logi
 
 - API keys are stored in VS Code SecretStorage, not in settings or project files.
 - Your diff and the draft in the Source Control input box are sent to the selected provider. Ollama and a self-hosted Custom endpoint keep them on your network.
+- The free tier of Gemini, the default provider, may use what you send to improve Google products, and human reviewers may read it; in the EEA, Switzerland and the UK the paid-tier terms apply instead. OpenRouter free models and Mistral's free mode can also train on your data. Before using a free tier on private code, check [what each provider does with your data](docs/providers.md#data-use) and keep sensitive files out with the exclusions below.
 - The content of `.env`, key and certificate files is never sent, only their path. Add your own patterns with `commitSage.general.excludeFiles` or a `.commitsageignore` file. Known secret formats in the rest of the diff (API keys, tokens, private keys) are masked. Masking is pattern-based, so prefer a local provider for a repository full of secrets. See [Sensitive files and secrets](docs/configuration.md#sensitive-files-and-secrets).
 - Telemetry is on by default. Turn it off with `commitSage.telemetry.enabled: false`; details in [docs/telemetry.md](docs/telemetry.md).
 
