@@ -335,9 +335,15 @@ describe('rulesToInstructions', () => {
         expect(result).toContain('Header must not end with "."');
     });
 
-    it('emits trailer guidance with the default trailer label', () => {
-        const result = rulesToInstructions({ 'trailer-exists': [2, 'always'] } as never);
-        expect(result).toContain('End the message with a "Signed-off-by:" trailer line');
+    it('never asks the model for a Signed-off-by trailer', () => {
+        expect(rulesToInstructions({ 'trailer-exists': [2, 'always'] } as never)).not.toContain('Signed-off-by');
+        expect(rulesToInstructions({ 'trailer-exists': [2, 'always', 'signed-off-by:'] } as never)).not.toContain('signed-off-by');
+        expect(rulesToInstructions({ 'signed-off-by': [2, 'always', 'Signed-off-by:'] } as never)).not.toContain('Signed-off-by');
+    });
+
+    it('still emits guidance for other required trailers', () => {
+        const result = rulesToInstructions({ 'trailer-exists': [2, 'always', 'Reviewed-by:'] } as never);
+        expect(result).toContain('End the message with a "Reviewed-by:" trailer line');
     });
 
     it('emits the "must NOT be" verb for subject-case never', () => {

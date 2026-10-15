@@ -227,7 +227,7 @@ export class CommitWorkflow {
             try {
                 // Nothing was staged when the message was generated, so the commit
                 // has to stage the whole worktree to match what the message says.
-                await this.handleAutoCommit(finalMessage, repoPath, !useStagedChanges);
+                await this.handleAutoCommit(finalMessage, repoPath, !useStagedChanges, commitMessage.signOff === true);
             } catch (error) {
                 // GitService already sent commit_failed / push_failed; this is
                 // not a generation failure. Not awaited: the progress
@@ -248,6 +248,7 @@ export class CommitWorkflow {
         message: string,
         repoPath: string,
         stageAll: boolean,
+        signOff: boolean,
     ): Promise<void> {
         // Last line of defense for the "a repo turns on auto-commit for you"
         // case. `restrictedConfigurations` covers the settings store and
@@ -259,7 +260,7 @@ export class CommitWorkflow {
             return;
         }
 
-        await GitService.commitChanges(message, repoPath, stageAll);
+        await GitService.commitChanges(message, repoPath, stageAll, signOff);
 
         if (ConfigService.get('commit.autoPush')) {
             await GitService.pushChanges(repoPath);

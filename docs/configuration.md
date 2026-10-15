@@ -49,7 +49,7 @@ When Commit Sage changes a setting itself (the sidebar, startup dialogs, **Selec
 | `commitSage.commit.commitlint.rulesPath` | `string` | `""` | Path to a commitlint rules file, used by the `conventional` and `angular` formats. Empty: `commitlint.config.{js,cjs,json,yml,yaml}` in the repository root is used. |
 | `commitSage.commit.commitlint.engine` | `string` | `"builtin"` | Validator. `builtin`: the bundled validator, runs no project code. `project`: the repository's commitlint CLI from `node_modules`, for `conventional`, `angular`, `atom`, `karma`, `semantic` and `google`; falls back to `builtin` when the CLI is unavailable. |
 | `commitSage.commit.onlyStagedChanges` | `boolean` | `false` | `true`: only staged changes are analyzed. `false`: staged changes if any, otherwise all changes including untracked files; auto-commit then stages them with `git add -A`. |
-| `commitSage.commit.autoCommit` | `boolean` | `false` | Commits after the message is generated. |
+| `commitSage.commit.autoCommit` | `boolean` | `false` | Commits after the message is generated. Adds `--signoff` when the commitlint rules require a sign-off; see [Signed-off-by](commit-formats.md#signed-off-by). |
 | `commitSage.commit.autoPush` | `boolean` | `false` | Pushes after the auto-commit. Ignored unless `autoCommit` is `true`. |
 | `commitSage.commit.refs.enabled` | `boolean` | `false` | Adds an issue or ticket ref, such as `#123` or `PROJ-456`, to every generated message. |
 | `commitSage.commit.refs.source` | `string` | `"prompt"` | Where the ref comes from. `prompt`: asked before each generation. `branch`: extracted from the branch name with `branchPattern`. `input`: the fixed `refs.value`. |

@@ -482,12 +482,25 @@ describe('CommitLintService static engine compatibility', () => {
         expect((await CommitLintService.validate('feat: trimmed fine', tmpDir)).valid).toBe(true);
     });
 
-    it('requires a Signed-off-by trailer when signed-off-by is always', async () => {
+    it('flags a required Signed-off-by trailer instead of failing on it', async () => {
         fs.writeFileSync(path.join(tmpDir, '.commitlintrc.json'), JSON.stringify({
-            rules: { 'signed-off-by': [2, 'always', 'Signed-off-by:'] },
+            rules: { 'signed-off-by': [2, 'always', 'Signed-off-by:'], 'subject-full-stop': [2, 'never', '.'] },
         }));
-        expect((await CommitLintService.validate('feat: no trailer', tmpDir)).valid).toBe(false);
-        expect((await CommitLintService.validate('feat: with trailer\n\nSigned-off-by: Dev <d@x.io>', tmpDir)).valid).toBe(true);
+        expect(await CommitLintService.validate('feat: no trailer', tmpDir))
+            .toEqual({ valid: true, errors: [], signOffRequired: true });
+        expect(await CommitLintService.validate('feat: no trailer.', tmpDir))
+            .toEqual({ valid: false, errors: ['subject may not end with "."'], signOffRequired: true });
+        expect(await CommitLintService.validate('feat: with trailer\n\nSigned-off-by: Dev <d@x.io>', tmpDir))
+            .toEqual({ valid: true, errors: [] });
+    });
+
+    it('still fails a "never" Signed-off-by rule', async () => {
+        fs.writeFileSync(path.join(tmpDir, '.commitlintrc.json'), JSON.stringify({
+            rules: { 'signed-off-by': [2, 'never', 'Signed-off-by:'] },
+        }));
+        const result = await CommitLintService.validate('feat: x\n\nSigned-off-by: Dev <d@x.io>', tmpDir);
+        expect(result.valid).toBe(false);
+        expect(result.signOffRequired).toBeUndefined();
     });
 
     it('validates body-min-length', async () => {

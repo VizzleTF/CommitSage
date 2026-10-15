@@ -448,8 +448,8 @@ describe('checkTrailerRule', () => {
         expect((await validateWith(rules, 'feat: x\n\nbody\n\nReviewed-by: A <a@x.io>')).valid).toBe(true);
     });
 
-    it('rulesToInstructions emits the trailer guidance line', async () => {
+    it('rulesToInstructions leaves the sign-off to git', async () => {
         const result = await instructionsFor({ 'signed-off-by': [2, 'always', 'Signed-off-by:'] });
-        expect(result).toContain('Signed-off-by:');
+        expect(result).not.toContain('Signed-off-by');
     });
 });

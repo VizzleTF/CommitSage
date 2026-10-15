@@ -110,11 +110,12 @@ function appendFooterInstructions(rules: CommitLintRules, lines: string[]): void
   }
 }
 
+// A sign-off certifies the human author, so the model is never asked for one:
+// `signed-off-by` is skipped and so is `trailer-exists` on a Signed-off-by trailer.
 function appendTrailerInstructions(rules: CommitLintRules, lines: string[]): void {
-  for (const ruleName of ['signed-off-by', 'trailer-exists'] as const) {
-    if (isErrorWith(rules, ruleName, 'always')) {
-      lines.push(`- End the message with a "${rules[ruleName][2] ?? 'Signed-off-by:'}" trailer line`);
-    }
+  const trailer = (rules['trailer-exists']?.[2] as string | undefined) ?? 'Signed-off-by:';
+  if (isErrorWith(rules, 'trailer-exists', 'always') && !/^signed-off-by\b/i.test(trailer)) {
+    lines.push(`- End the message with a "${trailer}" trailer line`);
   }
 }
 

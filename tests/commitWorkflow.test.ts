@@ -1,9 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import * as vscode from 'vscode';
 
-const { settings, generate, promptForKey, removeKey } = vi.hoisted(() => ({
+const { settings, generate, promptForKey, removeKey, commitChanges } = vi.hoisted(() => ({
     settings: {} as Record<string, unknown>,
     generate: vi.fn(),
+    commitChanges: vi.fn(),
     promptForKey: vi.fn(),
     removeKey: vi.fn(),
 }));
@@ -26,6 +27,7 @@ vi.mock('../src/services/gitService', () => ({
         getDiff: async () => 'diff',
         getExcludedPaths: async () => new Set(),
         hasHead: async () => false,
+        commitChanges,
     },
     isIndexStaged: () => false,
 }));
@@ -53,6 +55,7 @@ beforeEach(() => {
     generate.mockReset();
     promptForKey.mockReset();
     removeKey.mockReset();
+    commitChanges.mockReset();
     Object.assign(settings, {
         'provider.type': 'ollama',
         'ollama.useAuthToken': false,
@@ -87,5 +90,16 @@ describe('CommitWorkflow on a 401', () => {
         expect(removeKey).toHaveBeenCalledWith('ollama');
         expect(promptForKey).toHaveBeenCalledWith('ollama');
         expect(generate).toHaveBeenCalledTimes(2);
+    });
+});
+
+describe('CommitWorkflow auto-commit', () => {
+    it('asks git to sign off when the commitlint rules require it', async () => {
+        settings['commit.autoCommit'] = true;
+        generate.mockReset().mockResolvedValue({ message: 'feat: x', model: 'm', signOff: true });
+
+        await CommitWorkflow.generateAndSetCommitMessage();
+
+        expect(commitChanges).toHaveBeenCalledWith('feat: x', '/repo', true, true);
     });
 });

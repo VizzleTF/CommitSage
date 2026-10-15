@@ -1,6 +1,8 @@
 export interface CommitMessage {
     message: string;
     model: string;
+    /** The project's commitlint rules require a Signed-off-by trailer; git adds it, never the model. */
+    signOff?: boolean;
 }
 
 export interface ProgressReporter {
@@ -32,6 +34,8 @@ export interface CommitLintConfig {
 export interface CommitLintResult {
   valid: boolean;
   errors: string[];
+  /** A rule requires a Signed-off-by trailer; its error is left out of `errors`. */
+  signOffRequired?: boolean;
 }
 
 export interface ParsedCommit {

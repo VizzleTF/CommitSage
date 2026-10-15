@@ -42,6 +42,12 @@ process.stdin.on('end', () => {
         console.error('Please add rules to your commitlint config');
         process.exit(1);
     }
+    if (data.includes('unsigned')) {
+        console.log('✖   message must be signed off [signed-off-by]');
+        console.log('✖   message must have \`Signed-off-by:\` trailer [trailer-exists]');
+        console.log('✖   found 2 problems, 0 warnings');
+        process.exit(1);
+    }
     if (data.includes('bad')) {
         console.log('✖   type must be one of [feat, cli-only-rule] [type-enum]');
         console.log('✖   found 1 problems, 0 warnings');
@@ -127,6 +133,12 @@ describe('CommitLintService engine selection', () => {
         const result = await CommitLintService.validate('feat: contains bad word', tmpDir, undefined, { engine: 'project' });
         expect(result.valid).toBe(false);
         expect(result.errors[0]).toContain('cli-only-rule');
+    });
+
+    it('drops the CLI sign-off errors and flags the requirement', async () => {
+        installFakeCli(tmpDir);
+        const result = await CommitLintService.validate('feat: unsigned', tmpDir, undefined, { engine: 'project' });
+        expect(result).toEqual({ valid: true, errors: [], signOffRequired: true });
     });
 
     it('builtin engine never spawns the project CLI', async () => {

@@ -1,5 +1,5 @@
 import { ConfigService } from '../utils/configService';
-import { CommitMessage, ProgressReporter } from '../models/types';
+import { CommitLintResult, CommitMessage, ProgressReporter } from '../models/types';
 import { PromptService } from './promptService';
 import { TelemetryService } from './telemetryService';
 import { AIServiceFactory } from './aiServiceFactory';
@@ -97,9 +97,11 @@ export class AIService {
             format: commitFormat,
         };
         let attempt = 0;
+        let signOff = false;
 
         while (attempt < maxRetries) {
-            const { valid, errors } = await this.validateWithAutoFix(result, repoPath, rulesPath, commitFormat, lintOpts);
+            const { valid, errors, signOffRequired } = await this.validateWithAutoFix(result, repoPath, rulesPath, commitFormat, lintOpts);
+            signOff = signOff || signOffRequired === true;
 
             if (valid) {
                 break;
@@ -121,7 +123,7 @@ export class AIService {
             );
         }
 
-        return result;
+        return signOff ? { ...result, signOff } : result;
     }
 
     private static async validateWithAutoFix(
@@ -130,19 +132,19 @@ export class AIService {
         rulesPath: string,
         commitFormat: string,
         lintOpts: { engine: CommitLintEngine; signal?: AbortSignal; format: string }
-    ): Promise<{ valid: boolean; errors: string[] }> {
-        let { valid, errors } = await CommitLintService.validate(result.message, repoPath, rulesPath, lintOpts);
+    ): Promise<CommitLintResult> {
+        const lint = await CommitLintService.validate(result.message, repoPath, rulesPath, lintOpts);
 
-        if (!valid) {
+        if (!lint.valid) {
             // Mechanical violations (casing, trailing period, blank line)
             // are fixed in code to save an LLM round-trip.
             const fixed = CommitLintService.autoFix(result.message, repoPath, rulesPath, commitFormat);
             if (fixed !== result.message) {
                 result.message = fixed;
-                ({ valid, errors } = await CommitLintService.validate(fixed, repoPath, rulesPath, lintOpts));
+                return CommitLintService.validate(fixed, repoPath, rulesPath, lintOpts);
             }
         }
 
-        return { valid, errors };
+        return lint;
     }
 }

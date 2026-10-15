@@ -39,6 +39,21 @@ describe('extractAndValidateMessage: cleanup', () => {
     });
 });
 
+describe('extractAndValidateMessage: Signed-off-by', () => {
+    it('removes sign-off lines the model wrote', () => {
+        expect(extractAndValidateMessage('feat: x\n\nbody\n\nSigned-off-by: Bot <b@x.io>', 'Foo')).toBe('feat: x\n\nbody');
+        expect(extractAndValidateMessage('feat: x\r\n\r\n  signed-off-by: a\r\nRefs: #1', 'Foo')).toBe('feat: x\r\n\r\nRefs: #1');
+    });
+
+    it('keeps a mention that is not a trailer line', () => {
+        expect(extractAndValidateMessage('docs: explain the Signed-off-by: trailer', 'Foo')).toBe('docs: explain the Signed-off-by: trailer');
+    });
+
+    it('throws when only a sign-off is left', () => {
+        expect(() => extractAndValidateMessage('Signed-off-by: Bot <b@x.io>', 'Foo')).toThrow('Generated commit message is empty.');
+    });
+});
+
 describe('extractAndValidateMessage', () => {
     it('throws when content is undefined', () => {
         expect(() => extractAndValidateMessage(undefined, 'Foo')).toThrow(

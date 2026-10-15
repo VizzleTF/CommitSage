@@ -84,6 +84,17 @@ describe('GitService.commitChanges', () => {
         expect(calls.some((c) => c[0] === 'commit' && c[2] === 'feat: x')).toBe(true);
     });
 
+    it('passes --signoff only when asked', async () => {
+        const commits: string[][] = [];
+        installExecGit((args) => {
+            if (args[0] === 'commit') { commits.push(args); }
+            return args.join(' ') === 'diff --cached --name-only -z' ? 'a.txt\0' : '';
+        });
+        await GitService.commitChanges('feat: x', '/repo', false, true);
+        await GitService.commitChanges('feat: y', '/repo', false);
+        expect(commits).toEqual([['commit', '--signoff', '-m', 'feat: x'], ['commit', '-m', 'feat: y']]);
+    });
+
     it('rethrows and reports commit_failed when the commit command fails', async () => {
         installExecGit((args) => {
             if (args.join(' ') === 'diff --cached --name-only -z') {

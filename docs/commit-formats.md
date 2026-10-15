@@ -230,3 +230,9 @@ With `commitSage.commit.commitlint.enabled` and the `builtin` engine, the valida
 | `detailed` | no types; requires the `Summary:` line | 72 after `Summary: ` |
 
 For `conventional` and `angular`, the `builtin` engine also reads the repository's commitlint config. Validator settings are described in [configuration.md](configuration.md).
+
+## Signed-off-by
+
+The model never writes a `Signed-off-by` trailer: a sign-off certifies that a person wrote the change. Commit Sage removes such lines from the reply and does not ask the model for one, even when the commitlint rules require it (`signed-off-by`, or `trailer-exists` with `Signed-off-by:`). Such a rule does not trigger a retry.
+
+With `commitSage.commit.autoCommit` on and such a rule found by commitlint validation, Commit Sage commits with `git commit --signoff`, so git adds your `user.name` and `user.email`. For commits you make yourself in the Source Control view, turn on the VS Code setting `git.alwaysSignOff`.

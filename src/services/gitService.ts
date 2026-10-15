@@ -21,11 +21,13 @@ export class GitService {
    * `stageAll` is set by the workflow when the commit message was generated
    * from the *unstaged* worktree diff (nothing was staged at generation time).
    * Without it the commit would miss the unstaged edits the message describes.
+   * `signOff` lets git add the Signed-off-by trailer from user.name/user.email.
    */
   static async commitChanges(
     message: string,
     repoPath: string,
     stageAll: boolean,
+    signOff = false,
   ): Promise<void> {
     try {
       if (stageAll) {
@@ -41,7 +43,7 @@ export class GitService {
         throw new NoChangesDetectedError();
       }
 
-      await this.executeGitCommand(['commit', '-m', message], repoPath);
+      await this.executeGitCommand(['commit', ...(signOff ? ['--signoff'] : []), '-m', message], repoPath);
       Logger.log('Changes committed successfully');
 
       TelemetryService.sendEvent({

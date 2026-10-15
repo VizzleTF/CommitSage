@@ -77,4 +77,26 @@ describe('AIService commitlint gate', () => {
         expect(refinementPrompt).toHaveBeenCalledWith('feat: x', ['subject-case'], 'RULES');
         expect(generate).toHaveBeenCalledTimes(2);
     });
+
+    it('marks the message for git sign-off when a rule requires it', async () => {
+        settings['commit.commitFormat'] = 'conventional';
+        validate.mockResolvedValueOnce({ valid: true, errors: [], signOffRequired: true });
+
+        const result = await AIService.generateCommitMessage('/repo', 'diff', '', progress);
+
+        expect(result).toEqual({ message: 'feat: x', model: 'gpt-test', signOff: true });
+        expect(refinementPrompt).not.toHaveBeenCalled();
+    });
+
+    it('keeps the sign-off flag through a refinement', async () => {
+        settings['commit.commitFormat'] = 'conventional';
+        validate
+            .mockResolvedValueOnce({ valid: false, errors: ['subject-case'], signOffRequired: true })
+            .mockResolvedValueOnce({ valid: true, errors: [], signOffRequired: true });
+
+        const result = await AIService.generateCommitMessage('/repo', 'diff', '', progress);
+
+        expect(result.signOff).toBe(true);
+        expect(generate).toHaveBeenCalledTimes(2);
+    });
 });

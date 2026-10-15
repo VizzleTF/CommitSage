@@ -19,6 +19,22 @@ import { applyAutoFixes } from './commitlint/autoFix';
  */
 export type CommitLintEngine = 'project' | 'builtin';
 
+// "always" errors of `signed-off-by` / `trailer-exists` on Signed-off-by, from
+// the builtin engine ('must contain a "Signed-off-by:" trailer') and the CLI
+// ('must be signed off', 'must have `Signed-off-by:` trailer').
+const SIGN_OFF_REQUIRED = /^message must (?:be signed off|(?:contain a|have) .signed-off-by\b)/i;
+
+/**
+ * A sign-off certifies the human author, so the model never writes one and a
+ * rule requiring it must not trigger refinement. The flag lets autoCommit
+ * commit with `--signoff`, where git adds the real identity.
+ */
+function withoutSignOffErrors(result: CommitLintResult): CommitLintResult {
+  const errors = result.errors.filter(e => !SIGN_OFF_REQUIRED.test(e));
+  if (errors.length === result.errors.length) { return result; }
+  return { valid: errors.length === 0, errors, signOffRequired: true };
+}
+
 export interface CommitLintOptions {
   engine?: CommitLintEngine;
   signal?: AbortSignal;
@@ -102,7 +118,7 @@ class CommitLintService {
     const format = opts.format ?? 'conventional';
     const cliResult = await this.viaProject(opts, format, 'validator',
       () => CommitLintCliService.validate(message, repoPath, rulesPath, opts.signal));
-    const result = cliResult ?? this.validateBuiltin(message, repoPath, rulesPath, format);
+    const result = withoutSignOffErrors(cliResult ?? this.validateBuiltin(message, repoPath, rulesPath, format));
     const verdict = result.valid ? 'valid' : `invalid (${result.errors.length} errors: ${result.errors.join('; ')})`;
     Logger.log(`CommitLint: ${cliResult ? 'project CLI verdict' : `builtin verdict (${format})`} — ${verdict}`);
     return result;

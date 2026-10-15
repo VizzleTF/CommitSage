@@ -118,7 +118,11 @@ export function extractAndValidateMessage(
     }
     // Reasoning models (Ollama deepseek-r1/qwen3, OpenAI-compatible endpoints)
     // may inline their <think> blocks; a reply that is only thinking is empty.
-    const cleanMessage = content.replace(/<think>[\s\S]*?<\/think>/g, '').trim();
+    const cleanMessage = content
+        .replace(/<think>[\s\S]*?<\/think>/g, '')
+        // A sign-off certifies the human author; git adds it (--signoff), the model never does.
+        .replace(/^[ \t]*signed-off-by:.*(?:\r?\n|$)/gim, '')
+        .trim();
     if (!cleanMessage) {
         throw new Error('Generated commit message is empty.');
     }
