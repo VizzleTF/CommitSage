@@ -17,6 +17,25 @@ interface OllamaResponse {
 // `false` is safe for every model.
 const OLLAMA_THINKING_LADDER: ThinkingLadder = [{ think: false }];
 
+// Ollama's default window is 4096 tokens on machines with under 24 GiB of
+// VRAM, and an overflowing prompt loses its start: the format instructions.
+const OLLAMA_DEFAULT_CTX = 4096;
+// Room for the reply: a commit message plus some thinking. `num_predict` is
+// a ceiling (4096 by default), so reserving all of it would always overflow.
+const REPLY_RESERVE = 1024;
+
+/**
+ * The `num_ctx` to send when the user left `ollama.numCtx` at 0: undefined
+ * while the prompt fits the default window, otherwise the next power of two
+ * that holds it (~3 chars per token) plus room for the reply. Powers of two
+ * keep the number of distinct values low, since each change reloads the
+ * model; Ollama itself caps the value at the model's trained context.
+ */
+export function autoNumCtx(promptLength: number): number | undefined {
+    const needed = Math.ceil(promptLength / 3) + REPLY_RESERVE;
+    return needed <= OLLAMA_DEFAULT_CTX ? undefined : 2 ** Math.ceil(Math.log2(needed));
+}
+
 export class OllamaService {
     static async generateCommitMessage(
         prompt: string,
@@ -33,9 +52,9 @@ export class OllamaService {
             : undefined;
 
         return withRetryAndApiKeyGuard('Ollama', progress, async attempt => {
-            // Ollama nests sampling parameters under `options`. `num_ctx` and
-            // `temperature` stay conditional so Ollama keeps its own per-model
-            // defaults when the user hasn't overridden them; `num_predict` carries
+            // Ollama nests sampling parameters under `options`. `temperature`
+            // stays conditional so Ollama keeps its per-model default, and
+            // `num_ctx` is sent only when the prompt needs it; `num_predict` carries
             // the shared output budget, which local reasoning models also draw
             // their thinking from.
             const ollamaOptions: Record<string, unknown> = {};
@@ -44,8 +63,11 @@ export class OllamaService {
                 ollamaOptions.temperature = temperature;
             }
             ollamaOptions['num_predict'] = resolveMaxOutputTokens(options, attempt);
-            if (typeof numCtx === 'number' && numCtx > 0) {
-                ollamaOptions['num_ctx'] = numCtx;
+            const contextLength = typeof numCtx === 'number' && numCtx > 0
+                ? numCtx
+                : autoNumCtx(prompt.length);
+            if (contextLength !== undefined) {
+                ollamaOptions['num_ctx'] = contextLength;
             }
             const data = await sendWithThinkingLadder(`ollama|${apiUrl}|${model}`, OLLAMA_THINKING_LADDER, thinking =>
                 HttpUtils.postJson<OllamaResponse>(apiUrl, {

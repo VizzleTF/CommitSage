@@ -630,7 +630,7 @@
         "commitSage.ollama.numCtx": {
           "type": "number",
           "default": 0,
-          "markdownDescription": "Context window length passed to Ollama as `options.num_ctx`. **`0` (default) leaves the per-model Ollama default in place** — set explicitly only if your model's default is too small for your diffs (e.g. `8192`, `16384`, `32768`). Larger values use more RAM/VRAM.",
+          "markdownDescription": "Context window length passed to Ollama as `options.num_ctx`. **`0` (default) sizes it automatically:** nothing is sent while the prompt fits Ollama's default 4096-token window, otherwise the next power of two that holds the prompt (e.g. `8192`, `16384`). Set a value to pin it. Larger values use more RAM/VRAM.",
           "order": 17
         },
         "commitSage.openrouter.model": {

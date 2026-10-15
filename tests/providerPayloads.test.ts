@@ -260,6 +260,16 @@ describe('OllamaService payload', () => {
         SETTINGS['ollama.numCtx'] = 0;
     });
 
+    it('sizes num_ctx to a prompt that overflows the default window', async () => {
+        const { OllamaService } = await import('../src/services/ollamaService');
+        mockedPostJson.mockResolvedValueOnce({ message: { content: 'ok' } });
+
+        // 30k chars ≈ 10k tokens + reply room → next power of two
+        await OllamaService.generateCommitMessage('x'.repeat(30_000), progress);
+        const [, payload] = mockedPostJson.mock.calls[0];
+        expect((payload as { options: Record<string, unknown> }).options.num_ctx).toBe(16384);
+    });
+
     it('throws ApiKeyInvalidError on HTTP 401 (F037)', async () => {
         const { OllamaService } = await import('../src/services/ollamaService');
         const { ApiKeyInvalidError } = await import('../src/models/errors');
@@ -648,5 +658,15 @@ describe('truncated responses are rejected, not committed', () => {
 
         const result = await OllamaService.generateCommitMessage('hi', progress);
         expect(result.message).toBe('feat: ok');
+    });
+});
+
+describe('autoNumCtx', () => {
+    it('leaves prompts that fit the 4096 default alone and rounds larger ones up', async () => {
+        const { autoNumCtx } = await import('../src/services/ollamaService');
+        expect(autoNumCtx(0)).toBeUndefined();
+        expect(autoNumCtx(9_000)).toBeUndefined();
+        expect(autoNumCtx(9_300)).toBe(8192);
+        expect(autoNumCtx(100_000)).toBe(65536);
     });
 });

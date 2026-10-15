@@ -172,7 +172,7 @@ Models run by an Ollama server, on your machine or on another host.
 - Settings:
   - `ollama.baseUrl`: default `http://localhost:11434`.
   - `ollama.model`: default `llama3.2`.
-  - `ollama.numCtx`: default `0`. Context window sent to Ollama as `options.num_ctx`; `0` keeps the model's own default.
+  - `ollama.numCtx`: default `0`. Context window sent to Ollama as `options.num_ctx`; `0` sends nothing while the prompt fits Ollama's default 4096-token window and otherwise sizes it to the prompt, so a long diff does not push the instructions out of the window.
   - `ollama.useAuthToken`: default `false`. When `true`, the extension sends the stored token as a Bearer token.
 
 ## Custom (OpenAI-compatible)

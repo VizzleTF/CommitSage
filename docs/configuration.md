@@ -106,7 +106,7 @@ Each key applies only when `commitSage.provider.type` selects that provider.
 | `commitSage.ollama.baseUrl` | `string` | `"http://localhost:11434"` | Ollama server URL. |
 | `commitSage.ollama.model` | `string` | `"llama3.2"` | Ollama model name. The model must be installed on the server. |
 | `commitSage.ollama.useAuthToken` | `boolean` | `false` | Sends the auth token set with `Set Ollama Auth Token`. |
-| `commitSage.ollama.numCtx` | `number` | `0` | Context window passed to Ollama as `options.num_ctx`. `0` keeps the model's default. |
+| `commitSage.ollama.numCtx` | `number` | `0` | Context window passed to Ollama as `options.num_ctx`. `0` sends nothing while the prompt fits Ollama's default 4096-token window, otherwise the next power of two that holds the prompt. |
 | `commitSage.openrouter.model` | `string` | `"openrouter/free"` | OpenRouter model ID. |
 | `commitSage.openrouter.preferFreeModels` | `boolean` | `false` | Limits the model picker to free models (`:free` suffix or zero pricing). |
 | `commitSage.groq.model` | `string` | `"openai/gpt-oss-20b"` | Groq model ID. |

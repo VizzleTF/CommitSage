@@ -103,7 +103,7 @@ export function buildWebviewL10n() {
         geminiThinkingLevel: vscode.l10n.t('Thinking level (Gemini 3)'),
         geminiThinkingLevelHint: vscode.l10n.t('Gemini 3 always thinks. Higher levels cost more tokens and time; low is ample for commit messages.'),
         ollamaNumCtx: vscode.l10n.t('Context window (num_ctx)'),
-        ollamaNumCtxHint: vscode.l10n.t('Ollama context length. 0 = use model default. Larger values use more RAM/VRAM.'),
+        ollamaNumCtxHint: vscode.l10n.t('Ollama context length. 0 = sized to the prompt when it exceeds the 4096 default. Larger values use more RAM/VRAM.'),
         pinned: vscode.l10n.t('Pinned by .commitsage/config.json in this repo — change it there.'),
         providerLabels: PROVIDER_LABELS,
         liveSource: PROVIDER_LIVE_SOURCES,
