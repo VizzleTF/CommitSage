@@ -79,8 +79,6 @@ export async function fetchOpenAIModels(baseUrl: string, apiKey: string): Promis
 const CODESTRAL_KNOWN_MODELS = [
     'codestral-latest',
     'codestral-2508',
-    'codestral-2501',
-    'codestral-2405',
 ];
 
 export function fetchCodestralModels(): string[] {
