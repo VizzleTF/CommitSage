@@ -5,6 +5,7 @@ import { RetryUtils } from '../utils/retryUtils';
 import { toError } from '../utils/errorUtils';
 import { HttpError, NetworkError } from '../utils/httpUtils';
 import { ConfigService } from '../utils/configService';
+import { Logger } from '../utils/logger';
 
 /**
  * Shared LLM sampling temperature (`general.temperature`, default 0.7).
@@ -34,7 +35,7 @@ const MAX_BUDGET_DOUBLINGS = 3;
  * against the same budget: Gemini 2.5 Pro cannot disable thinking at all, and
  * the old hardcoded 1024 left ~40 tokens for the answer, truncating it (#447).
  */
-export function getConfiguredMaxOutputTokens(): number {
+function getConfiguredMaxOutputTokens(): number {
     const raw = ConfigService.get('general.maxOutputTokens');
     if (typeof raw !== 'number' || !Number.isFinite(raw) || raw <= 0) {
         return DEFAULT_MAX_OUTPUT_TOKENS;
@@ -54,39 +55,36 @@ export function resolveMaxOutputTokens(options?: GenerateOptions, attempt: numbe
 }
 
 /**
- * Wraps the per-attempt body of an HTTP-LLM provider with the shared
- * error-handling envelope: throw `ApiKeyInvalidError` on HTTP 401 (so
- * `commitWorkflow.handleInvalidApiKey` reprompts the user), otherwise
- * delegate to `RetryUtils.handleGenerationError` for retry/backoff
- * with `handleHttpError` as the mapper.
+ * Runs the per-attempt body of an HTTP-LLM provider inside the shared
+ * error-handling envelope: an invalid key (see `isInvalidApiKeyError`) throws
+ * `ApiKeyInvalidError` so `commitWorkflow.handleInvalidApiKey` reprompts the
+ * user; any other error goes to `RetryUtils.handleGenerationError`, which waits
+ * out the backoff or throws. `fn` gets the 1-based attempt so it can grow the
+ * output budget (`resolveMaxOutputTokens`).
  *
- * Used by OpenAI, Codestral, Gemini's single-model branch, and Ollama. Ollama
- * passes a custom `errorMapper` for its self-hosted 404/500/network wording;
- * everyone else gets the default `handleHttpError` mapping.
+ * Used by every provider except Gemini's auto mode. Ollama passes a custom
+ * `errorMapper` for its self-hosted 404/500/network wording; everyone else
+ * gets the default `handleHttpError` mapping.
  */
 export async function withRetryAndApiKeyGuard(
     name: string,
-    prompt: string,
     progress: ProgressReporter,
-    attempt: number,
-    retryFn: (prompt: string, progress: ProgressReporter, attempt: number) => Promise<CommitMessage>,
-    fn: () => Promise<CommitMessage>,
-    errorMapper?: (err: Error) => ApiErrorResult,
+    fn: (attempt: number) => Promise<CommitMessage>,
+    errorMapper: (err: Error) => ApiErrorResult = err => handleHttpError(err, `${name} API`),
 ): Promise<CommitMessage> {
-    try {
-        return await fn();
-    } catch (error) {
-        if (error instanceof HttpError && isInvalidApiKeyError(error)) {
-            throw new ApiKeyInvalidError(name);
+    for (let attempt = 1; ; attempt++) {
+        RetryUtils.updateProgressForAttempt(progress, attempt);
+        try {
+            const result = await fn(attempt);
+            progress.report({ message: 'Processing generated message...', increment: 90 });
+            Logger.log(`Commit message generated using ${result.model} model`);
+            return result;
+        } catch (error) {
+            if (error instanceof HttpError && isInvalidApiKeyError(error)) {
+                throw new ApiKeyInvalidError(name);
+            }
+            await RetryUtils.handleGenerationError(toError(error), progress, attempt, errorMapper);
         }
-        return RetryUtils.handleGenerationError(
-            toError(error),
-            prompt,
-            progress,
-            attempt,
-            retryFn,
-            errorMapper ?? ((err: Error) => handleHttpError(err, `${name} API`))
-        );
     }
 }
 
@@ -94,34 +92,21 @@ export async function withRetryAndApiKeyGuard(
  * Detect "invalid API key" across providers that don't all use HTTP 401.
  * - OpenAI/Anthropic/Groq/Codestral/OpenRouter/DeepSeek/Ollama → 401
  * - **xAI** → **400** with body `{"code":"Client specified an invalid argument",
- *   "error":"Incorrect API key provided: ..."}` — non-standard, but observed in
- *   production. Match on the message string rather than only the status.
+ *   "error":"Incorrect API key provided: ..."}`
+ * - **Gemini** → **400** with `{"error":{"message":"API key not valid. Please
+ *   pass a valid API key.","status":"INVALID_ARGUMENT"}}`
+ * Both 400s are non-standard, so match on the message rather than the status.
  */
 export function isInvalidApiKeyError(error: HttpError): boolean {
     if (error.status === 401) {
         return true;
     }
-    if (error.status === 400) {
-        const data = error.data;
-        const message =
-            typeof data === 'string'
-                ? data
-                : (data as { error?: string | { message?: string } } | undefined)?.error;
-        const messageText =
-            typeof message === 'string'
-                ? message
-                : message?.message ?? JSON.stringify(data);
-        return /incorrect api key|invalid api key|api key.*(?:invalid|expired|revoked)/i.test(messageText ?? '');
+    if (error.status !== 400) {
+        return false;
     }
-    return false;
-}
-
-export function validateCommitMessage(message: string): string {
-    const cleanMessage = message.trim();
-    if (!cleanMessage) {
-        throw new Error('Generated commit message is empty.');
-    }
-    return cleanMessage;
+    const data = error.data as HttpErrorData;
+    const text = extractErrorMessage(data) ?? (typeof data === 'string' ? data : JSON.stringify(data));
+    return /incorrect api key|invalid api key|api key not valid|api key.*(?:invalid|expired|revoked)/i.test(text ?? '');
 }
 
 export function extractAndValidateMessage(
@@ -131,7 +116,13 @@ export function extractAndValidateMessage(
     if (!content) {
         throw new Error(`Invalid response format from ${serviceName} API`);
     }
-    return validateCommitMessage(content);
+    // Reasoning models (Ollama deepseek-r1/qwen3, OpenAI-compatible endpoints)
+    // may inline their <think> blocks; a reply that is only thinking is empty.
+    const cleanMessage = content.replace(/<think>[\s\S]*?<\/think>/g, '').trim();
+    if (!cleanMessage) {
+        throw new Error('Generated commit message is empty.');
+    }
+    return cleanMessage;
 }
 
 type HttpErrorData =
@@ -144,26 +135,6 @@ function extractErrorMessage(data: HttpErrorData): string | undefined {
     return typeof rawError === 'string' ? rawError : rawError?.message;
 }
 
-function handle403(
-    status: number,
-    errorMessage: string | undefined,
-    data: HttpErrorData,
-): ApiErrorResult {
-    // xAI returns 403 when a team has no credits/licenses yet,
-    // with `error: "Your newly created team doesn't have any
-    // credits or licenses yet. ..."`. Surface that text directly
-    // so users see the purchase URL instead of a generic 403.
-    const text = errorMessage ?? (typeof data === 'string' ? data : '');
-    if (/credits or licenses/i.test(text)) {
-        return { errorMessage: text, shouldRetry: false, statusCode: status };
-    }
-    return {
-        errorMessage: text || errorMessages.authenticationError,
-        shouldRetry: false,
-        statusCode: status,
-    };
-}
-
 function handleHttpStatus(
     status: number,
     errorMessage: string | undefined,
@@ -174,8 +145,12 @@ function handleHttpStatus(
             return { errorMessage: errorMessages.authenticationError, shouldRetry: false, statusCode: status };
         case 402:
             return { errorMessage: errorMessages.paymentRequired, shouldRetry: false, statusCode: status };
-        case 403:
-            return handle403(status, errorMessage, data);
+        case 403: {
+            // xAI answers 403 with "... no credits or licenses yet" and a
+            // purchase link: the provider's own text beats a generic auth error.
+            const text = errorMessage ?? (typeof data === 'string' ? data : '');
+            return { errorMessage: text || errorMessages.authenticationError, shouldRetry: false, statusCode: status };
+        }
         case 429:
             return { errorMessage: errorMessages.rateLimitExceeded, shouldRetry: true, statusCode: status };
         case 422:

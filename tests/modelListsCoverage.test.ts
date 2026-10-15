@@ -9,40 +9,25 @@ vi.mock('../src/utils/httpUtils', async () => {
     return {
         ...actual,
         HttpUtils: {
+            createRequestHeaders: actual.HttpUtils.createRequestHeaders,
             stripTrailingSlashes: actual.HttpUtils.stripTrailingSlashes,
             getJson: mockedGetJson,
         },
     };
 });
 
-const { mockGetAvailableModels } = vi.hoisted(() => ({ mockGetAvailableModels: vi.fn() }));
-
-vi.mock('../src/services/geminiService', () => ({
-    GeminiService: { getAvailableModels: mockGetAvailableModels },
-}));
-
 import {
-    fetchGeminiModels,
     fetchOpenAIModels,
     fetchOllamaModels,
-    fetchOpenRouterModels,
-    fetchGroqModels,
-    fetchDeepSeekModels,
+    fetchOpenAICompatModels,
+    isFreeOpenRouterModel,
 } from '../src/services/modelLists';
+
+const bearer = (key: string): unknown =>
+    expect.objectContaining({ headers: expect.objectContaining({ Authorization: `Bearer ${key}` }) });
 
 beforeEach(() => {
     mockedGetJson.mockReset();
-    mockGetAvailableModels.mockReset();
-});
-
-describe('fetchGeminiModels', () => {
-    it('delegates to GeminiService.getAvailableModels', async () => {
-        mockGetAvailableModels.mockResolvedValue(['gemini-2.5-pro']);
-        const signal = new AbortController().signal;
-        const result = await fetchGeminiModels('key', signal);
-        expect(result).toEqual(['gemini-2.5-pro']);
-        expect(mockGetAvailableModels).toHaveBeenCalledWith('key', signal);
-    });
 });
 
 describe('fetchOpenAIModels ordering', () => {
@@ -57,7 +42,7 @@ describe('fetchOpenAIModels ordering', () => {
                 { id: '' },
             ],
         });
-        const result = await fetchOpenAIModels('key', 'https://api.openai.test');
+        const result = await fetchOpenAIModels('https://api.openai.test', 'key');
         // length desc: o1-mini (7) before the length-6 pair; within length 6,
         // lexicographic tiebreak puts gpt-4o before o3-pro.
         expect(result).toEqual(['gpt-4o-2024-08-06', 'o1-mini', 'gpt-4o', 'o3-pro']);
@@ -65,12 +50,12 @@ describe('fetchOpenAIModels ordering', () => {
 
     it('coerces an entry with no id to "" and drops it', async () => {
         mockedGetJson.mockResolvedValue({ data: [{}, { id: 'gpt-4o' }] });
-        expect(await fetchOpenAIModels('key', 'https://api.openai.test')).toEqual(['gpt-4o']);
+        expect(await fetchOpenAIModels('https://api.openai.test', 'key')).toEqual(['gpt-4o']);
     });
 
     it('handles a missing data array', async () => {
         mockedGetJson.mockResolvedValue({});
-        expect(await fetchOpenAIModels('key', 'https://api.openai.test')).toEqual([]);
+        expect(await fetchOpenAIModels('https://api.openai.test', 'key')).toEqual([]);
     });
 });
 
@@ -81,7 +66,7 @@ describe('fetchOllamaModels auth', () => {
         expect(result).toEqual(['llama3']);
         expect(mockedGetJson).toHaveBeenCalledWith(
             'http://localhost:11434/api/tags',
-            expect.objectContaining({ headers: { Authorization: 'Bearer tok' } }),
+            bearer('tok'),
         );
     });
 
@@ -106,7 +91,7 @@ describe('fetchOllamaModels auth', () => {
     });
 });
 
-describe('fetchOpenRouterModels', () => {
+describe('OpenRouter free-model filter', () => {
     it('filters to free models when preferFreeModels is true', async () => {
         mockedGetJson.mockResolvedValue({
             data: [
@@ -117,11 +102,11 @@ describe('fetchOpenRouterModels', () => {
                 {}, // no id -> coerced to '' and dropped
             ],
         });
-        const result = await fetchOpenRouterModels('key', true);
+        const result = await fetchOpenAICompatModels('https://openrouter.ai/api/v1', 'key', isFreeOpenRouterModel);
         expect(result).toEqual(['a/model:free', 'b/zero']);
         expect(mockedGetJson).toHaveBeenCalledWith(
             'https://openrouter.ai/api/v1/models',
-            expect.objectContaining({ headers: { Authorization: 'Bearer key' } }),
+            bearer('key'),
         );
     });
 
@@ -129,43 +114,31 @@ describe('fetchOpenRouterModels', () => {
         mockedGetJson.mockResolvedValue({
             data: [{ id: 'z/paid' }, { id: 'a/free:free' }, { id: 'a/free:free' }],
         });
-        const result = await fetchOpenRouterModels('key', false);
+        const result = await fetchOpenAICompatModels('https://openrouter.ai/api/v1', 'key');
         expect(result).toEqual(['a/free:free', 'z/paid']);
     });
 
     it('handles a missing data array', async () => {
         mockedGetJson.mockResolvedValue({});
-        expect(await fetchOpenRouterModels('key', true)).toEqual([]);
+        expect(await fetchOpenAICompatModels('https://openrouter.ai/api/v1', 'key', isFreeOpenRouterModel)).toEqual([]);
     });
 });
 
-describe('fetchGroqModels (OpenAI-compatible shape)', () => {
-    it('maps + dedupes + sorts model ids', async () => {
+describe('fetchOpenAICompatModels', () => {
+    it('maps + dedupes + sorts model ids from <baseUrl>/models', async () => {
         mockedGetJson.mockResolvedValue({
             data: [{ id: 'llama-3' }, { id: 'gemma' }, { id: 'llama-3' }, { id: '' }, {}],
         });
-        const result = await fetchGroqModels('key');
+        const result = await fetchOpenAICompatModels('https://api.groq.com/openai/v1', 'key');
         expect(result).toEqual(['gemma', 'llama-3']);
         expect(mockedGetJson).toHaveBeenCalledWith(
             'https://api.groq.com/openai/v1/models',
-            expect.objectContaining({ headers: { Authorization: 'Bearer key' } }),
-        );
-    });
-});
-
-describe('fetchDeepSeekModels (OpenAI-compatible shape)', () => {
-    it('requests the deepseek endpoint and returns sorted ids', async () => {
-        mockedGetJson.mockResolvedValue({ data: [{ id: 'deepseek-chat' }] });
-        const result = await fetchDeepSeekModels('key');
-        expect(result).toEqual(['deepseek-chat']);
-        expect(mockedGetJson).toHaveBeenCalledWith(
-            'https://api.deepseek.com/models',
-            expect.objectContaining({ headers: { Authorization: 'Bearer key' } }),
+            bearer('key'),
         );
     });
 
     it('handles a missing data array', async () => {
         mockedGetJson.mockResolvedValue({});
-        expect(await fetchDeepSeekModels('key')).toEqual([]);
+        expect(await fetchOpenAICompatModels('https://api.deepseek.com', 'key')).toEqual([]);
     });
 });

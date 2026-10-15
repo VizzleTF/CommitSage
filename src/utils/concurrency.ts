@@ -1,4 +1,10 @@
 /**
+ * Limit for per-file `git` subprocess fan-out: bounded without starving very
+ * small changesets — for ≤8 files the behaviour matches Promise.all.
+ */
+export const GIT_FANOUT_CONCURRENCY = 8;
+
+/**
  * Run an async mapper over `items` with at most `limit` operations in flight.
  * Preserves output order. If the mapper throws, the rejection propagates and
  * remaining items are still drained but their results are discarded.
@@ -6,9 +12,6 @@
  * If `signal` is supplied and aborts mid-run, workers stop pulling new items
  * (in-flight mappers complete or reject on their own) and the call rejects
  * with an `AbortError`-shaped error.
- *
- * Default limit (8) was chosen to keep `git` subprocess fan-out bounded without
- * starving very small changesets — for ≤8 files the behaviour matches Promise.all.
  */
 export async function mapLimit<T, R>(
     items: readonly T[],

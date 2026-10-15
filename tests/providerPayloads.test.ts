@@ -63,7 +63,7 @@ vi.mock('../src/utils/configService', () => ({
 
 vi.mock('../src/utils/retryUtils', () => ({
     RetryUtils: {
-        updateProgressForAttempt: vi.fn(async () => undefined),
+        updateProgressForAttempt: vi.fn(),
         handleGenerationError: vi.fn(async (err: Error) => {
             throw err;
         }),
@@ -88,7 +88,7 @@ describe('OpenAIService payload', () => {
             choices: [{ message: { content: 'feat: ok' } }],
         });
 
-        await generateViaOpenAICompatibleProvider('openai', 'hello', progress, 1, {
+        await generateViaOpenAICompatibleProvider('openai', 'hello', progress, {
             maxTokens: 4096,
         });
 
@@ -111,7 +111,7 @@ describe('OpenAIService payload', () => {
             choices: [{ message: { content: 'ok' } }],
         });
 
-        await generateViaOpenAICompatibleProvider('openai', 'hi', progress, 1);
+        await generateViaOpenAICompatibleProvider('openai', 'hi', progress);
         const [, payload] = mockedPostJson.mock.calls[0];
         expect(payload).toMatchObject({ max_completion_tokens: 4096 });
     });
@@ -131,7 +131,7 @@ describe('OpenAIService payload', () => {
                 } }))
                 .mockResolvedValue({ choices: [{ message: { content: 'feat: ok' } }] });
 
-            const result = await generateViaOpenAICompatibleProvider('custom', 'hi', progress, 1);
+            const result = await generateViaOpenAICompatibleProvider('custom', 'hi', progress);
             expect(result.message).toBe('feat: ok');
             const payloads = mockedPostJson.mock.calls.map((c) => c[1]);
             expect(payloads).toHaveLength(3);
@@ -142,7 +142,7 @@ describe('OpenAIService payload', () => {
             expect(payloads[2]).not.toHaveProperty('temperature');
 
             // Learned shape is reused: next request goes through in one call.
-            await generateViaOpenAICompatibleProvider('custom', 'hi', progress, 1);
+            await generateViaOpenAICompatibleProvider('custom', 'hi', progress);
             expect(mockedPostJson).toHaveBeenCalledTimes(4);
             expect(mockedPostJson.mock.calls[3][1]).toEqual(payloads[2]);
         } finally {
@@ -150,10 +150,21 @@ describe('OpenAIService payload', () => {
         }
     });
 
+    it('adds https:// to a base URL without a scheme', async () => {
+        SETTINGS['openai.baseUrl'] = ' api.example.com/v1 ';
+        try {
+            mockedPostJson.mockResolvedValueOnce({ choices: [{ message: { content: 'ok' } }] });
+            await generateViaOpenAICompatibleProvider('openai', 'hi', progress);
+            expect(mockedPostJson.mock.calls[0][0]).toBe('https://api.example.com/v1/chat/completions');
+        } finally {
+            SETTINGS['openai.baseUrl'] = 'https://api.openai.com/v1';
+        }
+    });
+
     it('does not loop on an unrelated 400', async () => {
         const { HttpError } = await import('../src/utils/httpUtils');
         mockedPostJson.mockRejectedValueOnce(new HttpError(400, { error: { message: 'bad prompt' } }));
-        await expect(generateViaOpenAICompatibleProvider('openai', 'hi', progress, 1)).rejects.toBeInstanceOf(HttpError);
+        await expect(generateViaOpenAICompatibleProvider('openai', 'hi', progress)).rejects.toBeInstanceOf(HttpError);
         expect(mockedPostJson).toHaveBeenCalledTimes(1);
     });
 });
@@ -165,7 +176,7 @@ describe('CodestralService payload', () => {
             choices: [{ message: { content: 'feat: ok' } }],
         });
 
-        await generateViaOpenAICompatibleProvider('codestral', 'hello', progress, 1);
+        await generateViaOpenAICompatibleProvider('codestral', 'hello', progress);
         expect(mockedPostJson).toHaveBeenCalledTimes(1);
         const [url, payload] = mockedPostJson.mock.calls[0];
         expect(url).toBe('https://codestral.mistral.ai/v1/chat/completions');
@@ -185,7 +196,7 @@ describe('CodestralService payload', () => {
             choices: [{ message: { content: 'ok' } }],
         });
 
-        await generateViaOpenAICompatibleProvider('codestral', 'hi', progress, 1, {
+        await generateViaOpenAICompatibleProvider('codestral', 'hi', progress, {
             maxTokens: 4096,
         });
         const [, payload] = mockedPostJson.mock.calls[0];
@@ -203,7 +214,7 @@ describe('OllamaService payload', () => {
             message: { content: 'feat: ok' },
         });
 
-        await OllamaService.generateCommitMessage('hello', progress, 1);
+        await OllamaService.generateCommitMessage('hello', progress);
         const [url, payload] = mockedPostJson.mock.calls[0];
         expect(url).toBe('http://localhost:11434/api/chat');
         expect(payload).toMatchObject({
@@ -223,7 +234,7 @@ describe('OllamaService payload', () => {
             message: { content: 'ok' },
         });
 
-        await OllamaService.generateCommitMessage('hi', progress, 1, {
+        await OllamaService.generateCommitMessage('hi', progress, {
             maxTokens: 4096,
         });
         const [, payload] = mockedPostJson.mock.calls[0];
@@ -240,7 +251,7 @@ describe('OllamaService payload', () => {
             message: { content: 'ok' },
         });
 
-        await OllamaService.generateCommitMessage('hi', progress, 1);
+        await OllamaService.generateCommitMessage('hi', progress);
         const [, payload] = mockedPostJson.mock.calls[0];
         expect(payload).toMatchObject({
             options: { num_ctx: 16384, temperature: 0.7 },
@@ -257,7 +268,7 @@ describe('OllamaService payload', () => {
         mockedPostJson.mockRejectedValueOnce(new HttpError(401, {}));
 
         await expect(
-            OllamaService.generateCommitMessage('hi', progress, 1)
+            OllamaService.generateCommitMessage('hi', progress)
         ).rejects.toBeInstanceOf(ApiKeyInvalidError);
     });
 });
@@ -270,7 +281,7 @@ describe('GeminiService request', () => {
             candidates: [{ content: { parts: [{ text: 'feat: ok' }] } }],
         });
 
-        await GeminiService.generateCommitMessage('hello', progress, 1);
+        await GeminiService.generateCommitMessage('hello', progress);
 
         const [url, , opts] = mockedPostJson.mock.calls[0];
         expect(typeof url).toBe('string');
@@ -289,7 +300,7 @@ describe('AbortSignal propagation (F004)', () => {
         });
 
         const ctrl = new AbortController();
-        await generateViaOpenAICompatibleProvider('openai', 'hi', progress, 1, {
+        await generateViaOpenAICompatibleProvider('openai', 'hi', progress, {
             signal: ctrl.signal,
         });
 
@@ -303,7 +314,7 @@ describe('AbortSignal propagation (F004)', () => {
         });
 
         const ctrl = new AbortController();
-        await generateViaOpenAICompatibleProvider('codestral', 'hi', progress, 1, {
+        await generateViaOpenAICompatibleProvider('codestral', 'hi', progress, {
             signal: ctrl.signal,
         });
 
@@ -318,7 +329,7 @@ describe('AbortSignal propagation (F004)', () => {
         });
 
         const ctrl = new AbortController();
-        await OllamaService.generateCommitMessage('hi', progress, 1, {
+        await OllamaService.generateCommitMessage('hi', progress, {
             signal: ctrl.signal,
         });
 
@@ -333,7 +344,7 @@ describe('AbortSignal propagation (F004)', () => {
         });
 
         const ctrl = new AbortController();
-        await GeminiService.generateCommitMessage('hi', progress, 1, {
+        await GeminiService.generateCommitMessage('hi', progress, {
             signal: ctrl.signal,
         });
 
@@ -349,7 +360,7 @@ describe('GroqService payload', () => {
             choices: [{ message: { content: 'feat: ok' } }],
         });
 
-        await generateViaOpenAICompatibleProvider('groq', 'hello', progress, 1);
+        await generateViaOpenAICompatibleProvider('groq', 'hello', progress);
 
         const [url, payload, opts] = mockedPostJson.mock.calls[0];
         expect(url).toBe('https://api.groq.com/openai/v1/chat/completions');
@@ -370,7 +381,7 @@ describe('OpenRouterService payload', () => {
             choices: [{ message: { content: 'feat: ok' } }],
         });
 
-        await generateViaOpenAICompatibleProvider('openrouter', 'hello', progress, 1);
+        await generateViaOpenAICompatibleProvider('openrouter', 'hello', progress);
 
         const [url, payload, opts] = mockedPostJson.mock.calls[0];
         expect(url).toBe('https://openrouter.ai/api/v1/chat/completions');
@@ -391,7 +402,7 @@ describe('DeepSeekService payload', () => {
             choices: [{ message: { content: 'feat: ok' } }],
         });
 
-        await generateViaOpenAICompatibleProvider('deepseek', 'hello', progress, 1);
+        await generateViaOpenAICompatibleProvider('deepseek', 'hello', progress);
 
         const [url, payload] = mockedPostJson.mock.calls[0];
         expect(url).toBe('https://api.deepseek.com/chat/completions');
@@ -406,7 +417,7 @@ describe('XaiService payload', () => {
             choices: [{ message: { content: 'feat: ok' } }],
         });
 
-        await generateViaOpenAICompatibleProvider('xai', 'hello', progress, 1);
+        await generateViaOpenAICompatibleProvider('xai', 'hello', progress);
 
         const [url, payload] = mockedPostJson.mock.calls[0];
         expect(url).toBe('https://api.x.ai/v1/chat/completions');
@@ -423,7 +434,7 @@ describe('fetchXaiModels fallback', () => {
             new HttpError(403, { error: "Your newly created team doesn't have any credits or licenses yet." }),
         );
 
-        const models = await fetchXaiModels('test-key');
+        const models = await fetchXaiModels('https://api.x.ai/v1', 'test-key');
         expect(models.length).toBeGreaterThan(0);
         expect(models).toContain('grok-3-mini');
     });
@@ -435,7 +446,7 @@ describe('fetchXaiModels fallback', () => {
             data: [{ id: 'grok-future-1' }, { id: 'grok-future-2' }],
         });
 
-        const models = await fetchXaiModels('test-key');
+        const models = await fetchXaiModels('https://api.x.ai/v1', 'test-key');
         expect(models).toEqual(['grok-future-1', 'grok-future-2']);
     });
 });
@@ -448,7 +459,7 @@ describe('AnthropicService payload', () => {
             content: [{ type: 'text', text: 'feat: ok' }],
         });
 
-        await AnthropicService.generateCommitMessage('hello', progress, 1);
+        await AnthropicService.generateCommitMessage('hello', progress);
 
         const [url, payload, opts] = mockedPostJson.mock.calls[0];
         expect(url).toBe('https://api.anthropic.com/v1/messages');
@@ -470,7 +481,7 @@ describe('AnthropicService payload', () => {
             content: [{ type: 'text', text: 'fix: bug squashed' }],
         });
 
-        const result = await AnthropicService.generateCommitMessage('hi', progress, 1);
+        const result = await AnthropicService.generateCommitMessage('hi', progress);
         expect(result.message).toBe('fix: bug squashed');
         expect(result.model).toBe('claude-sonnet-4-5-20250929');
     });
@@ -483,7 +494,7 @@ describe('AnthropicService payload', () => {
         mockedPostJson.mockRejectedValueOnce(new HttpError(401, {}));
 
         await expect(
-            AnthropicService.generateCommitMessage('hi', progress, 1)
+            AnthropicService.generateCommitMessage('hi', progress)
         ).rejects.toBeInstanceOf(ApiKeyInvalidError);
     });
 });
@@ -496,7 +507,7 @@ describe('CustomOpenAIService payload', () => {
             choices: [{ message: { content: 'feat: ok' } }],
         });
 
-        await generateViaOpenAICompatibleProvider('custom', 'hello', progress, 1);
+        await generateViaOpenAICompatibleProvider('custom', 'hello', progress);
 
         const [url, payload, opts] = mockedPostJson.mock.calls[0];
         expect(url).toBe('http://localhost:1234/v1/chat/completions');
@@ -512,7 +523,7 @@ describe('CustomOpenAIService payload', () => {
             choices: [{ message: { content: 'feat: ok' } }],
         });
 
-        await generateViaOpenAICompatibleProvider('custom', 'hello', progress, 1);
+        await generateViaOpenAICompatibleProvider('custom', 'hello', progress);
 
         const [, , opts] = mockedPostJson.mock.calls[0];
         const headers = (opts as { headers: Record<string, string> }).headers;
@@ -529,7 +540,7 @@ describe('CustomOpenAIService payload', () => {
             choices: [{ message: { content: 'ok' } }],
         });
 
-        await generateViaOpenAICompatibleProvider('custom', 'hi', progress, 1);
+        await generateViaOpenAICompatibleProvider('custom', 'hi', progress);
 
         const [url] = mockedPostJson.mock.calls[0];
         expect(url).toBe('http://localhost:1234/v1/v1/completions');
@@ -549,7 +560,7 @@ describe('truncated responses are rejected, not committed', () => {
         });
 
         await expect(
-            generateViaOpenAICompatibleProvider('openai', 'hi', progress, 1)
+            generateViaOpenAICompatibleProvider('openai', 'hi', progress)
         ).rejects.toBeInstanceOf(TruncatedResponseError);
     });
 
@@ -558,7 +569,7 @@ describe('truncated responses are rejected, not committed', () => {
             choices: [{ message: { content: 'feat: ok' }, finish_reason: 'stop' }],
         });
 
-        const result = await generateViaOpenAICompatibleProvider('openai', 'hi', progress, 1);
+        const result = await generateViaOpenAICompatibleProvider('openai', 'hi', progress);
         expect(result.message).toBe('feat: ok');
     });
 
@@ -571,7 +582,7 @@ describe('truncated responses are rejected, not committed', () => {
         });
 
         await expect(
-            AnthropicService.generateCommitMessage('hi', progress, 1)
+            AnthropicService.generateCommitMessage('hi', progress)
         ).rejects.toBeInstanceOf(TruncatedResponseError);
     });
 
@@ -584,7 +595,7 @@ describe('truncated responses are rejected, not committed', () => {
         });
 
         await expect(
-            OllamaService.generateCommitMessage('hi', progress, 1)
+            OllamaService.generateCommitMessage('hi', progress)
         ).rejects.toBeInstanceOf(TruncatedResponseError);
     });
 
@@ -595,7 +606,7 @@ describe('truncated responses are rejected, not committed', () => {
             done_reason: 'stop',
         });
 
-        const result = await OllamaService.generateCommitMessage('hi', progress, 1);
+        const result = await OllamaService.generateCommitMessage('hi', progress);
         expect(result.message).toBe('feat: ok');
     });
 });

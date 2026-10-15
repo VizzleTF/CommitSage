@@ -33,7 +33,7 @@ class CommitLintCliService {
   /**
    * Both public entry points spawn `node <repo>/node_modules/.../commitlint`
    * and let it `require()` the repo's own config — arbitrary code execution by
-   * design. The caller (`CommitLintService.useProjectEngine`) checks trust
+   * design. The caller (`CommitLintService.viaProject`) checks trust
    * already; this repeats the check at the sink so a future caller cannot
    * reintroduce RCE by forgetting it.
    */
@@ -95,20 +95,8 @@ class CommitLintCliService {
     rulesPath?: string,
     signal?: AbortSignal,
   ): Promise<CommitLintResult | null> {
-    if (!this.isExecutionAllowed()) { return null; }
-
-    const cliPath = this.detect(repoPath);
-    if (!cliPath) { return null; }
-
-    const args = ['--color', 'false', ...this.configArgs(repoPath, rulesPath)];
-    const res = await this.run(cliPath, args, message, repoPath, signal);
-
-    if (signal?.aborted) {
-      // The abort killed the child, which surfaces as exitCode === null — the
-      // same shape as "no usable CLI". Without this the run would degrade to
-      // the builtin validator and keep going after the user cancelled.
-      throw new UserCancelledError('CommitLint validation was cancelled');
-    }
+    const res = await this.exec(repoPath, rulesPath, [], message, signal, 'validation');
+    if (!res) { return null; }
     if (res.timedOut || res.exitCode === null) {
       Logger.warn(`CommitLint: project CLI ${res.timedOut ? 'timed out' : 'failed to run'} — falling back to builtin validator`);
       return null;
@@ -140,17 +128,8 @@ class CommitLintCliService {
     rulesPath?: string,
     signal?: AbortSignal,
   ): Promise<CommitLintRules | null> {
-    if (!this.isExecutionAllowed()) { return null; }
-
-    const cliPath = this.detect(repoPath);
-    if (!cliPath) { return null; }
-
-    const args = ['--print-config=json', '--color', 'false', ...this.configArgs(repoPath, rulesPath)];
-    const res = await this.run(cliPath, args, undefined, repoPath, signal);
-    if (signal?.aborted) {
-      throw new UserCancelledError('CommitLint rule resolution was cancelled');
-    }
-    if (res.timedOut || res.exitCode !== 0) { return null; }
+    const res = await this.exec(repoPath, rulesPath, ['--print-config=json'], undefined, signal, 'rule resolution');
+    if (!res || res.timedOut || res.exitCode !== 0) { return null; }
 
     try {
       const config = JSON.parse(res.stdout) as { rules?: CommitLintRules };
@@ -160,9 +139,34 @@ class CommitLintCliService {
     }
   }
 
-  private static configArgs(repoPath: string, rulesPath?: string): string[] {
+  /**
+   * Shared preamble: trust check, CLI lookup, run. Null when the CLI can't be
+   * used. Throws UserCancelledError on abort: the killed child surfaces as
+   * exitCode === null — the same shape as "no usable CLI" — so without this the
+   * run would degrade to the builtin engine and keep going after the cancel.
+   */
+  private static async exec(
+    repoPath: string,
+    rulesPath: string | undefined,
+    args: string[],
+    stdin: string | undefined,
+    signal: AbortSignal | undefined,
+    what: string,
+  ): Promise<CliRunResult | null> {
+    if (!this.isExecutionAllowed()) { return null; }
+
+    const cliPath = this.detect(repoPath);
+    if (!cliPath) { return null; }
+
     const abs = toAbsoluteRulesPath(repoPath, rulesPath);
-    return abs ? ['--config', abs] : [];
+    // An already-aborted signal never fires 'abort', so don't spawn at all.
+    const res = signal?.aborted
+      ? null
+      : await this.run(cliPath, [...args, '--color', 'false', ...(abs ? ['--config', abs] : [])], stdin, repoPath, signal);
+    if (signal?.aborted) {
+      throw new UserCancelledError(`CommitLint ${what} was cancelled`);
+    }
+    return res;
   }
 
   private static run(

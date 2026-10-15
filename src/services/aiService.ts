@@ -2,19 +2,12 @@ import { ConfigService } from '../utils/configService';
 import { CommitMessage, ProgressReporter } from '../models/types';
 import { PromptService } from './promptService';
 import { TelemetryService } from './telemetryService';
-import { errorMessages } from '../utils/constants';
-import { removeThinkTags } from '../utils/textProcessing';
 import { AIServiceFactory } from './aiServiceFactory';
-import { truncateDiff } from '../utils/diffTruncation';
+import { capBlameAnalysis, resolveMaxDiffLength, truncateDiff } from '../utils/diffTruncation';
 import { Provider } from '../views/webview/protocol';
 import { CommitLintService, CommitLintEngine } from './commitLintService';
 import { Logger } from '../utils/logger';
-
-// Fallback if `general.maxDiffSize` is unreadable. ~100k chars covers most
-// diffs while staying within safe LLM API context window limits for major
-// providers. Tighter caps (e.g. ~20k chars) are needed for low-TPM free
-// tiers like Groq free — see the setting's description for guidance.
-const DEFAULT_MAX_DIFF_LENGTH = 100000;
+import { formatSupportsCommitlint } from '../utils/constants';
 
 interface GenerateContext {
     fileCount?: number;
@@ -30,14 +23,10 @@ export class AIService {
         progress: ProgressReporter,
         context: GenerateContext = {}
     ): Promise<CommitMessage> {
-        if (!diff) {
-            throw new Error(errorMessages.noChanges);
-        }
-
         const provider = ConfigService.getProvider();
         const model = ConfigService.getModel();
         const language = ConfigService.get('commit.commitLanguage');
-        const maxDiffLength = this.resolveMaxDiffLength();
+        const maxDiffLength = resolveMaxDiffLength(ConfigService.get('general.maxDiffSize'));
         const diffSize = diff.length;
         const truncated = diffSize > maxDiffLength;
 
@@ -51,30 +40,28 @@ export class AIService {
         });
 
         const startTime = Date.now();
+        const commitFormat = ConfigService.get('commit.commitFormat');
+        const commitlintEnabled = ConfigService.get('commit.commitlint.enabled') && formatSupportsCommitlint(commitFormat);
+        // Extracted once per generation: the prompt and every refinement share
+        // them, and the project engine spawns a CLI for each extraction.
+        const rules = commitlintEnabled ? await PromptService.loadRules(repoPath, commitFormat, context.signal) : '';
+
         const truncatedDiff = truncateDiff(diff, maxDiffLength);
-        const prompt = await PromptService.generatePrompt(repoPath, truncatedDiff, blameAnalysis, progress);
+        const prompt = await PromptService.generatePrompt(
+            repoPath, truncatedDiff, capBlameAnalysis(blameAnalysis, maxDiffLength), progress, rules,
+        );
 
         progress.report({ message: 'Generating commit message...', increment: 50 });
 
-        const serviceType = provider as Provider;
         let result = await AIServiceFactory.generateCommitMessage(
-            serviceType,
+            provider,
             prompt,
             progress,
-            undefined,
             { signal: context.signal }
         );
 
-        result.message = removeThinkTags(result.message);
-
-        const commitFormat = ConfigService.get('commit.commitFormat');
-        // Validation never applies to free-form custom prompts or the
-        // history-driven `previous` format (neither has a fixed structure).
-        const commitlintEnabled = ConfigService.get('commit.commitlint.enabled')
-            && commitFormat !== 'custom'
-            && commitFormat !== 'previous';
         if (commitlintEnabled) {
-            result = await this.applyCommitLint(result, repoPath, commitFormat, serviceType, progress, context);
+            result = await this.applyCommitLint(result, repoPath, commitFormat, rules, provider, progress, context);
         }
 
         TelemetryService.sendEvent({
@@ -92,20 +79,21 @@ export class AIService {
         result: CommitMessage,
         repoPath: string,
         commitFormat: string,
-        serviceType: Provider,
+        rules: string,
+        provider: Provider,
         progress: ProgressReporter,
         context: GenerateContext
     ): Promise<CommitMessage> {
         const maxRetries = ConfigService.get('commit.commitlint.maxRetries');
+        const rulesPath = ConfigService.get('commit.commitlint.rulesPath');
+        const lintOpts = {
+            engine: ConfigService.get('commit.commitlint.engine') as CommitLintEngine,
+            signal: context.signal,
+            format: commitFormat,
+        };
         let attempt = 0;
 
         while (attempt < maxRetries) {
-            const rulesPath = ConfigService.get('commit.commitlint.rulesPath');
-            const lintOpts = {
-                engine: ConfigService.get('commit.commitlint.engine') as CommitLintEngine,
-                signal: context.signal,
-                format: commitFormat,
-            };
             const { valid, errors } = await this.validateWithAutoFix(result, repoPath, rulesPath, commitFormat, lintOpts);
 
             if (valid) {
@@ -120,16 +108,12 @@ export class AIService {
 
             progress.report({ message: `CommitLint validation failed, refining… (${attempt}/${maxRetries})`, increment: 10 });
 
-            const refinementPrompt = await PromptService.generateRefinementPrompt(repoPath, result.message, errors, progress);
-            const refined = await AIServiceFactory.generateCommitMessage(
-                serviceType,
-                refinementPrompt,
+            result = await AIServiceFactory.generateCommitMessage(
+                provider,
+                PromptService.generateRefinementPrompt(result.message, errors, rules),
                 progress,
-                undefined,
                 { signal: context.signal }
             );
-
-            result = { ...refined, message: removeThinkTags(refined.message) };
         }
 
         return result;
@@ -155,23 +139,5 @@ export class AIService {
         }
 
         return { valid, errors };
-    }
-
-    /**
-     * Read `general.maxDiffSize` and clamp to a sane range. `-1` disables
-     * truncation (sends the whole diff regardless of size — only useful with
-     * very-long-context models). Anything else is clamped to [1000, 1_000_000]
-     * so a hand-edited project config can't either send an empty prompt or
-     * overflow JSON.stringify.
-     */
-    private static resolveMaxDiffLength(): number {
-        const raw = ConfigService.get('general.maxDiffSize');
-        if (raw === -1) {
-            return Number.POSITIVE_INFINITY;
-        }
-        if (typeof raw !== 'number' || !Number.isFinite(raw) || raw <= 0) {
-            return DEFAULT_MAX_DIFF_LENGTH;
-        }
-        return Math.max(1000, Math.min(1_000_000, raw));
     }
 }

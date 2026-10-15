@@ -18,7 +18,6 @@
     "workspace"
   ],
   "activationEvents": [
-    "onCommand:commitsage.generateCommitMessage",
     "onUri"
   ],
   "categories": [
@@ -39,6 +38,17 @@
   "icon": "icon.png",
   "main": "./dist/extension.js",
   "l10n": "./l10n",
+  "files": [
+    "dist/extension.js",
+    "dist/webview/main.js",
+    "dist/webview/styles.css",
+    "icon.png",
+    "icons/*.svg",
+    "walkthroughs/*.md",
+    "l10n/bundle.l10n.json",
+    "package.nls.json",
+    "LICENSE"
+  ],
   "capabilities": {
     "virtualWorkspaces": {
       "supported": false,
@@ -438,7 +448,7 @@
         "commitSage.commit.commitlint.enabled": {
           "type": "boolean",
           "default": false,
-          "markdownDescription": "Validate the generated message against the rules of the selected `#commitSage.commit.commitFormat#`, auto-fix mechanical violations and retry with the LLM when needed (up to `#commitSage.commit.commitlint.maxRetries#` times). Has no effect with the `custom` format and is switched off automatically when `custom` is selected.",
+          "markdownDescription": "Validate the generated message against the rules of the selected `#commitSage.commit.commitFormat#`, auto-fix mechanical violations and retry with the LLM when needed (up to `#commitSage.commit.commitlint.maxRetries#` times). Has no effect with the `custom` and `previous` formats.",
           "order": 9
         },
         "commitSage.commit.commitlint.maxRetries": {
@@ -472,7 +482,7 @@
         "commitSage.commit.onlyStagedChanges": {
           "type": "boolean",
           "default": false,
-          "markdownDescription": "Generate commit message only for staged changes.\n\n- **Disabled (default):** commits staged changes if present, otherwise commits all tracked changes.\n- **Enabled:** ignores unstaged work entirely.",
+          "markdownDescription": "Generate commit message only for staged changes.\n\n- **Disabled (default):** staged changes if present, otherwise all changes including untracked files (auto-commit stages them with `git add -A`).\n- **Enabled:** ignores unstaged work entirely.",
           "order": 7
         },
         "commitSage.commit.autoCommit": {
@@ -662,7 +672,7 @@
         "commitSage.general.maxDiffSize": {
           "type": "number",
           "default": 100000,
-          "markdownDescription": "Maximum diff size in characters sent to the LLM. Larger diffs are truncated with a `...(truncated)` marker. **Set to `-1` to disable truncation (sends the entire diff — only safe with long-context models).** Clamped to the range `[1000, 1000000]`.\n\n**Tighten this for low-TPM free tiers:**\n- **Groq free tier (6000 TPM)** — set to ~`20000` (~5000 tokens for the diff + room for prompt/response).\n- **OpenRouter free (20 RPM / 50 RPD)** — `40000` typically fine.\n- **Gemini / Anthropic / DeepSeek paid** — default `100000` is fine.\n\nRule of thumb: 1 token ≈ 4 chars, so `100000` chars ≈ 25000 tokens.",
+          "markdownDescription": "Maximum diff size in characters sent to the LLM. Larger diffs are truncated with a `...(truncated)` marker. **Set to `-1` to disable truncation (sends the entire diff — only safe with long-context models); one file's diff is still cut at 1,000,000 characters.** Clamped to the range `[1000, 1000000]`.\n\n**Tighten this for low-TPM free tiers:**\n- **Groq free tier (6000 TPM)** — set to ~`20000` (~5000 tokens for the diff + room for prompt/response).\n- **OpenRouter free (20 RPM / 50 RPD)** — `40000` typically fine.\n- **Gemini / Anthropic / DeepSeek paid** — default `100000` is fine.\n\nRule of thumb: 1 token ≈ 4 chars, so `100000` chars ≈ 25000 tokens.",
           "order": 19
         },
         "commitSage.apiRequestTimeout": {
@@ -747,7 +757,6 @@
     "@vscode/test-cli": "^0.0.15",
     "@vscode/test-electron": "^3.1.0",
     "@vscode/vsce": "^4.0.0",
-    "dotenv": "^18.0.7",
     "esbuild": "^0.28.2",
     "eslint": "^10.11.0",
     "eslint-import-resolver-typescript": "^4.4.5",
@@ -762,8 +771,7 @@
     "vitest": "^5.0.2"
   },
   "dependencies": {
-    "@amplitude/analytics-node": "^1.5.79",
-    "@amplitude/analytics-types": "^2.11.1"
+    "@amplitude/analytics-node": "^1.5.79"
   },
   "overrides": {
     "serialize-javascript": "^7.0.5",

@@ -98,6 +98,10 @@ export class Uri {
         return { fsPath: p };
     }
 
+    static joinPath(base: { fsPath: string }, ...segments: string[]) {
+        return Uri.file([base.fsPath, ...segments].join('/'));
+    }
+
     // Minimal URI parse adequate for the OAuth callback round-trip:
     // splits scheme://authority/path?query and round-trips toString().
     static parse(value: string) {
@@ -116,6 +120,8 @@ export class Uri {
 }
 
 export const ProgressLocation = { Notification: 15 };
+
+export const ConfigurationTarget = { Global: 1, Workspace: 2, WorkspaceFolder: 3 };
 
 export const l10n = {
     t: (message: string, ...args: Array<string | number | boolean>): string => {
@@ -143,6 +149,7 @@ export default {
     commands,
     Uri,
     ProgressLocation,
+    ConfigurationTarget,
     EventEmitter,
     l10n,
 };

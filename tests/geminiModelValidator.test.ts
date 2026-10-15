@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 const {
     mockGet, mockGetOptionalKey, mockGetAvailableModels,
-    mockShowWarning, mockExecuteCommand, mockUpdate, mockGetConfiguration,
+    mockShowWarning, mockExecuteCommand, mockSet,
     mockLog,
 } = vi.hoisted(() => ({
     mockGet: vi.fn(),
@@ -10,8 +10,7 @@ const {
     mockGetAvailableModels: vi.fn(),
     mockShowWarning: vi.fn(),
     mockExecuteCommand: vi.fn(),
-    mockUpdate: vi.fn(),
-    mockGetConfiguration: vi.fn(),
+    mockSet: vi.fn(),
     mockLog: vi.fn(),
 }));
 
@@ -19,12 +18,10 @@ vi.mock('vscode', () => ({
     l10n: { t: (msg: string, ...args: Array<string | number>) => msg.replace(/\{(\d+)\}/g, (_, i) => String(args[Number(i)])) },
     window: { showWarningMessage: mockShowWarning },
     commands: { executeCommand: mockExecuteCommand },
-    workspace: { getConfiguration: mockGetConfiguration },
-    ConfigurationTarget: { Global: 1 },
 }));
 
 vi.mock('../src/utils/configService', () => ({
-    ConfigService: { get: mockGet },
+    ConfigService: { get: mockGet, set: mockSet },
 }));
 
 vi.mock('../src/services/apiKeyManager', () => ({
@@ -43,7 +40,6 @@ import { validateGeminiModelOnStartup } from '../src/services/geminiModelValidat
 
 beforeEach(() => {
     vi.clearAllMocks();
-    mockGetConfiguration.mockReturnValue({ update: mockUpdate });
     mockGet.mockImplementation((k: string) => {
         if (k === 'provider.type') return 'gemini';
         if (k === 'gemini.model') return 'gemini-old';
@@ -101,13 +97,13 @@ describe('validateGeminiModelOnStartup prompt actions', () => {
         mockShowWarning.mockResolvedValue('Pick a model');
         await validateGeminiModelOnStartup();
         expect(mockExecuteCommand).toHaveBeenCalledWith('commitsage.settings.focus');
-        expect(mockUpdate).not.toHaveBeenCalled();
+        expect(mockSet).not.toHaveBeenCalled();
     });
 
     it('switches the model to auto when the user picks "Switch to auto"', async () => {
         mockShowWarning.mockResolvedValue('Switch to auto');
         await validateGeminiModelOnStartup();
-        expect(mockUpdate).toHaveBeenCalledWith('commitSage.gemini.model', 'auto', 1);
+        expect(mockSet).toHaveBeenCalledWith('gemini.model', 'auto');
         expect(mockExecuteCommand).not.toHaveBeenCalled();
     });
 
@@ -115,6 +111,6 @@ describe('validateGeminiModelOnStartup prompt actions', () => {
         mockShowWarning.mockResolvedValue(undefined);
         await validateGeminiModelOnStartup();
         expect(mockExecuteCommand).not.toHaveBeenCalled();
-        expect(mockUpdate).not.toHaveBeenCalled();
+        expect(mockSet).not.toHaveBeenCalled();
     });
 });

@@ -40,6 +40,53 @@ describe('preserveFocus', () => {
         expect(next.selectionEnd).toBe(3);
     });
 
+    it('keeps unsaved text when the pushed state carries a different value', () => {
+        const input = mountInput('x', 'saved');
+        input.focus();
+        input.value = 'typing in progress';
+        input.setSelectionRange(6, 6);
+
+        preserveFocus(() => rebuildWith('x', 'saved'));
+
+        const next = document.getElementById('x') as HTMLInputElement;
+        expect(next.value).toBe('typing in progress');
+        expect(next.selectionStart).toBe(6);
+    });
+
+    it('shows the new pushed value in a focused field the user did not edit', () => {
+        const input = mountInput('x', 'old');
+        input.defaultValue = 'old';
+        input.focus();
+
+        preserveFocus(() => {
+            rebuildWith('x', 'new');
+            (document.getElementById('x') as HTMLInputElement).defaultValue = 'new';
+        });
+
+        const next = document.getElementById('x') as HTMLInputElement;
+        expect(document.activeElement).toBe(next);
+        expect(next.value).toBe('new');
+    });
+
+    it('re-runs a combobox filter on the restored text', () => {
+        const input = mountInput('model', 'gpt');
+        input.setAttribute('role', 'combobox');
+        input.focus();
+        const onInput = vi.fn();
+
+        preserveFocus(() => {
+            rebuildWith('model', 'other');
+            const next = document.getElementById('model') as HTMLInputElement;
+            next.setAttribute('role', 'combobox');
+            // Real combobox clears itself on focus and filters on `input`.
+            next.addEventListener('focus', () => { next.value = ''; });
+            next.addEventListener('input', () => onInput(next.value));
+        });
+
+        expect((document.getElementById('model') as HTMLInputElement).value).toBe('gpt');
+        expect(onInput).toHaveBeenCalledWith('gpt');
+    });
+
     it('runs the rebuild even when nothing is focused', () => {
         const built = vi.fn(() => rebuildWith('y', 'z'));
         preserveFocus(built);

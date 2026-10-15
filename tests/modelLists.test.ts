@@ -9,23 +9,21 @@ vi.mock('../src/utils/httpUtils', async () => {
     return {
         ...actual,
         HttpUtils: {
+            createRequestHeaders: actual.HttpUtils.createRequestHeaders,
             stripTrailingSlashes: actual.HttpUtils.stripTrailingSlashes,
             getJson: mockedGetJson,
         },
     };
 });
 
-vi.mock('../src/services/geminiService', () => ({
-    GeminiService: {},
-}));
-
 import {
     fetchOpenAIModels,
+    fetchOpenAICompatModels,
     fetchOllamaModels,
     fetchXaiModels,
     fetchAnthropicModels,
     fetchCodestralModels,
-    fetchMistralModels,
+    isMistralChatModel,
 } from '../src/services/modelLists';
 
 describe('modelLists trailing-slash handling', () => {
@@ -33,7 +31,7 @@ describe('modelLists trailing-slash handling', () => {
 
     it('strips trailing slashes from the OpenAI base URL before requesting', async () => {
         mockedGetJson.mockResolvedValue({ data: [{ id: 'gpt-4o' }] });
-        await fetchOpenAIModels('key', 'https://api.openai.test///');
+        await fetchOpenAIModels('https://api.openai.test///', 'key');
         expect(mockedGetJson).toHaveBeenCalledWith(
             'https://api.openai.test/models',
             expect.anything(),
@@ -56,31 +54,46 @@ describe('modelLists static fallbacks', () => {
 
     it('fetchXaiModels falls back to the static list when the live list is empty', async () => {
         mockedGetJson.mockResolvedValueOnce({ data: [] });
-        const result = await fetchXaiModels('key');
+        const result = await fetchXaiModels('https://api.x.ai/v1', 'key');
         expect(result).toContain('grok-4-fast');
         expect(result.length).toBeGreaterThan(0);
     });
 
-    it('fetchXaiModels rethrows when the request was aborted (cancellation propagates)', async () => {
-        const controller = new AbortController();
-        controller.abort();
-        mockedGetJson.mockRejectedValueOnce(new Error('aborted'));
-        await expect(fetchXaiModels('key', controller.signal)).rejects.toThrow('aborted');
+    it('fetchXaiModels falls back to the static list when the request fails', async () => {
+        mockedGetJson.mockRejectedValueOnce(new Error('boom'));
+        await expect(fetchXaiModels('https://api.x.ai/v1', 'key')).resolves.toContain('grok-3-mini');
     });
 
-    it('fetchAnthropicModels returns the static known-models list', async () => {
-        const result = await fetchAnthropicModels('key');
-        expect(result).toContain('claude-sonnet-4-5-20250929');
-        expect(result.length).toBeGreaterThan(0);
-    });
-
-    it('fetchCodestralModels returns the static known-models list', async () => {
-        const result = await fetchCodestralModels('key');
-        expect(result).toContain('codestral-latest');
+    it('fetchCodestralModels returns the static known-models list', () => {
+        expect(fetchCodestralModels()).toContain('codestral-latest');
     });
 });
 
-describe('fetchMistralModels', () => {
+describe('fetchAnthropicModels', () => {
+    beforeEach(() => mockedGetJson.mockReset());
+
+    it('reads the live /v1/models list with x-api-key auth and a full page', async () => {
+        mockedGetJson.mockResolvedValue({
+            data: [
+                { id: 'claude-sonnet-x', type: 'model', display_name: 'Sonnet' },
+                { id: 'claude-haiku-x', type: 'model' },
+                { id: 'claude-sonnet-x' },
+            ],
+            has_more: false,
+        });
+
+        await expect(fetchAnthropicModels('key')).resolves.toEqual(['claude-haiku-x', 'claude-sonnet-x']);
+
+        const [url, opts] = mockedGetJson.mock.calls[0];
+        // The endpoint pages at 20 by default.
+        expect(url).toBe('https://api.anthropic.com/v1/models?limit=1000');
+        expect(opts.headers['x-api-key']).toBe('key');
+        expect(opts.headers['anthropic-version']).toBe('2023-06-01');
+        expect(opts.headers.Authorization).toBeUndefined();
+    });
+});
+
+describe('Mistral chat-model filter', () => {
     beforeEach(() => {
         mockedGetJson.mockReset();
     });
@@ -97,7 +110,7 @@ describe('fetchMistralModels', () => {
             ],
         });
 
-        await expect(fetchMistralModels('key')).resolves.toEqual([
+        await expect(fetchOpenAICompatModels('https://api.mistral.ai/v1', 'key', isMistralChatModel)).resolves.toEqual([
             'magistral-medium-latest',
             'mistral-large-latest',
             'mistral-small-latest',
@@ -118,6 +131,7 @@ describe('fetchMistralModels', () => {
             ],
         });
 
-        await expect(fetchMistralModels('key')).resolves.toEqual(['mistral-small-latest']);
+        await expect(fetchOpenAICompatModels('https://api.mistral.ai/v1', 'key', isMistralChatModel))
+            .resolves.toEqual(['mistral-small-latest']);
     });
 });

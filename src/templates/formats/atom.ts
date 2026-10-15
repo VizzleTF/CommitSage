@@ -133,7 +133,7 @@ feat(auth): 添加与 Google 提供商的 OAuth2 集成
 スコープ（オプション）：影響を受けるコードベースの部分（例：auth、ui、api、core）
 
 例：
-feat(auth): GoogleプロバイダーとのOAuth2統合を追加
+feat(auth): 認証にGoogleプロバイダーとのOAuth2統合を追加
 
 以下を含む完全なOAuth2フローを実装：
 - 認証コード交換
@@ -170,7 +170,7 @@ Typen:
 Bereich (optional): Der betroffene Teil der Codebasis (z.B. auth, ui, api, core)
 
 Beispiel:
-feat(auth): OAuth2-Integration mit Google-Provider hinzufügen
+feat(auth): füge OAuth2-Integration mit Google-Provider hinzu
 
 Vollständigen OAuth2-Flow implementiert, einschließlich:
 - Autorisierungscode-Austausch
@@ -244,7 +244,7 @@ Breaking-change: Endpoints API d'authentification mis à jour`,
 범위 (선택): 영향을 받는 코드베이스 부분 (예: auth, ui, api, core)
 
 예시:
-feat(auth): Google 제공자와 OAuth2 통합 추가
+feat(auth): 인증에 Google 제공자와의 OAuth2 통합 추가
 
 다음을 포함한 전체 OAuth2 흐름을 구현:
 - 인증 코드 교환

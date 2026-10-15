@@ -1,14 +1,16 @@
 import { Logger } from '../utils/logger';
 
 import { CommitLintCliService } from './commitLintCliService';
-import { FORMAT_RULE_SETS, COMMITLINT_COMPATIBLE_FORMATS, CONFIG_DRIVEN_FORMATS } from './formatRules';
+import { FORMAT_RULE_SETS, FormatRuleSet } from './formatRules';
+import { COMMITLINT_COMPATIBLE_FORMATS, CONFIG_DRIVEN_FORMATS } from '../utils/constants';
 import * as vscode from 'vscode';
-import { CommitLintResult, CommitLintRules } from '../models/types';
+import { CommitLintResult } from '../models/types';
 import { UserCancelledError } from '../models/errors';
+import { toError } from '../utils/errorUtils';
 
-import { hasConfig as detectConfig, resolveConfigPath, loadConfig } from './commitlint/configLoader';
+import { resolveConfigPath, loadConfig } from './commitlint/configLoader';
 import { rulesToInstructions, COMMIT_RULES_DEFAULT } from './commitlint/ruleInstructions';
-import { validateCommit, validateWithRuleSet } from './commitlint/ruleValidator';
+import { validateWithRuleSet } from './commitlint/ruleValidator';
 import { applyAutoFixes } from './commitlint/autoFix';
 
 /**
@@ -33,70 +35,60 @@ export interface CommitLintOptions {
  *   autoFix           — mechanical header fixes
  */
 class CommitLintService {
-  static hasConfig(repoPath: string): boolean {
-    return detectConfig(repoPath);
+  /**
+   * Runs `run` on the project CLI when that engine is selected and usable.
+   * Null means "fall back to builtin"; a cancelled run aborts instead: the CLI
+   * is killed on abort, and that is indistinguishable from "no usable CLI" by
+   * exit code alone.
+   */
+  private static async viaProject<T>(
+    opts: CommitLintOptions, format: string, what: string, run: () => Promise<T | null>,
+  ): Promise<T | null> {
+    if (opts.engine !== 'project' || !vscode.workspace.isTrusted || !COMMITLINT_COMPATIBLE_FORMATS.has(format)) {
+      return null;
+    }
+    try {
+      const result = await run();
+      if (result) { return result; }
+    } catch (error) {
+      if (error instanceof UserCancelledError) {
+        throw error;
+      }
+      Logger.log(`CommitLint: project CLI ${what} failed: ${toError(error).message}`);
+    }
+    Logger.warn(`CommitLint: project engine requested but commitlint CLI is unavailable — using builtin ${what}`);
+    return null;
   }
 
-  private static useProjectEngine(engine: CommitLintEngine, format: string): boolean {
-    return engine === 'project'
-      && vscode.workspace.isTrusted
-      && COMMITLINT_COMPATIBLE_FORMATS.has(format);
+  /**
+   * The builtin rule set for a format. conventional/angular read the repo's
+   * commitlint config when one is found and yields rules; every other format
+   * (and those two without a config) uses its static set.
+   */
+  private static builtinRuleSet(format: string, repoPath: string, rulesPath?: string): FormatRuleSet | undefined {
+    if (CONFIG_DRIVEN_FORMATS.has(format)) {
+      const configPath = resolveConfigPath(repoPath, rulesPath);
+      const rules = configPath ? loadConfig(configPath) : {};
+      if (Object.keys(rules).length > 0) { return { rules }; }
+    }
+    return FORMAT_RULE_SETS[format];
   }
 
   static async extractRules(repoPath: string, rulesPath?: string, opts: CommitLintOptions = {}): Promise<string> {
     const format = opts.format ?? 'conventional';
-    if (this.useProjectEngine(opts.engine ?? 'builtin', format)) {
-      try {
-        // Fully resolved rules: extends chains, community presets and plugins
-        // are already applied by the project's own commitlint.
-        const resolved = await CommitLintCliService.resolvedRules(repoPath, rulesPath, opts.signal);
-        if (resolved) {
-          Logger.log(`CommitLint: prompt rules from project CLI (${Object.keys(resolved).length} resolved rules)`);
-          return rulesToInstructions(resolved);
-        }
-      } catch (error) {
-        // A cancelled run must abort, not quietly fall through to the builtin
-        // engine: the CLI is killed on abort and that is indistinguishable from
-        // "no usable CLI" by exit code alone.
-        if (error instanceof UserCancelledError) {
-          throw error;
-        }
-        Logger.log(`CommitLint: project CLI rule extraction failed: ${error instanceof Error ? error.message : String(error)}`);
-      }
-      Logger.warn('CommitLint: project engine requested but commitlint CLI is unavailable — using builtin rule extraction');
+    // Fully resolved rules: extends chains, community presets and plugins
+    // are already applied by the project's own commitlint.
+    const resolved = await this.viaProject(opts, format, 'rule extraction',
+      () => CommitLintCliService.resolvedRules(repoPath, rulesPath, opts.signal));
+    if (resolved) {
+      Logger.log(`CommitLint: prompt rules from project CLI (${Object.keys(resolved).length} resolved rules)`);
+      return rulesToInstructions(resolved);
     }
-    return this.extractRulesBuiltin(repoPath, rulesPath, format);
-  }
-
-  /**
-   * For config-driven formats (conventional/angular), resolves and loads the
-   * repo's commitlint config, returning its rules — or null when the format
-   * isn't config-driven, no config is found, or it yields no rules. Shared by
-   * the builtin extract/validate/autofix paths.
-   */
-  private static loadConfigDrivenRules(format: string, repoPath: string, rulesPath?: string): CommitLintRules | null {
-    if (!CONFIG_DRIVEN_FORMATS.has(format)) { return null; }
-    const explicitPath = Boolean(rulesPath && rulesPath !== '.');
-    const configPath = (explicitPath || detectConfig(repoPath))
-      ? resolveConfigPath(repoPath, rulesPath)
-      : null;
-    if (!configPath) { return null; }
-    const rules = loadConfig(configPath);
-    return Object.keys(rules).length > 0 ? rules : null;
-  }
-
-  private static extractRulesBuiltin(repoPath: string, rulesPath: string | undefined, format: string): string {
     try {
-      // conventional/angular read the repo's commitlint config when present;
-      // every other format is checked against its own static rule set.
-      const configRules = this.loadConfigDrivenRules(format, repoPath, rulesPath);
-      if (configRules) { return rulesToInstructions(configRules); }
-
-      const ruleSet = FORMAT_RULE_SETS[format];
-      if (!ruleSet) { return COMMIT_RULES_DEFAULT; }
-      return rulesToInstructions(ruleSet.rules, ruleSet.headerHint);
+      const ruleSet = this.builtinRuleSet(format, repoPath, rulesPath);
+      return ruleSet ? rulesToInstructions(ruleSet.rules, ruleSet.headerHint) : COMMIT_RULES_DEFAULT;
     } catch (error) {
-      Logger.log(`CommitLint: error extracting rules: ${error instanceof Error ? error.message : String(error)}`);
+      Logger.log(`CommitLint: error extracting rules: ${toError(error).message}`);
       return COMMIT_RULES_DEFAULT;
     }
   }
@@ -108,54 +100,33 @@ class CommitLintService {
     opts: CommitLintOptions = {},
   ): Promise<CommitLintResult> {
     const format = opts.format ?? 'conventional';
-    if (this.useProjectEngine(opts.engine ?? 'builtin', format)) {
-      try {
-        const cliResult = await CommitLintCliService.validate(message, repoPath, rulesPath, opts.signal);
-        if (cliResult) {
-          const cliVerdict = cliResult.valid ? 'valid' : `invalid (${cliResult.errors.length} errors: ${cliResult.errors.join('; ')})`;
-          Logger.log(`CommitLint: project CLI verdict — ${cliVerdict}`);
-          return cliResult;
-        }
-      } catch (error) {
-        if (error instanceof UserCancelledError) {
-          throw error;
-        }
-        Logger.log(`CommitLint: project CLI validation failed: ${error instanceof Error ? error.message : String(error)}`);
-      }
-      Logger.warn('CommitLint: project engine requested but commitlint CLI is unavailable — using builtin validator');
-    }
-    const result = this.validateBuiltin(message, repoPath, rulesPath, format);
-    const builtinVerdict = result.valid ? 'valid' : `invalid (${result.errors.length} errors: ${result.errors.join('; ')})`;
-    Logger.log(`CommitLint: builtin verdict (${format}) — ${builtinVerdict}`);
+    const cliResult = await this.viaProject(opts, format, 'validator',
+      () => CommitLintCliService.validate(message, repoPath, rulesPath, opts.signal));
+    const result = cliResult ?? this.validateBuiltin(message, repoPath, rulesPath, format);
+    const verdict = result.valid ? 'valid' : `invalid (${result.errors.length} errors: ${result.errors.join('; ')})`;
+    Logger.log(`CommitLint: ${cliResult ? 'project CLI verdict' : `builtin verdict (${format})`} — ${verdict}`);
     return result;
   }
 
   private static validateBuiltin(message: string, repoPath: string, rulesPath: string | undefined, format: string): CommitLintResult {
     try {
-      const configRules = this.loadConfigDrivenRules(format, repoPath, rulesPath);
-      if (configRules) { return validateCommit(message, configRules); }
-
-      const ruleSet = FORMAT_RULE_SETS[format];
-      if (!ruleSet) { return { valid: true, errors: [] }; }
-      return validateWithRuleSet(message, ruleSet);
+      const ruleSet = this.builtinRuleSet(format, repoPath, rulesPath);
+      return ruleSet ? validateWithRuleSet(message, ruleSet) : { valid: true, errors: [] };
     } catch (error) {
-      Logger.log(`CommitLint: validation error: ${error instanceof Error ? error.message : String(error)}`);
+      Logger.log(`CommitLint: validation error: ${toError(error).message}`);
       return { valid: true, errors: [] };
     }
   }
 
   static autoFix(message: string, repoPath: string, rulesPath?: string, format = 'conventional'): string {
     try {
-      const configRules = this.loadConfigDrivenRules(format, repoPath, rulesPath);
-      if (configRules) { return applyAutoFixes(message, configRules); }
-
-      const ruleSet = FORMAT_RULE_SETS[format];
+      const ruleSet = this.builtinRuleSet(format, repoPath, rulesPath);
       // Emoji-prefixed and structural formats are left to the LLM refinement
       // loop — mechanical header fixes assume a conventional-shaped header.
       if (!ruleSet || ruleSet.stripPrefix || ruleSet.structural) { return message; }
       return applyAutoFixes(message, ruleSet.rules);
     } catch (error) {
-      Logger.log(`CommitLint: autofix error: ${error instanceof Error ? error.message : String(error)}`);
+      Logger.log(`CommitLint: autofix error: ${toError(error).message}`);
       return message;
     }
   }

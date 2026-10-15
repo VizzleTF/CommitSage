@@ -9,12 +9,13 @@ import { atomTemplate } from './formats/atom';
 import { detailedTemplate } from './formats/detailed';
 import { previousTemplate } from './formats/previous';
 import { SUPPORTED_LANGUAGES } from '../utils/constants';
-import type { CommitLanguage } from '../utils/constants';
+import type { CommitLanguage, COMMIT_FORMATS } from '../utils/constants';
 import { Logger } from '../utils/logger';
 
 type CommitTemplate = Record<Exclude<CommitLanguage, 'custom'>, string>;
 
-export type CommitFormat = 'conventional' | 'angular' | 'karma' | 'semantic' | 'emoji' | 'emojiKarma' | 'google' | 'atom' | 'detailed' | 'previous';
+/** Formats with a prompt template: every `commitFormat` value but `custom`. */
+export type CommitFormat = Exclude<typeof COMMIT_FORMATS[number], 'custom'>;
 
 const templates: Record<CommitFormat, CommitTemplate> = {
     conventional: conventionalTemplate,

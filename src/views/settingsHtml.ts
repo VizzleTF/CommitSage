@@ -7,20 +7,17 @@ import { InitData } from './webview/protocol';
  * here as side-effect-free string functions.
  */
 
-export function escapeHtml(s: string): string {
+function escapeHtml(s: string): string {
     return s
         .replaceAll('&', '&amp;')
         .replaceAll('<', '&lt;')
         .replaceAll('>', '&gt;');
 }
 
-export function escapeForScript(s: string): string {
-    // </script> in JSON would break out of the <script> block. The other two
-    // pairs neutralise HTML comment / CDATA endings just in case.
-    return s
-        .replaceAll(/<\/script>/gi, String.raw`<\/script>`)
-        .replaceAll('<!--', String.raw`<\!--`)
-        .replaceAll(']]>', String.raw`]]\>`);
+// `<` only occurs inside JSON strings, where `\u003c` is the same character.
+// That keeps `</script>` and `<!--` out of the <script> block and the JSON valid.
+function jsonForScript(value: unknown): string {
+    return JSON.stringify(value).replaceAll('<', String.raw`\u003c`);
 }
 
 export interface SettingsHtmlOptions {
@@ -44,7 +41,7 @@ export function renderSettingsHtml(opts: SettingsHtmlOptions): string {
 </head>
 <body>
     <div id="root"><div class="loading">${escapeHtml(loadingLabel)}</div></div>
-    <script id="init-data" type="application/json">${escapeForScript(JSON.stringify(initData))}</script>
+    <script id="init-data" type="application/json">${jsonForScript(initData)}</script>
     <script nonce="${nonce}" src="${scriptUri}"></script>
 </body>
 </html>`;

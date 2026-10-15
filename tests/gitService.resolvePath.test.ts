@@ -132,14 +132,14 @@ describe('resolveGitPath (per-fresh-module cache branches)', () => {
     const absA = path.resolve('/usr/bin/git');
     const absB = path.resolve('/opt/homebrew/bin/git');
 
-    it('uses a configured absolute string git.path (lines 34-40)', async () => {
+    it('uses a configured absolute string git.path', async () => {
         const binary = await resolveSpawnedBinary(
             vscodeMock({ gitPathSetting: absA }),
         );
         expect(binary).toBe(absA);
     });
 
-    it('uses the first absolute entry from an array git.path (lines 32-40)', async () => {
+    it('uses the first absolute entry from an array git.path', async () => {
         // First entry relative (skipped by the isAbsolute guard), second absolute.
         const binary = await resolveSpawnedBinary(
             vscodeMock({ gitPathSetting: ['relative/git', absB] }),
@@ -147,7 +147,7 @@ describe('resolveGitPath (per-fresh-module cache branches)', () => {
         expect(binary).toBe(absB);
     });
 
-    it('ignores a relative configured path and falls through to the extension API (lines 34,43-47)', async () => {
+    it('ignores a relative configured path and falls through to the extension API', async () => {
         const binary = await resolveSpawnedBinary(
             vscodeMock({
                 gitPathSetting: 'relative/git', // not absolute -> no candidate matches
@@ -158,7 +158,7 @@ describe('resolveGitPath (per-fresh-module cache branches)', () => {
         expect(binary).toBe(absA);
     });
 
-    it('falls through to the extension API when git.path is unset (lines 43-47)', async () => {
+    it('falls through to the extension API when git.path is unset', async () => {
         const binary = await resolveSpawnedBinary(
             vscodeMock({
                 gitPathSetting: undefined,
@@ -169,7 +169,7 @@ describe('resolveGitPath (per-fresh-module cache branches)', () => {
         expect(binary).toBe(absB);
     });
 
-    it('falls back to bare "git" when the extension API path is relative (lines 45-53)', async () => {
+    it('falls back to bare "git" when the extension API path is relative', async () => {
         const binary = await resolveSpawnedBinary(
             vscodeMock({
                 extension: 'relative',
@@ -179,14 +179,14 @@ describe('resolveGitPath (per-fresh-module cache branches)', () => {
         expect(binary).toBe('git');
     });
 
-    it('falls back to bare "git" when nothing resolves (lines 52-53)', async () => {
+    it('falls back to bare "git" when nothing resolves', async () => {
         const binary = await resolveSpawnedBinary(
             vscodeMock({ gitPathSetting: undefined, extension: 'none' }),
         );
         expect(binary).toBe('git');
     });
 
-    it('falls back to bare "git" when resolution throws (catch path, lines 49-53)', async () => {
+    it('falls back to bare "git" when resolution throws (catch path)', async () => {
         const binary = await resolveSpawnedBinary(
             vscodeMock({ gitPathSetting: undefined, extension: 'throws' }),
         );

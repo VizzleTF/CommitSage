@@ -25,7 +25,7 @@ afterEach(() => {
 // ─── autoFix.ts ──────────────────────────────────────────────────────────────
 
 describe('applyAutoFixes', () => {
-    it('uppercases the type when type-case is upper-case (line 15)', () => {
+    it('uppercases the type when type-case is upper-case', () => {
         const rules = { 'type-case': [2, 'always', 'upper-case'] } as never;
         expect(applyAutoFixes('feat: add thing', rules)).toBe('FEAT: add thing');
     });
@@ -40,9 +40,14 @@ describe('applyAutoFixes', () => {
         expect(applyAutoFixes('feat: wow!!!!', rules)).toBe('feat: wow');
     });
 
-    it('defaults the stop to "." when subject-full-stop has no value (line 26 ??)', () => {
+    it('defaults the stop to "." when subject-full-stop has no value', () => {
         const rules = { 'subject-full-stop': [2, 'never'] } as never;
         expect(applyAutoFixes('feat: ends here.', rules)).toBe('feat: ends here');
+    });
+
+    it('leaves the header alone when the stop is an empty string (no endless loop)', () => {
+        const rules = { 'subject-full-stop': [2, 'never', ''] } as never;
+        expect(applyAutoFixes('feat: ends here.', rules)).toBe('feat: ends here.');
     });
 
     it('does not insert a blank line when one already exists', () => {
@@ -55,7 +60,7 @@ describe('applyAutoFixes', () => {
         expect(applyAutoFixes('', rules)).toBe('');
     });
 
-    it('leaves the scope untouched for a non-lower-case scope-case (line 20 else)', () => {
+    it('leaves the scope untouched for a non-lower-case scope-case', () => {
         // scope-case is active but not 'lower-case' → the lowercasing branch is skipped.
         const rules = { 'scope-case': [2, 'always', 'upper-case'] } as never;
         expect(applyAutoFixes('feat(API): add thing', rules)).toBe('feat(API): add thing');
@@ -69,17 +74,17 @@ describe('caseStr', () => {
         expect(caseStr(['lower-case', 'upper-case'])).toBe('lowercase, UPPERCASE');
     });
 
-    it('falls back to String() for an array with an unknown case (line 18)', () => {
+    it('falls back to String() for an array with an unknown case', () => {
         expect(caseStr(['lower-case', 'mystery-case'])).toBe('lowercase, mystery-case');
     });
 
-    it('falls back to String() for an unknown scalar case (line 19)', () => {
+    it('falls back to String() for an unknown scalar case', () => {
         expect(caseStr('mystery-case')).toBe('mystery-case');
     });
 });
 
 describe('checkCase', () => {
-    it('returns false from the default branch for an unknown case (line 35)', () => {
+    it('returns false from the default branch for an unknown case', () => {
         // always + unknown case → cases.some(matches) is false → not satisfied.
         expect(checkCase('feat', 'totally-unknown-case', 'always')).toBe(false);
         // never + unknown case → !cases.some(matches) is true → satisfied.
@@ -90,17 +95,17 @@ describe('checkCase', () => {
 // ─── configLoader.ts ─────────────────────────────────────────────────────────
 
 describe('resolveConfigPath', () => {
-    it('returns null when an explicit rulesPath points to a directory (line 54 isFile false)', () => {
+    it('returns null when an explicit rulesPath points to a directory', () => {
         const sub = path.join(tmpDir, 'adir');
         fs.mkdirSync(sub);
         expect(resolveConfigPath(tmpDir, 'adir')).toBeNull();
     });
 
-    it('returns null when an explicit rulesPath does not exist (statSync throws → catch line 56)', () => {
+    it('returns null when an explicit rulesPath does not exist (statSync throws)', () => {
         expect(resolveConfigPath(tmpDir, 'nope/missing.json')).toBeNull();
     });
 
-    it('returns null when nothing is found by auto-discovery (line 67)', () => {
+    it('returns null when nothing is found by auto-discovery', () => {
         expect(resolveConfigPath(tmpDir)).toBeNull();
     });
 
@@ -112,7 +117,7 @@ describe('resolveConfigPath', () => {
 });
 
 describe('loadConfig mergePresets', () => {
-    it('warns and ignores an unknown community preset (line 83)', () => {
+    it('warns and ignores an unknown community preset', () => {
         const cfg = path.join(tmpDir, '.commitlintrc.json');
         fs.writeFileSync(cfg, JSON.stringify({
             extends: ['@some/unknown-preset'],
@@ -132,7 +137,7 @@ describe('loadConfig mergePresets', () => {
 });
 
 describe('loadConfig loadLocalExtends', () => {
-    it('warns when a local extends target is not found (line 107)', () => {
+    it('warns when a local extends target is not found', () => {
         const cfg = path.join(tmpDir, '.commitlintrc.json');
         fs.writeFileSync(cfg, JSON.stringify({
             extends: ['./does-not-exist'],
@@ -142,7 +147,7 @@ describe('loadConfig loadLocalExtends', () => {
         expect((rules['type-enum'] as unknown[])[2]).toContain('own');
     });
 
-    it('skips a non-file candidate (a directory) when resolving local extends (line 100 continue)', () => {
+    it('skips a non-file candidate (a directory) when resolving local extends', () => {
         // Candidate order is base.js, base.cjs, base.json, …  Make the FIRST tried
         // candidate (base.js) a DIRECTORY so statSync succeeds but isFile() is false
         // → the `continue` on line 100 runs; a real base.json then wins.
@@ -168,7 +173,7 @@ describe('loadConfig loadLocalExtends', () => {
 });
 
 describe('loadConfig YAML extends parsing', () => {
-    it('parses a YAML extends list with multiple items (lines 143-146)', () => {
+    it('parses a YAML extends list with multiple items', () => {
         const cfg = path.join(tmpDir, '.commitlintrc.yml');
         fs.writeFileSync(cfg, [
             'extends:',
@@ -181,7 +186,7 @@ describe('loadConfig YAML extends parsing', () => {
         expect((rules['type-enum'] as unknown[])[2]).toContain('yamlext');
     });
 
-    it('parses an inline YAML extends string (line 137)', () => {
+    it('parses an inline YAML extends string', () => {
         const cfg = path.join(tmpDir, '.commitlintrc.yaml');
         fs.writeFileSync(cfg, [
             "extends: '@commitlint/config-conventional'",
@@ -194,8 +199,11 @@ describe('loadConfig YAML extends parsing', () => {
     });
 });
 
+/** A `require` stand-in with the `resolve`/`cache` members requireJsConfig touches. */
+const fakeRequire = (load: () => unknown) => Object.assign(load, { resolve: (p: string) => p, cache: {} });
+
 describe('loadConfig requireJsConfig', () => {
-    it('skips a JS config in an untrusted workspace (lines 168-169)', async () => {
+    it('skips a JS config in an untrusted workspace', async () => {
         vi.resetModules();
         vi.doMock('vscode', async () => {
             const actual = await vi.importActual<typeof import('../tests/__mocks__/vscode')>('../tests/__mocks__/vscode');
@@ -208,14 +216,14 @@ describe('loadConfig requireJsConfig', () => {
         vi.doUnmock('vscode');
     });
 
-    it('warns and returns {} for an ESM .js config (ERR_REQUIRE_ESM, lines 176-178)', async () => {
+    it('warns and returns {} for an ESM .js config (ERR_REQUIRE_ESM)', async () => {
         vi.resetModules();
         vi.doMock('node:module', () => ({
-            createRequire: () => () => {
+            createRequire: () => fakeRequire(() => {
                 const e = new Error('require of ESM') as NodeJS.ErrnoException;
                 e.code = 'ERR_REQUIRE_ESM';
                 throw e;
-            },
+            }),
         }));
         const { loadConfig: load } = await import('../src/services/commitlint/configLoader');
         const cfg = path.join(tmpDir, 'commitlint.config.js');
@@ -224,10 +232,10 @@ describe('loadConfig requireJsConfig', () => {
         vi.doUnmock('node:module');
     });
 
-    it('re-throws a non-ESM require error, caught by loadConfig (line 180 throw → 226)', async () => {
+    it('re-throws a non-ESM require error, caught by loadConfig', async () => {
         vi.resetModules();
         vi.doMock('node:module', () => ({
-            createRequire: () => () => { throw new SyntaxError('broken'); },
+            createRequire: () => fakeRequire(() => { throw new SyntaxError('broken'); }),
         }));
         const { loadConfig: load } = await import('../src/services/commitlint/configLoader');
         const cfg = path.join(tmpDir, 'commitlint.config.js');
@@ -236,16 +244,35 @@ describe('loadConfig requireJsConfig', () => {
         vi.doUnmock('node:module');
     });
 
-    it('outer catch handles a non-Error throw from require (line 226 String())', async () => {
+    it('outer catch handles a non-Error throw from require', async () => {
         vi.resetModules();
         vi.doMock('node:module', () => ({
-            createRequire: () => () => { throw 'plain string require failure'; },
+            createRequire: () => fakeRequire(() => { throw 'plain string require failure'; }),
         }));
         const { loadConfig: load } = await import('../src/services/commitlint/configLoader');
         const cfg = path.join(tmpDir, 'commitlint.config.js');
         fs.writeFileSync(cfg, 'module.exports = {};');
         expect(load(cfg)).toEqual({});
         vi.doUnmock('node:module');
+    });
+
+    it('re-reads an edited JS config instead of serving the require cache', () => {
+        const cfg = path.join(tmpDir, 'commitlint.config.js');
+        fs.writeFileSync(cfg, "module.exports = { rules: { 'type-enum': [2, 'always', ['v1']] } };");
+        fs.utimesSync(cfg, 1000, 1000);
+        expect((loadConfig(cfg)['type-enum'] as unknown[])[2]).toEqual(['v1']);
+        fs.writeFileSync(cfg, "module.exports = { rules: { 'type-enum': [2, 'always', ['v2']] } };");
+        fs.utimesSync(cfg, 2000, 2000);
+        expect((loadConfig(cfg)['type-enum'] as unknown[])[2]).toEqual(['v2']);
+    });
+
+    it('runs an unchanged JS config once, not on every rule lookup', () => {
+        const cfg = path.join(tmpDir, 'commitlint.config.js');
+        const counter = path.join(tmpDir, 'runs.txt');
+        fs.writeFileSync(cfg, `require('fs').appendFileSync(${JSON.stringify(counter)}, 'x'); module.exports = {};`);
+        loadConfig(cfg);
+        loadConfig(cfg);
+        expect(fs.readFileSync(counter, 'utf8')).toBe('x');
     });
 
     it('loads a valid CJS config and honours module.exports.default', () => {
@@ -257,25 +284,25 @@ describe('loadConfig requireJsConfig', () => {
 });
 
 describe('loadConfig misc branches', () => {
-    it('returns {} for a package.json with no commitlint field (line 211 else)', () => {
+    it('returns {} for a package.json with no commitlint field', () => {
         const cfg = path.join(tmpDir, 'package.json');
         fs.writeFileSync(cfg, JSON.stringify({ name: 'x' }));
         expect(loadConfig(cfg)).toEqual({});
     });
 
-    it('warns and returns {} for a .ts config (lines 214-217)', () => {
+    it('warns and returns {} for a .ts config', () => {
         const cfg = path.join(tmpDir, 'commitlint.config.ts');
         fs.writeFileSync(cfg, 'export default { rules: {} };');
         expect(loadConfig(cfg)).toEqual({});
     });
 
-    it('throws-then-catches for malformed .json with an extension (line 201 throw → 226 catch)', () => {
+    it('throws-then-catches for malformed .json with an extension', () => {
         const cfg = path.join(tmpDir, '.commitlintrc.json');
         fs.writeFileSync(cfg, '{ not valid json');
         expect(loadConfig(cfg)).toEqual({});
     });
 
-    it('falls back to YAML for malformed extensionless .commitlintrc (line 199)', () => {
+    it('falls back to YAML for malformed extensionless .commitlintrc', () => {
         const cfg = path.join(tmpDir, '.commitlintrc');
         fs.writeFileSync(cfg, 'rules:\n  type-enum: [2, always, [feat, yamlfallback]]\n');
         const rules = loadConfig(cfg);
@@ -286,11 +313,11 @@ describe('loadConfig misc branches', () => {
 // ─── ruleInstructions.ts ─────────────────────────────────────────────────────
 
 describe('rulesToInstructions', () => {
-    it('returns COMMIT_RULES_DEFAULT when no rule produces a line (line 133 else)', () => {
+    it('returns COMMIT_RULES_DEFAULT when no rule produces a line', () => {
         expect(rulesToInstructions({})).toBe(COMMIT_RULES_DEFAULT);
     });
 
-    it('prepends the headerHint when supplied (line 123)', () => {
+    it('prepends the headerHint when supplied', () => {
         const result = rulesToInstructions(
             { 'type-enum': [2, 'always', ['feat']] } as never,
             'header must start with an emoji',
@@ -298,17 +325,17 @@ describe('rulesToInstructions', () => {
         expect(result).toContain('header must start with an emoji');
     });
 
-    it('emits subject-full-stop guidance with default stop "." (line 65)', () => {
+    it('emits subject-full-stop guidance with default stop "."', () => {
         const result = rulesToInstructions({ 'subject-full-stop': [2, 'never'] } as never);
         expect(result).toContain('Subject must not end with "."');
     });
 
-    it('emits header-full-stop guidance with default stop "." (line 78)', () => {
+    it('emits header-full-stop guidance with default stop "."', () => {
         const result = rulesToInstructions({ 'header-full-stop': [2, 'never'] } as never);
         expect(result).toContain('Header must not end with "."');
     });
 
-    it('emits trailer guidance with the default trailer label (line 115)', () => {
+    it('emits trailer guidance with the default trailer label', () => {
         const result = rulesToInstructions({ 'trailer-exists': [2, 'always'] } as never);
         expect(result).toContain('End the message with a "Signed-off-by:" trailer line');
     });
@@ -324,7 +351,7 @@ describe('rulesToInstructions', () => {
 describe('validateDetailed (via validateWithRuleSet)', () => {
     const detailedSet: FormatRuleSet = { rules: {}, structural: 'detailed' };
 
-    it('flags a summary longer than 72 characters (lines 33-34)', () => {
+    it('flags a summary longer than 72 characters', () => {
         const longSummary = 'Summary: ' + 'x'.repeat(80) + '\n\nDetails:\n\nEffects:';
         const result = validateWithRuleSet(longSummary, detailedSet);
         expect(result.valid).toBe(false);
@@ -338,7 +365,7 @@ describe('validateDetailed (via validateWithRuleSet)', () => {
 });
 
 describe('validateWithRuleSet header pattern', () => {
-    it('rejects a header that does not match the pattern (line 16)', () => {
+    it('rejects a header that does not match the pattern', () => {
         const set: FormatRuleSet = {
             rules: {},
             headerPattern: /^MATCH/,
@@ -357,48 +384,48 @@ describe('validateWithRuleSet header pattern', () => {
 });
 
 describe('validateCommit default/unknown rule branches', () => {
-    it('ignores a rule whose entry severity is not 2 (continue line 51)', () => {
+    it('ignores a rule whose entry severity is not 2', () => {
         const result = validateCommit('anything', { 'type-empty': [1, 'never'] } as never);
         expect(result.valid).toBe(true);
     });
 
-    it('ignores an entirely unknown rule category (evaluateRule default line 80)', () => {
+    it('ignores an entirely unknown rule category (evaluateRule default)', () => {
         const result = validateCommit('feat: x', { 'mystery-rule': [2, 'always', 1] } as never);
         expect(result.valid).toBe(true);
     });
 
-    it('ignores an unknown type-* rule (checkTypeRule default line 144)', () => {
+    it('ignores an unknown type-* rule (checkTypeRule default)', () => {
         const result = validateCommit('feat: x', { 'type-mystery': [2, 'always'] } as never);
         expect(result.valid).toBe(true);
     });
 
-    it('ignores an unknown scope-* rule (checkScopeRule default line 169)', () => {
+    it('ignores an unknown scope-* rule (checkScopeRule default)', () => {
         const result = validateCommit('feat(api): x', { 'scope-mystery': [2, 'always'] } as never);
         expect(result.valid).toBe(true);
     });
 
-    it('ignores an unknown subject-* rule (checkSubjectRule default line 190)', () => {
+    it('ignores an unknown subject-* rule (checkSubjectRule default)', () => {
         const result = validateCommit('feat: x', { 'subject-mystery': [2, 'always'] } as never);
         expect(result.valid).toBe(true);
     });
 
-    it('ignores an unknown header-* rule (checkHeaderRule default line 206)', () => {
+    it('ignores an unknown header-* rule (checkHeaderRule default)', () => {
         const result = validateCommit('feat: x', { 'header-mystery': [2, 'always'] } as never);
         expect(result.valid).toBe(true);
     });
 
-    it('ignores an unknown body-* rule (checkBodyRule default line 229)', () => {
+    it('ignores an unknown body-* rule (checkBodyRule default)', () => {
         const result = validateCommit('feat: x\n\nbody', { 'body-mystery': [2, 'always'] } as never);
         expect(result.valid).toBe(true);
     });
 
-    it('ignores an unknown footer-* rule (checkFooterRule default line 255)', () => {
+    it('ignores an unknown footer-* rule (checkFooterRule default)', () => {
         const result = validateCommit('feat: x\n\nbody\n\nFixes: #1', { 'footer-mystery': [2, 'always'] } as never);
         expect(result.valid).toBe(true);
     });
 });
 
-describe('checkHeaderRule header-full-stop always (lines 108-111)', () => {
+describe('checkHeaderRule header-full-stop always', () => {
     it('fails when the header lacks the required full stop', () => {
         const result = validateCommit('feat: no stop', { 'header-full-stop': [2, 'always', '.'] } as never);
         expect(result.valid).toBe(false);
@@ -411,20 +438,20 @@ describe('checkHeaderRule header-full-stop always (lines 108-111)', () => {
     });
 });
 
-describe('checkFullStopRule default stop "." (line 109 ??)', () => {
+describe('checkFullStopRule default stop "."', () => {
     it('defaults the stop to "." when header-full-stop has no value', () => {
         const result = validateCommit('feat: ends.', { 'header-full-stop': [2, 'never'] } as never);
         expect(result.valid).toBe(false);
         expect(result.errors[0]).toContain('header may not end with "."');
     });
 
-    it('skips body-full-stop when the body is empty (skipEmpty line 108)', () => {
+    it('skips body-full-stop when the body is empty (skipEmpty)', () => {
         const result = validateCommit('feat: x', { 'body-full-stop': [2, 'always', '.'] } as never);
         expect(result.valid).toBe(true);
     });
 });
 
-describe('checkHeaderRule header-trim (lines 204-205)', () => {
+describe('checkHeaderRule header-trim', () => {
     it('fails when the header has trailing whitespace', () => {
         const result = validateCommit('feat: x   ', { 'header-trim': [2, 'always'] } as never);
         expect(result.valid).toBe(false);
@@ -437,7 +464,7 @@ describe('checkHeaderRule header-trim (lines 204-205)', () => {
     });
 });
 
-describe('checkTrailerRule default trailer value (line 262 ??)', () => {
+describe('checkTrailerRule default trailer value', () => {
     it('defaults to "Signed-off-by:" when no trailer value is configured', () => {
         const result = validateCommit('feat: x', { 'signed-off-by': [2, 'always'] } as never);
         expect(result.valid).toBe(false);
@@ -445,7 +472,7 @@ describe('checkTrailerRule default trailer value (line 262 ??)', () => {
     });
 });
 
-describe('checkLengthRule null-field branch (line 118)', () => {
+describe('checkLengthRule null-field branch', () => {
     it('skips scope length rules when scope is null', () => {
         // No scope present → scope is null → checkLengthRule returns null early.
         const result = validateCommit('feat: no scope here', { 'scope-max-length': [2, 'always', 3] } as never);
@@ -453,7 +480,7 @@ describe('checkLengthRule null-field branch (line 118)', () => {
     });
 });
 
-describe('checkFooterRule footer-leading-blank (lines 242-243)', () => {
+describe('checkFooterRule footer-leading-blank', () => {
     it('fails when the footer line is not preceded by a blank line', () => {
         // The footer's first line ("Signed-off-by: A") also appears earlier right
         // after the non-blank "body" line. indexOf finds that earlier occurrence,
@@ -470,7 +497,7 @@ describe('checkFooterRule footer-leading-blank (lines 242-243)', () => {
         expect(result.valid).toBe(true);
     });
 
-    it('passes when there is no footer at all (line 239 falsy-footer branch)', () => {
+    it('passes when there is no footer at all', () => {
         // condition === 'always' but footer is empty → the `&& footer` short-circuits.
         const result = validateCommit('feat: x\n\njust a body', { 'footer-leading-blank': [2, 'always'] } as never);
         expect(result.valid).toBe(true);
@@ -480,31 +507,31 @@ describe('checkFooterRule footer-leading-blank (lines 242-243)', () => {
 // ─── commitLintService.ts ────────────────────────────────────────────────────
 
 describe('CommitLintService no-ruleset formats', () => {
-    it('extractRules returns the default prompt for an unknown format (line 89)', async () => {
+    it('extractRules returns the default prompt for an unknown format', async () => {
         const { CommitLintService } = await import('../src/services/commitLintService');
         const result = await CommitLintService.extractRules(tmpDir, undefined, { format: 'no-such-format' });
         expect(result).toBe(COMMIT_RULES_DEFAULT);
     });
 
-    it('validate returns valid:true for an unknown format with no rule set (line 129)', async () => {
+    it('validate returns valid:true for an unknown format with no rule set', async () => {
         const { CommitLintService } = await import('../src/services/commitLintService');
         const result = await CommitLintService.validate('anything at all', tmpDir, undefined, { format: 'no-such-format' });
         expect(result).toEqual({ valid: true, errors: [] });
     });
 
-    it('autoFix leaves emoji-prefixed formats untouched (stripPrefix branch line 145)', async () => {
+    it('autoFix leaves emoji-prefixed formats untouched (stripPrefix branch)', async () => {
         const { CommitLintService } = await import('../src/services/commitLintService');
         const msg = ':sparkles: Add Thing.';
         expect(CommitLintService.autoFix(msg, tmpDir, undefined, 'emoji')).toBe(msg);
     });
 
-    it('autoFix leaves structural (detailed) formats untouched (structural branch line 145)', async () => {
+    it('autoFix leaves structural (detailed) formats untouched (structural branch)', async () => {
         const { CommitLintService } = await import('../src/services/commitLintService');
         const msg = 'Summary: x';
         expect(CommitLintService.autoFix(msg, tmpDir, undefined, 'detailed')).toBe(msg);
     });
 
-    it('autoFix returns the message for an unknown format (no rule set, line 145)', async () => {
+    it('autoFix returns the message for an unknown format (no rule set)', async () => {
         const { CommitLintService } = await import('../src/services/commitLintService');
         const msg = 'Whatever: text.';
         expect(CommitLintService.autoFix(msg, tmpDir, undefined, 'no-such-format')).toBe(msg);
@@ -513,7 +540,7 @@ describe('CommitLintService no-ruleset formats', () => {
 
 describe('CommitLintService config-loader error paths (catch blocks)', () => {
     beforeEach(() => {
-        // conventional is a CONFIG_DRIVEN_FORMAT, so loadConfigDrivenRules runs.
+        // conventional is a CONFIG_DRIVEN_FORMAT, so builtinRuleSet loads its config.
         fs.writeFileSync(path.join(tmpDir, '.commitlintrc.json'), JSON.stringify({
             rules: { 'type-enum': [2, 'always', ['feat']] },
         }));
@@ -533,29 +560,28 @@ describe('CommitLintService config-loader error paths (catch blocks)', () => {
         return (await import('../src/services/commitLintService')).CommitLintService;
     };
 
-    it('extractRulesBuiltin catch returns the default prompt (lines 92-93)', async () => {
+    it('extractRules builtin catch returns the default prompt', async () => {
         const Svc = await mockLoadConfigThrows();
         const result = await Svc.extractRules(tmpDir);
         expect(result).toBe(COMMIT_RULES_DEFAULT);
         vi.doUnmock('../src/services/commitlint/configLoader');
     });
 
-    it('validateBuiltin catch returns valid:true (lines 132-133)', async () => {
+    it('validateBuiltin catch returns valid:true', async () => {
         const Svc = await mockLoadConfigThrows();
         const result = await Svc.validate('feat: x', tmpDir);
         expect(result).toEqual({ valid: true, errors: [] });
         vi.doUnmock('../src/services/commitlint/configLoader');
     });
 
-    it('autoFix catch returns the original message (lines 148-149)', async () => {
+    it('autoFix catch returns the original message', async () => {
         const Svc = await mockLoadConfigThrows();
         const msg = 'Feat: x.';
         expect(Svc.autoFix(msg, tmpDir)).toBe(msg);
         vi.doUnmock('../src/services/commitlint/configLoader');
     });
 
-    // A non-Error throw exercises the `: String(error)` side of each catch's
-    // `error instanceof Error ? … : String(error)` ternary.
+    // A non-Error throw exercises the String() path of each catch's toError().
     const mockLoadConfigThrowsString = async () => {
         vi.resetModules();
         vi.doMock('../src/services/commitlint/configLoader', async () => {
@@ -567,19 +593,19 @@ describe('CommitLintService config-loader error paths (catch blocks)', () => {
         return (await import('../src/services/commitLintService')).CommitLintService;
     };
 
-    it('extractRulesBuiltin catch handles a non-Error throw (line 92 String())', async () => {
+    it('extractRules builtin catch handles a non-Error throw', async () => {
         const Svc = await mockLoadConfigThrowsString();
         expect(await Svc.extractRules(tmpDir)).toBe(COMMIT_RULES_DEFAULT);
         vi.doUnmock('../src/services/commitlint/configLoader');
     });
 
-    it('validateBuiltin catch handles a non-Error throw (line 132 String())', async () => {
+    it('validateBuiltin catch handles a non-Error throw', async () => {
         const Svc = await mockLoadConfigThrowsString();
         expect(await Svc.validate('feat: x', tmpDir)).toEqual({ valid: true, errors: [] });
         vi.doUnmock('../src/services/commitlint/configLoader');
     });
 
-    it('autoFix catch handles a non-Error throw (line 148 String())', async () => {
+    it('autoFix catch handles a non-Error throw', async () => {
         const Svc = await mockLoadConfigThrowsString();
         expect(Svc.autoFix('Feat: x.', tmpDir)).toBe('Feat: x.');
         vi.doUnmock('../src/services/commitlint/configLoader');
@@ -606,7 +632,7 @@ describe('CommitLintService project engine fallback', () => {
         vi.doUnmock('../src/services/commitLintCliService');
     });
 
-    it('extractRules uses the project CLI rules when available (lines 52-54)', async () => {
+    it('extractRules uses the project CLI rules when available', async () => {
         const Svc = await mockCli({
             resolvedRules: async () => ({ 'type-enum': [2, 'always', ['feat', 'cliresolved']] }),
         });
@@ -614,25 +640,25 @@ describe('CommitLintService project engine fallback', () => {
         expect(result).toContain('cliresolved');
     });
 
-    it('extractRules falls back to builtin when the CLI returns null (lines 59-61)', async () => {
+    it('extractRules falls back to builtin when the CLI returns null', async () => {
         const Svc = await mockCli({ resolvedRules: async () => null });
         const result = await Svc.extractRules(tmpDir, undefined, { engine: 'project', format: 'conventional' });
         expect(result).toContain('Allowed types: feat');
     });
 
-    it('extractRules falls back to builtin when the CLI throws (lines 56-57)', async () => {
+    it('extractRules falls back to builtin when the CLI throws', async () => {
         const Svc = await mockCli({ resolvedRules: async () => { throw new Error('cli boom'); } });
         const result = await Svc.extractRules(tmpDir, undefined, { engine: 'project', format: 'conventional' });
         expect(result).toContain('Allowed types: feat');
     });
 
-    it('extractRules catch handles a non-Error CLI throw (line 57 String())', async () => {
+    it('extractRules catch handles a non-Error CLI throw', async () => {
         const Svc = await mockCli({ resolvedRules: async () => { throw 'cli string boom'; } });
         const result = await Svc.extractRules(tmpDir, undefined, { engine: 'project', format: 'conventional' });
         expect(result).toContain('Allowed types: feat');
     });
 
-    it('validate uses the project CLI verdict when available (lines 107-110)', async () => {
+    it('validate uses the project CLI verdict when available', async () => {
         const Svc = await mockCli({
             validate: async () => ({ valid: false, errors: ['cli says nope'] }),
         });
@@ -640,7 +666,7 @@ describe('CommitLintService project engine fallback', () => {
         expect(result).toEqual({ valid: false, errors: ['cli says nope'] });
     });
 
-    it('validate reports the CLI "valid" verdict branch (line 108)', async () => {
+    it('validate reports the CLI "valid" verdict branch', async () => {
         const Svc = await mockCli({
             validate: async () => ({ valid: true, errors: [] }),
         });
@@ -648,19 +674,19 @@ describe('CommitLintService project engine fallback', () => {
         expect(result).toEqual({ valid: true, errors: [] });
     });
 
-    it('validate falls back to builtin when the CLI returns null (line 115)', async () => {
+    it('validate falls back to builtin when the CLI returns null', async () => {
         const Svc = await mockCli({ validate: async () => null });
         const result = await Svc.validate('feat: ok', tmpDir, undefined, { engine: 'project', format: 'conventional' });
         expect(result.valid).toBe(true);
     });
 
-    it('validate falls back to builtin when the CLI throws (lines 112-113)', async () => {
+    it('validate falls back to builtin when the CLI throws', async () => {
         const Svc = await mockCli({ validate: async () => { throw new Error('cli boom'); } });
         const result = await Svc.validate('feat: ok', tmpDir, undefined, { engine: 'project', format: 'conventional' });
         expect(result.valid).toBe(true);
     });
 
-    it('validate catch handles a non-Error CLI throw (line 113 String())', async () => {
+    it('validate catch handles a non-Error CLI throw', async () => {
         const Svc = await mockCli({ validate: async () => { throw 'cli string boom'; } });
         const result = await Svc.validate('feat: ok', tmpDir, undefined, { engine: 'project', format: 'conventional' });
         expect(result.valid).toBe(true);

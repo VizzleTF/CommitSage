@@ -2,18 +2,18 @@ import * as vscode from 'vscode';
 import { ConfigService } from '../utils/configService';
 import { Logger } from '../utils/logger';
 import { CommitMessage } from '../models/types';
-import { GitService, isIndexStaged, isStagedStatus } from './gitService';
+import { GitService, isIndexStaged } from './gitService';
+import { GitRepositoryProvider } from './gitRepository';
 import { GitBlameAnalyzer } from './gitBlameAnalyzer';
 import { TelemetryService } from './telemetryService';
 import { AIService } from './aiService';
 import { ApiKeyManager } from './apiKeyManager';
 import { UserCancelledError, ApiKeyInvalidError } from '../models/errors';
 import { toError, sanitizeErrorForTelemetry } from '../utils/errorUtils';
-import { mapLimit } from '../utils/concurrency';
-import { extractRef } from '../utils/refUtils';
+import { GIT_FANOUT_CONCURRENCY, mapLimit } from '../utils/concurrency';
+import { applyRef, extractRef } from '../utils/refUtils';
 import { RefStore } from './refStore';
 
-const BLAME_CONCURRENCY = 8;
 const MAX_API_KEY_RETRIES = 3;
 
 export class CommitWorkflow {
@@ -22,33 +22,28 @@ export class CommitWorkflow {
         apiKeyRetryCount: number = 0,
     ): Promise<void> {
         try {
-            await this.initializeAndValidate();
-
-            if (!sourceControlRepository) {
-                const repos = await GitService.getRepositories();
-                if (repos.length === 1) {
-                    sourceControlRepository = repos[0];
-                } else {
-                    sourceControlRepository = await GitService.selectRepository(repos);
-                }
+            if (!vscode.workspace.workspaceFolders) {
+                throw new Error('No workspace folder is open');
             }
+
+            // Reassigned so the invalid-API-key retry reuses the picked repo.
+            sourceControlRepository = await GitRepositoryProvider.getActiveRepository(sourceControlRepository);
 
             // Pre-check API key if required for the provider
             const provider = ConfigService.getProvider();
             if (ApiKeyManager.requiresKeyForCurrentConfig(provider)) {
-                await this.ensureApiKey(provider);
+                await ApiKeyManager.getKey(provider);
             }
 
             // Resolve the ref before generation (may show an input box for the
             // 'prompt' source) so the progress UI stays clean.
             const ref = await this.resolveRef(sourceControlRepository);
 
-            await this.executeWithProgress(async (progress, token) => {
-                // Check for cancellation
-                if (token.isCancellationRequested) {
-                    throw new UserCancelledError();
-                }
-
+            await vscode.window.withProgress({
+                location: vscode.ProgressLocation.Notification,
+                title: vscode.l10n.t('Commit Sage'),
+                cancellable: true,
+            }, async (progress, token) => {
                 const controller = new AbortController();
                 const cancelSubscription = token.onCancellationRequested(() => {
                     controller.abort();
@@ -95,6 +90,16 @@ export class CommitWorkflow {
                     return;
                 }
                 const provider = ConfigService.getProvider();
+                // The key is not sent while its toggle is off: asking for a new
+                // one would only repeat the 401.
+                if (!ApiKeyManager.requiresKeyForCurrentConfig(provider)) {
+                    await this.handleError(new Error(vscode.l10n.t(
+                        '{0} returned 401. Turn on commitSage.{1} and set the token.',
+                        provider,
+                        provider === 'ollama' ? 'ollama.useAuthToken' : 'custom.useApiKey',
+                    )));
+                    return;
+                }
                 await this.handleInvalidApiKey(provider, sourceControlRepository, apiKeyRetryCount);
                 return;
             }
@@ -110,10 +115,6 @@ export class CommitWorkflow {
         }
     }
 
-    private static async ensureApiKey(provider: string): Promise<void> {
-        await ApiKeyManager.getKey(provider);
-    }
-
     private static async resolveRef(repository?: vscode.SourceControl): Promise<string> {
         if (!ConfigService.get('commit.refs.enabled')) {
             return '';
@@ -121,17 +122,13 @@ export class CommitWorkflow {
 
         const source = ConfigService.get('commit.refs.source');
 
-        if (source === 'branch') {
-            const repoPath = repository?.rootUri?.fsPath ?? '';
-            const branch = await GitService.getBranchName(repoPath);
-            return extractRef(branch, ConfigService.get('commit.refs.branchPattern')) ?? '';
-        }
-
-        if (source === 'input') {
+        if (source === 'branch' || source === 'input') {
+            const branch = await GitService.getBranchName(repository?.rootUri?.fsPath ?? '');
+            if (source === 'branch') {
+                return extractRef(branch, ConfigService.get('commit.refs.branchPattern')) ?? '';
+            }
             // Branch-specific saved ref (workspaceState) wins over the
             // project-wide ref (commit.refs.value) — more specific scope first.
-            const repoPath = repository?.rootUri?.fsPath ?? '';
-            const branch = await GitService.getBranchName(repoPath);
             const branchRef = branch ? RefStore.getBranchRef(branch) : undefined;
             return (branchRef ?? ConfigService.get('commit.refs.value')).trim();
         }
@@ -169,27 +166,10 @@ export class CommitWorkflow {
         } catch (error) {
             if (error instanceof UserCancelledError) {
                 Logger.log('User cancelled API key update');
+            } else {
+                await this.handleError(toError(error));
             }
         }
-    }
-
-    private static async initializeAndValidate(): Promise<void> {
-        if (!vscode.workspace.workspaceFolders) {
-            throw new Error('No workspace folder is open');
-        }
-    }
-
-    private static async executeWithProgress(
-        action: (progress: vscode.Progress<{ message?: string; increment?: number }>, token: vscode.CancellationToken) => Promise<void>
-    ): Promise<void> {
-        await vscode.window.withProgress(
-            {
-                location: vscode.ProgressLocation.Notification,
-                title: vscode.l10n.t('Commit Sage'),
-                cancellable: true
-            },
-            action
-        );
     }
 
     private static async generateAndApplyMessage(
@@ -201,45 +181,32 @@ export class CommitWorkflow {
     ): Promise<CommitMessage> {
         progress.report({ message: vscode.l10n.t('Analyzing changes…'), increment: 10 });
 
-        if (token.isCancellationRequested) {
-            throw new UserCancelledError();
-        }
-
         if (!sourceControlRepository?.rootUri) {
             throw new Error('No Git repository found');
         }
 
         const repoPath = sourceControlRepository.rootUri.fsPath;
-        const onlyStagedSetting = ConfigService.get('commit.onlyStagedChanges');
-        // One `git status --porcelain` pass drives the staged-vs-all decision
-        // AND the per-file blame list, replacing a separate hasChanges('staged')
-        // probe and a second getChangedFiles call.
-        const allChangedFiles = await GitService.getChangedFiles(repoPath, false, signal);
+        // One `git status --porcelain` pass drives the staged-vs-worktree
+        // decision AND the per-file blame list.
+        const allChangedFiles = await GitService.getChangedFiles(repoPath, signal);
         const hasStagedChanges = allChangedFiles.some(file => isIndexStaged(file.status));
-        const useStagedChanges = onlyStagedSetting || hasStagedChanges;
+        const useStagedChanges = ConfigService.get('commit.onlyStagedChanges') || hasStagedChanges;
 
-        if (token.isCancellationRequested) {
-            throw new UserCancelledError();
-        }
-
-        const diff = await GitService.getDiff(repoPath, useStagedChanges, hasStagedChanges, signal);
-        if (!diff) {
-            throw new Error('No changes to commit');
-        }
+        const diff = await GitService.getDiff(repoPath, useStagedChanges, signal);
 
         const changedFiles = useStagedChanges
-            ? allChangedFiles.filter(file => isStagedStatus(file.status))
+            ? allChangedFiles.filter(file => isIndexStaged(file.status))
             : allChangedFiles;
-        // hasHead is constant for the repo this run — resolve once instead of
-        // per blame fan-out call.
-        const hasHead = await GitService.hasHead(repoPath, signal);
-        const blameAnalyses = await mapLimit(
-            changedFiles,
-            BLAME_CONCURRENCY,
-            (file) => GitBlameAnalyzer.analyzeChanges(repoPath, file.path, file.status, useStagedChanges, signal, hasHead),
-            signal,
-        );
-        const blameAnalysis = blameAnalyses.filter(Boolean).join('\n\n');
+        // Blame reads HEAD, so a repo without commits has nothing to blame.
+        const blameAnalyses = await GitService.hasHead(repoPath, signal)
+            ? await mapLimit(
+                changedFiles,
+                GIT_FANOUT_CONCURRENCY,
+                (file) => GitBlameAnalyzer.analyzeChanges(repoPath, file.path, file.status, useStagedChanges, signal),
+                signal,
+            )
+            : [];
+        const blameAnalysis = blameAnalyses.filter(Boolean).join('\n');
 
         if (token.isCancellationRequested) {
             throw new UserCancelledError();
@@ -251,29 +218,20 @@ export class CommitWorkflow {
             signal,
         });
 
-        let finalMessage = commitMessage.message;
-        if (ref) {
-            switch (ConfigService.get('commit.refs.placement')) {
-                case 'prefix':
-                    // Same first line, before the subject: "PROJ-1 feat: …"
-                    finalMessage = `${ref} ${finalMessage}`;
-                    break;
-                case 'start':
-                    // Own line above the message.
-                    finalMessage = `${ref}\n\n${finalMessage}`;
-                    break;
-                default:
-                    // 'end' — own line below the message.
-                    finalMessage = `${finalMessage}\n\n${ref}`;
-            }
-        }
-
+        const finalMessage = applyRef(commitMessage.message, ref, ConfigService.get('commit.refs.placement'));
         sourceControlRepository.inputBox.value = finalMessage;
 
         if (ConfigService.get('commit.autoCommit')) {
-            // Nothing was staged when the message was generated, so the commit
-            // has to stage the whole worktree to match what the message says.
-            await this.handleAutoCommit(sourceControlRepository, !useStagedChanges);
+            try {
+                // Nothing was staged when the message was generated, so the commit
+                // has to stage the whole worktree to match what the message says.
+                await this.handleAutoCommit(finalMessage, repoPath, !useStagedChanges);
+            } catch (error) {
+                // GitService already sent commit_failed / push_failed; this is
+                // not a generation failure. Not awaited: the progress
+                // notification would stay open until the error is dismissed.
+                void this.handleError(toError(error));
+            }
         }
 
         return { ...commitMessage, message: finalMessage };
@@ -285,8 +243,9 @@ export class CommitWorkflow {
     }
 
     private static async handleAutoCommit(
-        repository: vscode.SourceControl,
-        stageAll: boolean = false,
+        message: string,
+        repoPath: string,
+        stageAll: boolean,
     ): Promise<void> {
         // Last line of defense for the "a repo turns on auto-commit for you"
         // case. `restrictedConfigurations` covers the settings store and
@@ -298,19 +257,10 @@ export class CommitWorkflow {
             return;
         }
 
-        try {
-            if (!repository.inputBox.value) {
-                throw new Error('No commit message available');
-            }
+        await GitService.commitChanges(message, repoPath, stageAll);
 
-            await GitService.commitChanges(repository.inputBox.value, repository, stageAll);
-
-            if (ConfigService.get('commit.autoPush')) {
-                await GitService.pushChanges(repository);
-            }
-        } catch (error) {
-            Logger.error('Auto-commit/push failed:', toError(error));
-            throw error;
+        if (ConfigService.get('commit.autoPush')) {
+            await GitService.pushChanges(repoPath);
         }
     }
 }

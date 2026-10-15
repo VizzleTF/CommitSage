@@ -31,3 +31,22 @@ export function extractRef(branchName: string, pattern: string): string | null {
     // from a prefix, e.g. `issue-(\d+)`); otherwise use the full match.
     return (match[1] ?? match[0]) || null;
 }
+
+/**
+ * Places `ref` in `message` per the `commit.refs.placement` setting: `prefix`
+ * on the subject line, `start` on its own line above, otherwise (`end`) on
+ * its own line below.
+ */
+export function applyRef(message: string, ref: string, placement: string): string {
+    if (!ref) {
+        return message;
+    }
+    switch (placement) {
+        case 'prefix':
+            return `${ref} ${message}`;
+        case 'start':
+            return `${ref}\n\n${message}`;
+        default:
+            return `${message}\n\n${ref}`;
+    }
+}

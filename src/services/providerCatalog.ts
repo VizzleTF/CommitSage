@@ -9,9 +9,9 @@ import { Provider } from '../views/webview/protocol';
  * set/remove-key commands, configService) can derive from it instead of
  * re-declaring the same facts in parallel tables that silently drift.
  *
- * Runtime behavior that needs config/secrets (current model, live model fetch)
- * lives in `providerRegistry.ts`, which composes these metadata entries with
- * the closures it can only build at that layer.
+ * Runtime behavior that needs config/secrets (the live model fetch) lives in
+ * `providerRegistry.ts`, which composes these metadata entries with the
+ * closures it can only build at that layer.
  */
 export interface ProviderMeta {
     id: Provider;
@@ -83,8 +83,7 @@ export const PROVIDER_CATALOG: readonly ProviderMeta[] = [
         setCmd: 'commitsage.setAnthropicApiKey',
         removeCmd: 'commitsage.removeAnthropicApiKey',
         apiKeyUrl: 'https://console.anthropic.com/settings/keys',
-        liveSource: 'Static list (Anthropic has no public /models endpoint)',
-        noRefresh: true,
+        liveSource: 'Anthropic /v1/models',
         validateKey: lax,
     },
     {

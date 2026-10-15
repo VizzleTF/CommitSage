@@ -34,7 +34,18 @@ const CONVENTIONAL_RULES: CommitLintRules = {
   'footer-leading-blank': [1, 'always'],
 };
 
-const EMOJI_LEAD = /^(:[a-z0-9_+-]+:|\p{Extended_Pictographic}️?)\s+/u;
+// `:emoji:` shortcode or the emoji symbol (with its optional U+FE0F selector).
+const EMOJI = String.raw`(:[a-z0-9_+-]+:|\p{Extended_Pictographic}\uFE0F?)`;
+const EMOJI_LEAD = new RegExp(`^${EMOJI}\\s+`, 'u');
+
+const KARMA_RULES: CommitLintRules = {
+  'type-enum':         [2, 'always', BASE_TYPES],
+  'type-case':         [2, 'always', 'lower-case'],
+  'type-empty':        [2, 'never'],
+  'subject-empty':     [2, 'never'],
+  'subject-full-stop': [2, 'never', '.'],
+  'header-max-length': [2, 'always', 72],
+};
 
 export const FORMAT_RULE_SETS: Record<string, FormatRuleSet> = {
   conventional: { rules: CONVENTIONAL_RULES },
@@ -49,47 +60,22 @@ export const FORMAT_RULE_SETS: Record<string, FormatRuleSet> = {
     },
   },
 
-  atom: {
-    rules: {
-      ...CONVENTIONAL_RULES,
-      'type-enum': [2, 'always', BASE_TYPES],
-    },
-  },
+  // Same types and casing as conventional; the template only adds a footer.
+  atom: { rules: CONVENTIONAL_RULES },
 
-  karma: {
-    rules: {
-      'type-enum':         [2, 'always', BASE_TYPES],
-      'type-case':         [2, 'always', 'lower-case'],
-      'type-empty':        [2, 'never'],
-      'subject-empty':     [2, 'never'],
-      'subject-full-stop': [2, 'never', '.'],
-      'header-max-length': [2, 'always', 72],
-    },
-  },
+  karma: { rules: KARMA_RULES },
 
   // `type: message` — a scope is not part of the format.
-  semantic: {
-    rules: {
-      'type-enum':         [2, 'always', BASE_TYPES],
-      'type-case':         [2, 'always', 'lower-case'],
-      'type-empty':        [2, 'never'],
-      'scope-empty':       [2, 'always'],
-      'subject-empty':     [2, 'never'],
-      'subject-full-stop': [2, 'never', '.'],
-      'header-max-length': [2, 'always', 72],
-    },
-  },
+  semantic: { rules: { ...KARMA_RULES, 'scope-empty': [2, 'always'] } },
 
-  // `<Type>: <Description>` — capitalized type, otherwise conventional-like.
+  // `type: Description` — conventional types, but the description starts
+  // with a capital letter (as in the template's example).
   google: {
     rules: {
-      'type-enum':         [2, 'always', ['Feat', 'Fix', 'Docs', 'Style', 'Refactor', 'Test', 'Chore']],
-      'type-empty':        [2, 'never'],
-      'subject-empty':     [2, 'never'],
-      'header-max-length': [2, 'always', 72],
+      ...CONVENTIONAL_RULES,
+      'scope-case':   undefined,
+      'subject-case': undefined,
     },
-    headerPattern: /^[A-Z][a-zA-Z]*(\([^)]*\))?: \S/,
-    headerHint: 'header must look like "Type: Description" with a capitalized type',
   },
 
   // `:emoji: message` — no type at all, just the emoji lead-in.
@@ -97,37 +83,24 @@ export const FORMAT_RULE_SETS: Record<string, FormatRuleSet> = {
     rules: {
       'header-max-length': [2, 'always', 72],
     },
-    headerPattern: /^(:[a-z0-9_+-]+:|\p{Extended_Pictographic}️?)\s+\S/u,
+    headerPattern: new RegExp(`^${EMOJI}\\s+\\S`, 'u'),
     headerHint: 'header must start with an emoji (shortcode like :sparkles: or the symbol) followed by the message',
     stripPrefix: EMOJI_LEAD,
   },
 
   // `:emoji: type(scope): message` — karma rules after the emoji lead-in.
   emojiKarma: {
-    rules: {
-      'type-enum':         [2, 'always', BASE_TYPES],
-      'type-case':         [2, 'always', 'lower-case'],
-      'type-empty':        [2, 'never'],
-      'subject-empty':     [2, 'never'],
-      'subject-full-stop': [2, 'never', '.'],
-      'header-max-length': [2, 'always', 80],
-    },
-    headerPattern: /^(:[a-z0-9_+-]+:|\p{Extended_Pictographic}️?)\s+[a-z]+(\([^)]*\))?: \S/u,
+    rules: { ...KARMA_RULES, 'header-max-length': [2, 'always', 80] },
+    headerPattern: new RegExp(`^${EMOJI}\\s+[a-z]+(\\([^)]*\\))?: \\S`, 'u'),
     headerHint: 'header must look like ":emoji: type(scope): message"',
     stripPrefix: EMOJI_LEAD,
   },
 
+  // The template lets the model skip Details/Effects, so only the Summary
+  // line is required.
   detailed: {
     rules: {},
     structural: 'detailed',
-    headerHint: 'message must have "Summary: …" (≤ 72 chars) as the first line, then "Details:" and "Effects:" sections with "- " bullets',
+    headerHint: 'message must start with "Summary: …" (≤ 72 chars), optionally followed by "Details:" and "Effects:" sections with "- " bullets',
   },
 };
-
-/** Formats whose structure the project's commitlint parser can check directly. */
-export const COMMITLINT_COMPATIBLE_FORMATS = new Set([
-  'conventional', 'angular', 'atom', 'karma', 'semantic', 'google',
-]);
-
-/** Formats that read the repo's commitlint config in the builtin engine. */
-export const CONFIG_DRIVEN_FORMATS = new Set(['conventional', 'angular']);

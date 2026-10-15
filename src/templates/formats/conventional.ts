@@ -191,14 +191,14 @@ Regeln zur Typauswahl:
 
 Beispiele:
 Dokumentationsänderung:
-docs: Installations- und Nutzungsanleitungen aktualisieren
+docs: aktualisiere Installations- und Nutzungsanleitungen
 
 - Beschreibung neuer Funktionen hinzugefügt
 - Konfigurationsabschnitt aktualisiert
 - Nutzungsbeispiele hinzugefügt
 
 Funktionsänderung:
-feat(auth): Benutzerauthentifizierung hinzufügen
+feat(auth): füge Benutzerauthentifizierung hinzu
 
 - OAuth2-Provider-Integration implementiert
 - Auth-Service-Modul erstellt

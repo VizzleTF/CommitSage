@@ -113,56 +113,56 @@ describe('generatePrompt — reminder + commitlint', () => {
         expect(out).toContain('Follow the Summary/Details/Effects template exactly.');
     });
 
-    it('appends commitlint rules when enabled and format is not custom', async () => {
-        cfg({
-            'commit.commitFormat': 'conventional',
-            'commit.commitLanguage': 'english',
-            'commit.commitlint.enabled': true,
-            'commit.commitlint.rulesPath': '/rules',
-            'commit.commitlint.engine': 'cli',
-        });
-        const out = await PromptService.generatePrompt('/repo', 'DIFF', 'BLAME', progress as never);
-        expect(out).toContain('RULES');
-        expect(mockExtractRules).toHaveBeenCalledWith('/repo', '/rules', { engine: 'cli', format: 'conventional' });
+    it('appends the rules passed by the caller to the template', async () => {
+        cfg({ 'commit.commitFormat': 'conventional', 'commit.commitLanguage': 'english' });
+        const out = await PromptService.generatePrompt('/repo', 'DIFF', 'BLAME', progress as never, 'RULES');
+        expect(out).toContain('TEMPLATE[english]\n\nRULES');
+        expect(mockExtractRules).not.toHaveBeenCalled();
     });
 
-    it('does not append rules when commitlint enabled but format is custom', async () => {
-        cfg({
-            'commit.commitFormat': 'custom',
-            'commit.commitLanguage': 'english',
-            'commit.commitlint.enabled': true,
-        });
+    it('uses the conventional template for the custom format without instructions', async () => {
+        cfg({ 'commit.commitFormat': 'custom', 'commit.commitLanguage': 'english' });
         await PromptService.generatePrompt('/repo', 'DIFF', 'BLAME', progress as never);
-        expect(mockExtractRules).not.toHaveBeenCalled();
+        expect(mockGetTemplate).toHaveBeenCalledWith('conventional', 'english');
+    });
+
+    it('leaves the language line out of a custom-instructions prompt', async () => {
+        cfg({ 'commit.useCustomInstructions': true, 'commit.customInstructions': 'MY RULES', 'commit.commitLanguage': 'russian' });
+        const out = await PromptService.generatePrompt('/repo', 'DIFF', 'BLAME', progress as never);
+        expect(out.startsWith('MY RULES\n\nGit diff to analyze:\nDIFF')).toBe(true);
+        expect(out).not.toContain('на русском');
+    });
+});
+
+describe('loadRules', () => {
+    it('extracts the rules with the configured engine, the format and the abort signal', async () => {
+        cfg({ 'commit.commitlint.rulesPath': '/rules', 'commit.commitlint.engine': 'project' });
+        const signal = new AbortController().signal;
+        expect(await PromptService.loadRules('/repo', 'angular', signal)).toBe('RULES');
+        expect(mockExtractRules).toHaveBeenCalledWith('/repo', '/rules', { engine: 'project', format: 'angular', signal });
     });
 });
 
 describe('generateRefinementPrompt', () => {
-    it('builds a refinement prompt with errors and rules', async () => {
-        cfg({
-            'commit.commitFormat': 'conventional',
-            'commit.commitLanguage': 'english',
-            'commit.commitlint.rulesPath': '/rules',
-            'commit.commitlint.engine': 'cli',
-        });
-        const out = await PromptService.generateRefinementPrompt('/repo', 'orig msg', ['err1', 'err2'], progress as never);
+    it('builds a refinement prompt from the message, errors and the given rules', () => {
+        cfg({ 'commit.commitFormat': 'conventional', 'commit.commitLanguage': 'english' });
+        const out = PromptService.generateRefinementPrompt('orig msg', ['err1', 'err2'], 'RULES');
         expect(out).toContain('orig msg');
         expect(out).toContain('- err1');
         expect(out).toContain('- err2');
         expect(out).toContain('RULES');
-        expect(mockExtractRules).toHaveBeenCalledWith('/repo', '/rules', { engine: 'cli', format: 'conventional' });
+        expect(out).toContain('Please write the commit message in English.');
+        // No template, translation or rule extraction on a retry.
+        expect(mockGetTemplate).not.toHaveBeenCalled();
+        expect(mockGetCustomTemplate).not.toHaveBeenCalled();
+        expect(mockExtractRules).not.toHaveBeenCalled();
     });
 
-    it('maps the custom format to conventional for template resolution', async () => {
-        cfg({
-            'commit.commitFormat': 'custom',
-            'commit.commitLanguage': 'english',
-        });
-        await PromptService.generateRefinementPrompt('/repo', 'orig', ['e'], progress as never);
-        // template fetched for 'conventional', not 'custom'
-        expect(mockGetTemplate).toHaveBeenCalledWith('conventional', 'english');
-        // but extractRules still gets the raw setting ('custom')
-        expect(mockExtractRules).toHaveBeenCalledWith('/repo', undefined, expect.objectContaining({ format: 'custom' }));
+    it('names a custom language without translating the template', () => {
+        cfg({ 'commit.commitLanguage': 'custom', 'commit.customLanguageName': 'Klingon' });
+        const out = PromptService.generateRefinementPrompt('orig', ['e'], 'RULES');
+        expect(out).toContain('Please write the commit message in Klingon.');
+        expect(mockGetCustomTemplate).not.toHaveBeenCalled();
     });
 });
 

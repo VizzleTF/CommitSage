@@ -48,9 +48,9 @@ describe('AIServiceFactory.generateCommitMessage routing', () => {
 
     it.each(classCases)('routes %s to its dedicated service class', async (type, svc, name) => {
         const opts = { maxTokens: 10 };
-        const result = await AIServiceFactory.generateCommitMessage(type, 'prompt', progress, 2, opts);
+        const result = await AIServiceFactory.generateCommitMessage(type, 'prompt', progress, opts);
         expect(result).toEqual({ message: `from-${name}`, model: name });
-        expect(svc.generateCommitMessage).toHaveBeenCalledWith('prompt', progress, 2, opts);
+        expect(svc.generateCommitMessage).toHaveBeenCalledWith('prompt', progress, opts);
         expect(generateViaOpenAICompatibleProvider).not.toHaveBeenCalled();
     });
 
@@ -58,9 +58,9 @@ describe('AIServiceFactory.generateCommitMessage routing', () => {
 
     it.each(compatCases)('routes %s through the OpenAI-compatible dispatcher', async (type) => {
         const opts = { maxTokens: 10 };
-        const result = await AIServiceFactory.generateCommitMessage(type, 'prompt', progress, 2, opts);
+        const result = await AIServiceFactory.generateCommitMessage(type, 'prompt', progress, opts);
         expect(result).toEqual({ message: `from-${type}`, model: type });
-        expect(generateViaOpenAICompatibleProvider).toHaveBeenCalledWith(type, 'prompt', progress, 2, opts);
+        expect(generateViaOpenAICompatibleProvider).toHaveBeenCalledWith(type, 'prompt', progress, opts);
     });
 
     it('throws for an unsupported service type', async () => {

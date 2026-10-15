@@ -1,8 +1,6 @@
-export const emojiTemplate = {
-    english: `Generate a commit message following the Emoji format:
-:emoji: commit message
-
-Common emojis (Gitmoji + Conventional Emoji Commits):
+/** The emoji list, shared with the emojiKarma template. */
+export const EMOJI_LIST = {
+    english: `Common emojis (Gitmoji + Conventional Emoji Commits):
 ✨ :sparkles: - New feature
 🐛 :bug: - Bug fix
 📝 :memo: - Documentation updates
@@ -18,16 +16,9 @@ Common emojis (Gitmoji + Conventional Emoji Commits):
 🔥 :fire: - Remove code or files
 ⬆️ :arrow_up: - Upgrade dependencies
 ⬇️ :arrow_down: - Downgrade dependencies
-✅ :white_check_mark: - Fix CI build
+✅ :white_check_mark: - Fix CI build`,
 
-Example:
-✨ add real-time collaboration feature
-🐛 fix authentication token expiration`,
-
-    russian: `Создайте сообщение коммита в формате Emoji:
-:emoji: сообщение коммита
-
-Часто используемые эмодзи (Gitmoji + Conventional Emoji Commits):
+    russian: `Часто используемые эмодзи (Gitmoji + Conventional Emoji Commits):
 ✨ :sparkles: - Новая функциональность
 🐛 :bug: - Исправление ошибок
 📝 :memo: - Обновление документации
@@ -43,16 +34,9 @@ Example:
 🔥 :fire: - Удаление кода или файлов
 ⬆️ :arrow_up: - Обновление зависимостей
 ⬇️ :arrow_down: - Понижение версий зависимостей
-✅ :white_check_mark: - Исправление сборки CI
+✅ :white_check_mark: - Исправление сборки CI`,
 
-Пример:
-✨ добавить функцию совместной работы в реальном времени
-🐛 исправить срок действия токена аутентификации`,
-
-    chinese: `生成符合 Emoji 格式的提交信息：
-:emoji: 提交信息
-
-常用表情符号 (Gitmoji + Conventional Emoji Commits)：
+    chinese: `常用表情符号 (Gitmoji + Conventional Emoji Commits)：
 ✨ :sparkles: - 新功能
 🐛 :bug: - Bug 修复
 📝 :memo: - 文档更新
@@ -68,16 +52,9 @@ Example:
 🔥 :fire: - 删除代码或文件
 ⬆️ :arrow_up: - 升级依赖
 ⬇️ :arrow_down: - 降级依赖
-✅ :white_check_mark: - 修复CI构建
+✅ :white_check_mark: - 修复CI构建`,
 
-示例：
-✨ 添加实时协作功能
-🐛 修复认证令牌过期问题`,
-
-    japanese: `絵文字形式のコミットメッセージを生成してください：
-:emoji: コミットメッセージ
-
-よく使用する絵文字 (Gitmoji + Conventional Emoji Commits)：
+    japanese: `よく使用する絵文字 (Gitmoji + Conventional Emoji Commits)：
 ✨ :sparkles: - 新機能
 🐛 :bug: - バグ修正
 📝 :memo: - ドキュメント更新
@@ -93,16 +70,9 @@ Example:
 🔥 :fire: - コードやファイルの削除
 ⬆️ :arrow_up: - 依存関係アップグレード
 ⬇️ :arrow_down: - 依存関係ダウングレード
-✅ :white_check_mark: - CIビルド修正
+✅ :white_check_mark: - CIビルド修正`,
 
-例：
-✨ リアルタイムコラボレーション機能を追加
-🐛 認証トークンの有効期限の問題を修正`,
-
-    german: `Erstellen Sie eine Commit-Nachricht im Emoji-Format:
-:emoji: Commit-Nachricht
-
-Häufig verwendete Emojis (Gitmoji + Conventional Emoji Commits):
+    german: `Häufig verwendete Emojis (Gitmoji + Conventional Emoji Commits):
 ✨ :sparkles: - Neue Funktion
 🐛 :bug: - Fehlerbehebung
 📝 :memo: - Dokumentationsaktualisierung
@@ -118,16 +88,9 @@ Häufig verwendete Emojis (Gitmoji + Conventional Emoji Commits):
 🔥 :fire: - Code oder Dateien entfernen
 ⬆️ :arrow_up: - Abhängigkeiten aktualisieren
 ⬇️ :arrow_down: - Abhängigkeiten herunterstufen
-✅ :white_check_mark: - CI-Build reparieren
+✅ :white_check_mark: - CI-Build reparieren`,
 
-Beispiele:
-✨ Echtzeit-Zusammenarbeitsfunktion hinzufügen
-🐛 Ablauf des Authentifizierungstokens beheben`,
-
-    french: `Générez un message de commit au format Emoji :
-:emoji: message de commit
-
-Emojis courants (Gitmoji + Conventional Emoji Commits) :
+    french: `Emojis courants (Gitmoji + Conventional Emoji Commits) :
 ✨ :sparkles: - Nouvelle fonctionnalité
 🐛 :bug: - Correction de bug
 📝 :memo: - Mise à jour de documentation
@@ -143,16 +106,9 @@ Emojis courants (Gitmoji + Conventional Emoji Commits) :
 🔥 :fire: - Suppression de code ou fichiers
 ⬆️ :arrow_up: - Mise à jour des dépendances
 ⬇️ :arrow_down: - Rétrogradation des dépendances
-✅ :white_check_mark: - Correction du build CI
+✅ :white_check_mark: - Correction du build CI`,
 
-Exemples :
-✨ ajouter la fonctionnalité de collaboration en temps réel
-🐛 corriger l'expiration du jeton d'authentification`,
-
-    korean: `Emoji 형식에 따라 커밋 메시지를 생성하세요:
-:emoji: 커밋 메시지
-
-자주 사용하는 이모지 (Gitmoji + Conventional Emoji Commits):
+    korean: `자주 사용하는 이모지 (Gitmoji + Conventional Emoji Commits):
 ✨ :sparkles: - 새 기능
 🐛 :bug: - 버그 수정
 📝 :memo: - 문서 업데이트
@@ -168,16 +124,9 @@ Exemples :
 🔥 :fire: - 코드 또는 파일 삭제
 ⬆️ :arrow_up: - 종속성 업그레이드
 ⬇️ :arrow_down: - 종속성 다운그레이드
-✅ :white_check_mark: - CI 빌드 수정
+✅ :white_check_mark: - CI 빌드 수정`,
 
-예시:
-✨ 실시간 협업 기능 추가
-🐛 인증 토큰 만료 문제 수정`,
-
-    spanish: `Genera un mensaje de commit siguiendo el formato Emoji:
-:emoji: mensaje de commit
-
-Emojis comunes (Gitmoji + Conventional Emoji Commits):
+    spanish: `Emojis comunes (Gitmoji + Conventional Emoji Commits):
 ✨ :sparkles: - Nueva característica
 🐛 :bug: - Corrección de errores
 📝 :memo: - Actualización de documentación
@@ -193,16 +142,9 @@ Emojis comunes (Gitmoji + Conventional Emoji Commits):
 🔥 :fire: - Eliminar código o archivos
 ⬆️ :arrow_up: - Actualizar dependencias
 ⬇️ :arrow_down: - Degradar dependencias
-✅ :white_check_mark: - Arreglar build CI
+✅ :white_check_mark: - Arreglar build CI`,
 
-Ejemplo:
-✨ añadir característica de colaboración en tiempo real
-🐛 corregir expiración del token de autenticación`,
-
-    portuguese: `Gere uma mensagem de commit seguindo o formato Emoji:
-:emoji: mensagem de commit
-
-Emojis comuns (Gitmoji + Conventional Emoji Commits):
+    portuguese: `Emojis comuns (Gitmoji + Conventional Emoji Commits):
 ✨ :sparkles: - Nova funcionalidade
 🐛 :bug: - Correção de bug
 📝 :memo: - Atualizações de documentação
@@ -218,7 +160,86 @@ Emojis comuns (Gitmoji + Conventional Emoji Commits):
 🔥 :fire: - Remover código ou arquivos
 ⬆️ :arrow_up: - Atualizar dependências
 ⬇️ :arrow_down: - Reverter atualização de dependências
-✅ :white_check_mark: - Corrigir build do CI
+✅ :white_check_mark: - Corrigir build do CI`,
+};
+
+export const emojiTemplate = {
+    english: `Generate a commit message following the Emoji format:
+:emoji: commit message
+
+${EMOJI_LIST.english}
+
+Example:
+✨ add real-time collaboration feature
+🐛 fix authentication token expiration`,
+
+    russian: `Создайте сообщение коммита в формате Emoji:
+:emoji: сообщение коммита
+
+${EMOJI_LIST.russian}
+
+Пример:
+✨ добавить функцию совместной работы в реальном времени
+🐛 исправить срок действия токена аутентификации`,
+
+    chinese: `生成符合 Emoji 格式的提交信息：
+:emoji: 提交信息
+
+${EMOJI_LIST.chinese}
+
+示例：
+✨ 添加实时协作功能
+🐛 修复认证令牌过期问题`,
+
+    japanese: `絵文字形式のコミットメッセージを生成してください：
+:emoji: コミットメッセージ
+
+${EMOJI_LIST.japanese}
+
+例：
+✨ リアルタイムコラボレーション機能を追加
+🐛 認証トークンの有効期限の問題を修正`,
+
+    german: `Erstellen Sie eine Commit-Nachricht im Emoji-Format:
+:emoji: Commit-Nachricht
+
+${EMOJI_LIST.german}
+
+Beispiele:
+✨ Echtzeit-Zusammenarbeitsfunktion hinzufügen
+🐛 Ablauf des Authentifizierungstokens beheben`,
+
+    french: `Générez un message de commit au format Emoji :
+:emoji: message de commit
+
+${EMOJI_LIST.french}
+
+Exemples :
+✨ ajouter la fonctionnalité de collaboration en temps réel
+🐛 corriger l'expiration du jeton d'authentification`,
+
+    korean: `Emoji 형식에 따라 커밋 메시지를 생성하세요:
+:emoji: 커밋 메시지
+
+${EMOJI_LIST.korean}
+
+예시:
+✨ 실시간 협업 기능 추가
+🐛 인증 토큰 만료 문제 수정`,
+
+    spanish: `Genera un mensaje de commit siguiendo el formato Emoji:
+:emoji: mensaje de commit
+
+${EMOJI_LIST.spanish}
+
+Ejemplo:
+✨ añadir característica de colaboración en tiempo real
+🐛 corregir expiración del token de autenticación`,
+
+    portuguese: `Gere uma mensagem de commit seguindo o formato Emoji:
+:emoji: mensagem de commit
+
+${EMOJI_LIST.portuguese}
 
 Exemplo:
 ✨ adicionar funcionalidade de colaboração em tempo real

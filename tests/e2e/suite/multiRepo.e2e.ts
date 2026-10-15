@@ -59,7 +59,7 @@ describe('Multi-repository workspace', () => {
         await fs.appendFile(path.join(repoB.path, 'README.md'), '\nB modified\n');
         await git(repoB.path, 'add', 'README.md');
 
-        // GitService.selectRepository shows QuickPick of {label, description, repository}.
+        // GitRepositoryProvider.selectRepository shows QuickPick of {label, description, repository}.
         // Stub returns the second item — selection of repoB. The `repository`
         // value MUST be the real SourceControl from vscode.git so its inputBox
         // is the live one CommitWorkflow writes into.

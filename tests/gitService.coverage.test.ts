@@ -10,6 +10,7 @@ vi.mock('node:child_process', () => ({
 }));
 
 import { GitService } from '../src/services/gitService';
+import { GitRepositoryProvider } from '../src/services/gitRepository';
 import {
     GitExtensionNotFoundError,
     NoRepositoriesFoundError,
@@ -63,62 +64,30 @@ afterEach(() => {
 });
 
 describe('GitService.commitChanges', () => {
-    it('throws NoChangesDetectedError when there is nothing to commit', async () => {
-        installExecGit(() => ''); // every detection reports nothing
+    it('throws NoChangesDetectedError when nothing is staged', async () => {
+        installExecGit(() => '');
         await expect(
-            GitService.commitChanges('msg', fakeRepo('/repo')),
+            GitService.commitChanges('msg', '/repo', false),
         ).rejects.toBeInstanceOf(NoChangesDetectedError);
     });
 
-    it('commits staged changes and emits commit_completed', async () => {
-        installExecGit((args) => {
-            const key = args.join(' ');
-            if (key === 'diff --cached --name-only') {
-                return 'a.txt\n';
-            }
-            return '';
-        });
-        await expect(
-            GitService.commitChanges('feat: x', fakeRepo('/repo')),
-        ).resolves.toBeUndefined();
-    });
-
-    it('stages untracked + deleted files when nothing is staged, then commits', async () => {
+    it('commits staged changes without touching the index', async () => {
         const calls: string[][] = [];
         installExecGit((args) => {
             calls.push(args);
-            const key = args.join(' ');
-            switch (key) {
-                case 'diff --cached --name-only':
-                    return ''; // no staged
-                case 'ls-files --others --exclude-standard':
-                    return 'new.txt\n';
-                case 'ls-files --deleted':
-                    return 'gone.txt\n';
-                default:
-                    return '';
-            }
+            return args.join(' ') === 'diff --cached --name-only -z' ? 'a.txt\0' : '';
         });
-        await GitService.commitChanges('msg', fakeRepo('/repo'));
-        // git add -- new.txt gone.txt was issued.
-        const addCall = calls.find((c) => c[0] === 'add');
-        expect(addCall).toBeDefined();
-        expect(addCall).toEqual(['add', '--', 'new.txt', 'gone.txt']);
-        // commit -m msg was issued.
-        expect(calls.some((c) => c[0] === 'commit' && c[2] === 'msg')).toBe(true);
-    });
-
-    it('throws when no active repository is found', async () => {
-        // No repository arg, getActiveRepository -> getRepositories throws.
-        vi.spyOn(vscode.extensions, 'getExtension').mockReturnValue(undefined);
-        await expect(GitService.commitChanges('msg')).rejects.toThrow();
+        await expect(
+            GitService.commitChanges('feat: x', '/repo', false),
+        ).resolves.toBeUndefined();
+        expect(calls.some((c) => c[0] === 'add')).toBe(false);
+        expect(calls.some((c) => c[0] === 'commit' && c[2] === 'feat: x')).toBe(true);
     });
 
     it('rethrows and reports commit_failed when the commit command fails', async () => {
         installExecGit((args) => {
-            const key = args.join(' ');
-            if (key === 'diff --cached --name-only') {
-                return 'a.txt\n';
+            if (args.join(' ') === 'diff --cached --name-only -z') {
+                return 'a.txt\0';
             }
             if (args[0] === 'commit') {
                 return { throws: new Error('commit failed') };
@@ -126,8 +95,43 @@ describe('GitService.commitChanges', () => {
             return '';
         });
         await expect(
-            GitService.commitChanges('m', fakeRepo('/repo')),
+            GitService.commitChanges('m', '/repo', false),
         ).rejects.toThrow('commit failed');
+    });
+
+    it('stageAll: stages the whole worktree with `add -A` before committing', async () => {
+        const calls: string[][] = [];
+        installExecGit((args) => {
+            calls.push(args);
+            // After `add -A` everything the message was generated from is staged.
+            return args.join(' ') === 'diff --cached --name-only -z' ? 'edited.txt\0' : '';
+        });
+
+        await GitService.commitChanges('msg', '/repo', true);
+
+        expect(calls[0]).toEqual(['add', '-A']);
+        expect(calls.filter((c) => c[0] === 'add')).toEqual([['add', '-A']]);
+        expect(calls.some((c) => c[0] === 'commit')).toBe(true);
+    });
+
+    it('stageAll: commits even when the staged listing overflows the output cap', async () => {
+        const calls: string[][] = [];
+        installExecGit((args) => {
+            calls.push(args);
+            return args.join(' ') === 'diff --cached --name-only -z'
+                ? { result: { stdout: 'a.txt\0half/pa', stderr: '', exitCode: -1 } }
+                : '';
+        });
+
+        await expect(GitService.commitChanges('msg', '/repo', true)).resolves.toBeUndefined();
+        expect(calls.some((c) => c[0] === 'commit')).toBe(true);
+    });
+
+    it('stageAll: still reports NoChangesDetectedError when `add -A` stages nothing', async () => {
+        installExecGit(() => '');
+        await expect(
+            GitService.commitChanges('msg', '/repo', true),
+        ).rejects.toBeInstanceOf(NoChangesDetectedError);
     });
 });
 
@@ -139,7 +143,7 @@ describe('GitService.pushChanges', () => {
             }
             return '';
         });
-        await expect(GitService.pushChanges(fakeRepo('/repo'))).resolves.toBeUndefined();
+        await expect(GitService.pushChanges('/repo')).resolves.toBeUndefined();
     });
 
     it('throws when the repository has no remotes', async () => {
@@ -149,7 +153,7 @@ describe('GitService.pushChanges', () => {
             }
             return '';
         });
-        await expect(GitService.pushChanges(fakeRepo('/repo'))).rejects.toThrow(
+        await expect(GitService.pushChanges('/repo')).rejects.toThrow(
             /no configured remotes/i,
         );
     });
@@ -161,13 +165,9 @@ describe('GitService.pushChanges', () => {
             }
             return '';
         });
-        await expect(GitService.pushChanges(fakeRepo('/repo'))).rejects.toThrow(
+        await expect(GitService.pushChanges('/repo')).rejects.toThrow(
             /no configured remotes/i,
         );
-    });
-
-    it('throws when no active repository is found', async () => {
-        await expect(GitService.pushChanges(fakeRepo(undefined))).rejects.toThrow();
     });
 
     it('rethrows when the push command fails', async () => {
@@ -180,72 +180,44 @@ describe('GitService.pushChanges', () => {
             }
             return '';
         });
-        await expect(GitService.pushChanges(fakeRepo('/repo'))).rejects.toThrow(
+        await expect(GitService.pushChanges('/repo')).rejects.toThrow(
             'push rejected',
         );
     });
 });
 
-describe('GitService.hasChanges', () => {
-    it('returns true for each change type when git lists files', async () => {
-        installExecGit(() => 'file.txt\n');
-        for (const t of ['staged', 'unstaged', 'untracked', 'deleted'] as const) {
-            expect(await GitService.hasChanges('/repo', t)).toBe(true);
-        }
-    });
-
-    it('returns false when output is empty', async () => {
-        installExecGit(() => '');
-        expect(await GitService.hasChanges('/repo', 'staged')).toBe(false);
-    });
-
-    it('returns false (swallows) when the git command throws', async () => {
-        installExecGit(() => ({ throws: new Error('git failed') }));
-        expect(await GitService.hasChanges('/repo', 'unstaged')).toBe(false);
-    });
-});
-
 describe('GitService.getChangedFiles', () => {
-    it('parses porcelain output into path/status entries', async () => {
+    it('parses NUL-separated porcelain output into path/status entries', async () => {
         installExecGit((args) => {
-            if (args.join(' ') === 'status --porcelain') {
-                return 'M  staged.txt\n M unstaged.txt\n?? new.txt\n';
+            if (args.join(' ') === 'status --porcelain -z') {
+                return 'M  staged.txt\0 M with space.txt\0?? ü.txt\0';
             }
             return '';
         });
         const files = await GitService.getChangedFiles('/repo');
         expect(files).toEqual([
             { path: 'staged.txt', status: 'M ' },
-            { path: 'unstaged.txt', status: ' M' },
-            { path: 'new.txt', status: '??' },
+            { path: 'with space.txt', status: ' M' },
+            { path: 'ü.txt', status: '??' },
         ]);
     });
 
-    it('with onlyStaged=true keeps only staged-status entries', async () => {
+    it('takes the new path of a rename and skips the old one', async () => {
         installExecGit((args) => {
-            if (args.join(' ') === 'status --porcelain') {
-                return 'M  staged.txt\n M unstaged.txt\n';
+            if (args.join(' ') === 'status --porcelain -z') {
+                return 'RM new.txt\0old.txt\0 M other.txt\0';
             }
             return '';
         });
-        const files = await GitService.getChangedFiles('/repo', true);
-        expect(files).toEqual([{ path: 'staged.txt', status: 'M ' }]);
+        expect(await GitService.getChangedFiles('/repo')).toEqual([
+            { path: 'new.txt', status: 'RM' },
+            { path: 'other.txt', status: ' M' },
+        ]);
     });
 
-    it('resolves renamed entries to the new name', async () => {
-        installExecGit((args) => {
-            if (args.join(' ') === 'status --porcelain') {
-                return 'R  old.txt -> new.txt\n';
-            }
-            return '';
-        });
-        const files = await GitService.getChangedFiles('/repo');
-        expect(files[0].path).toBe('new.txt');
-    });
-
-    it('returns [] when the status command throws', async () => {
+    it('propagates a status failure instead of reporting no changes', async () => {
         installExecGit(() => ({ throws: new Error('status boom') }));
-        expect(await GitService.getChangedFiles('/repo')).toEqual([]);
+        await expect(GitService.getChangedFiles('/repo')).rejects.toThrow('status boom');
     });
 });
 
@@ -261,13 +233,13 @@ describe('GitService.hasHead', () => {
     });
 });
 
-describe('GitService.getRepositories / validateGitExtension', () => {
+describe('GitRepositoryProvider.getRepositories / validateGitExtension', () => {
     it('throws GitExtensionNotFoundError when the git extension is absent', async () => {
         vi.spyOn(vscode.extensions, 'getExtension').mockReturnValue(undefined);
-        await expect(GitService.getRepositories()).rejects.toBeInstanceOf(
+        await expect(GitRepositoryProvider.getRepositories()).rejects.toBeInstanceOf(
             GitExtensionNotFoundError,
         );
-        await expect(GitService.validateGitExtension()).rejects.toBeInstanceOf(
+        await expect(GitRepositoryProvider.validateGitExtension()).rejects.toBeInstanceOf(
             GitExtensionNotFoundError,
         );
     });
@@ -276,7 +248,7 @@ describe('GitService.getRepositories / validateGitExtension', () => {
         vi.spyOn(vscode.extensions, 'getExtension').mockReturnValue({
             activate: async () => ({ getAPI: () => ({ repositories: [] }) }),
         } as unknown as vscode.Extension<unknown>);
-        await expect(GitService.getRepositories()).rejects.toBeInstanceOf(
+        await expect(GitRepositoryProvider.getRepositories()).rejects.toBeInstanceOf(
             NoRepositoriesFoundError,
         );
     });
@@ -286,7 +258,7 @@ describe('GitService.getRepositories / validateGitExtension', () => {
         vi.spyOn(vscode.extensions, 'getExtension').mockReturnValue({
             activate: async () => ({ getAPI: () => ({ repositories: repos }) }),
         } as unknown as vscode.Extension<unknown>);
-        expect(await GitService.getRepositories()).toBe(repos);
+        expect(await GitRepositoryProvider.getRepositories()).toBe(repos);
     });
 
     it('validateGitExtension activates the extension when present', async () => {
@@ -294,34 +266,18 @@ describe('GitService.getRepositories / validateGitExtension', () => {
         vi.spyOn(vscode.extensions, 'getExtension').mockReturnValue({
             activate,
         } as unknown as vscode.Extension<unknown>);
-        await GitService.validateGitExtension();
+        await GitRepositoryProvider.validateGitExtension();
         expect(activate).toHaveBeenCalled();
     });
 });
 
-describe('GitService.initialize', () => {
-    it('succeeds when the git extension validates', async () => {
-        vi.spyOn(vscode.extensions, 'getExtension').mockReturnValue({
-            activate: async () => ({}),
-        } as unknown as vscode.Extension<unknown>);
-        await expect(GitService.initialize()).resolves.toBeUndefined();
-    });
-
-    it('rethrows when validation fails', async () => {
-        vi.spyOn(vscode.extensions, 'getExtension').mockReturnValue(undefined);
-        await expect(GitService.initialize()).rejects.toBeInstanceOf(
-            GitExtensionNotFoundError,
-        );
-    });
-});
-
-describe('GitService.selectRepository', () => {
+describe('GitRepositoryProvider.selectRepository', () => {
     it('returns the picked repository', async () => {
         const repo = fakeRepo('/repo');
         vi.spyOn(vscode.window, 'showQuickPick').mockResolvedValue({
             repository: repo,
         } as never);
-        expect(await GitService.selectRepository([repo])).toBe(repo);
+        expect(await GitRepositoryProvider.selectRepository([repo])).toBe(repo);
     });
 
     it('labels repos without a rootUri and throws when the pick is cancelled', async () => {
@@ -329,7 +285,7 @@ describe('GitService.selectRepository', () => {
         const showQuickPick = vi
             .spyOn(vscode.window, 'showQuickPick')
             .mockResolvedValue(undefined as never);
-        await expect(GitService.selectRepository([repo])).rejects.toBeInstanceOf(
+        await expect(GitRepositoryProvider.selectRepository([repo])).rejects.toBeInstanceOf(
             NoRepositorySelectedError,
         );
         // The repo without rootUri produced an "Unknown repository" option.
@@ -353,6 +309,9 @@ class FakeChild extends EventEmitter {
     stdout = new FakeStream();
     stderr = new FakeStream();
     killed = false;
+    // Like a real ChildProcess: both stay null while the process runs.
+    exitCode: number | null = null;
+    signalCode: string | null = null;
     killSignals: string[] = [];
     kill(signal?: string): boolean {
         this.killSignals.push(signal ?? 'SIGTERM');
@@ -362,7 +321,7 @@ class FakeChild extends EventEmitter {
 }
 
 describe('GitService.execGit (spawn machinery)', () => {
-    type Opts = { signal?: AbortSignal; allowNonZeroExit?: boolean };
+    type Opts = { signal?: AbortSignal; allowNonZeroExit?: boolean; maxBuffer?: number };
     const execGit = (args: string[], cwd: string, opts?: Opts) =>
         (
             GitService as unknown as {
@@ -417,6 +376,17 @@ describe('GitService.execGit (spawn machinery)', () => {
         await expect(p).rejects.toThrow(/timed out after/);
     });
 
+    it('raises the stdout cap to options.maxBuffer', async () => {
+        const child = nextChild();
+        const p = execGit(['diff'], '/repo', { maxBuffer: 300_000 });
+        child.stdout.emit('data', Buffer.from('x'.repeat(250_000)));
+        child.emit('close', 0, null);
+        const res = await p;
+        expect(res.exitCode).toBe(0);
+        expect(res.stdout.length).toBe(250_000);
+        expect(child.killSignals).toEqual([]);
+    });
+
     it('truncates and resolves when the stdout buffer cap overflows', async () => {
         const child = nextChild();
         const p = execGit(['show'], '/repo');
@@ -431,6 +401,17 @@ describe('GitService.execGit (spawn machinery)', () => {
         expect(res.exitCode).toBe(-1);
         expect(res.stdout.length).toBe(200_000);
         expect(child.killSignals).toContain('SIGTERM');
+    });
+
+    it('marks an overflowed stdout even when git exits 0 before the SIGTERM lands', async () => {
+        const child = nextChild();
+        const p = execGit(['status'], '/repo');
+        child.stdout.emit('data', Buffer.from('x'.repeat(200_001)));
+        child.stdout.emit('data', Buffer.from('dropped'));
+        child.emit('close', 0, null);
+        const res = await p;
+        expect(res.exitCode).toBe(-1);
+        expect(res.stdout.length).toBe(200_000);
     });
 
     it('caps stderr accumulation at the buffer cap', async () => {
@@ -475,14 +456,9 @@ describe('GitService.execGit (spawn machinery)', () => {
     });
 
     it('hard-kills with SIGKILL if the child survives the grace period', async () => {
-        // A child whose kill() does NOT flip `killed` stays "alive", so the
-        // 1500ms grace-period timer fires the SIGKILL escalation (646-647).
-        const child = new (class extends FakeChild {
-            kill(signal?: string): boolean {
-                this.killSignals.push(signal ?? 'SIGTERM');
-                return true; // never marks itself killed
-            }
-        })();
+        // SIGTERM was sent (`killed` is true) but the process ignores it and
+        // never exits, so the 1500ms grace-period timer must escalate.
+        const child = new FakeChild();
         spawnMock.mockReturnValueOnce(child);
         vi.useFakeTimers();
         const controller = new AbortController();
@@ -517,10 +493,10 @@ describe('GitService.execGit (spawn machinery)', () => {
     });
 });
 
-describe('GitService.getActiveRepository', () => {
+describe('GitRepositoryProvider.getActiveRepository', () => {
     it('returns the passed repository when it has a rootUri', async () => {
         const repo = fakeRepo('/repo');
-        expect(await GitService.getActiveRepository(repo)).toBe(repo);
+        expect(await GitRepositoryProvider.getActiveRepository(repo)).toBe(repo);
     });
 
     it('returns the sole repository when only one exists', async () => {
@@ -528,7 +504,7 @@ describe('GitService.getActiveRepository', () => {
         vi.spyOn(vscode.extensions, 'getExtension').mockReturnValue({
             activate: async () => ({ getAPI: () => ({ repositories: [repo] }) }),
         } as unknown as vscode.Extension<unknown>);
-        expect(await GitService.getActiveRepository()).toBe(repo);
+        expect(await GitRepositoryProvider.getActiveRepository()).toBe(repo);
     });
 
     it('picks the repo owning the active editor file', async () => {
@@ -541,7 +517,7 @@ describe('GitService.getActiveRepository', () => {
             document: { uri: { fsPath: '/repoB/src/file.ts' } },
         };
         try {
-            expect(await GitService.getActiveRepository()).toBe(r2);
+            expect(await GitRepositoryProvider.getActiveRepository()).toBe(r2);
         } finally {
             (vscode.window as { activeTextEditor: unknown }).activeTextEditor = undefined;
         }
@@ -568,342 +544,38 @@ describe('GitService.getActiveRepository', () => {
             repository: r1,
         } as never);
         try {
-            expect(await GitService.getActiveRepository()).toBe(r1);
+            expect(await GitRepositoryProvider.getActiveRepository()).toBe(r1);
+        } finally {
+            (vscode.window as { activeTextEditor: unknown }).activeTextEditor = undefined;
+        }
+    });
+
+    it('matches a whole path segment and prefers the innermost repo', async () => {
+        const app = fakeRepo('/w/app');
+        const appWeb = fakeRepo('/w/app-web');
+        const sub = fakeRepo('/w/app/libs/sub');
+        vi.spyOn(vscode.extensions, 'getExtension').mockReturnValue({
+            activate: async () => ({ getAPI: () => ({ repositories: [app, appWeb, sub] }) }),
+        } as unknown as vscode.Extension<unknown>);
+        const setActive = (fsPath: string) => {
+            (vscode.window as { activeTextEditor: unknown }).activeTextEditor = {
+                document: { uri: { fsPath } },
+            };
+        };
+        try {
+            setActive('/w/app-web/src/x.ts');
+            expect(await GitRepositoryProvider.getActiveRepository()).toBe(appWeb);
+            setActive('/w/app/libs/sub/y.ts');
+            expect(await GitRepositoryProvider.getActiveRepository()).toBe(sub);
+            setActive('/w/app/z.ts');
+            expect(await GitRepositoryProvider.getActiveRepository()).toBe(app);
         } finally {
             (vscode.window as { activeTextEditor: unknown }).activeTextEditor = undefined;
         }
     });
 });
 
-describe('GitService.commitChanges / pushChanges no-rootUri guard', () => {
-    it('commitChanges throws when the resolved repo has no rootUri', async () => {
-        // A repo object with no rootUri reaches the `!repo?.rootUri` guard.
-        await expect(
-            GitService.commitChanges('msg', fakeRepo(undefined)),
-        ).rejects.toThrow(/No active repository found/);
-    });
-});
-
-describe('GitService.getDiff submodule + special diff paths', () => {
-    it('skips submodule files in the staged diff (isSubmodule true)', async () => {
-        installExecGit((args) => {
-            const key = args.join(' ');
-            switch (key) {
-                case 'rev-parse HEAD':
-                    return 'deadbeef';
-                case 'diff --cached --name-only':
-                    return 'sub\nreal.txt\n';
-                case 'ls-files --stage -- sub':
-                    return '160000 hash 0\tsub'; // submodule gitlink
-                case 'ls-files --stage -- real.txt':
-                    return '100644 hash 0\treal.txt';
-                case 'diff --cached -- real.txt':
-                    return 'REAL-DIFF';
-                default:
-                    return '';
-            }
-        });
-        const diff = await GitService.getDiff('/repo', true);
-        expect(diff).toContain('REAL-DIFF');
-        expect(diff).not.toContain('160000');
-    });
-
-    it('treats an isSubmodule lookup error as "not a submodule"', async () => {
-        installExecGit((args) => {
-            const key = args.join(' ');
-            switch (key) {
-                case 'rev-parse HEAD':
-                    return 'deadbeef';
-                case 'diff --cached --name-only':
-                    return 'f.txt\n';
-                case 'ls-files --stage -- f.txt':
-                    return { throws: new Error('ls-files boom') };
-                case 'diff --cached -- f.txt':
-                    return 'F-DIFF';
-                default:
-                    return '';
-            }
-        });
-        const diff = await GitService.getDiff('/repo', true);
-        expect(diff).toContain('F-DIFF');
-    });
-
-    it('untracked diff: drops exit-128 results and swallows per-file errors', async () => {
-        installExecGit((args) => {
-            const key = args.join(' ');
-            switch (key) {
-                case 'rev-parse HEAD':
-                    return 'deadbeef';
-                case 'diff --cached --name-only':
-                    return '';
-                case 'diff --name-only':
-                    return '';
-                case 'ls-files --others --exclude-standard':
-                    return 'good.txt\nblocked.txt\nthrows.txt\n';
-                case 'diff --no-index -- /dev/null good.txt':
-                    return { result: { stdout: '+good', stderr: '', exitCode: 1 } };
-                case 'diff --no-index -- /dev/null blocked.txt':
-                    return { result: { stdout: 'should be dropped', stderr: '', exitCode: 128 } };
-                case 'diff --no-index -- /dev/null throws.txt':
-                    return { throws: new Error('diff boom') };
-                default:
-                    return '';
-            }
-        });
-        const diff = await GitService.getDiff('/repo', false);
-        expect(diff).toContain('# New files:');
-        expect(diff).toContain('+good');
-        expect(diff).not.toContain('should be dropped');
-    });
-
-    it('deleted diff: swallows a per-file diff error', async () => {
-        installExecGit((args) => {
-            const key = args.join(' ');
-            switch (key) {
-                case 'rev-parse HEAD':
-                    return 'deadbeef';
-                case 'diff --cached --name-only':
-                    return '';
-                case 'diff --name-only':
-                    return '';
-                case 'ls-files --others --exclude-standard':
-                    return '';
-                case 'ls-files --deleted':
-                    return 'ok.txt\nbad.txt\n';
-                case 'diff -- ok.txt':
-                    return '-removed';
-                case 'diff -- bad.txt':
-                    return { throws: new Error('deleted diff boom') };
-                default:
-                    return '';
-            }
-        });
-        const diff = await GitService.getDiff('/repo', false);
-        expect(diff).toContain('# Deleted files:');
-        expect(diff).toContain('-removed');
-    });
-});
-
-describe('GitService.hasChanges invalid type', () => {
-    it('returns false for an unknown change type (default branch throws, caught)', async () => {
-        installExecGit(() => 'x');
-        const result = await (
-            GitService as unknown as {
-                hasChanges: (r: string, t: string) => Promise<boolean>;
-            }
-        ).hasChanges('/repo', 'bogus');
-        expect(result).toBe(false);
-    });
-});
-
-describe('GitService.commitChanges staging branch coverage', () => {
-    it('stages deleted-only files (untracked false, deleted true)', async () => {
-        const calls: string[][] = [];
-        installExecGit((args) => {
-            calls.push(args);
-            const key = args.join(' ');
-            switch (key) {
-                case 'diff --cached --name-only':
-                    return ''; // no staged
-                case 'ls-files --others --exclude-standard':
-                    return ''; // no untracked -> hasUntrackedFiles false (branch 116 false)
-                case 'ls-files --deleted':
-                    return 'gone.txt\n';
-                default:
-                    return '';
-            }
-        });
-        await GitService.commitChanges('msg', fakeRepo('/repo'));
-        const addCall = calls.find((c) => c[0] === 'add');
-        expect(addCall).toEqual(['add', '--', 'gone.txt']);
-    });
-
-    it('stages untracked-only files (untracked true, deleted false)', async () => {
-        const calls: string[][] = [];
-        installExecGit((args) => {
-            calls.push(args);
-            const key = args.join(' ');
-            switch (key) {
-                case 'diff --cached --name-only':
-                    return '';
-                case 'ls-files --others --exclude-standard':
-                    return 'new.txt\n';
-                case 'ls-files --deleted':
-                    return ''; // hasDeletedFiles false (branch 128 false)
-                default:
-                    return '';
-            }
-        });
-        await GitService.commitChanges('msg', fakeRepo('/repo'));
-        const addCall = calls.find((c) => c[0] === 'add');
-        expect(addCall).toEqual(['add', '--', 'new.txt']);
-    });
-
-    it('skips the add command when the file listing yields nothing (filesToStage empty)', async () => {
-        const calls: string[][] = [];
-        installExecGit((args) => {
-            calls.push(args);
-            const key = args.join(' ');
-            switch (key) {
-                case 'diff --cached --name-only':
-                    return '';
-                // hasChanges('untracked') reports a change (whitespace trims to
-                // length>0 via the porcelain check)...
-                case 'ls-files --others --exclude-standard':
-                    // hasChanges sees "\n " -> trim().length 0? No: needs >0 for detection.
-                    // Use a real entry for detection but the staging filter drops blanks.
-                    return '   \n'; // whitespace-only -> hasChanges true, filtered to empty
-                case 'ls-files --deleted':
-                    return '';
-                default:
-                    return '';
-            }
-        });
-        // hasChanges('untracked') checks output.trim().length>0; '   \n'.trim() === '' -> false.
-        // So instead force detection true but listing empty is impossible via the same cmd.
-        // This asserts the commit still proceeds when nothing stageable is found.
-        await expect(
-            GitService.commitChanges('msg', fakeRepo('/repo')),
-        ).rejects.toBeInstanceOf(NoChangesDetectedError);
-        expect(calls.some((c) => c[0] === 'add')).toBe(false);
-    });
-});
-
-describe('GitService.commitChanges stageAll (B1)', () => {
-    it('stages the whole worktree with `add -A` before committing', async () => {
-        const calls: string[][] = [];
-        installExecGit((args) => {
-            calls.push(args);
-            // After `add -A` everything the message was generated from is staged.
-            return args.join(' ') === 'diff --cached --name-only' ? 'edited.txt\n' : '';
-        });
-
-        await GitService.commitChanges('msg', fakeRepo('/repo'), true);
-
-        expect(calls[0]).toEqual(['add', '-A']);
-        // The untracked/deleted-only staging path must not run on top of it.
-        expect(calls.filter((c) => c[0] === 'add')).toEqual([['add', '-A']]);
-        expect(calls.some((c) => c[0] === 'commit')).toBe(true);
-    });
-
-    it('does not touch the index when stageAll is false', async () => {
-        const calls: string[][] = [];
-        installExecGit((args) => {
-            calls.push(args);
-            return args.join(' ') === 'diff --cached --name-only' ? 'staged.txt\n' : '';
-        });
-
-        await GitService.commitChanges('msg', fakeRepo('/repo'));
-
-        expect(calls.some((c) => c[0] === 'add')).toBe(false);
-    });
-
-    it('still reports NoChangesDetectedError when `add -A` stages nothing', async () => {
-        installExecGit(() => '');
-        await expect(
-            GitService.commitChanges('msg', fakeRepo('/repo'), true),
-        ).rejects.toBeInstanceOf(NoChangesDetectedError);
-    });
-});
-
-describe('GitService.pushChanges resolves repo via getActiveRepository (branch 179)', () => {
-    it('uses getActiveRepository when no repository argument is passed', async () => {
-        const repo = fakeRepo('/repo');
-        vi.spyOn(vscode.extensions, 'getExtension').mockReturnValue({
-            activate: async () => ({ getAPI: () => ({ repositories: [repo] }) }),
-        } as unknown as vscode.Extension<unknown>);
-        installExecGit((args) => (args[0] === 'remote' ? 'origin\n' : ''));
-        await expect(GitService.pushChanges()).resolves.toBeUndefined();
-    });
-});
-
-describe('GitService.getDiff untracked/deleted empty-result branches', () => {
-    it('untracked detected but every per-file diff is blank -> section omitted (branch 258/423)', async () => {
-        installExecGit((args) => {
-            const key = args.join(' ');
-            switch (key) {
-                case 'rev-parse HEAD':
-                    return 'deadbeef';
-                case 'diff --cached --name-only':
-                    return '';
-                case 'diff --name-only':
-                    return 'u.txt\n'; // unstaged present so getDiff doesn't early-throw
-                case 'ls-files --stage -- u.txt':
-                    return '100644 h 0\tu.txt';
-                case 'diff -- u.txt':
-                    return 'UNSTAGED';
-                case 'ls-files --others --exclude-standard':
-                    return 'blank.txt\n';
-                case 'diff --no-index -- /dev/null blank.txt':
-                    // exit 128 -> dropped -> validDiffs empty -> getUntrackedDiff returns ''
-                    return { result: { stdout: '', stderr: '', exitCode: 128 } };
-                default:
-                    return '';
-            }
-        });
-        const diff = await GitService.getDiff('/repo', false);
-        expect(diff).toContain('UNSTAGED');
-        expect(diff).not.toContain('# New files:');
-    });
-
-    it('deleted detected but every per-file diff is blank -> section omitted (branch 265/458)', async () => {
-        installExecGit((args) => {
-            const key = args.join(' ');
-            switch (key) {
-                case 'rev-parse HEAD':
-                    return 'deadbeef';
-                case 'diff --cached --name-only':
-                    return '';
-                case 'diff --name-only':
-                    return 'u.txt\n';
-                case 'ls-files --stage -- u.txt':
-                    return '100644 h 0\tu.txt';
-                case 'diff -- u.txt':
-                    return 'UNSTAGED';
-                case 'ls-files --others --exclude-standard':
-                    return '';
-                case 'ls-files --deleted':
-                    return 'd.txt\n';
-                case 'diff -- d.txt':
-                    return ''; // blank -> validDiffs empty -> getDeletedDiff returns ''
-                default:
-                    return '';
-            }
-        });
-        const diff = await GitService.getDiff('/repo', false);
-        expect(diff).toContain('UNSTAGED');
-        expect(diff).not.toContain('# Deleted files:');
-    });
-
-    it('combines unstaged with untracked (covers the getUnstagedDiff call branch 252)', async () => {
-        installExecGit((args) => {
-            const key = args.join(' ');
-            switch (key) {
-                case 'rev-parse HEAD':
-                    return 'deadbeef';
-                case 'diff --cached --name-only':
-                    return '';
-                case 'diff --name-only':
-                    return 'u.txt\n';
-                case 'ls-files --stage -- u.txt':
-                    return '100644 h 0\tu.txt';
-                case 'diff -- u.txt':
-                    return 'UNSTAGED-BODY';
-                case 'ls-files --others --exclude-standard':
-                    return 'n.txt\n';
-                case 'diff --no-index -- /dev/null n.txt':
-                    return { result: { stdout: '+new', stderr: '', exitCode: 1 } };
-                default:
-                    return '';
-            }
-        });
-        const diff = await GitService.getDiff('/repo', false);
-        expect(diff).toContain('# Unstaged changes:');
-        expect(diff).toContain('# New files:');
-    });
-});
-
-describe('GitService.getActiveRepository no-active-editor branch (603)', () => {
+describe('GitRepositoryProvider.getActiveRepository no-active-editor branch', () => {
     it('falls back to selectRepository when there is no active editor', async () => {
         const r1 = fakeRepo('/repoA');
         const r2 = fakeRepo('/repoB');
@@ -914,12 +586,12 @@ describe('GitService.getActiveRepository no-active-editor branch (603)', () => {
         vi.spyOn(vscode.window, 'showQuickPick').mockResolvedValue({
             repository: r2,
         } as never);
-        expect(await GitService.getActiveRepository()).toBe(r2);
+        expect(await GitRepositoryProvider.getActiveRepository()).toBe(r2);
     });
 });
 
 describe('GitService.execGit additional spawn branches', () => {
-    type Opts = { signal?: AbortSignal; allowNonZeroExit?: boolean };
+    type Opts = { signal?: AbortSignal; allowNonZeroExit?: boolean; maxBuffer?: number };
     const execGit = (args: string[], cwd: string, opts?: Opts) =>
         (
             GitService as unknown as {
@@ -963,16 +635,20 @@ describe('GitService.execGit additional spawn branches', () => {
         expect(child.killSignals.filter((s) => s === 'SIGTERM')).toHaveLength(1);
     });
 
-    it('skips the SIGKILL escalation when the child is already killed (branch 652 false)', async () => {
-        // Standard FakeChild: kill() flips `killed = true`. After the SIGTERM
-        // from onAbort, the 1500ms grace timer finds `child.killed === true`,
-        // so the `if (!child.killed)` guard is false -> no SIGKILL.
-        const child = nextChild();
+    it('skips the SIGKILL escalation when the child exited on SIGTERM', async () => {
+        const child = new (class extends FakeChild {
+            kill(signal?: string): boolean {
+                super.kill(signal);
+                this.signalCode = signal ?? 'SIGTERM'; // the process honours it
+                return true;
+            }
+        })();
+        spawnMock.mockReturnValueOnce(child);
         vi.useFakeTimers();
         const controller = new AbortController();
         const p = execGit(['status'], '/repo', { signal: controller.signal });
-        controller.abort(); // onAbort -> SIGTERM -> child.killed = true
-        vi.advanceTimersByTime(1600); // grace timer fires; guard is false
+        controller.abort(); // onAbort -> SIGTERM -> child exits
+        vi.advanceTimersByTime(1600); // grace timer fires; the child is gone
         vi.useRealTimers();
         child.emit('close', null, 'SIGTERM');
         await expect(p).rejects.toThrow(/cancelled/i);

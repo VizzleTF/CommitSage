@@ -10,7 +10,7 @@ describe('buildWebviewL10n', () => {
         expect(bundle.apiKey).toBe('API key');
         expect(bundle.autoCommit).toBe('Auto-commit');
         expect(bundle.advanced).toBe('Advanced');
-        expect(bundle.autoOption).toBe('auto — try all available models');
+        expect(bundle.pinned).toContain('.commitsage/config.json');
     });
 
     it('exposes a string value for every key', () => {

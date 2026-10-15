@@ -5,6 +5,7 @@ import * as path from 'path';
 interface PackageJsonProperty {
     type?: string;
     default?: unknown;
+    enum?: unknown[];
 }
 
 const pkgPath = path.resolve(__dirname, '..', 'package.json');
@@ -37,6 +38,14 @@ describe('Settings schema (F036 + general)', () => {
         }
     });
 
+    it('every provider has a <provider>.model default, which getModelFor reads', async () => {
+        const { SETTING_DEFAULTS } = await import('../src/utils/configService');
+        const { PROVIDERS } = await import('../src/services/providerCatalog');
+        for (const p of PROVIDERS) {
+            expect(SETTING_DEFAULTS, `SETTING_DEFAULTS missing ${p}.model`).toHaveProperty([`${p}.model`]);
+        }
+    });
+
     it('ConfigService.knownConfigurationKeys matches the package.json schema (F053)', async () => {
         const { ConfigService } = await import('../src/utils/configService');
         const pkgKeys = Object.keys(pkg.contributes.configuration.properties);
@@ -48,5 +57,13 @@ describe('Settings schema (F036 + general)', () => {
         for (const key of ConfigService.knownConfigurationKeys) {
             expect(pkgKeys, `package.json missing ${key}`).toContain(key);
         }
+    });
+
+    it('the shared format, language and thinking-level lists match the package.json enums', async () => {
+        const { COMMIT_FORMATS, SUPPORTED_LANGUAGES, THINKING_LEVELS } = await import('../src/utils/constants');
+        const props = pkg.contributes.configuration.properties;
+        expect(props['commitSage.commit.commitFormat'].enum).toEqual([...COMMIT_FORMATS]);
+        expect(props['commitSage.commit.commitLanguage'].enum).toEqual([...SUPPORTED_LANGUAGES]);
+        expect(props['commitSage.gemini.thinkingLevel'].enum).toEqual([...THINKING_LEVELS]);
     });
 });

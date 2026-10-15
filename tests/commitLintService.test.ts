@@ -4,6 +4,9 @@ import * as os from 'os';
 import * as path from 'path';
 
 import { CommitLintService } from '../src/services/commitLintService';
+import { resolveConfigPath } from '../src/services/commitlint/configLoader';
+
+const hasConfig = (dir: string): boolean => resolveConfigPath(dir) !== null;
 
 let tmpDir: string;
 
@@ -15,31 +18,31 @@ afterEach(() => {
     fs.rmSync(tmpDir, { recursive: true, force: true });
 });
 
-// ─── hasConfig ───────────────────────────────────────────────────────────────
+// ─── config discovery ────────────────────────────────────────────────────────
 
-describe('CommitLintService.hasConfig', () => {
+describe('resolveConfigPath (config discovery)', () => {
     it('returns false when no config file exists', async () => {
-        expect(CommitLintService.hasConfig(tmpDir)).toBe(false);
+        expect(hasConfig(tmpDir)).toBe(false);
     });
 
     it('returns true for commitlint.config.js', async () => {
         fs.writeFileSync(path.join(tmpDir, 'commitlint.config.js'), 'module.exports = { rules: {} }');
-        expect(CommitLintService.hasConfig(tmpDir)).toBe(true);
+        expect(hasConfig(tmpDir)).toBe(true);
     });
 
     it('returns true for .commitlintrc.json', async () => {
         fs.writeFileSync(path.join(tmpDir, '.commitlintrc.json'), '{}');
-        expect(CommitLintService.hasConfig(tmpDir)).toBe(true);
+        expect(hasConfig(tmpDir)).toBe(true);
     });
 
     it('returns true for .commitlintrc (no extension)', async () => {
         fs.writeFileSync(path.join(tmpDir, '.commitlintrc'), '{}');
-        expect(CommitLintService.hasConfig(tmpDir)).toBe(true);
+        expect(hasConfig(tmpDir)).toBe(true);
     });
 
     it('returns true for .commitlintrc.yml', async () => {
         fs.writeFileSync(path.join(tmpDir, '.commitlintrc.yml'), 'rules: {}');
-        expect(CommitLintService.hasConfig(tmpDir)).toBe(true);
+        expect(hasConfig(tmpDir)).toBe(true);
     });
 });
 
@@ -323,7 +326,7 @@ describe('CommitLintService package.json config', () => {
             name: 'x',
             commitlint: { rules: { 'type-enum': [2, 'always', ['feat', 'pkg-json']] } },
         }));
-        expect(CommitLintService.hasConfig(tmpDir)).toBe(true);
+        expect(hasConfig(tmpDir)).toBe(true);
         expect(await CommitLintService.extractRules(tmpDir)).toContain('pkg-json');
     });
 
@@ -337,7 +340,7 @@ describe('CommitLintService package.json config', () => {
 
     it('ignores package.json without a commitlint field', async () => {
         fs.writeFileSync(path.join(tmpDir, 'package.json'), JSON.stringify({ name: 'x' }));
-        expect(CommitLintService.hasConfig(tmpDir)).toBe(false);
+        expect(hasConfig(tmpDir)).toBe(false);
         expect(await CommitLintService.extractRules(tmpDir)).toContain('Allowed types: feat');
     });
 
@@ -512,9 +515,17 @@ describe('CommitLintService per-format validation', () => {
         expect((await v('feat(api): scope not allowed', 'semantic')).valid).toBe(false);
     });
 
-    it('google: capitalized type required', async () => {
-        expect((await v('Feat: add thing', 'google')).valid).toBe(true);
-        expect((await v('feat: lowercase type', 'google')).valid).toBe(false);
+    it('google: lowercase conventional types, capitalized description allowed', async () => {
+        expect((await v('feat: Add user authentication system', 'google')).valid).toBe(true);
+        expect((await v('revert: Undo the cache change', 'google')).valid).toBe(true);
+        expect((await v('Feat: capitalized type', 'google')).valid).toBe(false);
+        expect((await v('wip: Unknown type', 'google')).valid).toBe(false);
+    });
+
+    it('atom: accepts every type its template names', async () => {
+        for (const type of ['perf', 'ci', 'build', 'revert']) {
+            expect((await v(`${type}(core): tidy up`, 'atom')).valid).toBe(true);
+        }
     });
 
     it('emoji: header must start with an emoji', async () => {
@@ -535,12 +546,21 @@ describe('CommitLintService per-format validation', () => {
         expect(result.errors.join()).toContain('type must');
     });
 
-    it('detailed: requires Summary/Details/Effects structure', async () => {
+    it('detailed: requires the Summary line; Details/Effects are optional', async () => {
         const good = 'Summary: add commitlint support\n\nDetails:\n- service: new validator\n\nEffects:\n- safer commits';
         expect((await v(good, 'detailed')).valid).toBe(true);
         expect((await v('feat: not detailed at all', 'detailed')).valid).toBe(false);
-        const noEffects = 'Summary: add thing\n\nDetails:\n- x: y';
-        expect((await v(noEffects, 'detailed')).valid).toBe(false);
+        // The template tells the model to skip these sections when they don't apply.
+        expect((await v('Summary: add thing\n\nDetails:\n- x: y', 'detailed')).valid).toBe(true);
+        expect((await v('Summary: fix a typo in a comment', 'detailed')).valid).toBe(true);
+        expect((await v(`Summary: ${'x'.repeat(73)}`, 'detailed')).valid).toBe(false);
+    });
+
+    it('conventional: skips subject-case for subjects without a cased first letter (CJK, digits)', async () => {
+        expect((await v('feat(auth): 添加用户认证', 'conventional')).valid).toBe(true);
+        expect((await v('docs: インストールガイドを更新', 'conventional')).valid).toBe(true);
+        expect((await v('fix: 2 typos in the readme', 'conventional')).valid).toBe(true);
+        expect((await v('feat: Add login', 'conventional')).valid).toBe(false);
     });
 
     it('angular format: chore banned, ! banned', async () => {

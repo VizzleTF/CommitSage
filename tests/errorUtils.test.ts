@@ -60,10 +60,13 @@ describe('sanitizeErrorForTelemetry', () => {
         expect(out).not.toContain('AIzaSyABCDEFG');
     });
 
-    it('preserves errorType from constructor name', () => {
-        class MyError extends Error {}
-        expect(sanitizeErrorForTelemetry(new MyError('x')).errorType).toBe(
-            'MyError'
-        );
+    it('takes errorType from error.name, which survives minification', () => {
+        class Minified extends Error {
+            constructor(message: string) {
+                super(message);
+                this.name = 'MyError';
+            }
+        }
+        expect(sanitizeErrorForTelemetry(new Minified('x')).errorType).toBe('MyError');
     });
 });

@@ -5,7 +5,6 @@ import { ConfigService } from '../utils/configService';
 import { getTemplate, CommitFormat } from '../templates';
 import { ProgressReporter } from '../models/types';
 import { AIServiceFactory } from './aiServiceFactory';
-import { Provider } from '../views/webview/protocol';
 import { toError } from '../utils/errorUtils';
 
 type TranslationsFile = Record<string, Partial<Record<CommitFormat, string>>>;
@@ -19,21 +18,6 @@ export class CustomLanguageService {
             return null;
         }
         return path.join(rootPath, '.commitsage', TRANSLATIONS_FILE);
-    }
-
-    private static async ensureCommitsageDirectory(): Promise<void> {
-        const rootPath = ConfigService.getProjectRootPath();
-        if (!rootPath) {
-            return;
-        }
-
-        const commitsagePath = path.join(rootPath, '.commitsage');
-
-        try {
-            await fs.promises.mkdir(commitsagePath, { recursive: true });
-        } catch (error) {
-            Logger.error('Failed to create .commitsage directory:', toError(error));
-        }
     }
 
     private static async readTranslations(): Promise<TranslationsFile> {
@@ -77,7 +61,7 @@ export class CustomLanguageService {
         }
 
         try {
-            await this.ensureCommitsageDirectory();
+            await fs.promises.mkdir(path.dirname(filePath), { recursive: true });
 
             const translations = await this.readTranslations();
             if (!translations[customLanguageName]) {
@@ -126,8 +110,8 @@ Rules:
 
 --- ${customLanguageName.toUpperCase()} TRANSLATION ---`;
 
-        const provider = ConfigService.getProvider() as Provider;
-        const result = await AIServiceFactory.generateCommitMessage(provider, translationPrompt, progress, undefined, { maxTokens: 4096 });
+        const provider = ConfigService.getProvider();
+        const result = await AIServiceFactory.generateCommitMessage(provider, translationPrompt, progress, { maxTokens: 4096 });
         const translatedTemplate = result.message.trim();
 
         await this.saveCachedTemplate(format, customLanguageName, translatedTemplate);

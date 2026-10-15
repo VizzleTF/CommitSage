@@ -4,6 +4,7 @@ import * as path from 'node:path';
 import { Logger } from '../utils/logger';
 import { toError } from '../utils/errorUtils';
 import { statOrUndefined } from '../utils/fsUtils';
+import { ConfigService } from '../utils/configService';
 
 export async function createProjectConfig(): Promise<void> {
     try {
@@ -44,43 +45,15 @@ export async function createProjectConfig(): Promise<void> {
             }
         }
 
+        // Every key here overrides user and workspace settings for everyone who
+        // clones the repo, so start from the current format and language only;
+        // docs/configuration.md lists the rest.
         const templateConfig = {
-            provider: {
-                type: 'gemini'
-            },
             commit: {
-                commitLanguage: 'english',
-                commitFormat: 'conventional',
-                useCustomInstructions: false,
-                customInstructions: '',
-                onlyStagedChanges: false,
-                autoCommit: false,
-                autoPush: false,
-                refs: {
-                    enabled: false,
-                    source: 'prompt',
-                    value: '',
-                    placement: 'end',
-                    branchPattern: '[A-Z][A-Z0-9]*-[0-9]+'
-                }
+                commitFormat: ConfigService.get('commit.commitFormat'),
+                commitLanguage: ConfigService.get('commit.commitLanguage'),
+                customLanguageName: ConfigService.get('commit.customLanguageName'),
             },
-            gemini: {
-                model: 'auto'
-            },
-            codestral: {
-                model: 'codestral-latest'
-            },
-            openai: {
-                model: 'gpt-3.5-turbo',
-                baseUrl: 'https://api.openai.com/v1'
-            },
-            ollama: {
-                baseUrl: 'http://localhost:11434',
-                model: 'llama3.2'
-            },
-            telemetry: {
-                enabled: true
-            }
         };
 
         await fs.mkdir(configDir, { recursive: true });

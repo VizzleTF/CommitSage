@@ -67,23 +67,21 @@ vi.mock('../src/utils/configService', () => ({
 
 // RetryUtils mock whose handleGenerationError is overridable per-test.
 const handleGenerationErrorImpl = {
-    fn: async (err: Error): Promise<never> => {
+    fn: async (err: Error): Promise<void> => {
         throw err;
     },
 };
 
 vi.mock('../src/utils/retryUtils', () => ({
     RetryUtils: {
-        updateProgressForAttempt: vi.fn(async () => undefined),
+        updateProgressForAttempt: vi.fn(),
         handleGenerationError: vi.fn(
             (
                 err: Error,
-                prompt: string,
                 progress: unknown,
                 attempt: number,
-                generateFn: (p: string, pr: unknown, a: number) => Promise<unknown>,
                 errorHandler: (e: Error) => unknown
-            ) => handleGenerationErrorImpl.fn(err, prompt, progress, attempt, generateFn, errorHandler)
+            ) => handleGenerationErrorImpl.fn(err, progress, attempt, errorHandler)
         ),
     },
 }));
@@ -102,30 +100,20 @@ beforeEach(() => {
     mockedGetOptionalKey.mockReset();
     mockedGetOptionalKey.mockResolvedValue(undefined);
     // default: rethrow
-    handleGenerationErrorImpl.fn = async (err: Error): Promise<never> => {
+    handleGenerationErrorImpl.fn = async (err: Error): Promise<void> => {
         throw err;
     };
     SETTINGS['custom.useApiKey'] = false;
     SETTINGS['custom.chatCompletionsPath'] = '/chat/completions';
     SETTINGS['ollama.numCtx'] = 0;
+    SETTINGS['ollama.baseUrl'] = 'http://localhost:11434';
+    SETTINGS['ollama.useAuthToken'] = false;
     SETTINGS['general.temperature'] = 0.7;
 });
 
-/**
- * Make handleGenerationError invoke the retry closure (generateFn) once.
- * This exercises the `(p, pr, a) => this.generateCommitMessage(...)` arrow
- * passed by every provider (the "line 24/31/32/44" uncovered closures).
- */
+/** Make handleGenerationError let the retry loop run another attempt. */
 function retryOnce(): void {
-    handleGenerationErrorImpl.fn = (async (
-        _err: Error,
-        prompt: string,
-        pr: unknown,
-        attempt: number,
-        generateFn: (p: string, pr: unknown, a: number) => Promise<unknown>
-    ) => {
-        return generateFn(prompt, pr, attempt + 1);
-    }) as typeof handleGenerationErrorImpl.fn;
+    handleGenerationErrorImpl.fn = (async () => undefined) as typeof handleGenerationErrorImpl.fn;
 }
 
 // ---------------------------------------------------------------------------
@@ -275,16 +263,16 @@ describe('handleHttpError "Unknown error" fallback (branch 180)', () => {
 });
 
 describe('withRetryAndApiKeyGuard error delegation', () => {
-    it('delegates non-401 HttpError to RetryUtils.handleGenerationError (lines 49-55)', async () => {
+    it('delegates non-401 HttpError to RetryUtils.handleGenerationError', async () => {
         const { withRetryAndApiKeyGuard } = await import('../src/services/baseAIService');
         const { RetryUtils } = await import('../src/utils/retryUtils');
         const { HttpError } = await import('../src/utils/httpUtils');
 
-        const retryFn = vi.fn(async () => ({ message: 'm', model: 'x' }));
         const err = new HttpError(500, {});
+        (RetryUtils.handleGenerationError as ReturnType<typeof vi.fn>).mockClear();
 
         await expect(
-            withRetryAndApiKeyGuard('Foo', 'p', progress, 1, retryFn, async () => {
+            withRetryAndApiKeyGuard('Foo', progress, async () => {
                 throw err;
             })
         ).rejects.toBe(err);
@@ -292,7 +280,7 @@ describe('withRetryAndApiKeyGuard error delegation', () => {
         expect(RetryUtils.handleGenerationError).toHaveBeenCalledTimes(1);
         // verify the errorHandler maps via handleHttpError with "<name> API"
         const call = (RetryUtils.handleGenerationError as ReturnType<typeof vi.fn>).mock.calls[0];
-        const errorHandler = call[5] as (e: Error) => { errorMessage: string };
+        const errorHandler = call[3] as (e: Error) => { errorMessage: string };
         const mapped = errorHandler(new HttpError(429, {}));
         expect(mapped.errorMessage).toBeDefined();
     });
@@ -303,7 +291,7 @@ describe('withRetryAndApiKeyGuard error delegation', () => {
         const { HttpError } = await import('../src/utils/httpUtils');
 
         await expect(
-            withRetryAndApiKeyGuard('Foo', 'p', progress, 1, vi.fn(), async () => {
+            withRetryAndApiKeyGuard('Foo', progress, async () => {
                 throw new HttpError(401, {});
             })
         ).rejects.toBeInstanceOf(ApiKeyInvalidError);
@@ -344,7 +332,7 @@ describe.each(retryCases)('$name retry closure', ({ provider, model }) => {
             )
             .mockResolvedValueOnce({ choices: [{ message: { content: 'feat: ok' } }] });
 
-        const result = await generateViaOpenAICompatibleProvider(provider, 'hello', progress, 1);
+        const result = await generateViaOpenAICompatibleProvider(provider, 'hello', progress);
         expect(result).toEqual({ message: 'feat: ok', model });
         expect(mockedPostJson).toHaveBeenCalledTimes(2);
     });
@@ -355,7 +343,7 @@ describe.each(retryCases)('$name retry closure', ({ provider, model }) => {
             new (await import('../src/utils/httpUtils')).HttpError(401, {})
         );
         await expect(
-            generateViaOpenAICompatibleProvider(provider, 'hi', progress, 1)
+            generateViaOpenAICompatibleProvider(provider, 'hi', progress)
         ).rejects.toBeInstanceOf(ApiKeyInvalidError);
     });
 });
@@ -366,13 +354,13 @@ describe('generateViaOpenAICompatible defaults', () => {
         mockedPostJson.mockResolvedValueOnce({
             choices: [{ message: { content: 'ok' } }],
         });
-        await generateViaOpenAICompatibleProvider('groq', 'hi', progress, 1);
+        await generateViaOpenAICompatibleProvider('groq', 'hi', progress);
         expect(mockedPostJson.mock.calls[0][1]).toMatchObject({ max_tokens: 4096 });
 
         mockedPostJson.mockResolvedValueOnce({
             choices: [{ message: { content: 'ok' } }],
         });
-        await generateViaOpenAICompatibleProvider('groq', 'hi', progress, 1, { maxTokens: 50 });
+        await generateViaOpenAICompatibleProvider('groq', 'hi', progress, { maxTokens: 50 });
         expect(mockedPostJson.mock.calls[1][1]).toMatchObject({ max_tokens: 50 });
     });
 });
@@ -386,7 +374,7 @@ describe('CustomOpenAIService key handling', () => {
         SETTINGS['custom.useApiKey'] = true;
         mockedPostJson.mockResolvedValueOnce({ choices: [{ message: { content: 'ok' } }] });
 
-        await generateViaOpenAICompatibleProvider('custom', 'hi', progress, 1);
+        await generateViaOpenAICompatibleProvider('custom', 'hi', progress);
         expect(mockedGetKey).toHaveBeenCalledWith('custom');
         const [, , opts] = mockedPostJson.mock.calls[0];
         const headers = (opts as { headers: Record<string, string> }).headers;
@@ -398,7 +386,7 @@ describe('CustomOpenAIService key handling', () => {
         SETTINGS['custom.useApiKey'] = false;
         mockedPostJson.mockResolvedValueOnce({ choices: [{ message: { content: 'ok' } }] });
 
-        await generateViaOpenAICompatibleProvider('custom', 'hi', progress, 1);
+        await generateViaOpenAICompatibleProvider('custom', 'hi', progress);
         expect(mockedGetKey).not.toHaveBeenCalled();
         const [, , opts] = mockedPostJson.mock.calls[0];
         const headers = (opts as { headers: Record<string, string> }).headers;
@@ -420,7 +408,7 @@ describe('AnthropicService coverage', () => {
             .mockRejectedValueOnce(new HttpError(500, {}))
             .mockResolvedValueOnce({ content: [{ type: 'text', text: 'feat: ok' }] });
 
-        const result = await AnthropicService.generateCommitMessage('hello', progress, 1);
+        const result = await AnthropicService.generateCommitMessage('hello', progress);
         expect(result.message).toBe('feat: ok');
         expect(mockedPostJson).toHaveBeenCalledTimes(2);
     });
@@ -428,7 +416,7 @@ describe('AnthropicService coverage', () => {
     it('forwards maxTokens override', async () => {
         const { AnthropicService } = await import('../src/services/anthropicService');
         mockedPostJson.mockResolvedValueOnce({ content: [{ type: 'text', text: 'ok' }] });
-        await AnthropicService.generateCommitMessage('hi', progress, 1, { maxTokens: 77 });
+        await AnthropicService.generateCommitMessage('hi', progress, { maxTokens: 77 });
         expect(mockedPostJson.mock.calls[0][1]).toMatchObject({ max_tokens: 77 });
     });
 });
@@ -446,7 +434,7 @@ describe('CodestralService coverage', () => {
             .mockRejectedValueOnce(new HttpError(500, {}))
             .mockResolvedValueOnce({ choices: [{ message: { content: 'feat: ok' } }] });
 
-        const result = await generateViaOpenAICompatibleProvider('codestral', 'hello', progress, 1);
+        const result = await generateViaOpenAICompatibleProvider('codestral', 'hello', progress);
         expect(result.message).toBe('feat: ok');
         expect(mockedPostJson).toHaveBeenCalledTimes(2);
     });
@@ -457,7 +445,7 @@ describe('CodestralService coverage', () => {
 // ---------------------------------------------------------------------------
 
 describe('GeminiService coverage', () => {
-    it('retry closure (line 191) for single-model branch', async () => {
+    it('retry closure for single-model branch', async () => {
         const { GeminiService } = await import('../src/services/geminiService');
         const { HttpError } = await import('../src/utils/httpUtils');
         SETTINGS['gemini.model'] = 'gemini-2.5-flash';
@@ -469,26 +457,26 @@ describe('GeminiService coverage', () => {
                 candidates: [{ content: { parts: [{ text: 'feat: ok' }] } }],
             });
 
-        const result = await GeminiService.generateCommitMessage('hello', progress, 1);
+        const result = await GeminiService.generateCommitMessage('hello', progress);
         expect(result).toEqual({ message: 'feat: ok', model: 'gemini-2.5-flash' });
         expect(mockedPostJson).toHaveBeenCalledTimes(2);
     });
 
-    it('buildGeminiGenerationConfig uses options.maxTokens (line 43)', async () => {
+    it('buildGeminiGenerationConfig uses options.maxTokens', async () => {
         const { GeminiService } = await import('../src/services/geminiService');
         SETTINGS['gemini.model'] = 'gemini-2.5-flash';
         mockedPostJson.mockResolvedValueOnce({
             candidates: [{ content: { parts: [{ text: 'ok' }] } }],
         });
 
-        await GeminiService.generateCommitMessage('hi', progress, 1, { maxTokens: 256 });
+        await GeminiService.generateCommitMessage('hi', progress, { maxTokens: 256 });
         const payload = mockedPostJson.mock.calls[0][1] as {
             generationConfig: { maxOutputTokens: number };
         };
         expect(payload.generationConfig.maxOutputTokens).toBe(256);
     });
 
-    it('auto mode throws when no models available (line 180)', async () => {
+    it('auto mode throws when no models available', async () => {
         const { GeminiService } = await import('../src/services/geminiService');
         SETTINGS['gemini.model'] = 'auto';
         // getAvailableModels returns [] only if getJson returns empty models AND
@@ -496,13 +484,13 @@ describe('GeminiService coverage', () => {
         mockedGetJson.mockResolvedValueOnce({ models: [] });
 
         await expect(
-            GeminiService.generateCommitMessage('hi', progress, 1)
+            GeminiService.generateCommitMessage('hi', progress)
         ).rejects.toThrow('No available Gemini models found');
 
         SETTINGS['gemini.model'] = 'gemini-2.5-flash';
     });
 
-    it('sort tie-break via localeCompare (line 78) — same tier & version', async () => {
+    it('sort tie-break via localeCompare — same tier & version', async () => {
         const { GeminiService } = await import('../src/services/geminiService');
         SETTINGS['gemini.model'] = 'auto';
         // two flash models, same version 2.5 → tierDiff 0, versionDiff 0 → localeCompare
@@ -516,18 +504,16 @@ describe('GeminiService coverage', () => {
             candidates: [{ content: { parts: [{ text: 'feat: ok' }] } }],
         });
 
-        const result = await GeminiService.generateCommitMessage('hi', progress, 1);
+        const result = await GeminiService.generateCommitMessage('hi', progress);
         // localeCompare orders -a before -b, so first model tried is ...-a
         expect(result.model).toBe('gemini-2.5-flash-a');
         SETTINGS['gemini.model'] = 'gemini-2.5-flash';
     });
 
-    it('getAvailableModels falls back to static list on fetch error', async () => {
+    it('getAvailableModels propagates a failed listing', async () => {
         const { GeminiService } = await import('../src/services/geminiService');
         mockedGetJson.mockRejectedValueOnce(new Error('network down'));
-        const models = await GeminiService.getAvailableModels('k');
-        expect(models.length).toBeGreaterThan(0);
-        expect(models).toContain('gemini-2.5-pro');
+        await expect(GeminiService.getAvailableModels('k')).rejects.toThrow('network down');
     });
 
     it('auto mode: all-401 throws ApiKeyInvalidError', async () => {
@@ -543,7 +529,7 @@ describe('GeminiService coverage', () => {
         mockedPostJson.mockRejectedValueOnce(new HttpError(401, {}));
 
         await expect(
-            GeminiService.generateCommitMessage('hi', progress, 1)
+            GeminiService.generateCommitMessage('hi', progress)
         ).rejects.toBeInstanceOf(ApiKeyInvalidError);
         SETTINGS['gemini.model'] = 'gemini-2.5-flash';
     });
@@ -560,7 +546,7 @@ describe('GeminiService coverage', () => {
         mockedPostJson.mockRejectedValueOnce(new HttpError(500, { error: 'boom' }));
 
         await expect(
-            GeminiService.generateCommitMessage('hi', progress, 1)
+            GeminiService.generateCommitMessage('hi', progress)
         ).rejects.toThrow('All models failed');
         SETTINGS['gemini.model'] = 'gemini-2.5-flash';
     });
@@ -576,7 +562,7 @@ describe('GeminiService coverage', () => {
         mockedPostJson.mockRejectedValueOnce('weird-string-failure');
 
         await expect(
-            GeminiService.generateCommitMessage('hi', progress, 1)
+            GeminiService.generateCommitMessage('hi', progress)
         ).rejects.toThrow('All models failed');
         SETTINGS['gemini.model'] = 'gemini-2.5-flash';
     });
@@ -632,15 +618,38 @@ describe('GeminiService coverage', () => {
 // ---------------------------------------------------------------------------
 
 describe('OllamaService coverage', () => {
-    it('adds Authorization header when an optional key is present (line 56)', async () => {
+    it('adds Authorization header when ollama.useAuthToken is on and a token is stored', async () => {
         const { OllamaService } = await import('../src/services/ollamaService');
+        SETTINGS['ollama.useAuthToken'] = true;
         mockedGetOptionalKey.mockResolvedValueOnce('ollama-token');
         mockedPostJson.mockResolvedValueOnce({ message: { content: 'feat: ok' } });
 
-        await OllamaService.generateCommitMessage('hi', progress, 1);
+        await OllamaService.generateCommitMessage('hi', progress);
         const [, , opts] = mockedPostJson.mock.calls[0];
         const headers = (opts as { headers: Record<string, string> }).headers;
         expect(headers['Authorization']).toBe('Bearer ollama-token');
+    });
+
+    it('does not send a stored token when ollama.useAuthToken is off', async () => {
+        const { OllamaService } = await import('../src/services/ollamaService');
+        SETTINGS['ollama.useAuthToken'] = false;
+        mockedGetOptionalKey.mockResolvedValue('stale-token');
+        mockedPostJson.mockResolvedValueOnce({ message: { content: 'feat: ok' } });
+
+        await OllamaService.generateCommitMessage('hi', progress);
+        const [, , opts] = mockedPostJson.mock.calls[0];
+        const headers = (opts as { headers: Record<string, string> }).headers;
+        expect(headers['Authorization']).toBeUndefined();
+        expect(mockedGetOptionalKey).not.toHaveBeenCalled();
+    });
+
+    it('strips a trailing slash from ollama.baseUrl', async () => {
+        const { OllamaService } = await import('../src/services/ollamaService');
+        SETTINGS['ollama.baseUrl'] = 'http://localhost:11434/';
+        mockedPostJson.mockResolvedValueOnce({ message: { content: 'feat: ok' } });
+
+        await OllamaService.generateCommitMessage('hi', progress);
+        expect(mockedPostJson.mock.calls[0][0]).toBe('http://localhost:11434/api/chat');
     });
 
     it('maps 404 to "Model not found" (no retry)', async () => {
@@ -652,11 +661,11 @@ describe('OllamaService coverage', () => {
 
         mockedPostJson.mockRejectedValueOnce(new HttpError(404, {}));
         await expect(
-            OllamaService.generateCommitMessage('hi', progress, 1)
+            OllamaService.generateCommitMessage('hi', progress)
         ).rejects.toBeTruthy();
 
         const call = (RetryUtils.handleGenerationError as ReturnType<typeof vi.fn>).mock.calls.at(-1)!;
-        const errorHandler = call[5] as (e: Error) => { errorMessage: string; statusCode?: number; shouldRetry: boolean };
+        const errorHandler = call[3] as (e: Error) => { errorMessage: string; statusCode?: number; shouldRetry: boolean };
         const mapped = errorHandler(new HttpError(404, {}));
         expect(mapped.errorMessage).toContain('Model not found');
         expect(mapped.shouldRetry).toBe(false);
@@ -670,11 +679,11 @@ describe('OllamaService coverage', () => {
 
         mockedPostJson.mockRejectedValueOnce(new HttpError(500, {}));
         await expect(
-            OllamaService.generateCommitMessage('hi', progress, 1)
+            OllamaService.generateCommitMessage('hi', progress)
         ).rejects.toBeTruthy();
 
         const call = (RetryUtils.handleGenerationError as ReturnType<typeof vi.fn>).mock.calls.at(-1)!;
-        const errorHandler = call[5] as (e: Error) => { errorMessage: string; shouldRetry: boolean; statusCode?: number };
+        const errorHandler = call[3] as (e: Error) => { errorMessage: string; shouldRetry: boolean; statusCode?: number };
         const mapped = errorHandler(new HttpError(500, {}));
         expect(mapped.errorMessage).toContain('Ollama is running properly');
         expect(mapped.shouldRetry).toBe(true);
@@ -687,11 +696,11 @@ describe('OllamaService coverage', () => {
 
         mockedPostJson.mockRejectedValueOnce(new HttpError(500, {}));
         await expect(
-            OllamaService.generateCommitMessage('hi', progress, 1)
+            OllamaService.generateCommitMessage('hi', progress)
         ).rejects.toBeTruthy();
 
         const call = (RetryUtils.handleGenerationError as ReturnType<typeof vi.fn>).mock.calls.at(-1)!;
-        const errorHandler = call[5] as (e: Error) => { errorMessage: string };
+        const errorHandler = call[3] as (e: Error) => { errorMessage: string };
         const mapped = errorHandler(new NetworkError('ECONNREFUSED', { code: 'ECONNREFUSED' }));
         expect(mapped.errorMessage).toContain('make sure Ollama is running');
     });
@@ -703,11 +712,11 @@ describe('OllamaService coverage', () => {
 
         mockedPostJson.mockRejectedValueOnce(new HttpError(403, { error: 'forbidden' }));
         await expect(
-            OllamaService.generateCommitMessage('hi', progress, 1)
+            OllamaService.generateCommitMessage('hi', progress)
         ).rejects.toBeTruthy();
 
         const call = (RetryUtils.handleGenerationError as ReturnType<typeof vi.fn>).mock.calls.at(-1)!;
-        const errorHandler = call[5] as (e: Error) => { errorMessage: string; shouldRetry: boolean };
+        const errorHandler = call[3] as (e: Error) => { errorMessage: string; shouldRetry: boolean };
         const mapped = errorHandler(new HttpError(403, { error: 'forbidden' }));
         expect(mapped.errorMessage).toBe('forbidden');
         expect(mapped.shouldRetry).toBe(false);
@@ -719,11 +728,11 @@ describe('OllamaService coverage', () => {
         const { HttpError } = await import('../src/utils/httpUtils');
         mockedPostJson.mockRejectedValueOnce(new HttpError(401, {}));
         await expect(
-            OllamaService.generateCommitMessage('hi', progress, 1)
+            OllamaService.generateCommitMessage('hi', progress)
         ).rejects.toBeInstanceOf(ApiKeyInvalidError);
     });
 
-    it('retries via generateFn closure (lines 75/80) then succeeds', async () => {
+    it('retries via generateFn closure then succeeds', async () => {
         const { OllamaService } = await import('../src/services/ollamaService');
         const { HttpError } = await import('../src/utils/httpUtils');
         retryOnce();
@@ -732,7 +741,7 @@ describe('OllamaService coverage', () => {
             .mockRejectedValueOnce(new HttpError(500, {}))
             .mockResolvedValueOnce({ message: { content: 'feat: ok' } });
 
-        const result = await OllamaService.generateCommitMessage('hi', progress, 1);
+        const result = await OllamaService.generateCommitMessage('hi', progress);
         expect(result).toEqual({ message: 'feat: ok', model: 'llama3.2' });
         expect(mockedPostJson).toHaveBeenCalledTimes(2);
     });

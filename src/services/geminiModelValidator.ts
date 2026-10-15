@@ -5,9 +5,6 @@ import { GeminiService } from './geminiService';
 import { Logger } from '../utils/logger';
 import { toError } from '../utils/errorUtils';
 
-const SETTING_KEY = 'commitSage.gemini.model';
-const AUTO_VALUE = 'auto';
-
 /**
  * If Google sunsets the configured Gemini model (e.g. a preview alias), the
  * user only learns about it via a 404 at generation time. This runs once on
@@ -22,7 +19,7 @@ export async function validateGeminiModelOnStartup(): Promise<void> {
     }
 
     const configured = ConfigService.get('gemini.model');
-    if (configured === AUTO_VALUE) {
+    if (configured === 'auto') {
         return;
     }
 
@@ -59,8 +56,6 @@ export async function validateGeminiModelOnStartup(): Promise<void> {
     if (selection === pick) {
         await vscode.commands.executeCommand('commitsage.settings.focus');
     } else if (selection === useAuto) {
-        await vscode.workspace
-            .getConfiguration()
-            .update(SETTING_KEY, AUTO_VALUE, vscode.ConfigurationTarget.Global);
+        await ConfigService.set('gemini.model', 'auto');
     }
 }

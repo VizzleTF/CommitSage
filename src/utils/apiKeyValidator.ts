@@ -1,15 +1,15 @@
+const EMPTY_KEY = 'API key cannot be empty';
+const INVALID_CHARS = 'API key contains invalid characters';
 
-const apiValidation = {
-    keyFormat: /^[A-Za-z0-9_-]+$/,
-    // Gemini accepts both old AI Studio keys (`AIza...`) and newer Google keys
-    // (`AQ.Ab8...`), the latter containing `.`. See issue #437.
-    geminiKeyFormat: /^[A-Za-z0-9._-]+$/,
-    openaiTestEndpoint: 'https://api.openai.com/v1/models',
-    errorMessages: {
-        emptyKey: 'API key cannot be empty',
-        invalidChars: 'API key contains invalid characters'
-    }
-} as const;
+/** Validator for providers with a fixed key shape: non-empty, every char in `charset`. */
+function charsetValidator(charset: RegExp): (key: string) => string | null {
+    return (key: string) => {
+        if (!key) {
+            return EMPTY_KEY;
+        }
+        return charset.test(key) ? null : INVALID_CHARS;
+    };
+}
 
 export class ApiKeyValidator {
     /**
@@ -21,38 +21,14 @@ export class ApiKeyValidator {
      * provider from `providerCatalog.ts`.
      */
     static validateNonEmpty(key: string): string | null {
-        if (!key) {
-            return apiValidation.errorMessages.emptyKey;
-        }
-        return null;
-    }
-
-    /** Strict charset validation shared by providers with a fixed key shape. */
-    private static validateStrictFormat(key: string): string | null {
-        if (!key) {
-            return apiValidation.errorMessages.emptyKey;
-        }
-        if (!apiValidation.keyFormat.test(key)) {
-            return apiValidation.errorMessages.invalidChars;
-        }
-        return null;
+        return key ? null : EMPTY_KEY;
     }
 
     /**
      * Charset check that allows both old AI Studio keys (`AIza...`) and newer
      * Google keys (`AQ.Ab8...`), the latter containing `.` (see issue #437).
      */
-    static validateGeminiApiKey(key: string): string | null {
-        if (!key) {
-            return apiValidation.errorMessages.emptyKey;
-        }
-        if (!apiValidation.geminiKeyFormat.test(key)) {
-            return apiValidation.errorMessages.invalidChars;
-        }
-        return null;
-    }
+    static readonly validateGeminiApiKey = charsetValidator(/^[A-Za-z0-9._-]+$/);
 
-    static validateCodestralApiKey(key: string): string | null {
-        return ApiKeyValidator.validateStrictFormat(key);
-    }
+    static readonly validateCodestralApiKey = charsetValidator(/^[A-Za-z0-9_-]+$/);
 }

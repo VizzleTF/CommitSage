@@ -2,11 +2,11 @@ import { Logger } from '../utils/logger';
 import { ConfigService } from '../utils/configService';
 import { ProgressReporter, CommitMessage, GenerateOptions } from '../models/types';
 import { ApiKeyInvalidError, TruncatedResponseError } from '../models/errors';
-import { extractAndValidateMessage, getConfiguredTemperature, resolveMaxOutputTokens, withRetryAndApiKeyGuard } from './baseAIService';
+import { extractAndValidateMessage, getConfiguredTemperature, isInvalidApiKeyError, resolveMaxOutputTokens, withRetryAndApiKeyGuard } from './baseAIService';
 import { HttpError, HttpUtils } from '../utils/httpUtils';
-import { RetryUtils } from '../utils/retryUtils';
 import { ApiKeyManager } from './apiKeyManager';
 import { toError } from '../utils/errorUtils';
+import { THINKING_LEVELS } from '../utils/constants';
 
 interface GeminiPart {
     text?: string;
@@ -41,7 +41,6 @@ const GEMINI_GENERATION_CONFIG_BASE = {
 /** Gemini 2.5 Pro is the one 2.5 model that cannot switch thinking off. */
 const GEMINI_PRO_MIN_THINKING_BUDGET = 128;
 
-const THINKING_LEVELS = ['minimal', 'low', 'medium', 'high'];
 const DEFAULT_THINKING_LEVEL = 'low';
 
 // `.commitsage/config.json` is parsed leniently, so both knobs are sanitized
@@ -54,7 +53,7 @@ function readThinkingBudget(): number {
 
 function readThinkingLevel(): string {
     const raw = ConfigService.get('gemini.thinkingLevel');
-    return THINKING_LEVELS.includes(raw) ? raw : DEFAULT_THINKING_LEVEL;
+    return (THINKING_LEVELS as readonly string[]).includes(raw) ? raw : DEFAULT_THINKING_LEVEL;
 }
 
 /**
@@ -149,36 +148,34 @@ function sortGeminiModelsByQuality(models: string[]): string[] {
     });
 }
 
+/** Auto mode's model list when the live one can't be fetched, best first. */
+const FALLBACK_GEMINI_MODELS = [
+    'gemini-2.5-pro',
+    'gemini-3-flash-preview',
+    'gemini-2.5-flash',
+    'gemini-2.5-flash-lite',
+];
+
 export class GeminiService {
     static async getAvailableModels(apiKey: string, signal?: AbortSignal): Promise<string[]> {
-        try {
-            const data = await HttpUtils.getJson<GeminiModelsResponse>(
-                'https://generativelanguage.googleapis.com/v1/models',
-                {
-                    headers: { 'x-goog-api-key': apiKey },
-                    signal,
-                }
-            );
+        const data = await HttpUtils.getJson<GeminiModelsResponse>(
+            'https://generativelanguage.googleapis.com/v1/models',
+            {
+                headers: { 'x-goog-api-key': apiKey },
+                signal,
+            }
+        );
 
-            const models = (data.models ?? [])
-                .filter((model: GeminiModel) =>
-                    model.supportedGenerationMethods?.includes('generateContent')
-                )
-                .map((model: GeminiModel) => model.name.replace('models/', ''))
-                .filter(isCommitCapableGeminiModel);
+        const models = (data.models ?? [])
+            .filter((model: GeminiModel) =>
+                model.supportedGenerationMethods?.includes('generateContent')
+            )
+            .map((model: GeminiModel) => model.name.replace('models/', ''))
+            .filter(isCommitCapableGeminiModel);
 
-            const sorted = sortGeminiModelsByQuality(models);
-            Logger.log(`Found ${sorted.length} available Gemini models (sorted by quality): ${sorted.join(', ')}`);
-            return sorted;
-        } catch (error) {
-            Logger.error('Failed to fetch available Gemini models:', toError(error));
-            return sortGeminiModelsByQuality([
-                'gemini-2.5-pro',
-                'gemini-2.5-flash',
-                'gemini-3-flash-preview',
-                'gemini-2.5-flash-lite'
-            ]);
-        }
+        const sorted = sortGeminiModelsByQuality(models);
+        Logger.log(`Found ${sorted.length} available Gemini models (sorted by quality): ${sorted.join(', ')}`);
+        return sorted;
     }
 
     /**
@@ -213,7 +210,7 @@ export class GeminiService {
         apiKey: string,
         options?: GenerateOptions
     ): Promise<CommitMessage> {
-        const errors: Array<{ model: string; error: string; status?: number }> = [];
+        const errors: Array<{ model: string; error: string; keyInvalid: boolean }> = [];
 
         for (const model of models) {
             try {
@@ -229,15 +226,14 @@ export class GeminiService {
                 return result;
 
             } catch (error) {
-                const status = error instanceof HttpError ? error.status : undefined;
+                const keyInvalid = error instanceof HttpError && isInvalidApiKeyError(error);
                 const errorMsg = error instanceof Error ? error.message : String(error);
-                errors.push({ model, error: errorMsg, status });
+                errors.push({ model, error: errorMsg, keyInvalid });
                 Logger.log(`Model ${model} failed: ${errorMsg}`);
             }
         }
 
-        const allUnauthorized = errors.length > 0 && errors.every(e => e.status === 401);
-        if (allUnauthorized) {
+        if (errors.length > 0 && errors.every(e => e.keyInvalid)) {
             throw new ApiKeyInvalidError('Gemini');
         }
 
@@ -248,17 +244,27 @@ export class GeminiService {
     static async generateCommitMessage(
         prompt: string,
         progress: ProgressReporter,
-        attempt: number = 1,
         options?: GenerateOptions
     ): Promise<CommitMessage> {
         const apiKey = await ApiKeyManager.getKey('gemini');
         const configuredModel = ConfigService.get('gemini.model');
 
         // Auto-mode is structurally different (loops over models, accumulates
-        // 401s rather than failing fast), so it bypasses the helper.
+        // key errors rather than failing fast), so it bypasses the helper.
         if (configuredModel === 'auto') {
             progress.report({ message: 'Fetching available Gemini models...', increment: 0 });
-            const availableModels = await this.getAvailableModels(apiKey, options?.signal);
+            let availableModels: string[];
+            try {
+                availableModels = await this.getAvailableModels(apiKey, options?.signal);
+            } catch (error) {
+                // A bad key fails the listing too; trying every fallback model
+                // would only repeat that rejection.
+                if (error instanceof HttpError && isInvalidApiKeyError(error)) {
+                    throw new ApiKeyInvalidError('Gemini');
+                }
+                Logger.error('Failed to fetch available Gemini models, using the built-in list:', toError(error));
+                availableModels = FALLBACK_GEMINI_MODELS;
+            }
 
             if (availableModels.length === 0) {
                 throw new Error('No available Gemini models found');
@@ -267,19 +273,8 @@ export class GeminiService {
             return this.tryGenerateWithModels(prompt, progress, availableModels, apiKey, options);
         }
 
-        return withRetryAndApiKeyGuard(
-            'Gemini',
-            prompt,
-            progress,
-            attempt,
-            (p, pr, a) => this.generateCommitMessage(p, pr, a, options),
-            async () => {
-                await RetryUtils.updateProgressForAttempt(progress, attempt);
-                const result = await this.callGemini(configuredModel, prompt, apiKey, options, attempt);
-                progress.report({ message: 'Processing generated message...', increment: 90 });
-                Logger.log(`Commit message generated using ${configuredModel} model`);
-                return result;
-            }
+        return withRetryAndApiKeyGuard('Gemini', progress, attempt =>
+            this.callGemini(configuredModel, prompt, apiKey, options, attempt)
         );
     }
 

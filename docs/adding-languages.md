@@ -10,13 +10,13 @@ The steps use `<LANGUAGE_ID>` for the language id in lowercase English (`italian
 
 ## Steps
 
-1. Add `'<LANGUAGE_ID>'` to `SUPPORTED_LANGUAGES` in `src/utils/constants.ts`, before `'custom'`:
+1. Add `'<LANGUAGE_ID>'` to `SUPPORTED_LANGUAGES` in `src/utils/constants.ts`, before `'custom'`. The array also fills the language dropdown in the Commit Sage sidebar:
 
    ```typescript
    export const SUPPORTED_LANGUAGES = ['english', 'russian', 'chinese', 'japanese', 'korean', 'german', 'french', 'spanish', 'portuguese', '<LANGUAGE_ID>', 'custom'] as const;
    ```
 
-2. Add a `<LANGUAGE_ID>` key with a translated template to each file in `src/templates/formats/`: `angular.ts`, `atom.ts`, `conventional.ts`, `detailed.ts`, `emoji.ts`, `emojiKarma.ts`, `google.ts`, `karma.ts`, `previous.ts` and `semantic.ts`. Keep the sections and examples of the `english` template.
+2. Add a `<LANGUAGE_ID>` key with a translated template to each file in `src/templates/formats/`: `angular.ts`, `atom.ts`, `conventional.ts`, `detailed.ts`, `emoji.ts`, `emojiKarma.ts`, `google.ts`, `karma.ts`, `previous.ts` and `semantic.ts`. Keep the sections and examples of the `english` template. `emojiKarma.ts` reuses the emoji list and the types list, so add those to `EMOJI_LIST` in `emoji.ts` and `KARMA_TYPES` in `karma.ts`. Example commit subjects start with a lowercase verb where the script has letter case: the builtin validator rejects a capitalized subject for most formats.
 
 3. Add an entry to `LANGUAGE_PROMPTS` in `src/services/promptService.ts`:
 
@@ -27,11 +27,9 @@ The steps use `<LANGUAGE_ID>` for the language id in lowercase English (`italian
    };
    ```
 
-4. Add `'<LANGUAGE_ID>'` to the `LANGUAGES` array in `src/views/settingsWebviewProvider.ts`, before `'custom'`. The array fills the language dropdown in the Commit Sage sidebar.
+4. In `package.json`, add the id to `contributes.configuration.properties["commitSage.commit.commitLanguage"].enum` before `"custom"`, and the language name to `enumDescriptions` at the same position.
 
-5. In `package.json`, add the id to `contributes.configuration.properties["commitSage.commit.commitLanguage"].enum` before `"custom"`, and the language name to `enumDescriptions` at the same position.
-
-6. Add the language to the user docs: the language line in `README.md`, the `commitLanguage` values in [configuration.md](configuration.md) and the built-in language list in [custom-language.md](custom-language.md).
+5. Add the language to the user docs: the language line in `README.md`, the `commitLanguage` values in [configuration.md](configuration.md) and the built-in language list in [custom-language.md](custom-language.md).
 
 ## Verify
 
@@ -40,6 +38,6 @@ npm run typecheck
 npm run test:unit
 ```
 
-`npm run typecheck` fails until every template and `LANGUAGE_PROMPTS` have the new key. `npm run compile` only bundles with esbuild and does not type-check.
+`npm run typecheck` fails until every template and `LANGUAGE_PROMPTS` have the new key. `npm run test:unit` fails when an example commit in a template breaks the builtin rules of its format, or when the `package.json` enum and `SUPPORTED_LANGUAGES` differ. `npm run compile` only bundles with esbuild and does not type-check.
 
 Then start the extension, select the new language in the Commit Sage sidebar and generate a message. The message is in the new language.

@@ -9,7 +9,7 @@ The diff and the commit message are not sent as event fields. Error fields carry
 Commit Sage sends events only when both settings allow it:
 
 - VS Code telemetry, `telemetry.telemetryLevel`. `off` stops all Commit Sage events. At `error` or `crash`, VS Code blocks usage events and still passes error events such as `extension_error` to the Commit Sage sender.
-- `commitSage.telemetry.enabled` (default `true`). Set it to `false` in VS Code settings, or in `.commitsage/config.json`:
+- `commitSage.telemetry.enabled` (default `true`). `false` in user settings, workspace settings or `.commitsage/config.json` turns events off. A workspace or project `true` does not override a user `false`, so a cloned repository cannot turn telemetry back on. A project can opt out for everyone:
 
 ```json
 {
@@ -42,7 +42,7 @@ The names below are the names Commit Sage passes to the VS Code telemetry logger
 | `message_generation_started` | Generation begins. | `provider`, `model`, `diffSize`, `fileCount`, `truncated` |
 | `message_generation_completed` | The provider returns a message. | `provider`, `model`, `durationMs`, `language`, `onlyStagedChanges` |
 | `message_generation_failed` | Generation fails, except for an invalid API key and a cancellation. | `provider`, `model`, `error`, `errorType` |
-| `commit_completed` | Auto-commit runs `git commit` successfully. | `hasStaged`, `hasUntracked`, `hasDeleted`, `messageLength` |
+| `commit_completed` | Auto-commit runs `git commit` successfully. | `fileCount`, `messageLength` |
 | `commit_failed` | Auto-commit fails. | `error`, `errorType` |
 | `push_completed` | Auto-push runs `git push` successfully. | none |
 | `push_failed` | Auto-push fails. | `error`, `errorType` |
@@ -56,16 +56,15 @@ The names below are the names Commit Sage passes to the VS Code telemetry logger
 | `provider` | `string` | Value of `commitSage.provider.type`, one of the providers in [providers.md](providers.md) |
 | `model` | `string` | In `message_generation_started` and `_failed`: the configured model. In `_completed`: the model that produced the message |
 | `diffSize` | `number` | Diff length in characters, before truncation |
-| `fileCount` | `number` | Number of changed files analyzed |
+| `fileCount` | `number` | In `message_generation_started`: number of changed files analyzed. In `commit_completed`: number of files in the commit |
 | `truncated` | `boolean` | `true` when the diff is longer than `commitSage.general.maxDiffSize` (default `100000`, `-1` disables truncation) |
 | `durationMs` | `number` | Milliseconds from the start of generation to the result |
 | `language` | `string` | Value of `commitSage.commit.commitLanguage` |
 | `onlyStagedChanges` | `boolean` | `true` when only staged changes were analyzed |
-| `hasStaged`, `hasUntracked`, `hasDeleted` | `boolean` | Whether the commit had staged, untracked or deleted files |
 | `messageLength` | `number` | Commit message length in characters |
 | `setting` | `string` | Changed setting name without the `commitSage.` prefix, for example `commit.commitFormat` |
 | `error` | `string` | Error message after redaction |
-| `errorType` | `string` | Error class name, for example `Error` or `NoChangesDetectedError` |
+| `errorType` | `string` | Error name (`error.name`), for example `Error` or `NoChangesDetectedError` |
 | `errorMessage` | `string` | Error message after redaction |
 | `errorStack` | `string` | Stack trace after redaction |
 

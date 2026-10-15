@@ -4,7 +4,7 @@ const {
     mockGet, mockHasValidProjectConfig, mockShowWarning,
     mockLog, mockError,
     mockShowErrorMessage, mockShowTextDocument, mockExecuteCommand,
-    mockUpdate, mockGetConfiguration,
+    mockSet,
 } = vi.hoisted(() => ({
     mockGet: vi.fn(),
     mockHasValidProjectConfig: vi.fn(),
@@ -14,20 +14,18 @@ const {
     mockShowErrorMessage: vi.fn(),
     mockShowTextDocument: vi.fn(),
     mockExecuteCommand: vi.fn(),
-    mockUpdate: vi.fn(),
-    mockGetConfiguration: vi.fn(),
+    mockSet: vi.fn(),
 }));
 
 vi.mock('vscode', () => ({
     l10n: { t: (msg: string, ...a: Array<string | number>) => msg.replace(/\{(\d+)\}/g, (_, i) => String(a[Number(i)])) },
     window: { showErrorMessage: mockShowErrorMessage, showTextDocument: mockShowTextDocument },
     commands: { executeCommand: mockExecuteCommand },
-    workspace: { getConfiguration: mockGetConfiguration },
     Uri: { file: (p: string) => ({ fsPath: p }) },
 }));
 
 vi.mock('../src/utils/configService', () => ({
-    ConfigService: { get: mockGet, hasValidProjectConfig: mockHasValidProjectConfig },
+    ConfigService: { get: mockGet, set: mockSet, hasValidProjectConfig: mockHasValidProjectConfig },
 }));
 
 vi.mock('../src/utils/logger', () => ({
@@ -38,7 +36,6 @@ import { SettingsValidator } from '../src/services/settingsValidator';
 
 beforeEach(() => {
     vi.clearAllMocks();
-    mockGetConfiguration.mockReturnValue({ update: mockUpdate });
     mockGet.mockReturnValue(undefined);
     mockHasValidProjectConfig.mockResolvedValue({ valid: true });
     mockShowWarning.mockResolvedValue(undefined);
@@ -108,14 +105,14 @@ describe('validateAutoPushState', () => {
         cfg(true, false);
         mockShowWarning.mockResolvedValue('Enable Auto Commit');
         await SettingsValidator.validateAutoPushState();
-        expect(mockUpdate).toHaveBeenCalledWith('commit.autoCommit', true, true);
+        expect(mockSet).toHaveBeenCalledWith('commit.autoCommit', true);
     });
 
     it('disables auto push on that choice', async () => {
         cfg(true, false);
         mockShowWarning.mockResolvedValue('Disable Auto Push');
         await SettingsValidator.validateAutoPushState();
-        expect(mockUpdate).toHaveBeenCalledWith('commit.autoPush', false, true);
+        expect(mockSet).toHaveBeenCalledWith('commit.autoPush', false);
     });
 
     it('opens settings on that choice', async () => {
@@ -129,7 +126,7 @@ describe('validateAutoPushState', () => {
         cfg(true, false);
         mockShowWarning.mockResolvedValue(undefined);
         await SettingsValidator.validateAutoPushState();
-        expect(mockUpdate).not.toHaveBeenCalled();
+        expect(mockSet).not.toHaveBeenCalled();
         expect(mockExecuteCommand).not.toHaveBeenCalled();
     });
 });
@@ -185,21 +182,21 @@ describe('validateRefsWithAutoCommit', () => {
         cfg(true, true);
         mockShowWarning.mockResolvedValue('Disable Refs Prompt');
         await SettingsValidator.validateRefsWithAutoCommit();
-        expect(mockUpdate).toHaveBeenCalledWith('commit.refs.enabled', false, true);
+        expect(mockSet).toHaveBeenCalledWith('commit.refs.enabled', false);
     });
 
     it('disables auto commit on that choice', async () => {
         cfg(true, true);
         mockShowWarning.mockResolvedValue('Disable Auto Commit');
         await SettingsValidator.validateRefsWithAutoCommit();
-        expect(mockUpdate).toHaveBeenCalledWith('commit.autoCommit', false, true);
+        expect(mockSet).toHaveBeenCalledWith('commit.autoCommit', false);
     });
 
     it('keeps both on that choice', async () => {
         cfg(true, true);
         mockShowWarning.mockResolvedValue('Keep Both');
         await SettingsValidator.validateRefsWithAutoCommit();
-        expect(mockUpdate).not.toHaveBeenCalled();
+        expect(mockSet).not.toHaveBeenCalled();
         expect(mockLog).toHaveBeenCalledWith('User chose to keep both Auto Commit and Refs prompt enabled');
     });
 
@@ -207,7 +204,7 @@ describe('validateRefsWithAutoCommit', () => {
         cfg(true, true);
         mockShowWarning.mockResolvedValue(undefined);
         await SettingsValidator.validateRefsWithAutoCommit();
-        expect(mockUpdate).not.toHaveBeenCalled();
+        expect(mockSet).not.toHaveBeenCalled();
     });
 });
 

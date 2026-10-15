@@ -1,262 +1,73 @@
 import { describe, it, expect } from 'vitest';
 import {
-    parseBlameOutput,
-    parseChangedLines,
-    analyzeBlameInfo,
-    formatAnalysis,
-    BlameInfo,
+    parseOldLineRanges,
+    parseBlameAuthors,
+    formatBlameSummary,
 } from '../src/services/gitBlameParser';
 
-describe('parseBlameOutput', () => {
-    it('parses a single blame entry', () => {
-        const blame = [
-            '0000000000000000000000000000000000000000 1 1 1',
-            'author Alice',
-            'author-mail <alice@example.com>',
-            'author-time 1700000000',
-            'author-tz +0000',
-            'summary initial',
-            'filename foo.ts',
-            '\tconst foo = 1;',
-        ].join('\n');
-
-        const result = parseBlameOutput(blame);
-        expect(result).toHaveLength(1);
-        expect(result[0].author).toBe('Alice');
-        expect(result[0].email).toBe('alice@example.com');
-        expect(result[0].timestamp).toBe(1700000000);
-        expect(result[0].line).toBe('const foo = 1;');
-        expect(result[0].lineNumber).toBe(1);
-        expect(result[0].commit).toBe(
-            '0000000000000000000000000000000000000000'
-        );
+describe('parseOldLineRanges', () => {
+    it('returns no ranges for an empty diff', () => {
+        expect(parseOldLineRanges('')).toEqual([]);
     });
 
-    it('parses multiple blame entries with their final-line numbers', () => {
-        const blame = [
-            'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa 5 5 1',
-            'author Alice',
-            'author-mail <alice@example.com>',
-            'author-time 1700000000',
-            'author-tz +0000',
-            'summary one',
-            'filename foo.ts',
-            '\tline at 5',
-            'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb 8 9 1',
-            'author Bob',
-            'author-mail <bob@example.com>',
-            'author-time 1700000100',
-            'author-tz +0000',
-            'summary two',
-            'filename foo.ts',
-            '\tline at 9',
+    it('reads the old side of each hunk, defaulting the count to 1', () => {
+        const diff = [
+            '@@ -2 +3 @@ one',
+            '-two',
+            '+TWO',
+            '@@ -10,3 +11,1 @@',
+            '-a',
+            '-b',
+            '-c',
+            '+abc',
         ].join('\n');
-
-        const result = parseBlameOutput(blame);
-        expect(result).toHaveLength(2);
-        expect(result[0].author).toBe('Alice');
-        expect(result[0].lineNumber).toBe(5);
-        expect(result[1].author).toBe('Bob');
-        // F025: should reflect *final* line number (3rd field), not orig (2nd)
-        expect(result[1].lineNumber).toBe(9);
+        expect(parseOldLineRanges(diff)).toEqual(['2,2', '10,12']);
     });
 
-    it('skips entries missing required fields', () => {
-        // Missing author-mail
-        const blame = [
-            'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa 1 1 1',
-            'author Alice',
-            'author-time 1700000000',
-            '\tline one',
-        ].join('\n');
+    it('skips pure additions, which have no old lines', () => {
+        expect(parseOldLineRanges('@@ -0,0 +1 @@\n+zero\n@@ -5,0 +7 @@ five\n+six')).toEqual([]);
+    });
 
-        expect(parseBlameOutput(blame)).toHaveLength(0);
+    it('ignores the file headers', () => {
+        const diff = '--- a/f.ts\n+++ b/f.ts\n@@ -1 +1 @@\n-x\n+y';
+        expect(parseOldLineRanges(diff)).toEqual(['1,1']);
     });
 });
 
-describe('parseBlameOutput presence checks (B8)', () => {
-    const entry = (sha: string, line: number, time: string, content: string) => [
-        `${sha} ${line} ${line} 1`,
-        'author Alice',
-        'author-mail <alice@example.com>',
-        `author-time ${time}`,
+describe('parseBlameAuthors', () => {
+    const entry = (sha: string, author: string, content: string) => [
+        `${sha} 1 1 1`,
+        `author ${author}`,
+        `author-mail <${author.toLowerCase()}@example.com>`,
+        'author-time 1700000000',
         'author-tz +0000',
+        'summary init',
+        'filename f.ts',
         `\t${content}`,
     ].join('\n');
 
-    it('keeps blank lines and epoch-0 commits', () => {
-        const sha = 'a'.repeat(40);
-        const out = parseBlameOutput([
-            entry(sha, 1, '1700000000', 'const a = 1;'),
-            // Blank line in the file -> empty content, previously dropped.
-            entry(sha, 2, '1700000000', ''),
-            // Commit authored at the Unix epoch -> timestamp 0, also dropped.
-            entry('b'.repeat(40), 3, '0', 'const c = 3;'),
-        ].join('\n'));
-
-        expect(out.map(b => b.lineNumber)).toEqual([1, 2, 3]);
-        expect(out[1].line).toBe('');
-        expect(out[2].timestamp).toBe(0);
-        expect(out[2].date).toBe('1970-01-01T00:00:00.000Z');
+    it('returns one author per blamed line', () => {
+        const porcelain = [
+            entry('a'.repeat(40), 'Alice', 'one'),
+            entry('b'.repeat(40), 'Bob', ''), // blank file line still counts
+            entry('a'.repeat(40), 'Alice', 'author Mallory'), // content is not a header
+        ].join('\n');
+        expect(parseBlameAuthors(porcelain)).toEqual(['Alice', 'Bob', 'Alice']);
     });
 
-    it('still drops an entry whose timestamp could not be parsed', () => {
-        const out = parseBlameOutput(entry('c'.repeat(40), 1, 'not-a-number', 'x'));
-        expect(out).toEqual([]);
+    it('does not count an entry cut off before its content line', () => {
+        const cut = entry('a'.repeat(40), 'Alice', 'x') + '\n' + `${'b'.repeat(40)} 2 2 1\nauthor Bob`;
+        expect(parseBlameAuthors(cut)).toEqual(['Alice']);
     });
 });
 
-describe('parseChangedLines', () => {
-    it('returns empty set when no hunks', () => {
-        expect(parseChangedLines('').size).toBe(0);
+describe('formatBlameSummary', () => {
+    it('returns empty for no blamed lines', () => {
+        expect(formatBlameSummary('a.ts', [])).toBe('');
     });
 
-    it('captures added lines from a single hunk', () => {
-        const diff = [
-            '@@ -1,3 +1,4 @@',
-            ' const a = 1;',
-            '+const b = 2;',
-            ' const c = 3;',
-            ' const d = 4;',
-        ].join('\n');
-
-        const lines = parseChangedLines(diff);
-        expect(Array.from(lines).sort((a, b) => a - b)).toEqual([2]);
-    });
-
-    it('captures added lines across multiple hunks', () => {
-        const diff = [
-            '@@ -1,2 +1,3 @@',
-            ' a',
-            '+b',
-            ' c',
-            '@@ -10,2 +11,3 @@',
-            ' x',
-            '+y',
-            ' z',
-        ].join('\n');
-
-        const lines = parseChangedLines(diff);
-        expect(Array.from(lines).sort((a, b) => a - b)).toEqual([2, 12]);
-    });
-
-    it('ignores the no-newline marker instead of counting it as a line (B6)', () => {
-        const diff = [
-            '@@ -1,2 +1,3 @@',
-            ' a',
-            '-b',
-            '\\ No newline at end of file',
-            '+b2',
-            '+c',
-        ].join('\n');
-
-        // Without the marker skip everything after it shifted by one line.
-        expect(Array.from(parseChangedLines(diff)).sort((a, b) => a - b)).toEqual([2, 3]);
-    });
-
-    it('does not advance line counter for removed lines', () => {
-        const diff = [
-            '@@ -1,3 +1,2 @@',
-            ' a',
-            '-b',
-            ' c',
-        ].join('\n');
-
-        // Only context lines exist; no '+' lines, so changedLines stays empty
-        expect(parseChangedLines(diff).size).toBe(0);
-    });
-
-    it('ignores +++ filename headers', () => {
-        const diff = [
-            '+++ b/foo.ts',
-            '@@ -1,1 +1,2 @@',
-            ' a',
-            '+b',
-        ].join('\n');
-
-        const lines = parseChangedLines(diff);
-        expect(Array.from(lines)).toEqual([2]);
-    });
-});
-
-describe('analyzeBlameInfo', () => {
-    const blame: BlameInfo[] = [
-        {
-            commit: 'a',
-            author: 'Alice',
-            email: 'alice@example.com',
-            date: '2023-01-01',
-            timestamp: 1,
-            line: 'a',
-            lineNumber: 1,
-        },
-        {
-            commit: 'b',
-            author: 'Bob',
-            email: 'bob@example.com',
-            date: '2023-01-02',
-            timestamp: 2,
-            line: 'b',
-            lineNumber: 2,
-        },
-        {
-            commit: 'c',
-            author: 'Alice',
-            email: 'alice@example.com',
-            date: '2023-01-03',
-            timestamp: 3,
-            line: 'c',
-            lineNumber: 3,
-        },
-    ];
-
-    it('counts changes per author using actual line numbers', () => {
-        const result = analyzeBlameInfo(blame, new Set([1, 3]));
-        const alice = result.get('Alice <alice@example.com>');
-        expect(alice?.count).toBe(2);
-        expect(alice?.lines).toEqual([1, 3]);
-        expect(result.has('Bob <bob@example.com>')).toBe(false);
-    });
-
-    it('returns empty map when no changed lines match', () => {
-        expect(analyzeBlameInfo(blame, new Set([99])).size).toBe(0);
-    });
-
-    it('uses entry.lineNumber, not array index (F025 regression guard)', () => {
-        // Sparse blame: a single entry that lives at line 42 in the file.
-        // The old impl used `index + 1` and would have credited line 1.
-        const sparse: BlameInfo[] = [
-            {
-                commit: 'x',
-                author: 'Carol',
-                email: 'carol@example.com',
-                date: '2023-01-04',
-                timestamp: 4,
-                line: 'far line',
-                lineNumber: 42,
-            },
-        ];
-        const result = analyzeBlameInfo(sparse, new Set([42]));
-        const carol = result.get('Carol <carol@example.com>');
-        expect(carol?.lines).toEqual([42]);
-        // And: line 1 is NOT credited just because the entry sits at index 0
-        expect(analyzeBlameInfo(sparse, new Set([1])).size).toBe(0);
-    });
-});
-
-describe('formatAnalysis', () => {
-    it('returns "No changes detected." for empty map', () => {
-        expect(formatAnalysis(new Map())).toBe('No changes detected.');
-    });
-
-    it('formats single line vs plural', () => {
-        const map = new Map([
-            ['Alice <a@e.com>', { count: 1, lines: [1] }],
-            ['Bob <b@e.com>', { count: 2, lines: [2, 3] }],
-        ]);
-        const out = formatAnalysis(map);
-        // Bob comes first (higher count)
-        expect(out.startsWith('Bob <b@e.com> modified 2 lines (2, 3)')).toBe(true);
-        expect(out).toContain('Alice <a@e.com> modified 1 line (1)');
+    it('ranks authors by line count without listing line numbers', () => {
+        expect(formatBlameSummary('src/a.ts', ['Bob', 'Alice', 'Alice', 'Bob', 'Alice']))
+            .toBe('src/a.ts: modifies lines last changed by Alice (3), Bob (2)');
     });
 });

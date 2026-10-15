@@ -155,10 +155,10 @@ test: Tests
 
 Beispiele:
 Kleine Änderung:
-feat(api): Datenvalidierungsmethode hinzufügen
+feat(api): füge Datenvalidierungsmethode hinzu
 
 Komplexe Änderung:
-refactor(core): Datenbankabfragen optimieren
+refactor(core): optimiere Datenbankabfragen
 
 - Query-Caching implementieren
 - Connection Pooling hinzufügen

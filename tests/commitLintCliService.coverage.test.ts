@@ -18,7 +18,7 @@ afterEach(() => {
 
 /**
  * Fake commitlint CLI that echoes whether a --config arg was passed, so we can
- * prove configArgs() forwarded the rulesPath. It also lets us assert against a
+ * prove the rulesPath was forwarded as --config. It also lets us assert against a
  * known config absolute path via stderr.
  */
 function installConfigEchoCli(root: string): void {
@@ -58,7 +58,7 @@ function installHangingCli(root: string): void {
     );
 }
 
-describe('CommitLintCliService.configArgs (via validate with rulesPath)', () => {
+describe('CommitLintCliService --config argument (via validate with rulesPath)', () => {
     it('passes a relative rulesPath resolved against repoPath as --config', async () => {
         installConfigEchoCli(tmpDir);
         const result = await CommitLintCliService.validate(

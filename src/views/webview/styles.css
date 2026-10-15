@@ -14,7 +14,6 @@
     --cs-radius: 5px;
     --cs-radius-card: 8px;
     --cs-pad-x: 12px;
-    --cs-row-gap: 7px;
     --cs-field-gap: 15px;
     --cs-ease: 120ms cubic-bezier(0.3, 0, 0.2, 1);
 }
@@ -122,7 +121,6 @@ label.field {
 }
 
 /* ── Inputs ──────────────────────────────────────────────────────────── */
-select,
 input[type="text"],
 input[type="number"],
 textarea {
@@ -136,27 +134,6 @@ textarea {
     font-family: inherit;
     font-size: inherit;
     transition: border-color var(--cs-ease), box-shadow var(--cs-ease);
-}
-/* Style the select to match the custom inputs/combobox: hide the native
-   widget chrome and draw our own chevron with two gradients (no external
-   image — CSP-safe). The option list itself is rendered by the host and
-   already follows the VS Code theme. */
-select {
-    cursor: pointer;
-    appearance: none;
-    -webkit-appearance: none;
-    padding-right: 26px;
-    background-color: var(--vscode-input-background, #3c3c3c);
-    background-image:
-        linear-gradient(45deg, transparent 50%, color-mix(in srgb, currentColor 65%, transparent) 50%),
-        linear-gradient(135deg, color-mix(in srgb, currentColor 65%, transparent) 50%, transparent 50%);
-    background-position: calc(100% - 14px) center, calc(100% - 9px) center;
-    background-size: 5px 5px, 5px 5px;
-    background-repeat: no-repeat;
-}
-select option {
-    background: var(--vscode-dropdown-background, var(--vscode-input-background, #3c3c3c));
-    color: var(--vscode-dropdown-foreground, var(--vscode-foreground, #ccc));
 }
 /* Number settings hold short values (30, 0.7, 100000) — cap their width so
    they don't stretch the full sidebar and look unbalanced. */
@@ -173,12 +150,10 @@ textarea {
     opacity: 1;
 }
 
-select:hover:not(:disabled),
 input:hover:not(:disabled),
 textarea:hover:not(:disabled) {
     border-color: color-mix(in srgb, var(--vscode-foreground, #ccc) 32%, var(--vscode-input-border, transparent));
 }
-select:focus,
 input:focus,
 textarea:focus {
     outline: none;
@@ -199,9 +174,7 @@ input[aria-invalid="true"]:focus {
     gap: 6px;
     align-items: stretch;
 }
-.row > .combo,
-.row > select,
-.row > input { flex: 1 1 auto; min-width: 0; }
+.row > .combo { flex: 1 1 auto; min-width: 0; }
 
 /* ── Buttons ─────────────────────────────────────────────────────────── */
 button {
@@ -249,7 +222,6 @@ button#refresh-models:active:not(:disabled) { transform: rotate(180deg); }
 
 button:disabled,
 input:disabled,
-select:disabled,
 textarea:disabled {
     opacity: 0.45;
     cursor: default;
@@ -540,7 +512,6 @@ textarea:disabled {
 }
 
 /* Green dot marking providers that have an API key configured. */
-.combo-dot,
 .select-dot {
     display: inline-block;
     width: 7px;
@@ -591,7 +562,7 @@ textarea:disabled {
 /* ── High-contrast themes: restore strong outlines ───────────────────── */
 @media (forced-colors: active) {
     details, .badge, .hint.pinned, .error, .combo-list, .select-list { border: 1px solid CanvasText; }
-    select:focus, input:focus, textarea:focus, button:focus-visible,
+    input:focus, textarea:focus, button:focus-visible,
     .select .select-trigger:focus-visible, .select.open .select-trigger {
         outline: 2px solid Highlight;
         box-shadow: none;

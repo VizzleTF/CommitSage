@@ -1,24 +1,40 @@
 // Reusable labelled form controls built on the `el` helper. Each returns a
 // detached DOM node and wires its own change handler to the supplied callback.
 
-import type { ViewState } from './protocol';
+import type { ViewState, WebviewSettingKey, WebviewSettings } from './protocol';
 import { el } from './dom';
 import { L } from './init';
 import { ListboxPopup } from './popup';
+import { setSetting } from './vscodeApi';
 
 export function fieldLabel(text: string): HTMLLabelElement {
     return el('label', { class: 'field' }, [text]);
 }
 
-/** True when the setting is pinned by .commitsage/config.json and the control is inert. */
-export function isPinned(state: ViewState, keyName: string): boolean {
-    return state.projectOverrides.includes(keyName);
+export function pinnedHint(): HTMLDivElement {
+    return el('div', { class: 'hint pinned' }, [L.pinned]) as HTMLDivElement;
 }
 
-export function pinnedHint(): HTMLDivElement {
-    return el('div', { class: 'hint pinned' }, [
-        'Pinned by .commitsage/config.json in this repo — change it there.',
-    ]) as HTMLDivElement;
+/**
+ * Append one setting: optional caption, the control `build` returns, then an
+ * optional hint. `build` gets the current value, a saver for this key, and
+ * whether the control must be disabled: a key pinned by
+ * .commitsage/config.json would silently ignore any write, so its control is
+ * inert and says where to change it.
+ */
+export function field<K extends WebviewSettingKey>(
+    body: HTMLElement,
+    state: ViewState,
+    key: K,
+    label: string | undefined,
+    build: (value: WebviewSettings[K], save: (v: WebviewSettings[K]) => void, disabled: boolean) => HTMLElement,
+    hint?: string,
+): void {
+    const pinned = state.projectOverrides.includes(key);
+    if (label) { body.appendChild(fieldLabel(label)); }
+    body.appendChild(build(state.settings[key], v => setSetting(key, v), pinned));
+    if (pinned) { body.appendChild(pinnedHint()); }
+    if (hint) { body.appendChild(el('div', { class: 'hint' }, [hint])); }
 }
 
 // Custom, fully theme-able dropdown (rounded popup, keyboard nav, "selected"
@@ -156,11 +172,15 @@ export function makeTextInput(
     id: string,
     value: string,
     onChange: (v: string) => void,
-    placeholder?: string,
+    opts: { placeholder?: string; disabled?: boolean } = {},
 ): HTMLInputElement {
     // Value set via the property (not the attribute) so it reflects the current
     // value, matching the number/textarea widgets below.
-    const input = el('input', { type: 'text', id, placeholder }) as HTMLInputElement;
+    const input = el('input', {
+        type: 'text', id, placeholder: opts.placeholder, disabled: opts.disabled,
+    }) as HTMLInputElement;
+    // defaultValue marks the pushed value; preserveFocus keeps only real edits.
+    input.defaultValue = value;
     input.value = value;
     input.addEventListener('change', () => onChange(input.value));
     return input;
@@ -170,8 +190,10 @@ export function makeNumberInput(
     id: string,
     value: number,
     onChange: (v: number) => void,
+    opts: { disabled?: boolean } = {},
 ): HTMLInputElement {
-    const input = el('input', { type: 'number', id }) as HTMLInputElement;
+    const input = el('input', { type: 'number', id, disabled: opts.disabled }) as HTMLInputElement;
+    input.defaultValue = String(value);
     input.value = String(value);
     input.addEventListener('change', () => {
         const parsed = Number.parseFloat(input.value);
@@ -192,8 +214,10 @@ export function makeTextarea(
     id: string,
     value: string,
     onChange: (v: string) => void,
+    opts: { disabled?: boolean } = {},
 ): HTMLTextAreaElement {
-    const ta = el('textarea', { id, rows: 5 }) as HTMLTextAreaElement;
+    const ta = el('textarea', { id, rows: 5, disabled: opts.disabled }) as HTMLTextAreaElement;
+    ta.defaultValue = value;
     ta.value = value;
     ta.addEventListener('change', () => onChange(ta.value));
     return ta;

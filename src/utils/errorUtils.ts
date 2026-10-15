@@ -34,6 +34,8 @@ export function redactSecrets(text: string): string {
 export function sanitizeErrorForTelemetry(error: Error): { error: string; errorType: string } {
     return {
         error: redactSecrets(error.message),
-        errorType: error.constructor.name,
+        // Not `constructor.name`: the production bundle is minified, so class
+        // names come out as `At` / `_r`. Every custom error sets `name`.
+        errorType: error.name,
     };
 }

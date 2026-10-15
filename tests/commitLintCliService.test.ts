@@ -206,7 +206,7 @@ describe('CommitLintCliService workspace-trust guard (V3)', () => {
 
         // Both entry points spawn `node <repo>/node_modules/...` and let it
         // require() the repo's config — the check belongs at the sink, not only
-        // in CommitLintService.useProjectEngine.
+        // in CommitLintService.viaProject.
         await expect(CommitLintCliService.validate('feat: x', tmpDir)).resolves.toBeNull();
         await expect(CommitLintCliService.resolvedRules(tmpDir)).resolves.toBeNull();
     });

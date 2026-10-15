@@ -2,7 +2,6 @@ import { Logger } from '../utils/logger';
 import type { CommitMessage, ProgressReporter, GenerateOptions } from '../models/types';
 import { extractAndValidateMessage, getConfiguredTemperature, resolveMaxOutputTokens, withRetryAndApiKeyGuard } from './baseAIService';
 import { HttpError, HttpUtils } from '../utils/httpUtils';
-import { RetryUtils } from '../utils/retryUtils';
 import { ConfigService } from '../utils/configService';
 import { ApiKeyManager } from './apiKeyManager';
 import { providerMeta } from './providerCatalog';
@@ -83,21 +82,12 @@ export async function generateViaOpenAICompatible(
     request: OpenAICompatibleRequest,
     prompt: string,
     progress: ProgressReporter,
-    attempt: number,
-    retryFn: (
-        prompt: string,
-        progress: ProgressReporter,
-        attempt: number,
-    ) => Promise<CommitMessage>,
     options?: GenerateOptions,
 ): Promise<CommitMessage> {
     return withRetryAndApiKeyGuard(
         request.providerLabel,
-        prompt,
         progress,
-        attempt,
-        retryFn,
-        async () => {
+        async attempt => {
             const path = request.chatCompletionsPath ?? '/chat/completions';
             const baseUrl = HttpUtils.stripTrailingSlashes(request.baseUrl);
 
@@ -106,8 +96,6 @@ export async function generateViaOpenAICompatible(
                 tokenParam: request.maxTokensParam ?? 'max_tokens',
                 omitTemperature: false,
             };
-
-            await RetryUtils.updateProgressForAttempt(progress, attempt);
 
             let data: OpenAIResponse;
             // At most two corrections (token field + temperature), then the error stands.
@@ -142,8 +130,6 @@ export async function generateViaOpenAICompatible(
                 }
             }
 
-            progress.report({ message: 'Processing generated message...', increment: 90 });
-
             const choice = data.choices?.[0];
             // `length` means the model ran out of `max_tokens` mid-message. Reasoning
             // models (DeepSeek `reasoner`, OpenAI o-series) spend that budget on
@@ -159,7 +145,6 @@ export async function generateViaOpenAICompatible(
                 choice?.message?.content,
                 request.providerLabel,
             );
-            Logger.log(`Commit message generated using ${request.model} model`);
             return { message, model: request.model };
         },
     );
@@ -187,7 +172,12 @@ interface CompatProviderSpec {
 
 const COMPAT_SPECS: Partial<Record<Provider, CompatProviderSpec>> = {
     openai: {
-        baseUrl: () => ConfigService.get('openai.baseUrl'),
+        // A URL without a scheme makes fetch throw "Invalid URL", which reads
+        // as a network error; assume https like the settings listener used to.
+        baseUrl: () => {
+            const url = ConfigService.get('openai.baseUrl').trim();
+            return !url || /^https?:\/\//i.test(url) ? url : `https://${url}`;
+        },
         // `max_tokens` is deprecated on OpenAI and rejected by gpt-5/o-series;
         // `max_completion_tokens` works for every current OpenAI chat model.
         maxTokensParam: 'max_completion_tokens',
@@ -230,6 +220,19 @@ export function isOpenAICompatibleProvider(provider: Provider): boolean {
     return provider in COMPAT_SPECS;
 }
 
+function compatSpec(provider: Provider): CompatProviderSpec {
+    const spec = COMPAT_SPECS[provider];
+    if (!spec) {
+        throw new Error(`Provider '${provider}' is not OpenAI-compatible`);
+    }
+    return spec;
+}
+
+/** API base URL of an OpenAI-compatible provider; its model list is `<base>/models`. */
+export function compatBaseUrl(provider: Provider): string {
+    return compatSpec(provider).baseUrl();
+}
+
 /**
  * Single entry point for every OpenAI-compatible provider. Replaces the seven
  * near-identical `*Service.ts` wrapper classes: looks up the provider's row in
@@ -240,13 +243,9 @@ export async function generateViaOpenAICompatibleProvider(
     provider: Provider,
     prompt: string,
     progress: ProgressReporter,
-    attempt: number = 1,
     options?: GenerateOptions,
 ): Promise<CommitMessage> {
-    const spec = COMPAT_SPECS[provider];
-    if (!spec) {
-        throw new Error(`Provider '${provider}' is not OpenAI-compatible`);
-    }
+    const spec = compatSpec(provider);
     const apiKey = spec.getApiKey
         ? await spec.getApiKey()
         : await ApiKeyManager.getKey(provider);
@@ -263,8 +262,6 @@ export async function generateViaOpenAICompatibleProvider(
         },
         prompt,
         progress,
-        attempt,
-        (p, pr, a) => generateViaOpenAICompatibleProvider(provider, p, pr, a, options),
         options,
     );
 }

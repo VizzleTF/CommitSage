@@ -10,7 +10,7 @@ import { PROVIDER_CATALOG } from '../services/providerCatalog';
  * display name in notifications come from `providerCatalog.ts` — adding a
  * provider there is the only change needed to expose its commands.
  */
-export function registerSetApiKeyCommands(_context: vscode.ExtensionContext): vscode.Disposable[] {
+export function registerSetApiKeyCommands(): vscode.Disposable[] {
     const disposables: vscode.Disposable[] = [];
 
     for (const meta of PROVIDER_CATALOG) {

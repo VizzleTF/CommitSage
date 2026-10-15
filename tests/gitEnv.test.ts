@@ -34,6 +34,18 @@ describe('buildGitEnv', () => {
         expect(buildGitEnv().SSH_AUTH_SOCK).toBe('/tmp/ssh-agent.sock');
     });
 
+    it('forwards Windows system vars and proxy settings in both spellings', () => {
+        process.env.SYSTEMROOT = 'C:\\Windows';
+        process.env.COMSPEC = 'C:\\Windows\\system32\\cmd.exe';
+        process.env.HTTPS_PROXY = 'http://proxy:3128';
+        process.env.no_proxy = 'localhost';
+        const env = buildGitEnv();
+        expect(env.SYSTEMROOT).toBe('C:\\Windows');
+        expect(env.COMSPEC).toBe('C:\\Windows\\system32\\cmd.exe');
+        expect(env.HTTPS_PROXY).toBe('http://proxy:3128');
+        expect(env.no_proxy).toBe('localhost');
+    });
+
     it('omits whitelisted vars when they are unset in the parent', () => {
         delete process.env.GIT_SSH_COMMAND;
         expect('GIT_SSH_COMMAND' in buildGitEnv()).toBe(false);

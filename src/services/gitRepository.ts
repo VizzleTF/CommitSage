@@ -18,24 +18,21 @@ interface GitExtension {
  * (explicit argument → single repo → repo of the active editor → user pick).
  */
 export class GitRepositoryProvider {
-  static async validateGitExtension(): Promise<void> {
+  private static async activateGitApi(): Promise<GitExtension> {
     const extension =
       vscode.extensions.getExtension<GitExtension>('vscode.git');
     if (!extension) {
       throw new GitExtensionNotFoundError();
     }
-    await extension.activate();
+    return extension.activate();
+  }
+
+  static async validateGitExtension(): Promise<void> {
+    await this.activateGitApi();
   }
 
   static async getRepositories(): Promise<vscode.SourceControl[]> {
-    const extension =
-      vscode.extensions.getExtension<GitExtension>('vscode.git');
-    if (!extension) {
-      throw new GitExtensionNotFoundError();
-    }
-
-    const gitExtension = await extension.activate();
-    const git = gitExtension.getAPI(1);
+    const git = (await this.activateGitApi()).getAPI(1);
 
     if (!git?.repositories?.length) {
       throw new NoRepositoriesFoundError();
@@ -77,20 +74,22 @@ export class GitRepositoryProvider {
       return repos[0];
     }
 
-    const activeEditor = vscode.window.activeTextEditor;
-    if (activeEditor) {
-      const activeFile = activeEditor.document.uri;
-      const activeRepo = repos.find((repo) => {
-        if (!repo.rootUri) {
-          return false;
-        }
-        return activeFile.fsPath.startsWith(repo.rootUri.fsPath);
-      });
-      if (activeRepo) {
-        return activeRepo;
+    // The innermost repo containing the active file: a separator-bounded
+    // prefix (so /w/app does not claim /w/app-web) and the longest root wins
+    // (so a submodule beats its parent).
+    const activeFile = vscode.window.activeTextEditor?.document.uri.fsPath;
+    let activeRepo: vscode.SourceControl | undefined;
+    for (const repo of repos) {
+      const root = repo.rootUri?.fsPath;
+      if (
+        activeFile && root &&
+        (activeFile === root || activeFile.startsWith(root + path.sep)) &&
+        root.length > (activeRepo?.rootUri?.fsPath.length ?? -1)
+      ) {
+        activeRepo = repo;
       }
     }
 
-    return this.selectRepository(repos);
+    return activeRepo ?? this.selectRepository(repos);
   }
 }

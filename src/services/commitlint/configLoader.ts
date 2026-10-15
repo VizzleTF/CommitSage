@@ -5,6 +5,7 @@ import { createRequire } from 'node:module';
 import * as vscode from 'vscode';
 
 import { Logger } from '../../utils/logger';
+import { toError } from '../../utils/errorUtils';
 import { FORMAT_RULE_SETS } from '../formatRules';
 import { CommitLintConfig, CommitLintRules } from '../../models/types';
 
@@ -40,11 +41,6 @@ function packageJsonHasConfig(repoPath: string): boolean {
   } catch {
     return false;
   }
-}
-
-export function hasConfig(repoPath: string): boolean {
-  return packageJsonHasConfig(repoPath)
-    || CONFIG_FILES.some(file => fs.existsSync(path.join(repoPath, file)));
 }
 
 /**
@@ -172,6 +168,10 @@ function parseYamlRuleLine(line: string, result: CommitLintConfig): void {
   } catch { /* skip malformed rule */ }
 }
 
+// mtime of each JS config when it was last required. Rules are read several
+// times per generation; re-running the user's config each time is wasteful.
+const jsConfigMtimes = new Map<string, number>();
+
 /**
  * `require`s a `.js`/`.cjs` config. Returns null (no rules) for untrusted
  * workspaces and ESM modules; re-throws unexpected require errors.
@@ -182,6 +182,13 @@ function requireJsConfig(configPath: string): CommitLintConfig | null {
     return null;
   }
   const req = createRequire(configPath);
+  // Drop the cached module once the file changes, so edits apply without a
+  // VS Code restart, like YAML/JSON configs that are re-read on every call.
+  const mtime = fs.statSync(configPath).mtimeMs;
+  if (jsConfigMtimes.get(configPath) !== mtime) {
+    delete req.cache[req.resolve(configPath)];
+    jsConfigMtimes.set(configPath, mtime);
+  }
   let mod: CommitLintConfig & { default?: CommitLintConfig };
   try {
     mod = req(configPath) as CommitLintConfig & { default?: CommitLintConfig };
@@ -236,7 +243,7 @@ export function loadConfig(configPath: string, visited: Set<string> = new Set())
 
     return loadTextConfig(configPath, ext, visited);
   } catch (error) {
-    Logger.log(`CommitLint: failed to parse ${configPath}: ${error instanceof Error ? error.message : String(error)}`);
+    Logger.log(`CommitLint: failed to parse ${configPath}: ${toError(error).message}`);
     return {};
   }
 }

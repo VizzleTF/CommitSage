@@ -39,56 +39,47 @@ const LANGUAGE_PROMPTS: Record<Exclude<CommitLanguage, 'custom'>, string> = {
 };
 
 export class PromptService {
-    private static async resolveLanguagePrompt(format: CommitFormat, progress: ProgressReporter): Promise<{ template: string; languagePrompt: string }> {
+    private static resolveTemplate(format: CommitFormat, progress: ProgressReporter): Promise<string> {
         const commitLanguage = ConfigService.get('commit.commitLanguage');
+        if (commitLanguage === 'custom') {
+            return CustomLanguageService.getTemplate(format, ConfigService.get('commit.customLanguageName'), progress);
+        }
+        return Promise.resolve(getTemplate(format, commitLanguage as CommitLanguage));
+    }
 
-        let template: string;
-        let languagePrompt: string;
-
+    private static languagePrompt(): string {
+        const commitLanguage = ConfigService.get('commit.commitLanguage');
         if (commitLanguage === 'custom') {
             const customLanguageName = ConfigService.get('commit.customLanguageName');
-            template = await CustomLanguageService.getTemplate(format, customLanguageName, progress);
-            languagePrompt = customLanguageName.trim()
+            return customLanguageName.trim()
                 ? `Please write the commit message in ${customLanguageName}.`
                 : LANGUAGE_PROMPTS.english;
-        } else {
-            const lang = commitLanguage as Exclude<CommitLanguage, 'custom'>;
-            template = getTemplate(format, lang);
-            languagePrompt = LANGUAGE_PROMPTS[lang] ?? LANGUAGE_PROMPTS.english;
         }
-
-        return { template, languagePrompt };
+        return LANGUAGE_PROMPTS[commitLanguage as Exclude<CommitLanguage, 'custom'>] ?? LANGUAGE_PROMPTS.english;
     }
 
     /**
-     * Resolve the active commitlint rule set as prompt text. Shared by
-     * `generatePrompt` (appends it to the format template) and
-     * `generateRefinementPrompt` (lists it for the fix-up), which previously
-     * each hand-read `rulesPath` + `engine` and called `extractRules`.
+     * The active commitlint rule set as prompt text. The caller loads it once
+     * per generation and passes it to `generatePrompt` (appended to the format
+     * template) and `generateRefinementPrompt` (listed for the fix-up).
      */
-    private static loadRules(repoPath: string, format: string): Promise<string> {
+    static loadRules(repoPath: string, format: string, signal?: AbortSignal): Promise<string> {
         const rulesPath = ConfigService.get('commit.commitlint.rulesPath');
         const engine = ConfigService.get('commit.commitlint.engine') as CommitLintEngine;
-        return CommitLintService.extractRules(repoPath, rulesPath, { engine, format });
+        return CommitLintService.extractRules(repoPath, rulesPath, { engine, format, signal });
     }
 
+    /** Joins the prompt sections; an empty language prompt or examples block is left out. */
     private static buildPrompt(mainInstructions: string, languagePrompt: string, diff: string, blameAnalysis: string, reminder: string, examplesBlock = ''): string {
-        const examplesSection = examplesBlock ? `${examplesBlock}\n\n` : '';
-        return `
-${mainInstructions}
-
-${examplesSection}${languagePrompt}
-
-Git diff to analyze:
-${diff}
-
-Git blame analysis:
-${blameAnalysis}
-
-${reminder}
-
-Please provide ONLY the commit message, without any additional text or explanations.
-`;
+        return [
+            mainInstructions,
+            examplesBlock,
+            languagePrompt,
+            `Git diff to analyze:\n${diff}`,
+            `Git blame analysis:\n${blameAnalysis}`,
+            reminder,
+            'Please provide ONLY the commit message, without any additional text or explanations.',
+        ].filter(Boolean).join('\n\n');
     }
 
     /**
@@ -121,60 +112,40 @@ Please provide ONLY the commit message, without any additional text or explanati
         return `${lead}\n\n${examples.join('\n\n---\n\n')}`;
     }
 
-    static async generatePrompt(repoPath: string, diff: string, blameAnalysis: string, progress: ProgressReporter): Promise<string> {
+    /**
+     * @param rules commitlint rules from `loadRules`, or '' when validation is
+     *   off — they ride along with the format template so the model sees
+     *   exactly what the validator will check.
+     */
+    static async generatePrompt(repoPath: string, diff: string, blameAnalysis: string, progress: ProgressReporter, rules = ''): Promise<string> {
         const useCustomInstructions = ConfigService.get('commit.useCustomInstructions');
         const customInstructions = ConfigService.get('commit.customInstructions');
 
         if (useCustomInstructions && customInstructions.trim()) {
-            return `${customInstructions}
-
-Git diff to analyze:
-${diff}
-
-Git blame analysis:
-${blameAnalysis}
-
-${STRICT_FORMAT_REMINDER}
-
-Please provide ONLY the commit message, without any additional text or explanations.`;
+            return this.buildPrompt(customInstructions, '', diff, blameAnalysis, STRICT_FORMAT_REMINDER);
         }
 
         const formatSetting = ConfigService.get('commit.commitFormat');
         const examples = await this.loadRecentCommitExamples(repoPath, formatSetting);
 
-        // `previous` needs example commits to define its style; with no usable
-        // history fall back to the conventional template so we don't ask the
-        // model to "match" an empty set.
-        const effectiveFormat = formatSetting === 'previous' && examples.length === 0
+        // `custom` without usable instructions has no template of its own, and
+        // `previous` needs example commits to define its style; both fall back
+        // to the conventional template (for `previous`, so we don't ask the
+        // model to "match" an empty set).
+        const format: CommitFormat = formatSetting === 'custom' || (formatSetting === 'previous' && examples.length === 0)
             ? 'conventional'
-            : formatSetting;
-        const format = effectiveFormat as CommitFormat;
+            : formatSetting as CommitFormat;
 
-        const { template, languagePrompt } = await this.resolveLanguagePrompt(format, progress);
-
+        const template = await this.resolveTemplate(format, progress);
         const reminder = format === 'detailed' ? DETAILED_FORMAT_REMINDER : STRICT_FORMAT_REMINDER;
-
-        // Validation enabled → the active rule set rides along with the format
-        // template, so the model sees exactly what the validator will check.
-        // `previous` has no fixed structure to validate, so it skips rules too.
-        let mainInstructions = template;
-        if (ConfigService.get('commit.commitlint.enabled') && formatSetting !== 'custom' && formatSetting !== 'previous') {
-            const rules = await this.loadRules(repoPath, formatSetting);
-            mainInstructions = `${template}\n\n${rules}`;
-        }
+        const mainInstructions = rules ? `${template}\n\n${rules}` : template;
 
         const examplesBlock = this.buildExamplesBlock(examples, formatSetting !== 'previous');
-        return this.buildPrompt(mainInstructions, languagePrompt, diff, blameAnalysis, reminder, examplesBlock);
+        return this.buildPrompt(mainInstructions, this.languagePrompt(), diff, blameAnalysis, reminder, examplesBlock);
     }
 
-    static async generateRefinementPrompt(repoPath: string, originalMessage: string, errors: string[], progress: ProgressReporter): Promise<string> {
-        const formatSetting = ConfigService.get('commit.commitFormat');
-        const format = (formatSetting === 'custom' ? 'conventional' : formatSetting) as CommitFormat;
-        const { languagePrompt } = await this.resolveLanguagePrompt(format, progress);
-
+    static generateRefinementPrompt(originalMessage: string, errors: string[], rules: string): string {
         // Full rule set included so the model doesn't fix one rule while breaking another
-        const rules = await this.loadRules(repoPath, formatSetting);
-
         return `The following commit message failed validation:
 
 ${originalMessage}
@@ -185,7 +156,7 @@ ${errors.map(e => `- ${e}`).join('\n')}
 ${rules}
 
 Rewrite the commit message fixing all the errors above while keeping every rule satisfied.
-${languagePrompt}
+${this.languagePrompt()}
 
 ${STRICT_FORMAT_REMINDER}
 

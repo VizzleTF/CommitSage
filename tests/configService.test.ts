@@ -102,7 +102,7 @@ describe('ConfigService.parseAndValidateProjectConfig type-check (L4)', () => {
 });
 
 describe('ConfigService.onProjectConfigChange (F052)', () => {
-    it('fires registered listeners and stops firing after dispose', () => {
+    it('fires registered listeners and stops firing after dispose', async () => {
         let count = 0;
         const sub = ConfigService.onProjectConfigChange(() => {
             count++;
@@ -110,19 +110,19 @@ describe('ConfigService.onProjectConfigChange (F052)', () => {
 
         // Reach into the private handler the watcher would invoke.
         const handler = (
-            ConfigService as unknown as { handleProjectConfigChange: () => void }
+            ConfigService as unknown as { handleProjectConfigChange: () => Promise<void> }
         ).handleProjectConfigChange.bind(ConfigService);
 
-        handler();
-        handler();
+        await handler();
+        await handler();
         expect(count).toBe(2);
 
         sub.dispose();
-        handler();
+        await handler();
         expect(count).toBe(2);
     });
 
-    it('a throwing listener does not block subsequent listeners', () => {
+    it('a throwing listener does not block subsequent listeners', async () => {
         let secondCount = 0;
         const sub1 = ConfigService.onProjectConfigChange(() => {
             throw new Error('boom');
@@ -132,9 +132,9 @@ describe('ConfigService.onProjectConfigChange (F052)', () => {
         });
 
         const handler = (
-            ConfigService as unknown as { handleProjectConfigChange: () => void }
+            ConfigService as unknown as { handleProjectConfigChange: () => Promise<void> }
         ).handleProjectConfigChange.bind(ConfigService);
-        handler();
+        await handler();
         expect(secondCount).toBe(1);
 
         sub1.dispose();

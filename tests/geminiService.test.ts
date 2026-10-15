@@ -44,7 +44,7 @@ vi.mock('../src/utils/configService', () => ({
 
 vi.mock('../src/utils/retryUtils', () => ({
     RetryUtils: {
-        updateProgressForAttempt: vi.fn(async () => undefined),
+        updateProgressForAttempt: vi.fn(),
         handleGenerationError: vi.fn(async (err: Error) => {
             throw err;
         }),
@@ -52,6 +52,13 @@ vi.mock('../src/utils/retryUtils', () => ({
 }));
 
 const progress = { report: () => undefined };
+
+/** What Gemini actually answers for a wrong key: 400, not 401. */
+const BAD_KEY_BODY = { error: {
+    code: 400,
+    message: 'API key not valid. Please pass a valid API key.',
+    status: 'INVALID_ARGUMENT',
+} };
 
 /** The `generationConfig` of the Nth `postJson` call. */
 function generationConfigOf(call: number): Record<string, unknown> {
@@ -95,15 +102,11 @@ describe('GeminiService.getAvailableModels (quality-tier sort)', () => {
         ]);
     });
 
-    it('returns the sorted static fallback when the listing request fails', async () => {
+    it('throws when the listing request fails, so callers can report it', async () => {
         const { GeminiService } = await import('../src/services/geminiService');
         mockedGetJson.mockRejectedValueOnce(new Error('network down'));
 
-        const result = await GeminiService.getAvailableModels('key');
-
-        expect(result[0]).toBe('gemini-2.5-pro');
-        expect(result[result.length - 1]).toBe('gemini-2.5-flash-lite');
-        expect(result).toContain('gemini-3-flash-preview');
+        await expect(GeminiService.getAvailableModels('key')).rejects.toThrow('network down');
     });
 });
 
@@ -134,7 +137,7 @@ describe('GeminiService thinkingConfig (#447)', () => {
         mockedPostJson.mockResolvedValueOnce({
             candidates: [{ content: { parts: [{ text: 'feat: ok' }] }, finishReason: 'STOP' }],
         });
-        await GeminiService.generateCommitMessage('hi', progress, 1);
+        await GeminiService.generateCommitMessage('hi', progress);
     }
 
     it('sends thinkingBudget for Gemini 2.5, defaulting it off', async () => {
@@ -203,7 +206,7 @@ describe('GeminiService.extractCommitMessage (#447)', () => {
             }],
         });
 
-        const result = await GeminiService.generateCommitMessage('hi', progress, 1);
+        const result = await GeminiService.generateCommitMessage('hi', progress);
         expect(result.message).toBe('fix(auth): validate reset token');
     });
 
@@ -219,7 +222,7 @@ describe('GeminiService.extractCommitMessage (#447)', () => {
         });
 
         await expect(
-            GeminiService.generateCommitMessage('hi', progress, 1)
+            GeminiService.generateCommitMessage('hi', progress)
         ).rejects.toBeInstanceOf(TruncatedResponseError);
     });
 });
@@ -236,12 +239,12 @@ describe('GeminiService auto-mode (tryGenerateWithModels)', () => {
             candidates: [{ content: { parts: [{ text: 'feat: ok' }] } }],
         });
 
-        const result = await GeminiService.generateCommitMessage('hi', progress, 1);
+        const result = await GeminiService.generateCommitMessage('hi', progress);
         expect(result.message).toBe('feat: ok');
         expect(result.model).toBe('gemini-2.5-pro');
     });
 
-    it('throws ApiKeyInvalidError when every model returns 401', async () => {
+    it('throws ApiKeyInvalidError when every model rejects the key', async () => {
         const { GeminiService } = await import('../src/services/geminiService');
         const { ApiKeyInvalidError } = await import('../src/models/errors');
         mockedGetJson.mockResolvedValueOnce({
@@ -250,11 +253,33 @@ describe('GeminiService auto-mode (tryGenerateWithModels)', () => {
                 { name: 'models/gemini-2.5-flash', supportedGenerationMethods: ['generateContent'] },
             ],
         });
-        mockedPostJson.mockRejectedValue(new HttpError(401, { error: 'unauthorized' }));
+        mockedPostJson.mockRejectedValue(new HttpError(400, BAD_KEY_BODY));
 
         await expect(
-            GeminiService.generateCommitMessage('hi', progress, 1)
+            GeminiService.generateCommitMessage('hi', progress)
         ).rejects.toBeInstanceOf(ApiKeyInvalidError);
+    });
+
+    it('throws ApiKeyInvalidError when the model listing rejects the key, without generating', async () => {
+        const { GeminiService } = await import('../src/services/geminiService');
+        const { ApiKeyInvalidError } = await import('../src/models/errors');
+        mockedGetJson.mockRejectedValueOnce(new HttpError(400, BAD_KEY_BODY));
+
+        await expect(
+            GeminiService.generateCommitMessage('hi', progress)
+        ).rejects.toBeInstanceOf(ApiKeyInvalidError);
+        expect(mockedPostJson).not.toHaveBeenCalled();
+    });
+
+    it('falls back to the built-in list when the listing fails for another reason', async () => {
+        const { GeminiService } = await import('../src/services/geminiService');
+        mockedGetJson.mockRejectedValueOnce(new Error('network down'));
+        mockedPostJson.mockResolvedValueOnce({
+            candidates: [{ content: { parts: [{ text: 'feat: ok' }] } }],
+        });
+
+        const result = await GeminiService.generateCommitMessage('hi', progress);
+        expect(result.model).toBe('gemini-2.5-pro');
     });
 
     it('throws an aggregated "All models failed" error on mixed failures', async () => {
@@ -270,7 +295,7 @@ describe('GeminiService auto-mode (tryGenerateWithModels)', () => {
             .mockRejectedValueOnce(new Error('timeout'));
 
         await expect(
-            GeminiService.generateCommitMessage('hi', progress, 1)
+            GeminiService.generateCommitMessage('hi', progress)
         ).rejects.toThrow(/All models failed/);
     });
 });

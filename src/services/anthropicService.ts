@@ -1,9 +1,7 @@
-import { Logger } from '../utils/logger';
 import { ConfigService } from '../utils/configService';
 import type { CommitMessage, ProgressReporter, GenerateOptions } from '../models/types';
 import { extractAndValidateMessage, getConfiguredTemperature, resolveMaxOutputTokens, withRetryAndApiKeyGuard } from './baseAIService';
 import { HttpUtils } from '../utils/httpUtils';
-import { RetryUtils } from '../utils/retryUtils';
 import { ApiKeyManager } from './apiKeyManager';
 import { TruncatedResponseError } from '../models/errors';
 
@@ -30,67 +28,54 @@ interface AnthropicResponse {
 }
 
 const ANTHROPIC_API_URL = 'https://api.anthropic.com/v1/messages';
-const ANTHROPIC_VERSION = '2023-06-01';
+export const ANTHROPIC_VERSION = '2023-06-01';
 
 export class AnthropicService {
     static async generateCommitMessage(
         prompt: string,
         progress: ProgressReporter,
-        attempt: number = 1,
         options?: GenerateOptions,
     ): Promise<CommitMessage> {
-        return withRetryAndApiKeyGuard(
-            'Anthropic',
-            prompt,
-            progress,
-            attempt,
-            (p, pr, a) => this.generateCommitMessage(p, pr, a, options),
-            async () => {
-                const apiKey = await ApiKeyManager.getKey('anthropic');
-                const model = ConfigService.get('anthropic.model');
+        const apiKey = await ApiKeyManager.getKey('anthropic');
+        const model = ConfigService.get('anthropic.model');
 
-                const payload = {
-                    model,
-                    // eslint-disable-next-line @typescript-eslint/naming-convention
-                    max_tokens: resolveMaxOutputTokens(options, attempt),
-                    temperature: getConfiguredTemperature(),
-                    messages: [{ role: 'user', content: prompt }],
-                };
+        return withRetryAndApiKeyGuard('Anthropic', progress, async attempt => {
+            const payload = {
+                model,
+                // eslint-disable-next-line @typescript-eslint/naming-convention
+                max_tokens: resolveMaxOutputTokens(options, attempt),
+                temperature: getConfiguredTemperature(),
+                messages: [{ role: 'user', content: prompt }],
+            };
 
-                await RetryUtils.updateProgressForAttempt(progress, attempt);
+            const data = await HttpUtils.postJson<AnthropicResponse>(
+                ANTHROPIC_API_URL,
+                payload,
+                {
+                    headers: HttpUtils.createRequestHeaders(
+                        apiKey,
+                        // eslint-disable-next-line @typescript-eslint/naming-convention
+                        { 'anthropic-version': ANTHROPIC_VERSION },
+                        'x-api-key',
+                    ),
+                    signal: options?.signal,
+                },
+            );
 
-                const data = await HttpUtils.postJson<AnthropicResponse>(
-                    ANTHROPIC_API_URL,
-                    payload,
-                    {
-                        headers: HttpUtils.createRequestHeaders(
-                            apiKey,
-                            // eslint-disable-next-line @typescript-eslint/naming-convention
-                            { 'anthropic-version': ANTHROPIC_VERSION },
-                            'x-api-key',
-                        ),
-                        signal: options?.signal,
-                    },
-                );
+            if (data.stop_reason === 'max_tokens') {
+                throw new TruncatedResponseError('Anthropic', `${model} exhausted max_tokens`);
+            }
 
-                progress.report({ message: 'Processing generated message...', increment: 90 });
-
-                if (data.stop_reason === 'max_tokens') {
-                    throw new TruncatedResponseError('Anthropic', `${model} exhausted max_tokens`);
-                }
-
-                // First text block — Anthropic can interleave `text` and `tool_use`
-                // blocks in `content[]`; we only ask for plain completion so
-                // a single text block is expected, but find-first defends
-                // against future API drift.
-                const textBlock = data.content?.find(b => b?.type === 'text');
-                const message = extractAndValidateMessage(
-                    textBlock?.text,
-                    'Anthropic',
-                );
-                Logger.log(`Commit message generated using ${model} model`);
-                return { message, model };
-            },
-        );
+            // First text block — Anthropic can interleave `text` and `tool_use`
+            // blocks in `content[]`; we only ask for plain completion so
+            // a single text block is expected, but find-first defends
+            // against future API drift.
+            const textBlock = data.content?.find(b => b?.type === 'text');
+            const message = extractAndValidateMessage(
+                textBlock?.text,
+                'Anthropic',
+            );
+            return { message, model };
+        });
     }
 }

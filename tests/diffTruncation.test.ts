@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { truncateDiff, splitIntoFileBlocks, isNoisyPath, blockPath } from '../src/utils/diffTruncation';
+import { truncateDiff, splitIntoFileBlocks, isNoisyPath, blockPath, resolveMaxDiffLength, capBlameAnalysis } from '../src/utils/diffTruncation';
 
 function fileBlock(path: string, bodyLines: number): string {
     const body = Array.from({ length: bodyLines }, (_, i) => `+line ${i} of ${path}`).join('\n');
@@ -147,5 +147,41 @@ describe('splitIntoFileBlocks', () => {
     it('returns a single block when there is no diff --git header', () => {
         const diff = '# New files:\nsome non-standard content\n';
         expect(splitIntoFileBlocks(diff)).toEqual([diff]);
+    });
+});
+
+describe('resolveMaxDiffLength', () => {
+    it('maps -1 to no limit, junk to the default and clamps the rest', () => {
+        expect(resolveMaxDiffLength(-1)).toBe(Number.POSITIVE_INFINITY);
+        expect(resolveMaxDiffLength(undefined)).toBe(100000);
+        expect(resolveMaxDiffLength(0)).toBe(100000);
+        expect(resolveMaxDiffLength(10)).toBe(1000);
+        expect(resolveMaxDiffLength(5_000_000)).toBe(1_000_000);
+        expect(resolveMaxDiffLength(20000)).toBe(20000);
+    });
+});
+
+describe('capBlameAnalysis', () => {
+    const line = (i: number) => `src/file${i}.ts: modifies lines last changed by Alice (${i})`;
+    const blame = Array.from({ length: 200 }, (_, i) => line(i)).join('\n');
+
+    it('keeps a short summary as is', () => {
+        expect(capBlameAnalysis(line(1), 100000)).toBe(line(1));
+    });
+
+    it('keeps whole lines within a tenth of the diff budget', () => {
+        const out = capBlameAnalysis(blame, 20000);
+        expect(out.length).toBeLessThanOrEqual(2000);
+        expect(blame.startsWith(out + '\n')).toBe(true);
+    });
+
+    it('never exceeds the hard cap, even without a diff limit', () => {
+        expect(capBlameAnalysis(blame, Number.POSITIVE_INFINITY).length).toBeLessThanOrEqual(4000);
+    });
+
+    it('drops the section when not even one line fits', () => {
+        // The smallest maxDiffSize (1000) leaves 100 chars for blame.
+        const long = `src/${'deep/'.repeat(20)}x.ts: modifies lines last changed by Alice (1)\n${line(2)}`;
+        expect(capBlameAnalysis(long, 1000)).toBe('');
     });
 });

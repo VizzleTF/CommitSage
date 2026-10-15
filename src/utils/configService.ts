@@ -2,9 +2,9 @@ import * as vscode from 'vscode';
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
 import { Logger } from './logger';
-import { ProjectConfig } from '../models/types';
 import { toError } from './errorUtils';
 import { isProvider } from '../services/providerCatalog';
+import type { Provider } from '../views/webview/protocol';
 import { statOrUndefined } from './fsUtils';
 import { isPlainObject, parseAndValidateProjectConfig } from './projectConfigParser';
 
@@ -75,7 +75,7 @@ export const SETTING_DEFAULTS = {
  * workspace is untrusted.
  *
  * `.commitsage/config.json` ships inside the repo and has the highest
- * precedence in `getConfig`, so without this gate any cloned repo could
+ * precedence in `get`, so without this gate any cloned repo could
  * redirect the diff (i.e. the user's private source) to an arbitrary endpoint
  * by pinning `provider.type` + `custom.baseUrl`, or silently commit and push
  * by pinning `commit.autoCommit`/`autoPush`. VS Code's
@@ -105,7 +105,7 @@ const TRUST_SENSITIVE_KEYS: ReadonlySet<string> = new Set<string>([
     'commit.commitlint.rulesPath',
 ]);
 
-type SettingKey = keyof typeof SETTING_DEFAULTS;
+export type SettingKey = keyof typeof SETTING_DEFAULTS;
 // Widen the literal-type defaults (e.g. `30`) back to their general types
 // (`number`) so that `ConfigService.get('apiRequestTimeout') === -1` and
 // other equality / comparison checks against non-default values type-check.
@@ -114,11 +114,11 @@ type Widened<T> =
   T extends number ? number :
   T extends string ? string :
   T;
-type SettingValue<K extends SettingKey> = Widened<(typeof SETTING_DEFAULTS)[K]>;
+export type SettingValue<K extends SettingKey> = Widened<(typeof SETTING_DEFAULTS)[K]>;
 
 export class ConfigService {
   private static readonly cache = new Map<string, CacheValue>();
-  private static projectConfigCache: ProjectConfig | null = null;
+  private static projectConfigCache: Record<string, unknown> | null = null;
   private static projectConfigFileWatcher: vscode.FileSystemWatcher | null =
     null;
   private static disposables: vscode.Disposable[] = [];
@@ -175,27 +175,11 @@ export class ConfigService {
       (event) => {
         if (event.affectsConfiguration('commitSage')) {
           this.clearCache();
-          if (event.affectsConfiguration('commitSage.openai.baseUrl')) {
-            const baseUrl = this.get('openai.baseUrl');
-            if (baseUrl) {
-              try {
-                const normalizedEndpoint =
-                  this.validateAndNormalizeEndpoint(baseUrl);
-                const config = vscode.workspace.getConfiguration('commitSage');
-                void config.update('openai.baseUrl', normalizedEndpoint, true);
-              } catch (error: unknown) {
-                Logger.error(
-                  'Failed to update OpenAI base URL:',
-                  toError(error),
-                );
-              }
-            }
-          }
         }
       },
     );
 
-    this.initializeProjectConfigWatcher(context);
+    this.initializeProjectConfigWatcher();
 
     // `untrustedWorkspaces.supported: "limited"` keeps this extension running
     // when trust is granted (no host reload), so the cache would otherwise
@@ -208,9 +192,7 @@ export class ConfigService {
     context.subscriptions.push(...this.disposables);
   }
 
-  private static initializeProjectConfigWatcher(
-    _context: vscode.ExtensionContext,
-  ): void {
+  private static initializeProjectConfigWatcher(): void {
     const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
     if (!workspaceFolder) {
       return;
@@ -220,7 +202,7 @@ export class ConfigService {
     this.projectConfigFileWatcher =
       vscode.workspace.createFileSystemWatcher(pattern);
 
-    const onChange = (): void => this.handleProjectConfigChange();
+    const onChange = (): void => void this.handleProjectConfigChange();
     this.projectConfigFileWatcher.onDidCreate(onChange);
     this.projectConfigFileWatcher.onDidChange(onChange);
     this.projectConfigFileWatcher.onDidDelete(onChange);
@@ -228,13 +210,10 @@ export class ConfigService {
     this.disposables.push(this.projectConfigFileWatcher);
   }
 
-  private static handleProjectConfigChange(): void {
-    this.invalidateProjectConfig();
-    // Async reload kicked off but not awaited — sync `ConfigService.get(...)`
-    // calls between the file change and the reload will see defaults until
-    // the cache repopulates. Async listeners (e.g. SettingsValidator) re-read
-    // FS themselves and don't depend on this cache.
-    void this.loadProjectConfig();
+  private static async handleProjectConfigChange(): Promise<void> {
+    // Reload before notifying, so listeners see the new values. `get()` calls
+    // during the read still see the previous project config.
+    await this.loadProjectConfig();
     for (const listener of this.projectConfigChangeListeners) {
       try {
         listener();
@@ -245,12 +224,6 @@ export class ConfigService {
         );
       }
     }
-  }
-
-  private static invalidateProjectConfig(): void {
-    this.projectConfigCache = null;
-    this.clearCache();
-    Logger.log('Project configuration cache invalidated');
   }
 
   static getProjectRootPath(): string | undefined {
@@ -315,10 +288,9 @@ export class ConfigService {
   }
 
   /**
-   * Load project config from disk into the in-memory cache. Called from
-   * `initialize` (awaited) and from `handleProjectConfigChange`
-   * (fire-and-forget). Synchronous `getConfig`/`get` callers read the
-   * resulting cache without further FS access.
+   * Load project config from disk into the in-memory cache and drop the
+   * resolved-value cache. Synchronous `get` callers read the result without
+   * further FS access.
    */
   private static async loadProjectConfig(): Promise<void> {
     const rootPath = this.getProjectRootPath();
@@ -357,10 +329,14 @@ export class ConfigService {
     } catch (error) {
       Logger.error('Error reading .commitsage config:', toError(error));
       this.projectConfigCache = {};
+    } finally {
+      // `get()` calls made while the file was read cached values resolved
+      // against the previous project config.
+      this.clearCache();
     }
   }
 
-  private static getProjectConfig(): ProjectConfig {
+  private static getProjectConfig(): Record<string, unknown> {
     return this.projectConfigCache ?? {};
   }
 
@@ -385,11 +361,6 @@ export class ConfigService {
   private static getNestedProjectValue<T>(
     sections: string[],
   ): T | undefined {
-    // Callers pass [section, leaf] where `leaf` may itself be dotted for
-    // 3+-level keys (e.g. 'commit', 'refs.value'). Flatten so each dot becomes
-    // one descent step; otherwise nested project-config overrides like
-    // commit.refs.value / commit.commitlint.maxRetries never resolve.
-    sections = sections.flatMap((s) => s.split('.'));
     let current: unknown = this.getProjectConfig();
     for (let i = 0; i < sections.length; i++) {
       const section = sections[i];
@@ -427,46 +398,20 @@ export class ConfigService {
    * extend `SETTING_DEFAULTS` and read it via `ConfigService.get('section.key')`.
    */
   static get<K extends SettingKey>(key: K): SettingValue<K> {
-    const defaultValue = SETTING_DEFAULTS[key] as CacheValue;
-    const dot = key.indexOf('.');
-    const section = dot >= 0 ? key.slice(0, dot) : '';
-    const leaf = dot >= 0 ? key.slice(dot + 1) : key;
-    return this.getConfig(section, leaf, defaultValue) as SettingValue<K>;
-  }
-
-  /**
-   * True when `.commitsage/config.json` pins this key, i.e. user/workspace
-   * settings for it are ignored. Lets UI mark dead controls instead of
-   * silently reverting them. Key uses the same dotted form as `get`.
-   */
-  static isProjectOverridden(key: string): boolean {
-    if (!this.isProjectValueAllowed(key)) {
-      return false;
-    }
-    const dot = key.indexOf('.');
-    const sections = dot >= 0 ? [key.slice(0, dot), key.slice(dot + 1)] : [key];
-    return this.getNestedProjectValue(sections) !== undefined;
-  }
-
-  static getConfig<T extends CacheValue>(
-    section: string,
-    key: string,
-    defaultValue: T,
-  ): T {
-    const configKey = section ? `${section}.${key}` : key;
+    const defaultValue = SETTING_DEFAULTS[key] as SettingValue<K>;
     try {
-      if (!this.cache.has(configKey)) {
-        const projectValue = this.isProjectValueAllowed(configKey)
-          ? this.getNestedProjectValue<T>(section ? [section, key] : [key])
+      if (!this.cache.has(key)) {
+        const projectValue = this.isProjectValueAllowed(key)
+          ? this.getNestedProjectValue<SettingValue<K>>(key.split('.'))
           : undefined;
 
         if (projectValue !== undefined) {
-          this.cache.set(configKey, projectValue);
+          this.cache.set(key, projectValue);
           return projectValue;
         }
 
         const config = vscode.workspace.getConfiguration('commitSage');
-        const value = config.inspect<T>(configKey);
+        const value = config.inspect<SettingValue<K>>(key);
         // `workspaceFolderValue` is deliberately not consulted: resolving it
         // needs a resource-scoped `getConfiguration(section, uri)`, which would
         // make the result depend on the active editor and invalidate this
@@ -479,16 +424,50 @@ export class ConfigService {
           value?.defaultValue ??
           defaultValue;
 
-        this.cache.set(configKey, effectiveValue);
+        this.cache.set(key, effectiveValue);
       }
-      return this.cache.get(configKey) as T;
+      return this.cache.get(key) as SettingValue<K>;
     } catch (error) {
-      Logger.error(`Error getting config ${configKey}:`, toError(error));
+      Logger.error(`Error getting config ${key}:`, toError(error));
       return defaultValue;
     }
   }
 
-  static getProvider(): string {
+  /**
+   * Write a setting where it takes effect: the workspace when it already holds
+   * a value (a user-level write would stay shadowed), user settings otherwise.
+   * A key pinned by `.commitsage/config.json` still wins over both, so the user
+   * is told to edit that file.
+   */
+  static async set(key: SettingKey, value: CacheValue): Promise<void> {
+    if (this.isProjectOverridden(key)) {
+      void Logger.showWarning(
+        vscode.l10n.t(
+          'commitSage.{0} is set in .commitsage/config.json, which overrides VS Code settings. Change it there.',
+          key,
+        ),
+      );
+    }
+    const config = vscode.workspace.getConfiguration('commitSage');
+    const target = config.inspect(key)?.workspaceValue === undefined
+      ? vscode.ConfigurationTarget.Global
+      : vscode.ConfigurationTarget.Workspace;
+    await config.update(key, value, target);
+  }
+
+  /**
+   * True when `.commitsage/config.json` pins this key, i.e. user/workspace
+   * settings for it are ignored. Lets UI mark dead controls instead of
+   * silently reverting them. Key uses the same dotted form as `get`.
+   */
+  static isProjectOverridden(key: string): boolean {
+    return (
+      this.isProjectValueAllowed(key) &&
+      this.getNestedProjectValue(key.split('.')) !== undefined
+    );
+  }
+
+  static getProvider(): Provider {
     const provider = this.get('provider.type');
     if (!isProvider(provider)) {
       Logger.warn(
@@ -585,7 +564,6 @@ export class ConfigService {
 
     // Refresh now rather than waiting for the file watcher (async, racy with an
     // immediate state push from the webview handler).
-    this.invalidateProjectConfig();
     await this.loadProjectConfig();
   }
 
@@ -599,25 +577,4 @@ export class ConfigService {
       this.projectConfigFileWatcher = null;
     }
   }
-
-  private static validateAndNormalizeEndpoint(endpoint: string): string {
-    if (!endpoint) {
-      return '';
-    }
-
-    let normalizedEndpoint = endpoint.trim();
-    if (
-      !normalizedEndpoint.startsWith('http://') &&
-      !normalizedEndpoint.startsWith('https://')
-    ) {
-      normalizedEndpoint = `https://${normalizedEndpoint}`;
-    }
-
-    if (normalizedEndpoint.endsWith('/')) {
-      normalizedEndpoint = normalizedEndpoint.slice(0, -1);
-    }
-
-    return normalizedEndpoint;
-  }
-
 }

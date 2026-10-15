@@ -82,7 +82,7 @@ function sliceAtLineBoundary(s: string, limit: number): string {
 /**
  * Split a combined git diff into per-file blocks. Each block starts at a
  * `diff --git ` line; any leading text before the first one (e.g. a
- * `# Staged changes:` category header) is attached to the first block.
+ * `# Unstaged changes:` category header) is attached to the first block.
  * Returns the whole diff as a single block when no headers are found
  * (e.g. a lone `git diff --no-index` for one untracked file).
  */
@@ -184,4 +184,42 @@ export function truncateDiff(diff: string, maxLength: number): string {
 
     const budgets = allocateBudgets(blocks, maxLength);
     return blocks.map((block, i) => renderBlock(block, budgets[i])).join('');
+}
+
+// Fallback if `general.maxDiffSize` is unreadable. ~100k chars covers most
+// diffs while staying within safe LLM API context window limits for major
+// providers. Tighter caps (e.g. ~20k chars) are needed for low-TPM free
+// tiers like Groq free — see the setting's description for guidance.
+const DEFAULT_MAX_DIFF_LENGTH = 100000;
+
+/**
+ * Clamp a raw `general.maxDiffSize` value to a sane range. `-1` disables
+ * truncation (sends the whole diff regardless of size — only useful with
+ * very-long-context models). Anything else is clamped to [1000, 1_000_000]
+ * so a hand-edited project config can't either send an empty prompt or
+ * overflow JSON.stringify.
+ */
+export function resolveMaxDiffLength(raw: unknown): number {
+    if (raw === -1) {
+        return Number.POSITIVE_INFINITY;
+    }
+    if (typeof raw !== 'number' || !Number.isFinite(raw) || raw <= 0) {
+        return DEFAULT_MAX_DIFF_LENGTH;
+    }
+    return Math.max(1000, Math.min(1_000_000, raw));
+}
+
+// Blame is secondary context: it never takes more than this, nor more than a
+// tenth of the diff budget.
+const MAX_BLAME_LENGTH = 4000;
+
+/** Keep whole lines of the blame summary within its share of `maxDiffLength`. */
+export function capBlameAnalysis(blame: string, maxDiffLength: number): string {
+    const cap = Math.min(MAX_BLAME_LENGTH, maxDiffLength / 10);
+    if (blame.length <= cap) {
+        return blame;
+    }
+    const lastNewline = blame.lastIndexOf('\n', cap);
+    // No whole line fits (tiny maxDiffSize) → drop the section.
+    return lastNewline > 0 ? blame.slice(0, lastNewline) : '';
 }

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { isDeletedStatus, isNewStatus, isIndexStaged, isStagedStatus } from '../src/services/gitService';
+import { isDeletedStatus, isNewStatus, isIndexStaged } from '../src/services/gitService';
 
 describe('git porcelain status decoding (F043)', () => {
     describe('isDeletedStatus', () => {
@@ -36,8 +36,8 @@ describe('git porcelain status decoding (F043)', () => {
         });
     });
 
-    // isIndexStaged powers the porcelain-derived staged flag in CommitWorkflow;
-    // it must match `git diff --cached --name-only` (any index code that isn't
+    // isIndexStaged powers the porcelain-derived staged flag and staged file
+    // subset in CommitWorkflow; it must match `git diff --cached --name-only` (any index code that isn't
     // unmodified ' ' or untracked '?').
     describe('isIndexStaged', () => {
         it.each([
@@ -53,20 +53,6 @@ describe('git porcelain status decoding (F043)', () => {
             ['??', false],  // untracked
         ])('decodes %s → %s', (status, expected) => {
             expect(isIndexStaged(status)).toBe(expected);
-        });
-    });
-
-    // isStagedStatus is the changed-files staged filter (M/A/D/R only).
-    describe('isStagedStatus', () => {
-        it.each([
-            ['M ', true],
-            ['A ', true],
-            ['D ', true],
-            ['R ', true],
-            [' M', false],
-            ['??', false],
-        ])('decodes %s → %s', (status, expected) => {
-            expect(isStagedStatus(status)).toBe(expected);
         });
     });
 });

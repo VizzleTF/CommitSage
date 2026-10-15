@@ -27,7 +27,7 @@ afterEach(() => {
     setWorkspaceFolder(undefined);
 });
 
-describe('ConfigService.get / getConfig layering', () => {
+describe('ConfigService.get layering', () => {
     it('returns the SETTING_DEFAULTS default when nothing overrides it', () => {
         expect(ConfigService.get('commit.autoCommit')).toBe(false);
         expect(ConfigService.get('gitTimeout')).toBe(120);
@@ -71,12 +71,6 @@ describe('ConfigService.get / getConfig layering', () => {
         expect(ConfigService.get('commit.autoCommit')).toBe(false);
         expect(ConfigService.get('gitTimeout')).toBe(120);
     });
-
-    it('getConfig with an empty section uses the bare key and the passed default', () => {
-        // Empty section -> configKey is the bare leaf; with no override the
-        // passed-in default is returned.
-        expect(ConfigService.getConfig('', 'someBareKey', 99)).toBe(99);
-    });
 });
 
 describe('ConfigService.isProjectOverridden', () => {
@@ -98,6 +92,40 @@ describe('ConfigService.isProjectOverridden', () => {
         };
         expect(ConfigService.isProjectOverridden('gitTimeout')).toBe(true);
         expect(ConfigService.isProjectOverridden('apiRequestTimeout')).toBe(false);
+    });
+});
+
+describe('ConfigService.set', () => {
+    function mockConfig(workspaceValue: unknown) {
+        const update = vi.fn(async () => undefined);
+        vi.spyOn(vscode.workspace, 'getConfiguration').mockReturnValue({
+            get: <T>(_k: string, d?: T) => d,
+            update,
+            inspect: () => ({ key: 'k', workspaceValue }),
+        } as unknown as vscode.WorkspaceConfiguration);
+        return update;
+    }
+
+    it('writes to user settings when the workspace holds no value', async () => {
+        const update = mockConfig(undefined);
+        await ConfigService.set('commit.autoPush', false);
+        expect(update).toHaveBeenCalledWith('commit.autoPush', false, vscode.ConfigurationTarget.Global);
+    });
+
+    it('writes to the workspace when it holds a value, which a user write would not beat', async () => {
+        const update = mockConfig(true);
+        await ConfigService.set('commit.autoPush', false);
+        expect(update).toHaveBeenCalledWith('commit.autoPush', false, vscode.ConfigurationTarget.Workspace);
+    });
+
+    it('warns when the project config pins the key', async () => {
+        (ConfigService as unknown as { projectConfigCache: unknown }).projectConfigCache = {
+            commit: { autoPush: true },
+        };
+        mockConfig(undefined);
+        const warn = vi.spyOn(vscode.window, 'showWarningMessage');
+        await ConfigService.set('commit.autoPush', false);
+        expect(warn).toHaveBeenCalledWith(expect.stringContaining('.commitsage/config.json'));
     });
 });
 
@@ -169,80 +197,8 @@ describe('ConfigService.dispose', () => {
     });
 });
 
-describe('ConfigService.initialize openai.baseUrl normalization', () => {
-    it('normalizes the baseUrl on a config change and writes it back', async () => {
-        // Capture the registered config-change listener.
-        let listener: ((e: unknown) => void) | undefined;
-        vi.spyOn(vscode.workspace, 'onDidChangeConfiguration').mockImplementation(
-            (l: (e: unknown) => void) => {
-                listener = l;
-                return { dispose: () => undefined };
-            },
-        );
-        const update = vi.fn(async () => undefined);
-        vi.spyOn(vscode.workspace, 'getConfiguration').mockReturnValue({
-            get: <T>(_k: string, d?: T) => d,
-            update,
-            inspect: <T>(key: string) =>
-                key === 'openai.baseUrl'
-                    ? { key, globalValue: 'example.com/v1/' as unknown as T }
-                    : undefined,
-        } as unknown as vscode.WorkspaceConfiguration);
-        // workspaceFolders undefined -> migrate/load/watcher early-return cleanly.
-        const ctx = { subscriptions: [] } as unknown as vscode.ExtensionContext;
-
-        await ConfigService.initialize(ctx);
-        expect(listener).toBeDefined();
-
-        listener!({
-            affectsConfiguration: (key: string) =>
-                key === 'commitSage' || key === 'commitSage.openai.baseUrl',
-        });
-
-        expect(update).toHaveBeenCalledWith(
-            'openai.baseUrl',
-            'https://example.com/v1',
-            true,
-        );
-
-        ConfigService.dispose();
-    });
-
-    it('logs (does not throw) when the baseUrl write-back fails', async () => {
-        let listener: ((e: unknown) => void) | undefined;
-        vi.spyOn(vscode.workspace, 'onDidChangeConfiguration').mockImplementation(
-            (l: (e: unknown) => void) => {
-                listener = l;
-                return { dispose: () => undefined };
-            },
-        );
-        // `config.update(...)` is invoked with `void`; throwing *synchronously*
-        // from the call is what reaches the catch block (an async rejection
-        // would become an unhandled rejection, not caught here).
-        vi.spyOn(vscode.workspace, 'getConfiguration').mockReturnValue({
-            get: <T>(_k: string, d?: T) => d,
-            update: () => {
-                throw new Error('update failed');
-            },
-            inspect: <T>(key: string) =>
-                key === 'openai.baseUrl'
-                    ? { key, globalValue: 'http://h/v1' as unknown as T }
-                    : undefined,
-        } as unknown as vscode.WorkspaceConfiguration);
-        const ctx = { subscriptions: [] } as unknown as vscode.ExtensionContext;
-
-        await ConfigService.initialize(ctx);
-        expect(() =>
-            listener!({
-                affectsConfiguration: (key: string) =>
-                    key === 'commitSage' || key === 'commitSage.openai.baseUrl',
-            }),
-        ).not.toThrow();
-
-        ConfigService.dispose();
-    });
-
-    it('clears cache on a generic commitSage change without baseUrl', async () => {
+describe('ConfigService.initialize config listener', () => {
+    it('clears cache on a commitSage change', async () => {
         let listener: ((e: unknown) => void) | undefined;
         vi.spyOn(vscode.workspace, 'onDidChangeConfiguration').mockImplementation(
             (l: (e: unknown) => void) => {
@@ -360,6 +316,17 @@ describe('ConfigService project-config loading from disk', () => {
         expect(ConfigService.get('commit.autoCommit')).toBe(false);
     });
 
+    it('drops values cached while the file was being read', async () => {
+        // A get() between a file change and the end of the reload must not
+        // leave a value without the project layer in the cache.
+        expect(ConfigService.get('commit.autoCommit')).toBe(false);
+        const dir = path.join(tmpDir, '.commitsage');
+        fs.mkdirSync(dir);
+        fs.writeFileSync(path.join(dir, 'config.json'), JSON.stringify({ commit: { autoCommit: true } }));
+        await loadProjectConfig();
+        expect(ConfigService.get('commit.autoCommit')).toBe(true);
+    });
+
     it('with no workspace folder sets an empty cache', async () => {
         setWorkspaceFolder(undefined);
         await loadProjectConfig();
@@ -452,6 +419,37 @@ describe('parseAndValidateProjectConfig edge cases', () => {
         ) as { commit: Record<string, unknown> };
         expect(out.commit.autoCommit).toBeUndefined();
         expect(out.commit.futureSetting).toBe('kept');
+    });
+
+    it('type-checks keys nested deeper than section.leaf', () => {
+        const out = parse(
+            JSON.stringify({
+                commit: { refs: { enabled: 'false', source: 'branch' }, commitlint: { maxRetries: '3' } },
+            }),
+        ) as { commit: { refs: Record<string, unknown>; commitlint: Record<string, unknown> } };
+        expect(out.commit.refs).toEqual({ source: 'branch' });
+        expect(out.commit.commitlint).toEqual({});
+    });
+
+    it('keeps correctly typed top-level settings and drops wrong-typed ones', () => {
+        const out = parse(JSON.stringify({ gitTimeout: 300, apiRequestTimeout: '60', futureFlag: 1 }));
+        expect(out).toEqual({ gitTimeout: 300, futureFlag: 1 });
+    });
+
+    it('warns about and drops a flat dotted key copied from settings.json', async () => {
+        const { Logger } = await import('../src/utils/logger');
+        const warn = vi.spyOn(Logger, 'warn').mockImplementation(() => undefined);
+        const out = parse(JSON.stringify({ 'commit.commitFormat': 'angular', commit: { autoCommit: true } }));
+        expect(out).toEqual({ commit: { autoCommit: true } });
+        expect(warn).toHaveBeenCalledWith(expect.stringContaining('"commit.commitFormat"'));
+    });
+
+    it('skips a known nested section holding a primitive and reserved nested keys', () => {
+        const out = parse('{"commit": {"refs": "PROJ-1", "__proto__": {"autoCommit": true}}}') as {
+            commit: Record<string, unknown>;
+        };
+        expect(out.commit).toEqual({});
+        expect(Object.getPrototypeOf(out.commit)).toBe(Object.prototype);
     });
 });
 
@@ -590,25 +588,6 @@ describe('ConfigService private-path edge cases', () => {
         ).getNestedProjectValue(['provider', 'type', 'extra']);
         expect(result).toBeUndefined();
     });
-
-    it('validateAndNormalizeEndpoint returns "" for an empty endpoint', () => {
-        const normalize = (
-            ConfigService as unknown as {
-                validateAndNormalizeEndpoint: (e: string) => string;
-            }
-        ).validateAndNormalizeEndpoint;
-        expect(normalize.call(ConfigService, '')).toBe('');
-    });
-
-    it('validateAndNormalizeEndpoint adds https:// and strips a trailing slash', () => {
-        const normalize = (
-            ConfigService as unknown as {
-                validateAndNormalizeEndpoint: (e: string) => string;
-            }
-        ).validateAndNormalizeEndpoint;
-        expect(normalize.call(ConfigService, 'host/api/')).toBe('https://host/api');
-        expect(normalize.call(ConfigService, 'http://host/api')).toBe('http://host/api');
-    });
 });
 
 describe('ConfigService.onProjectConfigChange dispose idempotency (branch 98)', () => {
@@ -645,26 +624,5 @@ describe('ConfigService.initialize config-listener branches', () => {
         listener!({ affectsConfiguration: () => false });
         // Not affecting commitSage -> clearCache not called from the listener body.
         expect(clearSpy).not.toHaveBeenCalled();
-    });
-
-    it('skips the baseUrl normalization when the resolved baseUrl is empty (branch 139 false)', async () => {
-        captureListener();
-        // Resolve openai.baseUrl to an empty string so `if (baseUrl)` is false.
-        const update = vi.fn(async () => undefined);
-        vi.spyOn(vscode.workspace, 'getConfiguration').mockReturnValue({
-            get: <T>(_k: string, d?: T) => d,
-            update,
-            inspect: <T>(key: string) =>
-                key === 'openai.baseUrl'
-                    ? { key, globalValue: '' as unknown as T }
-                    : undefined,
-        } as unknown as vscode.WorkspaceConfiguration);
-        await ConfigService.initialize({ subscriptions: [] } as unknown as vscode.ExtensionContext);
-        listener!({
-            affectsConfiguration: (key: string) =>
-                key === 'commitSage' || key === 'commitSage.openai.baseUrl',
-        });
-        // baseUrl empty -> no write-back attempted.
-        expect(update).not.toHaveBeenCalled();
     });
 });

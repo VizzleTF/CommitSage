@@ -55,12 +55,10 @@ export class SettingsValidator {
             );
 
             if (selection === enableAutoCommit) {
-                const config = vscode.workspace.getConfiguration('commitSage');
-                await config.update('commit.autoCommit', true, true);
+                await ConfigService.set('commit.autoCommit', true);
                 Logger.log('Auto Commit has been enabled');
             } else if (selection === disableAutoPush) {
-                const config = vscode.workspace.getConfiguration('commitSage');
-                await config.update('commit.autoPush', false, true);
+                await ConfigService.set('commit.autoPush', false);
                 Logger.log('Auto Push has been disabled');
             } else if (selection === openSettings) {
                 void vscode.commands.executeCommand(
@@ -101,12 +99,10 @@ export class SettingsValidator {
             );
 
             if (selection === disableRefs) {
-                const config = vscode.workspace.getConfiguration('commitSage');
-                await config.update('commit.refs.enabled', false, true);
+                await ConfigService.set('commit.refs.enabled', false);
                 Logger.log('Refs prompt has been disabled');
             } else if (selection === disableAutoCommit) {
-                const config = vscode.workspace.getConfiguration('commitSage');
-                await config.update('commit.autoCommit', false, true);
+                await ConfigService.set('commit.autoCommit', false);
                 Logger.log('Auto Commit has been disabled');
             } else if (selection === keepBoth) {
                 Logger.log('User chose to keep both Auto Commit and Refs prompt enabled');

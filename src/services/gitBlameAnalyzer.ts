@@ -1,24 +1,25 @@
 import * as path from 'node:path';
-import * as fs from 'node:fs/promises';
 import { Logger } from '../utils/logger';
-import { errorMessages } from '../utils/constants';
 import { GitService, isDeletedStatus, isNewStatus } from './gitService';
 import { toError } from '../utils/errorUtils';
 import {
-  analyzeBlameInfo,
-  formatAnalysis,
-  parseBlameOutput,
-  parseChangedLines,
+  formatBlameSummary,
+  parseBlameAuthors,
+  parseOldLineRanges,
 } from './gitBlameParser';
 
 export class GitBlameAnalyzer {
+  /**
+   * Who last changed the lines this commit modifies. Blames the pre-image in
+   * HEAD (the '-' side of the diff): the worktree version of a changed line
+   * is always "Not Committed Yet". The caller only runs this when HEAD exists.
+   */
   static async analyzeChanges(
     repoPath: string,
     filePath: string,
     knownStatus: string,
-    useStagedChanges: boolean = false,
+    useStagedChanges: boolean,
     signal?: AbortSignal,
-    knownHasHead?: boolean,
   ): Promise<string> {
     try {
       const normalizedPath = path.normalize(filePath.replace(/^\/+/, ''));
@@ -33,40 +34,34 @@ export class GitBlameAnalyzer {
         return `New file: ${normalizedPath}`;
       }
 
-      // Defensive checks for the modified-file path. `analyzeChanges` is the
-      // sole entry-point now, so they live here rather than inside the
-      // (former) getGitBlame helper which used to redo the porcelain status
-      // lookup. Existence + `hasHead` cover the cases blame can legitimately
-      // fail on without an opaque git error.
-      const absoluteFilePath = path.resolve(repoPath, normalizedPath);
-      try {
-        await fs.access(absoluteFilePath);
-      } catch {
-        throw new Error(`${errorMessages.fileNotFound}: ${absoluteFilePath}`);
-      }
-      // `hasHead` is constant for the repo across a single commit run, so the
-      // caller (CommitWorkflow) resolves it once and passes it in; fall back to
-      // a per-file probe when called standalone.
-      const headExists = knownHasHead ?? await GitService.hasHead(repoPath, signal);
-      if (!headExists) {
-        throw new Error(errorMessages.noCommitsYet);
+      // Worktree mode diffs against HEAD: the commit stages everything.
+      // Literal pathspecs so `[id].tsx` is not also matched as a glob; no
+      // color or external diff tool so the hunk headers stay parseable.
+      const diffArgs = useStagedChanges
+        ? ['--literal-pathspecs', 'diff', '--cached', '--unified=0', '--no-color', '--no-ext-diff', '--', normalizedPath]
+        : ['--literal-pathspecs', 'diff', 'HEAD', '--unified=0', '--no-color', '--no-ext-diff', '--', normalizedPath];
+      const { stdout: diff } = await GitService.execGit(diffArgs, repoPath, { signal });
+      const ranges = parseOldLineRanges(diff);
+      if (ranges.length === 0) {
+        return '';
       }
 
-      const { stdout: blameOutput } = await GitService.execGit(
-        ['blame', '--line-porcelain', '--', normalizedPath],
-        repoPath,
-        { signal },
-      );
-      const blame = parseBlameOutput(blameOutput);
-      const diffArgs = useStagedChanges
-        ? ['diff', '--cached', '--unified=0', '--', normalizedPath]
-        : ['diff', '--unified=0', '--', normalizedPath];
-      const { stdout: diff } = await GitService.execGit(diffArgs, repoPath, {
-        signal,
-      });
-      const changedLines = parseChangedLines(diff);
-      const authorChanges = analyzeBlameInfo(blame, changedLines);
-      return formatAnalysis(authorChanges);
+      const blameArgs = (...extra: string[]): string[] => [
+        '--literal-pathspecs', 'blame', ...extra, '--line-porcelain',
+        ...ranges.flatMap((range) => ['-L', range]), 'HEAD', '--', normalizedPath,
+      ];
+      let blame: string;
+      try {
+        ({ stdout: blame } = await GitService.execGit(blameArgs(), repoPath, { signal }));
+      } catch (error) {
+        // A global `blame.ignoreRevsFile` this repo lacks fails every blame;
+        // retry without it rather than drop attribution.
+        if (!/could not open object name list/.test(toError(error).message)) {
+          throw error;
+        }
+        ({ stdout: blame } = await GitService.execGit(blameArgs('--no-ignore-revs-file'), repoPath, { signal }));
+      }
+      return formatBlameSummary(normalizedPath, parseBlameAuthors(blame));
     } catch (error) {
       // Cancellation must still bubble up so the workflow aborts.
       if (signal?.aborted) {
@@ -74,7 +69,7 @@ export class GitBlameAnalyzer {
       }
       // Blame is auxiliary context — degrade gracefully instead of killing
       // the whole commit-message generation when one file can't be analyzed
-      // (binary file, permission issue, no HEAD, etc.).
+      // (binary file, permission issue, etc.).
       Logger.error('Error analyzing changes:', toError(error));
       return '';
     }

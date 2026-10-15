@@ -2,6 +2,8 @@
 // called only once per page, so every other module imports `vscode` from here
 // instead of acquiring its own.
 
+import type { IncomingMessage, WebviewSettingKey, WebviewSettings } from './protocol';
+
 declare function acquireVsCodeApi(): {
     postMessage(message: unknown): void;
     getState(): unknown;
@@ -10,10 +12,10 @@ declare function acquireVsCodeApi(): {
 
 export const vscode = acquireVsCodeApi();
 
-export function send(message: unknown): void {
+export function send(message: IncomingMessage): void {
     vscode.postMessage(message);
 }
 
-export function setSetting(key: string, value: string | boolean | number): void {
+export function setSetting<K extends WebviewSettingKey>(key: K, value: WebviewSettings[K]): void {
     send({ type: 'setSetting', key, value });
 }

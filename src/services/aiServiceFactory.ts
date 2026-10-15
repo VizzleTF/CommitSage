@@ -12,7 +12,6 @@ type AIServiceClass = {
     generateCommitMessage(
         prompt: string,
         progress: ProgressReporter,
-        attempt?: number,
         options?: GenerateOptions
     ): Promise<CommitMessage>;
 };
@@ -45,15 +44,14 @@ export class AIServiceFactory {
         type: Provider,
         prompt: string,
         progress: ProgressReporter,
-        attempt?: number,
         options?: GenerateOptions
     ): Promise<CommitMessage> {
         const service = NON_COMPAT_SERVICES[type];
         if (service) {
-            return service.generateCommitMessage(prompt, progress, attempt, options);
+            return service.generateCommitMessage(prompt, progress, options);
         }
         if (isOpenAICompatibleProvider(type)) {
-            return generateViaOpenAICompatibleProvider(type, prompt, progress, attempt, options);
+            return generateViaOpenAICompatibleProvider(type, prompt, progress, options);
         }
         throw new Error(`AI service type '${type}' is not supported`);
     }

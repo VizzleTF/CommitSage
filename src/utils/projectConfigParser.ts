@@ -1,5 +1,4 @@
 import { Logger } from './logger';
-import { ProjectConfig } from '../models/types';
 
 /**
  * Pure parsing + per-leaf type validation for `.commitsage/config.json`. Split
@@ -22,7 +21,7 @@ export function isPlainObject(value: unknown): value is Record<string, unknown> 
 
 /**
  * Parse raw JSON and drop anything that doesn't fit the schema: non-object
- * top level → {}, non-object sections skipped, and wrong-typed leaves dropped
+ * top level → {}, wrong-typed known keys and non-object known sections dropped
  * (with a warning) so users get feedback instead of a silent default. Keys not
  * present in `schema` pass through unchanged (forward-compat for settings added
  * in newer extension versions).
@@ -31,42 +30,60 @@ export function parseAndValidateProjectConfig(
     raw: string,
     source: string,
     schema: Record<string, unknown>,
-): ProjectConfig {
+): Record<string, unknown> {
     const parsed = JSON.parse(raw) as unknown;
     if (!isPlainObject(parsed)) {
         Logger.warn(`Project config at ${source} is not an object — ignoring.`);
         return {};
     }
-    // Drop top-level keys that are not plain objects (e.g. `commit: false`),
-    // since downstream code descends through them and would otherwise misread.
-    const validated: Record<string, Record<string, unknown>> = {};
-    for (const [section, value] of Object.entries(parsed)) {
-        // `__proto__` as a section name would set the prototype of the object
-        // we hand back instead of adding a field. No real setting is named
-        // this, so dropping it costs nothing.
-        if (UNSAFE_KEYS.has(section)) {
-            Logger.warn(`Project config at ${source}: ignoring reserved section "${section}".`);
+    return validateLevel(parsed, '', source, schema);
+}
+
+/** Validate one nesting level; `prefix` is the dotted path to it ('' or 'commit.refs.'). */
+function validateLevel(
+    level: Record<string, unknown>,
+    prefix: string,
+    source: string,
+    schema: Record<string, unknown>,
+): Record<string, unknown> {
+    const validated: Record<string, unknown> = {};
+    for (const [key, value] of Object.entries(level)) {
+        const fullKey = `${prefix}${key}`;
+        // `__proto__` as a key would set the prototype of the object we hand
+        // back instead of adding a field. No real setting is named this, so
+        // dropping it costs nothing.
+        if (UNSAFE_KEYS.has(key)) {
+            Logger.warn(`Project config at ${source}: ignoring reserved key "${fullKey}".`);
             continue;
         }
-        if (!isPlainObject(value)) {
+        // A key copied from settings.json ("commit.commitFormat") is never read:
+        // lookups walk nested objects.
+        if (key.includes('.')) {
             Logger.warn(
-                `Project config at ${source}: section "${section}" is not an object, skipping.`,
+                `Project config at ${source}: "${fullKey}" — use nested objects, e.g. {"commit": {"commitFormat": …}}; skipping.`,
             );
             continue;
         }
-        const validatedSection: Record<string, unknown> = {};
-        for (const [leaf, leafValue] of Object.entries(value)) {
-            const fullKey = `${section}.${leaf}`;
-            const expected = schema[fullKey];
-            if (expected === undefined || typeof leafValue === typeof expected) {
-                validatedSection[leaf] = leafValue;
+        // Own keys only: a top-level `toString` must not match Object.prototype.
+        const expected = Object.hasOwn(schema, fullKey) ? schema[fullKey] : undefined;
+        if (expected !== undefined) {
+            if (typeof value === typeof expected) {
+                validated[key] = value;
             } else {
                 Logger.warn(
-                    `Project config at ${source}: "${fullKey}" expected ${typeof expected}, got ${typeof leafValue} — skipping.`,
+                    `Project config at ${source}: "${fullKey}" expected ${typeof expected}, got ${typeof value} — skipping.`,
                 );
             }
+        } else if (isPlainObject(value)) {
+            validated[key] = validateLevel(value, `${fullKey}.`, source, schema);
+        } else if (Object.keys(schema).some((k) => k.startsWith(`${fullKey}.`))) {
+            // A known section holding a primitive (e.g. `commit: false`).
+            Logger.warn(
+                `Project config at ${source}: section "${fullKey}" is not an object, skipping.`,
+            );
+        } else {
+            validated[key] = value;
         }
-        validated[section] = validatedSection;
     }
     return validated;
 }

@@ -10,6 +10,8 @@ import { emojiKarmaTemplate } from '../src/templates/formats/emojiKarma';
 import { googleTemplate } from '../src/templates/formats/google';
 import { atomTemplate } from '../src/templates/formats/atom';
 import { detailedTemplate } from '../src/templates/formats/detailed';
+import { FORMAT_RULE_SETS } from '../src/services/formatRules';
+import { validateWithRuleSet } from '../src/services/commitlint/ruleValidator';
 
 const allTemplates = {
     conventional: conventionalTemplate,
@@ -54,4 +56,25 @@ describe('getTemplate', () => {
         const result = getTemplate('conventional', 'custom');
         expect(result).toBe(conventionalTemplate.english);
     });
+});
+
+describe('template examples pass the builtin rules of their format', () => {
+    const HEADER = /^(feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert)(\([^)]*\))?: \S/;
+    // Header-shaped lines, minus `type: meaning` lists (angular lists its types that way).
+    const exampleHeaders = (text: string): string[] => {
+        const lines = text.split('\n');
+        return lines.filter((l, i) => HEADER.test(l) && !HEADER.test(lines[i - 1] ?? '') && !HEADER.test(lines[i + 1] ?? ''));
+    };
+
+    for (const format of ['conventional', 'angular', 'atom', 'karma', 'semantic', 'google'] as const) {
+        it(format, () => {
+            for (const [lang, text] of Object.entries(allTemplates[format])) {
+                const headers = exampleHeaders(text);
+                expect(headers.length, `${format}/${lang} has no example header`).toBeGreaterThan(0);
+                for (const header of headers) {
+                    expect(validateWithRuleSet(header, FORMAT_RULE_SETS[format]).errors, `${format}/${lang}: ${header}`).toEqual([]);
+                }
+            }
+        });
+    }
 });

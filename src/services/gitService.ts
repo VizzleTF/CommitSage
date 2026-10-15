@@ -1,14 +1,11 @@
-import * as vscode from 'vscode';
 import { Logger } from '../utils/logger';
 import { NoChangesDetectedError } from '../models/errors';
 import { TelemetryService } from './telemetryService';
 import { toError, sanitizeErrorForTelemetry } from '../utils/errorUtils';
-import { unquoteGitPath } from '../utils/gitPath';
-import { mapLimit } from '../utils/concurrency';
-import { GitProcessRunner } from './gitProcessRunner';
-import { GitRepositoryProvider } from './gitRepository';
-
-const GIT_FANOUT_CONCURRENCY = 8;
+import { GIT_FANOUT_CONCURRENCY, mapLimit } from '../utils/concurrency';
+import { ConfigService } from '../utils/configService';
+import { resolveMaxDiffLength } from '../utils/diffTruncation';
+import { GIT_OUTPUT_BUFFER_CAP, GitProcessRunner } from './gitProcessRunner';
 
 // Minimum length for a commit message to be useful as a style example; shorter
 // ones (e.g. "fix", "wip") teach the model bad habits.
@@ -17,77 +14,29 @@ const MIN_EXAMPLE_COMMIT_LENGTH = 10;
 // Mechanical / low-signal commits whose style would mislead the example set.
 const RECENT_COMMIT_NOISE = /^(?:merge\b|bump version|revert\b|wip\b|chore\(release\))/i;
 
-const GIT_STATUS_CODES = {
-  modified: 'M',
-  added: 'A',
-  deleted: 'D',
-  renamed: 'R',
-  untracked: '??',
-  submodule: 'S',
-} as const;
-
-type GitStatusCode = (typeof GIT_STATUS_CODES)[keyof typeof GIT_STATUS_CODES];
-
-const STAGED_STATUS_CODES: Set<GitStatusCode> = new Set([
-  GIT_STATUS_CODES.modified,
-  GIT_STATUS_CODES.added,
-  GIT_STATUS_CODES.deleted,
-  GIT_STATUS_CODES.renamed,
-]);
-
 export class GitService {
-  static async initialize(): Promise<void> {
-    try {
-      Logger.log('Initializing Git service');
-      await this.validateGitExtension();
-      Logger.log('Git service initialized successfully');
-    } catch (error) {
-      Logger.error('Failed to initialize Git service:', toError(error));
-      throw error;
-    }
-  }
-
   /**
    * `stageAll` is set by the workflow when the commit message was generated
    * from the *unstaged* worktree diff (nothing was staged at generation time).
-   * Without it the commit only picks up untracked and deleted files, so a repo
-   * with unstaged edits either fails with `NoChangesDetectedError` or — worse,
-   * silently — commits a subset that does not match the generated message.
+   * Without it the commit would miss the unstaged edits the message describes.
    */
   static async commitChanges(
     message: string,
-    repository?: vscode.SourceControl,
-    stageAll: boolean = false,
+    repoPath: string,
+    stageAll: boolean,
   ): Promise<void> {
     try {
-      const repo = repository || (await this.getActiveRepository());
-      /* v8 ignore next -- optional-chaining artifact: `?.` short-circuit on a
-         nullish repo is unreachable (getActiveRepository never returns nullish);
-         the throw itself is covered. */
-      if (!repo?.rootUri) {
-        throw new Error('No active repository found');
-      }
-
-      const repoPath = repo.rootUri.fsPath;
       if (stageAll) {
         // `-A` = modified + deleted + untracked, i.e. exactly the set the
         // unstaged diff was built from (the index equals HEAD in this branch).
         await this.executeGitCommand(['add', '-A'], repoPath);
       }
-      const hasStagedChanges = await this.hasChanges(repoPath, 'staged');
-      const hasUntrackedFiles = await this.hasChanges(repoPath, 'untracked');
-      const hasDeletedFiles = await this.hasChanges(repoPath, 'deleted');
-
-      if (!hasStagedChanges && !hasUntrackedFiles && !hasDeletedFiles) {
+      // Not listFiles: after `add -A` a listing over the output cap must not
+      // fail the commit; the count only feeds telemetry.
+      const { stdout } = await this.execGit(['diff', '--cached', '--name-only', '-z'], repoPath);
+      const fileCount = stdout.split('\0').filter(Boolean).length;
+      if (fileCount === 0) {
         throw new NoChangesDetectedError();
-      }
-
-      if ((hasUntrackedFiles || hasDeletedFiles) && !hasStagedChanges) {
-        await this.stageUntrackedAndDeleted(
-          repoPath,
-          hasUntrackedFiles,
-          hasDeletedFiles,
-        );
       }
 
       await this.executeGitCommand(['commit', '-m', message], repoPath);
@@ -95,9 +44,7 @@ export class GitService {
 
       TelemetryService.sendEvent({
         name: 'commit_completed',
-        hasStaged: hasStagedChanges,
-        hasUntracked: hasUntrackedFiles,
-        hasDeleted: hasDeletedFiles,
+        fileCount,
         messageLength: message.length,
       });
     } catch (error) {
@@ -119,17 +66,8 @@ export class GitService {
     }
   }
 
-  static async pushChanges(repository?: vscode.SourceControl): Promise<void> {
+  static async pushChanges(repoPath: string): Promise<void> {
     try {
-      const repo = repository || (await this.getActiveRepository());
-      /* v8 ignore next -- optional-chaining artifact: `?.` short-circuit on a
-         nullish repo is unreachable (getActiveRepository never returns nullish);
-         the throw itself is covered. */
-      if (!repo?.rootUri) {
-        throw new Error('No active repository found');
-      }
-
-      const repoPath = repo.rootUri.fsPath;
       if (!(await this.hasRemotes(repoPath))) {
         throw new Error(
           'Repository has no configured remotes. Please add a remote repository using git remote add <name> <url>',
@@ -149,229 +87,77 @@ export class GitService {
   }
 
   /**
-   * Run a git command that prints one path per line and return the non-empty,
-   * git-unquoted paths. The single home for the
-   * `split('\n').filter(...).map(unquoteGitPath)` pipeline that used to be
-   * copy-pasted across staging, per-file diffing, and change detection.
+   * Run a git listing with `-z` and return its paths. NUL-separated output
+   * keeps paths with spaces/Unicode as-is (no C-quoting to undo). A listing
+   * cut at the output cap would end in a half path, so it fails instead.
    */
   private static async listFiles(
     listArgs: string[],
     repoPath: string,
     signal?: AbortSignal,
   ): Promise<string[]> {
-    const output = await this.executeGitCommand(listArgs, repoPath, signal);
-    return output
-      .split('\n')
-      .filter((file) => file.trim())
-      .map(unquoteGitPath);
+    const { stdout, exitCode } = await this.execGit([...listArgs, '-z'], repoPath, { signal });
+    if (exitCode === -1) {
+      throw new Error(`git ${listArgs[0]} output is too large`);
+    }
+    return stdout.split('\0').filter(Boolean);
   }
 
   /**
-   * Stage every untracked and/or deleted file so a "nothing staged yet" commit
-   * still captures them. Extracted from `commitChanges`; reuses `listFiles` for
-   * the same enumeration `hasChanges` performed.
+   * The diff the message is generated from: the index when `staged`,
+   * otherwise the whole worktree (tracked edits plus untracked files), which
+   * the commit then stages with `add -A`. Submodule pointer moves are included,
+   * dirty submodule content is not.
    */
-  private static async stageUntrackedAndDeleted(
-    repoPath: string,
-    hasUntrackedFiles: boolean,
-    hasDeletedFiles: boolean,
-    signal?: AbortSignal,
-  ): Promise<void> {
-    const filesToStage: string[] = [];
-    if (hasUntrackedFiles) {
-      filesToStage.push(
-        ...(await this.listFiles(['ls-files', '--others', '--exclude-standard'], repoPath, signal)),
-      );
-    }
-    if (hasDeletedFiles) {
-      filesToStage.push(
-        ...(await this.listFiles(['ls-files', '--deleted'], repoPath, signal)),
-      );
-    }
-    /* v8 ignore next -- the empty branch is unreachable: filesToStage is
-       populated by the same git ls-files command (+ same filter) that
-       hasChanges() used to decide we get here, so it's always non-empty. */
-    if (filesToStage.length > 0) {
-      await this.executeGitCommand(['add', '--', ...filesToStage], repoPath, signal);
-    }
-  }
-
-  /**
-   * Fan out `perFileDiff` over `files` (bounded concurrency), drop blank
-   * results, and prefix the surviving diffs with `header` — or return '' when
-   * none survive. Shared by `getUntrackedDiff` and `getDeletedDiff`, which
-   * differ only in the per-file git command.
-   */
-  private static async collectPerFileDiffs(
-    files: string[],
-    header: string,
-    perFileDiff: (file: string) => Promise<string>,
-    signal?: AbortSignal,
-  ): Promise<string> {
-    const diffs = await mapLimit(files, GIT_FANOUT_CONCURRENCY, perFileDiff, signal);
-    const validDiffs = diffs.filter((diff) => diff.trim());
-    return validDiffs.length > 0 ? header + validDiffs.join('\n') : '';
-  }
-
-  /**
-   * Enumerate the files that changed, by category, in a single pass. Each
-   * category is listed at most once and the list is reused for both the
-   * "are there changes?" decision and the subsequent per-file diffing — the
-   * old `detectChanges` + `collectDiffs` split listed every category twice
-   * (once via `hasChanges`, once via the diff collectors). The same git
-   * commands run, so the resulting diff is byte-for-byte identical; only the
-   * redundant second enumeration is gone.
-   *
-   * Category gating matches the previous behavior exactly: untracked/deleted
-   * surface only when there are no staged changes, deleted only when HEAD
-   * exists, and nothing but staged is collected in `onlyStagedChanges` mode.
-   */
-  private static async enumerateChanges(
-    repoPath: string,
-    onlyStagedChanges: boolean,
-    knownHasStagedChanges: boolean | undefined,
-    signal?: AbortSignal,
-  ): Promise<{
-    staged: string[];
-    unstaged: string[];
-    untracked: string[];
-    deleted: string[];
-  }> {
-    const hasHead = await this.hasHead(repoPath, signal);
-    // When the caller already knows there are no staged changes (CommitWorkflow
-    // derives this from its single porcelain pass), the staged list can only be
-    // empty — skip the `diff --cached --name-only` call entirely. Otherwise list
-    // it: we need the actual file list to diff, and to derive the flag when the
-    // caller didn't supply it.
-    const staged = knownHasStagedChanges === false
-      ? []
-      : await this.listFiles(['diff', '--cached', '--name-only'], repoPath, signal);
-    const hasStagedChanges = knownHasStagedChanges ?? staged.length > 0;
-
-    const unstaged = onlyStagedChanges
-      ? []
-      : await this.listFiles(['diff', '--name-only'], repoPath, signal);
-    const untracked = !onlyStagedChanges && !hasStagedChanges
-      ? await this.listFiles(['ls-files', '--others', '--exclude-standard'], repoPath, signal)
-      : [];
-    const deleted = hasHead && !onlyStagedChanges && !hasStagedChanges
-      ? await this.listFiles(['ls-files', '--deleted'], repoPath, signal)
-      : [];
-
-    return { staged, unstaged, untracked, deleted };
-  }
-
-  private static async collectDiffs(
-    repoPath: string,
-    changes: {
-      staged: string[];
-      unstaged: string[];
-      untracked: string[];
-      deleted: string[];
-    },
-    signal?: AbortSignal,
-    renames?: Map<string, string>,
-  ): Promise<string[]> {
-    const diffs: string[] = [];
-
-    if (changes.staged.length > 0) {
-      diffs.push(...await this.diffFiles(changes.staged, repoPath, ['diff', '--cached'], '# Staged changes:\n', signal, renames));
-    }
-
-    if (changes.unstaged.length > 0) {
-      diffs.push(...await this.diffFiles(changes.unstaged, repoPath, ['diff'], '# Unstaged changes:\n', signal));
-    }
-
-    if (changes.untracked.length > 0) {
-      const untracked = await this.getUntrackedDiff(changes.untracked, repoPath, signal);
-      if (untracked) {
-        diffs.push(untracked);
-      }
-    }
-
-    if (changes.deleted.length > 0) {
-      const deleted = await this.getDeletedDiff(changes.deleted, repoPath, signal);
-      if (deleted) {
-        diffs.push(deleted);
-      }
-    }
-
-    return diffs;
-  }
-
   static async getDiff(
     repoPath: string,
-    onlyStagedChanges: boolean,
-    knownHasStagedChanges?: boolean,
+    staged: boolean,
     signal?: AbortSignal,
   ): Promise<string> {
     try {
-      const changes = await this.enumerateChanges(
-        repoPath,
-        onlyStagedChanges,
-        knownHasStagedChanges,
-        signal,
+      // Never cut one file's diff below what `general.maxDiffSize` would send;
+      // `-1` (Infinity) still caps one file at 1M chars to bound memory.
+      const maxBuffer = Math.max(
+        GIT_OUTPUT_BUFFER_CAP,
+        Math.min(resolveMaxDiffLength(ConfigService.get('general.maxDiffSize')), 1_000_000),
       );
+      let diff: string;
+      if (staged) {
+        const files = await this.listFiles(['diff', '--cached', '--name-only'], repoPath, signal);
+        if (files.length === 0) {
+          throw new NoChangesDetectedError(
+            'No staged changes. Stage files or turn off commitSage.commit.onlyStagedChanges.',
+          );
+        }
+        const renames = await this.getStagedRenameMap(repoPath, signal);
+        diff = (await this.diffFiles(files, repoPath, ['diff', '--cached'], maxBuffer, signal, renames)).join('\n');
+      } else {
+        const tracked = await this.listFiles(['diff', '--name-only'], repoPath, signal);
+        const untracked = await this.listFiles(['ls-files', '--others', '--exclude-standard'], repoPath, signal);
+        diff = [
+          section('# Unstaged changes:\n', await this.diffFiles(tracked, repoPath, ['diff'], maxBuffer, signal)),
+          section('# New files:\n', await this.getUntrackedDiffs(untracked, repoPath, maxBuffer, signal)),
+        ].filter(Boolean).join('\n');
+      }
 
-      if (
-        changes.staged.length === 0 &&
-        changes.unstaged.length === 0 &&
-        changes.untracked.length === 0 &&
-        changes.deleted.length === 0
-      ) {
+      diff = diff.trim();
+      if (!diff) {
         throw new NoChangesDetectedError();
       }
-
-      const renames = changes.staged.length > 0
-        ? await this.getStagedRenameMap(repoPath, signal)
-        : undefined;
-
-      if (onlyStagedChanges && changes.staged.length > 0) {
-        const staged = await this.diffFiles(changes.staged, repoPath, ['diff', '--cached'], undefined, signal, renames);
-        return staged.join('\n\n').trim();
-      }
-
-      const diffs = await this.collectDiffs(repoPath, changes, signal, renames);
-
-      const combinedDiff = diffs.join('\n\n').trim();
-      if (!combinedDiff) {
-        throw new NoChangesDetectedError();
-      }
-
-      return combinedDiff;
+      return diff;
     } catch (error) {
       if (error instanceof NoChangesDetectedError) {
         throw error;
       }
       const original = toError(error);
       Logger.error('Error getting diff:', original);
-      // Re-throw with the prefix prepended but preserve the original
-      // constructor name and stack so telemetry buckets stay meaningful
-      // (callers read `error.constructor.name` for `errorType`).
+      // Re-throw with the prefix prepended but keep the original error (its
+      // `name` and stack) so telemetry buckets stay meaningful.
       original.message = `Failed to get diff: ${original.message}`;
       throw original;
     }
   }
 
-  private static async isSubmodule(file: string, repoPath: string, signal?: AbortSignal): Promise<boolean> {
-    try {
-      const { stdout } = await this.execGit(
-        ['ls-files', '--stage', '--', file],
-        repoPath,
-        { signal },
-      );
-      return stdout.includes('160000');
-    } catch {
-      return false;
-    }
-  }
-
-  /**
-   * Diff each pre-enumerated file (bounded concurrency), skipping submodules
-   * and blank diffs, prefixing surviving diffs with `prefix`. Takes the file
-   * list as input — the caller already enumerated it in `enumerateChanges` —
-   * instead of re-listing it here.
-   */
   /**
    * `newPath -> oldPath` for staged renames. The per-file diff below passes a
    * single pathspec, which git cannot pair with the deletion side, so a rename
@@ -412,46 +198,46 @@ export class GitService {
     return renames;
   }
 
+  /** Per-file diffs (bounded concurrency), blank ones dropped. */
   private static async diffFiles(
     files: string[],
     repoPath: string,
     diffArgs: string[],
-    prefix?: string,
+    maxBuffer: number,
     signal?: AbortSignal,
     renames?: Map<string, string>,
   ): Promise<string[]> {
-    const results = await mapLimit(files, GIT_FANOUT_CONCURRENCY, async (file) => {
-      if (await this.isSubmodule(file, repoPath, signal)) {
-        return null;
-      }
+    const diffs = await mapLimit(files, GIT_FANOUT_CONCURRENCY, async (file) => {
       const renamedFrom = renames?.get(file);
-      const fileDiff = await this.executeGitCommand(
-        renamedFrom
-          ? [...diffArgs, '-M', '--', renamedFrom, file]
-          : [...diffArgs, '--', file],
+      // Literal pathspecs: `[id].tsx` must not also match `i.tsx`. No color or
+      // external diff tool, whatever the user's git config says.
+      const args = ['--literal-pathspecs', ...diffArgs, '--no-color', '--no-ext-diff', '--ignore-submodules=dirty'];
+      const { stdout } = await this.execGit(
+        renamedFrom ? [...args, '-M', '--', renamedFrom, file] : [...args, '--', file],
         repoPath,
-        signal,
+        { signal, maxBuffer },
       );
-      if (!fileDiff.trim()) {
-        return null;
-      }
-      return prefix ? prefix + fileDiff : fileDiff;
+      return stdout;
     }, signal);
-
-    return results.filter((d): d is string => d !== null);
+    return diffs.filter((diff) => diff.trim());
   }
 
-  private static async getUntrackedDiff(files: string[], repoPath: string, signal?: AbortSignal): Promise<string> {
-    return this.collectPerFileDiffs(files, '# New files:\n', async (file) => {
+  private static async getUntrackedDiffs(
+    files: string[],
+    repoPath: string,
+    maxBuffer: number,
+    signal?: AbortSignal,
+  ): Promise<string[]> {
+    const diffs = await mapLimit(files, GIT_FANOUT_CONCURRENCY, async (file) => {
       try {
         // `git diff --no-index` always exits with 1 when the two inputs
         // differ (and 0 when they are identical), so we pass
         // allowNonZeroExit and use exitCode === 128 (or process error)
         // as the "real" failure signal.
         const { stdout, exitCode } = await this.execGit(
-          ['diff', '--no-index', '--', '/dev/null', file],
+          ['diff', '--no-color', '--no-ext-diff', '--no-index', '--', '/dev/null', file],
           repoPath,
-          { allowNonZeroExit: true, signal },
+          { allowNonZeroExit: true, signal, maxBuffer },
         );
         return exitCode === 128 ? '' : stdout;
       } catch (error) {
@@ -459,19 +245,7 @@ export class GitService {
         return '';
       }
     }, signal);
-  }
-
-  private static async getDeletedDiff(files: string[], repoPath: string, signal?: AbortSignal): Promise<string> {
-    return this.collectPerFileDiffs(files, '# Deleted files:\n', async (file) => {
-      try {
-        // git diff -- <file> on a deleted file (in the working tree) emits
-        // a proper unified diff against HEAD. No manual header construction.
-        return await this.executeGitCommand(['diff', '--', file], repoPath, signal);
-      } catch (error) {
-        Logger.error(`Error diffing deleted file ${file}:`, toError(error));
-        return '';
-      }
-    }, signal);
+    return diffs.filter((diff) => diff.trim());
   }
 
   static async getBranchName(repoPath: string, signal?: AbortSignal): Promise<string> {
@@ -491,79 +265,25 @@ export class GitService {
     }
   }
 
-  static async hasChanges(
-    repoPath: string,
-    type: 'staged' | 'unstaged' | 'untracked' | 'deleted',
-    signal?: AbortSignal,
-  ): Promise<boolean> {
-    try {
-      let command: string[];
-      switch (type) {
-        case 'staged':
-          command = ['diff', '--cached', '--name-only'];
-          break;
-        case 'unstaged':
-          command = ['diff', '--name-only'];
-          break;
-        case 'untracked':
-          command = ['ls-files', '--others', '--exclude-standard'];
-          break;
-        case 'deleted':
-          command = ['ls-files', '--deleted'];
-          break;
-        default:
-          throw new Error(`Invalid change type: ${type}`);
-      }
-
-      const output = await this.executeGitCommand(command, repoPath, signal);
-      return output.trim().length > 0;
-    } catch (error) {
-      Logger.error(`Error checking for ${type} changes:`, toError(error));
-      return false;
-    }
-  }
-
+  /**
+   * `git status --porcelain` entries. Errors propagate: an empty list would
+   * silently switch the workflow from staged to worktree mode.
+   */
   static async getChangedFiles(
     repoPath: string,
-    onlyStaged: boolean = false,
     signal?: AbortSignal,
   ): Promise<ChangedFile[]> {
-    try {
-      const statusCommand = ['status', '--porcelain'];
-      const output = await this.executeGitCommand(statusCommand, repoPath, signal);
-
-      return output
-        .split('\n')
-        .filter((line) => line.trim() !== '')
-        .filter((line) => {
-          if (onlyStaged) {
-            return isStagedStatus(line);
-          }
-          // For all changes, check both staged and unstaged status
-          const [staged, unstaged] = [line[0], line[1]];
-          return staged !== ' ' || unstaged !== ' ';
-        })
-        .map((line) => {
-          const status = line.substring(0, 2);
-          let filePath = line.substring(3).trim();
-
-          // Handle renamed files (they have format "R100 old-name -> new-name").
-          // Fall back to the raw path if the ` -> ` separator is missing so we
-          // never hand `undefined` to unquoteGitPath.
-          if (status.startsWith('R')) {
-            const renameParts = filePath.split(' -> ');
-            filePath = renameParts[1] ?? renameParts[0];
-          }
-
-          // Unquote paths that git quoted due to spaces or special characters
-          filePath = unquoteGitPath(filePath);
-
-          return { path: filePath, status };
-        });
-    } catch (error) {
-      Logger.error('Error getting changed files:', toError(error));
-      return [];
+    const fields = await this.listFiles(['status', '--porcelain'], repoPath, signal);
+    const files: ChangedFile[] = [];
+    for (let i = 0; i < fields.length; i++) {
+      const status = fields[i].substring(0, 2);
+      files.push({ path: fields[i].substring(3), status });
+      // With -z a rename/copy record is "XY new\0old\0"; skip the old path.
+      if (/[RC]/.test(status)) {
+        i++;
+      }
     }
+    return files;
   }
 
   /**
@@ -612,26 +332,6 @@ export class GitService {
     return stdout;
   }
 
-  static async getRepositories(): Promise<vscode.SourceControl[]> {
-    return GitRepositoryProvider.getRepositories();
-  }
-
-  static async selectRepository(
-    repos: vscode.SourceControl[],
-  ): Promise<vscode.SourceControl> {
-    return GitRepositoryProvider.selectRepository(repos);
-  }
-
-  static async getActiveRepository(
-    sourceControlRepository?: vscode.SourceControl,
-  ): Promise<vscode.SourceControl> {
-    return GitRepositoryProvider.getActiveRepository(sourceControlRepository);
-  }
-
-  static async validateGitExtension(): Promise<void> {
-    return GitRepositoryProvider.validateGitExtension();
-  }
-
   /**
    * Runs a `git` subcommand and returns its raw stdout/stderr/exit code.
    * Thin delegate to {@link GitProcessRunner.execGit} — kept on `GitService`
@@ -640,11 +340,14 @@ export class GitService {
   public static async execGit(
     args: string[],
     cwd: string,
-    options: { signal?: AbortSignal; allowNonZeroExit?: boolean } = {},
+    options: { signal?: AbortSignal; allowNonZeroExit?: boolean; maxBuffer?: number } = {},
   ): Promise<{ stdout: string; stderr: string; exitCode: number }> {
     return GitProcessRunner.execGit(args, cwd, options);
   }
+}
 
+function section(header: string, diffs: string[]): string {
+  return diffs.length > 0 ? header + diffs.join('\n') : '';
 }
 
 /** Result of `getChangedFiles`. `status` is the raw 2-char `git status --porcelain` code. */
@@ -658,9 +361,8 @@ interface ChangedFile {
  * The file is gone from the worktree when the worktree column (Y) is 'D' —
  * that covers ' D' (unstaged delete) and the combined codes 'AD' / 'MD' / 'RD'
  * (staged, then deleted on disk) — or when the code is exactly 'D ' (staged
- * delete). Missing the combined ones made `analyzeChanges` try to `fs.access`
- * a file that no longer exists. 'DM' stays false: the index deletion is staged
- * but the path is back on disk.
+ * delete). 'DM' stays false: the index deletion is staged but the path is
+ * back on disk.
  */
 export function isDeletedStatus(status: string): boolean {
   return status === 'D ' || status[1] === 'D';
@@ -677,21 +379,10 @@ export function isNewStatus(status: string): boolean {
 /**
  * The index column (X) shows a change vs HEAD — i.e. the file is staged. Equals
  * the set `git diff --cached --name-only` would list (any index code that isn't
- * "unmodified" ' ' or "untracked" '?'), so deriving the staged flag from a
- * single `git status --porcelain` parse matches the old `hasChanges('staged')`
- * probe without a second git call.
+ * "unmodified" ' ' or "untracked" '?'), so the staged flag and the staged file
+ * subset both come from the one `git status --porcelain` parse.
  */
 export function isIndexStaged(status: string): boolean {
   const x = status[0];
   return x !== ' ' && x !== '?';
-}
-
-/**
- * Whether the index column (X) is one of the staged codes the changed-files
- * list keys on (M/A/D/R). This is the same filter `getChangedFiles(_, true)`
- * applies, exposed so callers can derive the staged subset from an already
- * fetched all-changes list instead of re-running `git status`.
- */
-export function isStagedStatus(status: string): boolean {
-  return STAGED_STATUS_CODES.has(status[0] as GitStatusCode);
 }

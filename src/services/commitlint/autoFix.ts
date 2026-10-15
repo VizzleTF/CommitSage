@@ -27,7 +27,8 @@ export function applyAutoFixes(message: string, rules: CommitLintRules): string 
 
   if (isErrorWith(rules, 'subject-full-stop', 'never')) {
     const stop = (rules['subject-full-stop'][2] as string) ?? '.';
-    while (header.endsWith(stop)) { header = header.slice(0, -stop.length).trimEnd(); }
+    // An empty stop (`[2, 'never', '']`) would match forever.
+    while (stop && header.endsWith(stop)) { header = header.slice(0, -stop.length).trimEnd(); }
   }
 
   lines[0] = header;

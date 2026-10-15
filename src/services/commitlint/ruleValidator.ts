@@ -25,19 +25,14 @@ export function validateWithRuleSet(message: string, ruleSet: FormatRuleSet): Co
 
 function validateDetailed(message: string): CommitLintResult {
   const errors: string[] = [];
-  const lines = message.split('\n');
-  const header = lines[0];
+  const header = message.split('\n')[0];
 
+  // Details/Effects are optional: the template tells the model to skip them
+  // for trivial or runtime-neutral changes.
   if (!/^Summary: \S/.test(header)) {
     errors.push('first line must be "Summary: <imperative summary>"');
   } else if (header.length > 'Summary: '.length + 72) {
     errors.push('summary must not be longer than 72 characters');
-  }
-  if (!lines.some(l => l.trim() === 'Details:')) {
-    errors.push('message must contain a "Details:" section');
-  }
-  if (!lines.some(l => l.trim() === 'Effects:')) {
-    errors.push('message must contain an "Effects:" section');
   }
   return { valid: errors.length === 0, errors };
 }
@@ -175,7 +170,9 @@ function checkSubjectRule(
 ): string | null {
   const { subject, header } = ctx;
   switch (ruleName) {
-    case 'subject-case':       return checkCaseRule(subject, 'subject', value, condition);
+    // As in commitlint: a subject that doesn't start with a cased letter
+    // (CJK, digits) has no case to check.
+    case 'subject-case':       return /^[\p{Ll}\p{Lu}\p{Lt}]/u.test(subject) ? checkCaseRule(subject, 'subject', value, condition) : null;
     case 'subject-empty':      return checkEmptyRule(subject, 'subject', condition, false);
     case 'subject-full-stop':  return checkFullStopRule(subject, 'subject', value, condition, false);
     case 'subject-max-length':

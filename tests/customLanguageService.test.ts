@@ -135,27 +135,16 @@ describe('generateAndCacheTemplate', () => {
         spy.mockRestore();
     });
 
-    it('ensureCommitsageDirectory returns early when root path disappears mid-save', async () => {
-        mockGenerate.mockResolvedValue({ message: 'translated', model: 'm' });
-        const mkdirSpy = vi.spyOn(fs.promises, 'mkdir');
-        // First call (getTranslationsPath in saveCachedTemplate) sees a root,
-        // so we get past the !filePath guard. The next call (inside
-        // ensureCommitsageDirectory) sees no root -> early return, no mkdir.
-        mockGetProjectRootPath
-            .mockReturnValueOnce(tmpDir)   // saveCachedTemplate getTranslationsPath
-            .mockReturnValue(undefined);    // ensureCommitsageDirectory + later reads
-        const result = await CustomLanguageService.generateAndCacheTemplate('conventional' as never, 'Klingon', progress as never);
-        expect(result).toBe('translated');
-        expect(mkdirSpy).not.toHaveBeenCalled();
-        mkdirSpy.mockRestore();
-    });
-
-    it('logs an error when mkdir fails (ensureCommitsageDirectory catch)', async () => {
+    it('logs the save error once when mkdir fails and skips the write', async () => {
         mockGenerate.mockResolvedValue({ message: 'translated', model: 'm' });
         const spy = vi.spyOn(fs.promises, 'mkdir').mockRejectedValue(new Error('no perms'));
+        const writeSpy = vi.spyOn(fs.promises, 'writeFile');
         await CustomLanguageService.generateAndCacheTemplate('conventional' as never, 'Klingon', progress as never);
-        expect(Logger.error).toHaveBeenCalledWith('Failed to create .commitsage directory:', expect.any(Error));
+        expect(Logger.error).toHaveBeenCalledTimes(1);
+        expect(Logger.error).toHaveBeenCalledWith('Failed to save translation:', expect.any(Error));
+        expect(writeSpy).not.toHaveBeenCalled();
         spy.mockRestore();
+        writeSpy.mockRestore();
     });
 });
 

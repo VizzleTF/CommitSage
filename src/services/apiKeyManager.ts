@@ -3,26 +3,13 @@ import { Logger } from '../utils/logger';
 import { AiServiceError, ConfigurationError, UserCancelledError } from '../models/errors';
 import { toError } from '../utils/errorUtils';
 import { ConfigService } from '../utils/configService';
-import { PROVIDER_CATALOG, ProviderMeta, isProvider, providerMeta } from './providerCatalog';
+import { ProviderMeta, isProvider, providerMeta } from './providerCatalog';
 
 export class ApiKeyManager {
     private static secretStorage: vscode.SecretStorage;
-    private static readonly knownSecretKeys: Set<string> = new Set(
-        PROVIDER_CATALOG.map(c => c.secretKey),
-    );
 
-    static initialize(secretStorage: vscode.SecretStorage, context: vscode.ExtensionContext): void {
+    static initialize(secretStorage: vscode.SecretStorage): void {
         this.secretStorage = secretStorage;
-        // SecretStorage is shared across windows and (in Remote scenarios)
-        // across host/client. Without this listener a second window or remote
-        // host would keep using the stale key after a rotation.
-        context.subscriptions.push(
-            secretStorage.onDidChange(e => {
-                if (this.knownSecretKeys.has(e.key)) {
-                    Logger.log(`API key updated externally: ${e.key}`);
-                }
-            }),
-        );
     }
 
     /**
@@ -107,11 +94,11 @@ export class ApiKeyManager {
             if (error instanceof AiServiceError) {
                 throw error;
             }
+            // No popup here: every caller shows the failure in its own words.
             Logger.error(
                 `Failed to validate and set ${config.displayName} API key:`,
                 toError(error)
             );
-            await Logger.showError(vscode.l10n.t('Failed to set API key: {0}', toError(error).message));
             throw error;
         }
     }

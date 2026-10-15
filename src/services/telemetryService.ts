@@ -4,7 +4,6 @@ import { Logger } from '../utils/logger';
 import { ConfigService } from '../utils/configService';
 import { AMPLITUDE_API_KEY } from '../constants/apiKeys';
 import { redactSecrets } from '../utils/errorUtils';
-import { EventOptions } from '@amplitude/analytics-types';
 
 const FLUSH_QUEUE_SIZE = 30;
 const FLUSH_INTERVAL_MS = 30_000;
@@ -15,7 +14,7 @@ type TelemetryEvent =
     | { name: 'message_generation_started'; diffSize: number; fileCount: number; truncated: boolean; provider: string; model: string }
     | { name: 'message_generation_completed'; provider: string; model: string; durationMs: number; language: string; onlyStagedChanges: boolean }
     | { name: 'message_generation_failed'; provider: string; model: string; error: string; errorType: string }
-    | { name: 'commit_completed'; hasStaged: boolean; hasUntracked: boolean; hasDeleted: boolean; messageLength: number }
+    | { name: 'commit_completed'; fileCount: number; messageLength: number }
     | { name: 'commit_failed'; error: string; errorType: string }
     | { name: 'settings_changed'; setting: string }
     | { name: 'push_completed' }
@@ -37,7 +36,7 @@ interface TelemetryEventProperties {
 class AmplitudeTelemetrySender implements vscode.TelemetrySender {
     sendEventData(eventName: string, data?: Record<string, unknown>): void {
         /* eslint-disable @typescript-eslint/naming-convention */
-        const options: EventOptions = {
+        const options: amplitude.Types.EventOptions = {
             device_id: vscode.env.machineId,
             time: Date.now(),
         };
@@ -85,8 +84,8 @@ export class TelemetryService {
                 serverZone: 'EU',
                 flushQueueSize: FLUSH_QUEUE_SIZE,
                 flushIntervalMillis: FLUSH_INTERVAL_MS,
-                // optOut is driven by the TelemetryLogger gate — see
-                // syncOptOut() below for the extension-level toggle.
+                // optOut carries the extension-level toggle (computeEnabled);
+                // the TelemetryLogger below gates on VS Code's telemetry level.
                 optOut: !this.computeEnabled(),
             });
 
@@ -103,6 +102,8 @@ export class TelemetryService {
             // calls but does not propagate to the underlying SDK.
             this.disposables.push(
                 vscode.workspace.onDidChangeConfiguration(this.handleConfigChange.bind(this)),
+                // A project opt-out in .commitsage/config.json fires no settings event.
+                ConfigService.onProjectConfigChange(() => amplitude.setOptOut(!this.computeEnabled())),
             );
 
             context.subscriptions.push(...this.disposables);
@@ -113,8 +114,16 @@ export class TelemetryService {
         }
     }
 
+    /**
+     * Off when any level says `false`: user settings, workspace settings or the
+     * project config. A repo can opt its users out, never back in. VS Code's own
+     * telemetry level is not checked here: the TelemetryLogger gates on it live.
+     */
     private static computeEnabled(): boolean {
-        return vscode.env.isTelemetryEnabled && ConfigService.get('telemetry.enabled');
+        const setting = vscode.workspace.getConfiguration('commitSage').inspect<boolean>('telemetry.enabled');
+        return setting?.globalValue !== false
+            && setting?.workspaceValue !== false
+            && ConfigService.get('telemetry.enabled') !== false;
     }
 
     static sendEvent(event: TelemetryEvent): void {

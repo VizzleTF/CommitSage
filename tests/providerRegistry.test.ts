@@ -3,27 +3,27 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 const {
     mockGet,
     mockGetOptionalKey,
-    fetchGeminiModels,
+    getAvailableModels,
     fetchOpenAIModels,
+    fetchOpenAICompatModels,
     fetchCodestralModels,
     fetchOllamaModels,
-    fetchOpenRouterModels,
-    fetchGroqModels,
     fetchAnthropicModels,
-    fetchDeepSeekModels,
     fetchXaiModels,
+    isFreeOpenRouterModel,
+    isMistralChatModel,
 } = vi.hoisted(() => ({
     mockGet: vi.fn(),
     mockGetOptionalKey: vi.fn(),
-    fetchGeminiModels: vi.fn(),
+    getAvailableModels: vi.fn(),
     fetchOpenAIModels: vi.fn(),
+    fetchOpenAICompatModels: vi.fn(),
     fetchCodestralModels: vi.fn(),
     fetchOllamaModels: vi.fn(),
-    fetchOpenRouterModels: vi.fn(),
-    fetchGroqModels: vi.fn(),
     fetchAnthropicModels: vi.fn(),
-    fetchDeepSeekModels: vi.fn(),
     fetchXaiModels: vi.fn(),
+    isFreeOpenRouterModel: vi.fn(),
+    isMistralChatModel: vi.fn(),
 }));
 
 vi.mock('../src/utils/configService', () => ({
@@ -34,16 +34,19 @@ vi.mock('../src/services/apiKeyManager', () => ({
     ApiKeyManager: { getOptionalKey: mockGetOptionalKey },
 }));
 
+vi.mock('../src/services/geminiService', () => ({
+    GeminiService: { getAvailableModels },
+}));
+
 vi.mock('../src/services/modelLists', () => ({
-    fetchGeminiModels,
     fetchOpenAIModels,
+    fetchOpenAICompatModels,
     fetchCodestralModels,
     fetchOllamaModels,
-    fetchOpenRouterModels,
-    fetchGroqModels,
     fetchAnthropicModels,
-    fetchDeepSeekModels,
     fetchXaiModels,
+    isFreeOpenRouterModel,
+    isMistralChatModel,
 }));
 
 import {
@@ -61,14 +64,12 @@ beforeEach(() => {
     vi.clearAllMocks();
     mockGet.mockReturnValue(undefined);
     mockGetOptionalKey.mockResolvedValue('a-key');
-    fetchGeminiModels.mockResolvedValue(['g']);
+    getAvailableModels.mockResolvedValue(['g']);
     fetchOpenAIModels.mockResolvedValue(['o']);
-    fetchCodestralModels.mockResolvedValue(['c']);
+    fetchOpenAICompatModels.mockResolvedValue(['compat']);
+    fetchCodestralModels.mockReturnValue(['c']);
     fetchOllamaModels.mockResolvedValue(['ol']);
-    fetchOpenRouterModels.mockResolvedValue(['or']);
-    fetchGroqModels.mockResolvedValue(['gr']);
     fetchAnthropicModels.mockResolvedValue(['an']);
-    fetchDeepSeekModels.mockResolvedValue(['ds']);
     fetchXaiModels.mockResolvedValue(['x']);
 });
 
@@ -82,7 +83,7 @@ describe('providerRegistry derived exports', () => {
 
     it('NO_REFRESH_PROVIDERS contains only providers flagged noRefresh', () => {
         expect([...NO_REFRESH_PROVIDERS].sort()).toEqual(
-            ['anthropic', 'codestral', 'custom'].sort(),
+            ['codestral', 'custom'].sort(),
         );
     });
 
@@ -119,40 +120,34 @@ describe('providerDef()', () => {
     });
 });
 
-describe('selectedModel() reads config per provider', () => {
-    it.each([
-        ['gemini', 'gemini.model'],
-        ['openrouter', 'openrouter.model'],
-        ['groq', 'groq.model'],
-        ['anthropic', 'anthropic.model'],
-        ['openai', 'openai.model'],
-        ['deepseek', 'deepseek.model'],
-        ['xai', 'xai.model'],
-        ['codestral', 'codestral.model'],
-        ['ollama', 'ollama.model'],
-        ['custom', 'custom.model'],
-    ])('%s reads %s', (id, key) => {
-        mockGet.mockImplementation((k: string) => (k === key ? 'the-model' : undefined));
-        expect(providerDef(id as never).selectedModel()).toBe('the-model');
-        expect(mockGet).toHaveBeenCalledWith(key);
-    });
-});
-
 describe('fetchModels() success paths', () => {
     it('gemini passes the resolved key', async () => {
         expect(await providerDef('gemini').fetchModels()).toEqual(['g']);
-        expect(fetchGeminiModels).toHaveBeenCalledWith('a-key');
+        expect(getAvailableModels).toHaveBeenCalledWith('a-key');
     });
 
-    it('openrouter passes key and preferFreeModels', async () => {
+    it('openrouter filters to free models when preferFreeModels is on', async () => {
         mockGet.mockImplementation((k: string) => (k === 'openrouter.preferFreeModels' ? true : undefined));
-        expect(await providerDef('openrouter').fetchModels()).toEqual(['or']);
-        expect(fetchOpenRouterModels).toHaveBeenCalledWith('a-key', true);
+        expect(await providerDef('openrouter').fetchModels()).toEqual(['compat']);
+        expect(fetchOpenAICompatModels).toHaveBeenCalledWith('https://openrouter.ai/api/v1', 'a-key', isFreeOpenRouterModel);
     });
 
-    it('groq passes the key', async () => {
-        expect(await providerDef('groq').fetchModels()).toEqual(['gr']);
-        expect(fetchGroqModels).toHaveBeenCalledWith('a-key');
+    it('openrouter lists every model when preferFreeModels is off', async () => {
+        await providerDef('openrouter').fetchModels();
+        expect(fetchOpenAICompatModels).toHaveBeenCalledWith('https://openrouter.ai/api/v1', 'a-key', undefined);
+    });
+
+    it.each([
+        ['groq', 'https://api.groq.com/openai/v1'],
+        ['deepseek', 'https://api.deepseek.com'],
+    ])('%s lists <chat base URL>/models with the key', async (id, baseUrl) => {
+        expect(await providerDef(id as never).fetchModels()).toEqual(['compat']);
+        expect(fetchOpenAICompatModels).toHaveBeenCalledWith(baseUrl, 'a-key', undefined);
+    });
+
+    it('mistral keeps chat models only', async () => {
+        expect(await providerDef('mistral').fetchModels()).toEqual(['compat']);
+        expect(fetchOpenAICompatModels).toHaveBeenCalledWith('https://api.mistral.ai/v1', 'a-key', isMistralChatModel);
     });
 
     it('anthropic passes the key', async () => {
@@ -160,25 +155,20 @@ describe('fetchModels() success paths', () => {
         expect(fetchAnthropicModels).toHaveBeenCalledWith('a-key');
     });
 
-    it('openai passes key and baseUrl', async () => {
+    it('openai passes the configured baseUrl and key', async () => {
         mockGet.mockImplementation((k: string) => (k === 'openai.baseUrl' ? 'https://x' : undefined));
         expect(await providerDef('openai').fetchModels()).toEqual(['o']);
-        expect(fetchOpenAIModels).toHaveBeenCalledWith('a-key', 'https://x');
+        expect(fetchOpenAIModels).toHaveBeenCalledWith('https://x', 'a-key');
     });
 
-    it('deepseek passes the key', async () => {
-        expect(await providerDef('deepseek').fetchModels()).toEqual(['ds']);
-        expect(fetchDeepSeekModels).toHaveBeenCalledWith('a-key');
-    });
-
-    it('xai passes the key', async () => {
+    it('xai passes its base URL and the key', async () => {
         expect(await providerDef('xai').fetchModels()).toEqual(['x']);
-        expect(fetchXaiModels).toHaveBeenCalledWith('a-key');
+        expect(fetchXaiModels).toHaveBeenCalledWith('https://api.x.ai/v1', 'a-key');
     });
 
-    it('codestral passes the key', async () => {
+    it('codestral returns the static list once a key is set', async () => {
         expect(await providerDef('codestral').fetchModels()).toEqual(['c']);
-        expect(fetchCodestralModels).toHaveBeenCalledWith('a-key');
+        expect(mockGetOptionalKey).toHaveBeenCalledWith('codestral');
     });
 
     it('ollama with auth token enabled passes baseUrl + token', async () => {
@@ -213,12 +203,15 @@ describe('fetchModels() missing-key throws (requireKey)', () => {
         ['gemini', 'Gemini'],
         ['openrouter', 'OpenRouter'],
         ['groq', 'Groq'],
-        ['anthropic', 'Anthropic'],
+        ['anthropic', 'Anthropic Claude'],
         ['openai', 'OpenAI'],
         ['deepseek', 'DeepSeek'],
-        ['xai', 'xAI'],
+        ['xai', 'xAI Grok'],
         ['codestral', 'Codestral'],
+        ['mistral', 'Mistral'],
     ])('%s throws when key is missing', async (id, label) => {
+        // Real settings always hold a string base URL (defaults included).
+        mockGet.mockImplementation((k: string) => (k === 'openai.baseUrl' ? 'https://api.openai.com/v1' : undefined));
         mockGetOptionalKey.mockResolvedValue(undefined);
         await expect(providerDef(id as never).fetchModels()).rejects.toThrow(
             `${label} API key is not set`,

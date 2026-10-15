@@ -10,6 +10,8 @@ Settings named here are described in [configuration.md](configuration.md). Provi
 |---|---|---|
 | `No workspace folder is open` | VS Code has no folder open. | Open the repository folder. |
 | `No changes detected.` | The repository has no staged, unstaged, untracked or deleted files. | Run `git status` in the repository and make a change. |
+| `No staged changes. Stage files or turn off commitSage.commit.onlyStagedChanges.` | `commitSage.commit.onlyStagedChanges` is `true` and nothing is staged. | Stage the files to commit, or set `commitSage.commit.onlyStagedChanges` to `false`. |
+| `git <COMMAND> output is too large`, sometimes after `Failed to get diff: ` | The list of changed files is longer than 200,000 characters. | Commit the changes in smaller parts, or add generated files to `.gitignore`. |
 | `No Git repositories found in the current workspace.` | The open folder holds no Git repository. | Open the folder that contains `.git`. |
 | `Repository has no configured remotes. Please add a remote repository using git remote add <name> <url>` | Auto-push ran in a repository without a remote. | Add a remote with `git remote add <NAME> <URL>` or set `commitSage.commit.autoPush` to `false`. |
 | `Failed to set API key: <CAUSE>` | The key failed the format check or could not be stored. | Read `<CAUSE>` and paste the key again without spaces or extra characters. |
@@ -28,14 +30,14 @@ The shortcut has the `when` clause `scmProvider == git`. It works when focus is 
 
 ### `Invalid or expired API key. Please enter a new one.`
 
-The provider rejected the API key: HTTP 401, or HTTP 400 with an "invalid API key" message. Commit Sage deletes the stored key and opens an input box for a new one.
+The provider rejected the API key: HTTP 401, or HTTP 400 with an "invalid API key" or "API key not valid" message (xAI, Gemini). Commit Sage deletes the stored key and opens an input box for a new one.
 
 1. Paste a new key from the provider console. For Codestral, the key comes from `https://console.mistral.ai/codestral` and differs from a Mistral La Plateforme key.
 2. If three new keys in a row are rejected, Commit Sage shows `Invalid or expired API key. Maximum retry attempts reached.` Check that the key belongs to the provider set in `commitSage.provider.type`, then run **Commit Sage: Set <PROVIDER> API Key**.
 
 ## Provider and network errors
 
-A failed request is retried up to three times. After the last attempt, Commit Sage shows `Failed to generate commit message: <CAUSE>`. The table lists each `<CAUSE>`.
+A failed request is tried up to three times (two retries, after 1 s and 2 s). After the last attempt, Commit Sage shows `Failed to generate commit message: <CAUSE>`. The table lists each `<CAUSE>`.
 
 | `<CAUSE>` after `Failed to generate commit message: ` | Cause | Action |
 |---|---|---|
@@ -45,7 +47,7 @@ A failed request is retried up to three times. After the last attempt, Commit Sa
 | `Invalid Request: The request was malformed or the input was invalid. This may happen if the content is too long or contains unsupported characters.` | The provider returned HTTP 422 without an error text. | Lower `commitSage.general.maxDiffSize` or stage fewer files. |
 | `Server Error: The service is temporarily unavailable. Please try again later.` | The provider returned HTTP 500. | Run the command again later. |
 | `Invalid response format from <PROVIDER> API` | The response held no message text. | Run the command again, or pick another model. |
-| `Generated commit message is empty.` | The model returned only whitespace. | Run the command again, or pick another model. |
+| `Generated commit message is empty.` | The model returned only whitespace or only a `<think>` block. | Run the command again, or pick another model. |
 | `API Error: <STATUS>: <DETAIL>` | The provider returned another HTTP status. | Read `<DETAIL>`: it is the provider's own error text. |
 | ``<PROVIDER> stopped generating before the message was complete (<DETAIL>). Raise `commitSage.general.maxOutputTokens` if this keeps happening.`` | The model used up its output token budget, often on reasoning. | Raise `commitSage.general.maxOutputTokens` or pick a model without reasoning. |
 
@@ -75,7 +77,7 @@ The Ollama provider shows its own connection message; see [Ollama](#ollama).
 | `Model not found. Please check if Ollama is running and the model is installed.` | Ollama returned HTTP 404: the model in `commitSage.ollama.model` is not pulled. | Run `ollama pull <MODEL>`. |
 | `Server error. Please check if Ollama is running properly.` | Ollama returned HTTP 500. | Check the Ollama server log. |
 
-A remote Ollama server that requires a token needs `commitSage.ollama.useAuthToken` set to `true` and the token set with **Commit Sage: Set Ollama Auth Token**.
+A remote Ollama server that requires a token needs `commitSage.ollama.useAuthToken` set to `true` and the token set with **Commit Sage: Set Ollama Auth Token**. If the server returns HTTP 401 while `useAuthToken` is `false`, Commit Sage shows `ollama returned 401. Turn on commitSage.ollama.useAuthToken and set the token.` instead of asking for a new token. The `custom` provider does the same with `commitSage.custom.useApiKey`.
 
 ## OpenAI-compatible servers (LocalAI, LM Studio, vLLM, llama.cpp)
 
@@ -93,7 +95,10 @@ Commit Sage shows this dialog with **Open File** and **Ignore** buttons at start
 
 ### Project config values are ignored
 
-The workspace is not trusted. In an untrusted workspace the project config cannot set the keys listed in [configuration.md](configuration.md#workspace-trust), and the Output panel shows `Ignoring project config "<KEY>": the workspace is not trusted.` Trust the workspace to apply them.
+Check **View → Output → Commit Sage**:
+
+- `Ignoring project config "<KEY>": the workspace is not trusted.` In an untrusted workspace the project config cannot set the keys listed in [configuration.md](configuration.md#workspace-trust). Trust the workspace to apply them.
+- `"<KEY>" expected <TYPE>, got <TYPE> — skipping.` The value has the wrong type, for example `"true"` in quotes for a boolean. Fix the type and save the file.
 
 ### Custom language translation is requested on every run
 

@@ -23,6 +23,7 @@ vi.mock('../src/constants/apiKeys', () => ({
 
 // --- ConfigService ----------------------------------------------------------
 const telemetryEnabled = { value: true };
+let projectConfigListener: (() => void) | undefined;
 vi.mock('../src/utils/configService', () => ({
     ConfigService: {
         get: (key: string) => {
@@ -35,6 +36,10 @@ vi.mock('../src/utils/configService', () => ({
             'commitSage.telemetry.enabled',
             'commitSage.commit.autoCommit',
         ],
+        onProjectConfigChange: (l: () => void) => {
+            projectConfigListener = l;
+            return { dispose: () => undefined };
+        },
     },
 }));
 
@@ -63,18 +68,17 @@ let capturedSender:
       }
     | undefined;
 let configChangeListener: ((e: unknown) => void) | undefined;
-const isTelemetryEnabled = { value: true };
+// `inspect('telemetry.enabled')` result: user (global) and workspace levels.
+const telemetryInspect: { globalValue?: boolean; workspaceValue?: boolean } = {};
 
 vi.mock('vscode', () => ({
     version: '1.99.0',
     env: {
         machineId: 'mid',
-        get isTelemetryEnabled() {
-            return isTelemetryEnabled.value;
-        },
         createTelemetryLogger: (...a: unknown[]) => createTelemetryLogger(a[0]),
     },
     workspace: {
+        getConfiguration: () => ({ inspect: () => telemetryInspect }),
         onDidChangeConfiguration: (l: (e: unknown) => void) => {
             configChangeListener = l;
             return { dispose: () => undefined };
@@ -109,7 +113,8 @@ function makeContext(subscriptions: unknown[] = []): import('vscode').ExtensionC
 beforeEach(() => {
     apiKeyHolder.value = 'real-key';
     telemetryEnabled.value = true;
-    isTelemetryEnabled.value = true;
+    delete telemetryInspect.globalValue;
+    delete telemetryInspect.workspaceValue;
     capturedSender = undefined;
     configChangeListener = undefined;
     amplitudeInit.mockClear();
@@ -160,6 +165,22 @@ describe('TelemetryService.initialize', () => {
         );
     });
 
+    // telemetryEnabled (ConfigService.get) stays true: the project or workspace value wins there.
+    it.each([
+        ['the project config', { globalValue: false }],
+        ['the workspace settings', { globalValue: false, workspaceValue: true }],
+    ])('keeps optOut when %s says true over a user false', async (_where, levels) => {
+        Object.assign(telemetryInspect, levels);
+        await TelemetryService.initialize(makeContext());
+        expect(amplitudeInit).toHaveBeenCalledWith('real-key', expect.objectContaining({ optOut: true }));
+    });
+
+    it('lets the workspace opt out over a user true', async () => {
+        Object.assign(telemetryInspect, { globalValue: true, workspaceValue: false });
+        await TelemetryService.initialize(makeContext());
+        expect(amplitudeInit).toHaveBeenCalledWith('real-key', expect.objectContaining({ optOut: true }));
+    });
+
     it('marks itself not-initialized if amplitude.init throws', async () => {
         amplitudeInit.mockImplementationOnce(() => {
             throw new Error('init boom');
@@ -199,14 +220,12 @@ describe('TelemetryService.sendEvent', () => {
         await TelemetryService.initialize(makeContext());
         TelemetryService.sendEvent({
             name: 'commit_completed',
-            hasStaged: true,
-            hasUntracked: false,
-            hasDeleted: false,
+            fileCount: 3,
             messageLength: 12,
         });
         expect(logUsage).toHaveBeenCalledWith(
             'commit_completed',
-            expect.objectContaining({ hasStaged: true, messageLength: 12 }),
+            expect.objectContaining({ fileCount: 3, messageLength: 12 }),
         );
     });
 
@@ -313,6 +332,17 @@ describe('TelemetryService.handleConfigChange (via the captured listener)', () =
             'settings_changed',
             expect.objectContaining({ setting: 'commit.autoCommit' }),
         );
+    });
+
+    it('updates optOut when the project config changes telemetry.enabled', async () => {
+        await TelemetryService.initialize(makeContext());
+        amplitudeSetOptOut.mockClear();
+        telemetryEnabled.value = false;
+        projectConfigListener?.();
+        expect(amplitudeSetOptOut).toHaveBeenCalledWith(true);
+        telemetryEnabled.value = true;
+        projectConfigListener?.();
+        expect(amplitudeSetOptOut).toHaveBeenLastCalledWith(false);
     });
 
     it('falls back to the commitSage catch-all attribution', async () => {

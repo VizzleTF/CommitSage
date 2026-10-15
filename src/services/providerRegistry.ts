@@ -1,22 +1,23 @@
 import { ConfigService } from '../utils/configService';
 import { ApiKeyManager } from '../services/apiKeyManager';
 import {
-    fetchGeminiModels,
-    fetchOpenAIModels,
-    fetchCodestralModels,
-    fetchMistralModels,
-    fetchOllamaModels,
-    fetchOpenRouterModels,
-    fetchGroqModels,
+    ModelEntry,
     fetchAnthropicModels,
-    fetchDeepSeekModels,
+    fetchCodestralModels,
+    fetchOllamaModels,
+    fetchOpenAICompatModels,
+    fetchOpenAIModels,
     fetchXaiModels,
+    isFreeOpenRouterModel,
+    isMistralChatModel,
 } from '../services/modelLists';
+import { GeminiService } from './geminiService';
+import { compatBaseUrl } from './openAICompatibleService';
 import { Provider } from '../views/webview/protocol';
 import {
     PROVIDER_CATALOG,
     ProviderMeta,
-    providerMeta as catalogMeta,
+    providerMeta,
 } from './providerCatalog';
 
 export { PROVIDERS } from './providerCatalog';
@@ -28,86 +29,56 @@ export { PROVIDERS } from './providerCatalog';
  * iterates this table; everything else derives from the catalog.
  */
 export interface ProviderDef extends ProviderMeta {
-    /** Currently configured model id for this provider. */
-    selectedModel(): string;
     /** Fetches the live model list, throwing if a required key is missing. */
     fetchModels(): Promise<string[]>;
 }
 
-async function requireKey(id: Provider, label: string): Promise<string> {
+async function requireKey(id: Provider): Promise<string> {
     const key = await ApiKeyManager.getOptionalKey(id);
     if (!key) {
-        throw new Error(`${label} API key is not set`);
+        throw new Error(`${providerMeta(id).label} API key is not set`);
     }
     return key;
 }
 
-/** Per-provider runtime behavior, composed onto the catalog metadata below. */
-const PROVIDER_BEHAVIOR: Record<Provider, Pick<ProviderDef, 'selectedModel' | 'fetchModels'>> = {
-    gemini: {
-        selectedModel: () => ConfigService.get('gemini.model'),
-        fetchModels: async () => fetchGeminiModels(await requireKey('gemini', 'Gemini')),
+/** Model-list fetch for an OpenAI-compatible provider, from its chat base URL. */
+function compatModels(id: Provider, keep?: (m: ModelEntry) => boolean): () => Promise<string[]> {
+    return async () => fetchOpenAICompatModels(compatBaseUrl(id), await requireKey(id), keep);
+}
+
+/** Per-provider live model fetch, composed onto the catalog metadata below. */
+const FETCH_MODELS: Record<Provider, () => Promise<string[]>> = {
+    gemini: async () => GeminiService.getAvailableModels(await requireKey('gemini')),
+    openrouter: async () => fetchOpenAICompatModels(
+        compatBaseUrl('openrouter'),
+        await requireKey('openrouter'),
+        ConfigService.get('openrouter.preferFreeModels') ? isFreeOpenRouterModel : undefined,
+    ),
+    groq: compatModels('groq'),
+    anthropic: async () => fetchAnthropicModels(await requireKey('anthropic')),
+    openai: async () => fetchOpenAIModels(compatBaseUrl('openai'), await requireKey('openai')),
+    deepseek: compatModels('deepseek'),
+    xai: async () => fetchXaiModels(compatBaseUrl('xai'), await requireKey('xai')),
+    // Static list; still gated on the key so the UI shows the same
+    // "set a key" hint as the other providers.
+    codestral: async () => {
+        await requireKey('codestral');
+        return fetchCodestralModels();
     },
-    openrouter: {
-        selectedModel: () => ConfigService.get('openrouter.model'),
-        fetchModels: async () => fetchOpenRouterModels(
-            await requireKey('openrouter', 'OpenRouter'),
-            ConfigService.get('openrouter.preferFreeModels'),
-        ),
+    mistral: compatModels('mistral', isMistralChatModel),
+    ollama: async () => {
+        const useAuth = ConfigService.get('ollama.useAuthToken');
+        const token = useAuth ? await ApiKeyManager.getOptionalKey('ollama') : undefined;
+        return fetchOllamaModels(ConfigService.get('ollama.baseUrl'), token);
     },
-    groq: {
-        selectedModel: () => ConfigService.get('groq.model'),
-        fetchModels: async () => fetchGroqModels(await requireKey('groq', 'Groq')),
-    },
-    anthropic: {
-        selectedModel: () => ConfigService.get('anthropic.model'),
-        // Anthropic has no public /models endpoint; the list is a static
-        // fallback baked into modelLists.ts. We still gate on the key being set
-        // so the UI surfaces the same "set a key" hint as the other providers.
-        fetchModels: async () => fetchAnthropicModels(await requireKey('anthropic', 'Anthropic')),
-    },
-    openai: {
-        selectedModel: () => ConfigService.get('openai.model'),
-        fetchModels: async () => fetchOpenAIModels(
-            await requireKey('openai', 'OpenAI'),
-            ConfigService.get('openai.baseUrl'),
-        ),
-    },
-    deepseek: {
-        selectedModel: () => ConfigService.get('deepseek.model'),
-        fetchModels: async () => fetchDeepSeekModels(await requireKey('deepseek', 'DeepSeek')),
-    },
-    xai: {
-        selectedModel: () => ConfigService.get('xai.model'),
-        fetchModels: async () => fetchXaiModels(await requireKey('xai', 'xAI')),
-    },
-    codestral: {
-        selectedModel: () => ConfigService.get('codestral.model'),
-        fetchModels: async () => fetchCodestralModels(await requireKey('codestral', 'Codestral')),
-    },
-    mistral: {
-        selectedModel: () => ConfigService.get('mistral.model'),
-        fetchModels: async () => fetchMistralModels(await requireKey('mistral', 'Mistral')),
-    },
-    ollama: {
-        selectedModel: () => ConfigService.get('ollama.model'),
-        fetchModels: async () => {
-            const useAuth = ConfigService.get('ollama.useAuthToken');
-            const token = useAuth ? await ApiKeyManager.getOptionalKey('ollama') : undefined;
-            return fetchOllamaModels(ConfigService.get('ollama.baseUrl'), token);
-        },
-    },
-    custom: {
-        selectedModel: () => ConfigService.get('custom.model'),
-        // Custom has no listing endpoint — user types the model manually.
-        // Returning an empty list lets the dropdown render just the configured model.
-        fetchModels: async () => [],
-    },
+    // Custom has no listing endpoint — user types the model manually.
+    // Returning an empty list lets the dropdown render just the configured model.
+    custom: async () => [],
 };
 
 export const PROVIDER_DEFS: readonly ProviderDef[] = PROVIDER_CATALOG.map(meta => ({
     ...meta,
-    ...PROVIDER_BEHAVIOR[meta.id],
+    fetchModels: FETCH_MODELS[meta.id],
 }));
 
 /** Providers with no live `/models` endpoint — the UI hides their refresh button. */
@@ -120,8 +91,6 @@ const BY_ID = new Map<Provider, ProviderDef>(PROVIDER_DEFS.map(d => [d.id, d]));
 export function providerDef(id: Provider): ProviderDef {
     const def = BY_ID.get(id);
     if (!def) {
-        // Defer to the catalog's error for a consistent message / unknown-id guard.
-        catalogMeta(id);
         throw new Error(`Unknown provider: ${id}`);
     }
     return def;

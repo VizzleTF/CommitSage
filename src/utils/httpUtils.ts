@@ -10,8 +10,8 @@ export class HttpError extends Error {
   public readonly status: number;
   public readonly data: unknown;
 
-  constructor(status: number, data: unknown, message?: string) {
-    super(message ?? `HTTP ${status}`);
+  constructor(status: number, data: unknown) {
+    super(`HTTP ${status}`);
     this.name = 'HttpError';
     this.status = status;
     this.data = data;
@@ -24,12 +24,9 @@ export class HttpError extends Error {
  * Carries the original cause so `handleHttpError` can map ECONNREFUSED/ETIMEDOUT.
  */
 export class NetworkError extends Error {
-  public readonly cause: unknown;
-
   constructor(message: string, cause: unknown) {
-    super(message);
+    super(message, { cause });
     this.name = 'NetworkError';
-    this.cause = cause;
   }
 }
 
@@ -44,9 +41,8 @@ interface RequestOptions {
  * How a provider expects its API key to be transmitted.
  * - `bearer` — `Authorization: Bearer <key>` (OpenAI, Groq, OpenRouter, DeepSeek, xAI, Codestral, Ollama auth)
  * - `x-api-key` — `x-api-key: <key>` (Anthropic)
- * - `none` — no auth header, even if `apiKey` is provided (custom self-hosted)
  */
-export type AuthStyle = 'bearer' | 'x-api-key' | 'none';
+export type AuthStyle = 'bearer' | 'x-api-key';
 
 export class HttpUtils {
   // Remove trailing slashes without a regex (avoids any backtracking concern).
@@ -68,7 +64,7 @@ export class HttpUtils {
       ...additionalHeaders,
     };
 
-    if (apiKey && authStyle !== 'none') {
+    if (apiKey) {
       if (authStyle === 'x-api-key') {
         headers['x-api-key'] = apiKey;
       } else {

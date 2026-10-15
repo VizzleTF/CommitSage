@@ -11,7 +11,7 @@ Setting keys on this page omit the `commitSage.` prefix: `provider.type` means `
 | Gemini (default) | `gemini` | Cloud | Required | Fetched from the Google Generative Language API |
 | OpenRouter | `openrouter` | Cloud | Required | Fetched from `openrouter.ai/api/v1/models` |
 | Groq | `groq` | Cloud | Required | Fetched from `api.groq.com/openai/v1/models` |
-| Anthropic Claude | `anthropic` | Cloud | Required | Built-in list |
+| Anthropic Claude | `anthropic` | Cloud | Required | Fetched from `api.anthropic.com/v1/models` |
 | OpenAI | `openai` | Cloud | Required | Fetched from `<openai.baseUrl>/models` |
 | DeepSeek | `deepseek` | Cloud | Required | Fetched from `api.deepseek.com/models` |
 | xAI Grok | `xai` | Cloud | Required | Fetched from `api.x.ai/v1/models`; built-in list if the request fails |
@@ -40,7 +40,7 @@ Google Gemini models through the Gemini API. This is the default provider.
   - `gemini.thinkingBudget`: default `0`. Thinking token budget for Gemini 2.5 models; `0` disables thinking, `-1` lets the model decide.
   - `gemini.thinkingLevel`: default `low`. Thinking depth for Gemini 3.x models: `minimal`, `low`, `medium` or `high`.
 
-With `auto`, the extension fetches the models that support `generateContent` and keeps names that start with `gemini-`, which drops Gemma and LearnLM. It also drops image, audio, TTS, embedding and other non-text variants. It sorts the rest `pro` first, then `flash`, then `flash-lite`, newer versions first within each group, and tries each model in that order until one returns a message. If the model list cannot be fetched, it uses a built-in list of four models.
+With `auto`, the extension fetches the models that support `generateContent` and keeps names that start with `gemini-`, which drops Gemma and LearnLM. It also drops image, audio, TTS, embedding and other non-text variants. It sorts the rest `pro` first, then `flash`, then `flash-lite`, newer versions first within each group, and tries each model in that order until one returns a message. If the model list cannot be fetched, it uses a built-in list of four models. If Google rejects the key, Commit Sage asks for a new one instead.
 
 Gemini 3.x models cannot turn thinking off and ignore `gemini.thinkingBudget`. Gemini 2.5 Pro cannot disable thinking either: a budget of `0` is raised to `128` for that model.
 
@@ -70,7 +70,7 @@ Claude models from the Anthropic API.
 - Command: `Commit Sage: Set Anthropic API Key`
 - Settings: `anthropic.model`, default `claude-sonnet-4-5-20250929`.
 
-The extension does not fetch the Anthropic model list; it uses a built-in list: `claude-opus-4-1-20250805`, `claude-sonnet-4-5-20250929`, `claude-haiku-4-5-20251001`, `claude-3-5-sonnet-20241022`, `claude-3-5-haiku-20241022`.
+The model list in the sidebar comes from the Anthropic `/v1/models` endpoint, so it shows the models your key can use.
 
 Pro and Max subscription OAuth tokens are not supported; use an API key from the Anthropic Console.
 

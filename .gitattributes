@@ -18,7 +18,6 @@
 # Configuration files
 .gitignore text eol=lf
 .gitattributes text eol=lf
-.vscodeignore text eol=lf
 .commitsage text eol=lf
 .commitsage.example text eol=lf
 tsconfig.json text eol=lf

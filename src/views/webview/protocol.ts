@@ -1,9 +1,12 @@
 // Shared message + state contract between the extension host
 // (settingsWebviewProvider.ts) and the webview frontend (webview/main.ts).
 //
-// TYPES ONLY — no `vscode` import and no runtime code — so the browser bundle
-// can import it without pulling in Node deps, and both sides stay in lock-step
-// instead of carrying drifting hand-copied duplicates of these shapes.
+// TYPES ONLY — no runtime code, and host modules are pulled in with
+// `import type` only (esbuild erases those), so the browser bundle can import
+// this file without Node deps and both sides stay in lock-step.
+
+import type { SettingKey, SettingValue } from '../../utils/configService';
+import type { buildWebviewL10n } from '../webviewL10n';
 
 export type Provider =
     | 'gemini'
@@ -25,107 +28,21 @@ export interface ModelSlot {
 }
 
 /** Localized + branded strings the host hands the webview at render time. */
-export interface WebviewL10n {
-    provider: string;
-    modelAuth: string;
-    model: string;
-    modelPlaceholder: string;
-    refresh: string;
-    refreshing: string;
-    baseUrl: string;
-    path: string;
-    apiKey: string;
-    authToken: string;
-    setKey: string;
-    removeKey: string;
-    getKey: string;
-    loginOpenRouter: string;
-    keySet: string;
-    keyMissing: string;
-    noKey: string;
-    useAuthToken: string;
-    useApiKey: string;
-    preferFreeModels: string;
-    liveFrom: string;
-    notInList: string;
-    commit: string;
-    format: string;
-    language: string;
-    customLanguage: string;
-    refs: string;
-    refsEnabled: string;
-    refsEnabledHint: string;
-    refsSource: string;
-    refsSourcePrompt: string;
-    refsSourceBranch: string;
-    refsSourceInput: string;
-    refsValue: string;
-    refsValuePh: string;
-    refsSaveForBranch: string;
-    refsSaveForProject: string;
-    refsClearBranch: string;
-    refsNoBranch: string;
-    refsActiveBranch: string;
-    refsActiveProject: string;
-    refsActiveNone: string;
-    refsPlacement: string;
-    refsPlacementEnd: string;
-    refsPlacementStart: string;
-    refsPlacementPrefix: string;
-    refsBranchPattern: string;
-    refsBranchPatternHint: string;
-    onlyStaged: string;
-    automation: string;
-    autoCommit: string;
-    autoPush: string;
-    autoPushNeedsCommit: string;
-    untrusted: string;
-    customInstructions: string;
-    commitlint: string;
-    commitlintEnabled: string;
-    commitlintEngine: string;
-    commitlintMaxRetries: string;
-    commitlintRulesPath: string;
-    enableCustom: string;
-    customInstructionsPh: string;
-    useRecentCommits: string;
-    useRecentCommitsHint: string;
-    recentCommitsCount: string;
-    recentCommitsScope: string;
-    recentCommitsScopeAll: string;
-    recentCommitsScopeMine: string;
-    advanced: string;
-    apiTimeout: string;
-    gitTimeout: string;
-    timeoutHint: string;
-    maxDiffSize: string;
-    maxDiffSizeHint: string;
-    temperature: string;
-    temperatureHint: string;
-    maxOutputTokens: string;
-    maxOutputTokensHint: string;
-    geminiThinkingBudget: string;
-    geminiThinkingBudgetHint: string;
-    geminiThinkingLevel: string;
-    geminiThinkingLevelHint: string;
-    ollamaNumCtx: string;
-    ollamaNumCtxHint: string;
-    telemetry: string;
-    autoOption: string;
-    providerLabels: Record<Provider, string>;
-    liveSource: Record<Provider, string>;
-}
+export type WebviewL10n = ReturnType<typeof buildWebviewL10n>;
+
+/**
+ * Settings the panel reads and writes, keyed like `ConfigService.get`.
+ * `telemetry.enabled` has no control here, and the webview must not be able to
+ * turn telemetry back on, so it stays out of the contract.
+ */
+export type WebviewSettingKey = Exclude<SettingKey, 'telemetry.enabled'>;
+export type WebviewSettings = { [K in WebviewSettingKey]: SettingValue<K> };
 
 /** One-shot payload embedded in the page; never changes after first render. */
 export interface InitData {
     providers: readonly Provider[];
-    languages: readonly string[];
-    formats: readonly string[];
-    /** Formats the project's commitlint parser can validate directly. */
-    commitlintCompatFormats: readonly string[];
     /** Providers with no live model endpoint — UI hides their refresh button. */
     noRefreshProviders: readonly Provider[];
-    settingKeys: Record<string, string>;
     apiKeyUrls: Partial<Record<Provider, string>>;
     l10n: WebviewL10n;
 }
@@ -133,58 +50,25 @@ export interface InitData {
 /** Live, re-pushed-on-change snapshot the webview renders from. */
 export interface ViewState {
     trusted: boolean;
-    /** KEYS names pinned by .commitsage/config.json — their controls are inert. */
-    projectOverrides: string[];
+    /** Keys pinned by .commitsage/config.json — their controls are inert. */
+    projectOverrides: WebviewSettingKey[];
+    /** Provider generation uses: an invalid `provider.type` falls back to gemini. */
     provider: Provider;
+    /** Effective value of every panel setting (project config included). */
+    settings: WebviewSettings;
     models: Record<Provider, ModelSlot>;
-    selected: Record<Provider, string>;
     hasApiKey: Record<Provider, boolean>;
-    openai: { baseUrl: string };
-    gemini: { thinkingBudget: number; thinkingLevel: string };
-    ollama: { baseUrl: string; useAuthToken: boolean; numCtx: number };
-    openrouter: { preferFreeModels: boolean };
-    custom: { baseUrl: string; useApiKey: boolean; chatCompletionsPath: string };
-    commit: {
-        format: string;
-        language: string;
-        customLanguageName: string;
-        refsEnabled: boolean;
-        refsSource: string;
-        refsValue: string;
-        refsPlacement: string;
-        refsBranchPattern: string;
-        /** Current git branch ('' when unavailable) — labels the save button. */
-        refsBranch: string;
-        /** Ref saved for the current branch in workspaceState ('' when none). */
-        refsBranchRef: string;
-        onlyStagedChanges: boolean;
-        autoCommit: boolean;
-        autoPush: boolean;
-        useCustomInstructions: boolean;
-        customInstructions: string;
-        useRecentCommitsAsContext: boolean;
-        recentCommitsCount: number;
-        recentCommitsScope: string;
-        commitlintEnabled: boolean;
-        commitlintMaxRetries: number;
-        commitlintRulesPath: string;
-        commitlintEngine: string;
-        commitlintCliAvailable: boolean;
-    };
-    advanced: {
-        apiRequestTimeout: number;
-        gitTimeout: number;
-        maxDiffSize: number;
-        temperature: number;
-        maxOutputTokens: number;
-        telemetryEnabled: boolean;
-    };
+    /** Current git branch ('' when unavailable) — labels the save button. */
+    refsBranch: string;
+    /** Ref saved for the current branch in workspaceState ('' when none). */
+    refsBranchRef: string;
+    commitlintCliAvailable: boolean;
 }
 
 /** Messages the webview posts up to the extension host. */
 export type IncomingMessage =
     | { type: 'getState' }
-    | { type: 'setSetting'; key: string; value: string | boolean | number }
+    | { type: 'setSetting'; key: WebviewSettingKey; value: string | boolean | number }
     | { type: 'saveRefForBranch'; value: string }
     | { type: 'saveRefForProject'; value: string }
     | { type: 'clearBranchRef' }

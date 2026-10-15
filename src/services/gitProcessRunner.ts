@@ -54,11 +54,11 @@ if (typeof vscode.workspace?.onDidChangeConfiguration === 'function') {
   });
 }
 
-// Hard cap on stdout/stderr accumulation per `git` invocation. The diff is
-// later truncated to MAX_DIFF_LENGTH (100k) by aiService.ts; this cap is the
-// *upstream* guard so a runaway generated file never lets the buffer balloon
-// to hundreds of MB before truncation.
-const GIT_OUTPUT_BUFFER_CAP = 200_000;
+// Default cap on stdout/stderr accumulation per `git` invocation, so a runaway
+// generated file never lets the buffer balloon to hundreds of MB. Per-file
+// diffs raise it to `general.maxDiffSize` via `maxBuffer`; the combined diff
+// is truncated to that setting later in aiService.ts.
+export const GIT_OUTPUT_BUFFER_CAP = 200_000;
 
 /**
  * Owns the mechanics of running the `git` binary: path resolution, process
@@ -69,8 +69,9 @@ export class GitProcessRunner {
   static async execGit(
     args: string[],
     cwd: string,
-    options: { signal?: AbortSignal; allowNonZeroExit?: boolean } = {},
+    options: { signal?: AbortSignal; allowNonZeroExit?: boolean; maxBuffer?: number } = {},
   ): Promise<{ stdout: string; stderr: string; exitCode: number }> {
+    const maxBuffer = options.maxBuffer ?? GIT_OUTPUT_BUFFER_CAP;
     return new Promise((resolve, reject) => {
       const timeoutSeconds = ConfigService.get('gitTimeout');
       const timeoutMs =
@@ -94,9 +95,10 @@ export class GitProcessRunner {
       const onAbort = (): void => {
         aborted = true;
         child.kill('SIGTERM');
-        // Hard-kill if still alive after grace period
+        // Hard-kill if still alive after grace period. Not `child.killed`: it
+        // turns true as soon as SIGTERM is sent, even if the process ignores it.
         killTimer = setTimeout(() => {
-          if (!child.killed) {
+          if (child.exitCode === null && child.signalCode === null) {
             child.kill('SIGKILL');
           }
         }, 1500);
@@ -113,7 +115,7 @@ export class GitProcessRunner {
 
       let bufferOverflowed = false;
       child.stdout.on('data', (data: string) => {
-        if (stdout.length >= GIT_OUTPUT_BUFFER_CAP) {
+        if (stdout.length >= maxBuffer) {
           if (!bufferOverflowed) {
             bufferOverflowed = true;
             child.kill('SIGTERM');
@@ -124,7 +126,7 @@ export class GitProcessRunner {
       });
 
       child.stderr.on('data', (data: string) => {
-        if (stderr.length >= GIT_OUTPUT_BUFFER_CAP) {
+        if (stderr.length >= maxBuffer) {
           return;
         }
         stderr += data;
@@ -151,21 +153,23 @@ export class GitProcessRunner {
           reject(new Error('Git command cancelled'));
           return;
         }
+        if (bufferOverflowed) {
+          // Truncate to the cap and proceed with exitCode -1 — also when git
+          // exited on its own before the SIGTERM landed. Diffs accept the cut
+          // (`general.maxDiffSize` truncation follows), file listings in
+          // GitService reject it.
+          resolve({
+            stdout: stdout.slice(0, maxBuffer),
+            stderr,
+            exitCode: -1,
+          });
+          return;
+        }
         if (signal === 'SIGTERM' || signal === 'SIGKILL') {
-          if (bufferOverflowed) {
-            // Truncate to the cap and proceed; downstream truncation
-            // (MAX_DIFF_LENGTH in aiService.ts) handles the rest.
-            resolve({
-              stdout: stdout.slice(0, GIT_OUTPUT_BUFFER_CAP),
-              stderr,
-              exitCode: -1,
-            });
-            return;
-          }
           // Likely killed by the spawn `timeout` option
           reject(
             new Error(
-              `Git command timed out after ${timeoutSeconds}s: git ${args[0] ?? ''}. Increase commitSage.gitTimeout if this is a slow operation.`,
+              `Git command timed out after ${timeoutSeconds}s: git ${args.find((a) => !a.startsWith('-')) ?? ''}. Increase commitSage.gitTimeout if this is a slow operation.`,
             ),
           );
           return;

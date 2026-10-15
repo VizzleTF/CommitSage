@@ -91,7 +91,7 @@ describe('CommitLintCliService.run via spawn mock', () => {
         expect(await p).toEqual({ valid: true, errors: [] });
     });
 
-    it('kills the child with SIGKILL when the abort signal fires (line 176 listener)', async () => {
+    it('kills the child with SIGKILL when the abort signal fires', async () => {
         const child = new FakeChild();
         spawnHolder.fn = () => child;
         const controller = new AbortController();
@@ -106,6 +106,18 @@ describe('CommitLintCliService.run via spawn mock', () => {
         await expect(p).rejects.toBeInstanceOf(UserCancelledError);
     });
 
+    it('does not spawn the CLI when the signal is already aborted', async () => {
+        const spawn = vi.fn(() => new FakeChild());
+        spawnHolder.fn = spawn;
+        const controller = new AbortController();
+        controller.abort();
+        await expect(CommitLintCliService.validate('feat: x', tmpDir, undefined, controller.signal))
+            .rejects.toBeInstanceOf(UserCancelledError);
+        await expect(CommitLintCliService.resolvedRules(tmpDir, undefined, controller.signal))
+            .rejects.toBeInstanceOf(UserCancelledError);
+        expect(spawn).not.toHaveBeenCalled();
+    });
+
     it('propagates cancellation from resolvedRules too (B11)', async () => {
         const child = new FakeChild();
         spawnHolder.fn = () => child;
@@ -117,7 +129,7 @@ describe('CommitLintCliService.run via spawn mock', () => {
         await expect(p).rejects.toBeInstanceOf(UserCancelledError);
     });
 
-    it('swallows a stdin "error" event (EPIPE handler, line 183)', async () => {
+    it('swallows a stdin "error" event (EPIPE handler)', async () => {
         const child = new FakeChild();
         spawnHolder.fn = () => child;
         const p = CommitLintCliService.validate('feat: x', tmpDir);

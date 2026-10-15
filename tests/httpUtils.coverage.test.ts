@@ -23,12 +23,6 @@ describe('HttpUtils.createRequestHeaders', () => {
         expect(h['x-api-key']).toBe('abc');
         expect(h['Authorization']).toBeUndefined();
     });
-
-    it('omits auth header for authStyle none', () => {
-        const h = HttpUtils.createRequestHeaders('abc', undefined, 'none');
-        expect(h['Authorization']).toBeUndefined();
-        expect(h['x-api-key']).toBeUndefined();
-    });
 });
 
 describe('HttpError / NetworkError', () => {
@@ -38,11 +32,6 @@ describe('HttpError / NetworkError', () => {
         expect(e.status).toBe(500);
         expect(e.message).toBe('HTTP 500');
         expect((e.data as { error: { message: string } }).error.message).toBe('boom');
-    });
-
-    it('HttpError uses an explicit message when given', () => {
-        const e = new HttpError(404, undefined, 'not found');
-        expect(e.message).toBe('not found');
     });
 
     it('NetworkError carries cause', () => {

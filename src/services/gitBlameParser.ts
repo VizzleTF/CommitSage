@@ -1,121 +1,52 @@
-export interface BlameInfo {
-    commit: string;
-    author: string;
-    email: string;
-    date: string;
-    timestamp: number;
-    line: string;
-    /** Line number in the final (current) version of the file, 1-indexed. */
-    lineNumber: number;
+/**
+ * `-L start,end` ranges of the pre-image lines a `--unified=0` diff touches,
+ * read from the `@@ -start[,count] +… @@` hunk headers. A pure addition
+ * (count 0) has no old lines, so it yields no range.
+ */
+export function parseOldLineRanges(diff: string): string[] {
+    const ranges: string[] = [];
+    for (const match of diff.matchAll(/^@@ -(\d+)(?:,(\d+))? \+/gm)) {
+        const start = Number(match[1]);
+        const count = match[2] === undefined ? 1 : Number(match[2]);
+        if (count > 0) {
+            ranges.push(`${start},${start + count - 1}`);
+        }
+    }
+    return ranges;
 }
 
-export function parseBlameOutput(blameOutput: string): BlameInfo[] {
-    const lines = blameOutput.split('\n');
-    const blameInfos: BlameInfo[] = [];
-    let currentBlame: Partial<BlameInfo> = {};
-
-    for (const line of lines) {
+/**
+ * One author name per blamed line of `git blame --line-porcelain` output:
+ * every entry repeats its `author` header, and its content line starts with
+ * a tab. An entry cut off by the output cap (no content line) is not counted.
+ */
+export function parseBlameAuthors(porcelain: string): string[] {
+    const authors: string[] = [];
+    let author = '';
+    for (const line of porcelain.split('\n')) {
         if (line.startsWith('author ')) {
-            currentBlame.author = line.substring(7);
-        } else if (line.startsWith('author-mail ')) {
-            currentBlame.email = line.substring(12).replace(/[<>]/g, '');
-        } else if (line.startsWith('author-time ')) {
-            const ts = Number.parseInt(line.substring(12), 10);
-            // Skip malformed timestamps — `new Date(NaN).toISOString()` throws
-            // RangeError, which would abort the whole blame parse.
-            if (Number.isFinite(ts)) {
-                currentBlame.timestamp = ts;
-                currentBlame.date = new Date(ts * 1000).toISOString();
-            }
+            author = line.substring(7);
         } else if (line.startsWith('\t')) {
-            currentBlame.line = line.substring(1);
-            // Presence checks, not truthiness: a blank line in the file is an
-            // empty `line`, and a commit authored at the Unix epoch has
-            // `timestamp === 0`. Both are falsy and used to be dropped, so the
-            // per-author line counts came out short.
-            if (
-                currentBlame.author !== undefined &&
-                currentBlame.email !== undefined &&
-                currentBlame.date !== undefined &&
-                currentBlame.timestamp !== undefined &&
-                currentBlame.line !== undefined &&
-                currentBlame.lineNumber !== undefined
-            ) {
-                blameInfos.push(currentBlame as BlameInfo);
-            }
-            currentBlame = {};
-        } else {
-            // Header line of a blame entry:  <40-hex-sha> <orig> <final> [count]
-            const match = /^([0-9a-f]{40}) \d+ (\d+)(?: \d+)?$/.exec(line);
-            if (match) {
-                currentBlame.commit = match[1];
-                currentBlame.lineNumber = Number.parseInt(match[2], 10);
-            }
+            authors.push(author);
         }
     }
-
-    return blameInfos;
+    return authors;
 }
 
-export function parseChangedLines(diff: string): Set<number> {
-    const changedLines = new Set<number>();
-    const lines = diff.split('\n');
-    let currentLine = 0;
-
-    for (const line of lines) {
-        const match = /^@@ -\d+(?:,\d+)? \+(\d+)(?:,\d+)? @@/.exec(line);
-        if (match) {
-            currentLine = Number.parseInt(match[1], 10);
-        } else if (line.startsWith('\\ ')) {
-            // `\ No newline at end of file` is a diff marker, not content —
-            // counting it shifted every following line of the hunk by one and
-            // attributed the changes to the wrong blame entries.
-            continue;
-        } else if (line.startsWith('+') && !line.startsWith('+++')) {
-            changedLines.add(currentLine);
-            currentLine++;
-        } else if (!line.startsWith('-') && !line.startsWith('---')) {
-            currentLine++;
-        }
+/**
+ * "src/a.ts: modifies lines last changed by Alice (5), Bob (2)" — authors
+ * ranked by line count; '' when nothing was blamed.
+ */
+export function formatBlameSummary(file: string, authors: string[]): string {
+    if (authors.length === 0) {
+        return '';
     }
-
-    return changedLines;
-}
-
-export function analyzeBlameInfo(
-    blame: BlameInfo[],
-    changedLines: Set<number>
-): Map<string, { count: number; lines: number[] }> {
-    const authorChanges = new Map<string, { count: number; lines: number[] }>();
-
-    for (const info of blame) {
-        if (changedLines.has(info.lineNumber)) {
-            const key = `${info.author} <${info.email}>`;
-            const current = authorChanges.get(key) || { count: 0, lines: [] };
-            current.count++;
-            current.lines.push(info.lineNumber);
-            authorChanges.set(key, current);
-        }
+    const counts = new Map<string, number>();
+    for (const author of authors) {
+        counts.set(author, (counts.get(author) ?? 0) + 1);
     }
-
-    return authorChanges;
-}
-
-export function formatAnalysis(
-    authorChanges: Map<string, { count: number; lines: number[] }>
-): string {
-    if (authorChanges.size === 0) {
-        return 'No changes detected.';
-    }
-
-    const sortedAuthors = Array.from(authorChanges.entries()).sort(
-        (a, b) => b[1].count - a[1].count
-    );
-
-    return sortedAuthors
-        .map(
-            ([author, { count, lines }]) =>
-                `${author} modified ${count} line${count === 1 ? '' : 's'} (${lines.join(', ')})`
-        )
-        .join('\n');
+    const ranked = [...counts]
+        .sort((a, b) => b[1] - a[1])
+        .map(([author, count]) => `${author} (${count})`);
+    return `${file}: modifies lines last changed by ${ranked.join(', ')}`;
 }

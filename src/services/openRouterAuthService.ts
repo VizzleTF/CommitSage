@@ -16,7 +16,6 @@ const CALLBACK_PATH = 'openrouter-auth';
 const LOGIN_TIMEOUT_MS = 5 * 60 * 1000;
 
 interface PendingLogin {
-    verifier: string;
     settle: (result: { code: string } | { error: Error }) => void;
 }
 
@@ -35,7 +34,7 @@ interface TokenExchangeResponse {
  */
 export class OpenRouterAuthService {
     // Only one login can be in flight at a time. The URI handler is global, so
-    // it correlates an incoming callback with this pending verifier.
+    // it hands an incoming callback to this pending login.
     private static pending: PendingLogin | undefined;
 
     /** Registers the global URI handler that catches the OAuth redirect. */
@@ -70,7 +69,7 @@ export class OpenRouterAuthService {
         Logger.log(`OpenRouter login: callback=${callbackUri.toString(true)}`);
 
         try {
-            const code = await this.awaitCallback(verifier, authUrl);
+            const code = await this.awaitCallback(authUrl);
             const key = await this.exchangeCodeForKey(code, verifier);
             await ApiKeyManager.setKey('openrouter', key);
             await Logger.showInfo(vscode.l10n.t('Connected to OpenRouter'));
@@ -84,12 +83,10 @@ export class OpenRouterAuthService {
             await Logger.showError(
                 vscode.l10n.t('OpenRouter login failed: {0}', toError(error).message),
             );
-        } finally {
-            this.pending = undefined;
         }
     }
 
-    private static awaitCallback(verifier: string, authUrl: string): Thenable<string> {
+    private static awaitCallback(authUrl: string): Thenable<string> {
         return vscode.window.withProgress(
             {
                 location: vscode.ProgressLocation.Notification,
@@ -120,7 +117,7 @@ export class OpenRouterAuthService {
                         }
                     };
 
-                    this.pending = { verifier, settle };
+                    this.pending = { settle };
                     token.onCancellationRequested(() =>
                         settle({ error: new UserCancelledError('OpenRouter login cancelled') }),
                     );

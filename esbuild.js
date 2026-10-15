@@ -1,18 +1,9 @@
-// Build script. Replaces webpack — see VSCODE_API_AUDIT.md (item 3).
+// Build script.
 // Usage: node esbuild.js [--production] [--watch] [--analyze]
-//
-// `process.env.AMPLITUDE_API_KEY` is replaced at build time:
-//   - CI rewrites src/constants/apiKeys.ts with the literal value before
-//     calling this, so the reference is gone by the time we bundle.
-//   - Local devs may have a `.env` with AMPLITUDE_API_KEY=...; we load it
-//     via dotenv and inject via esbuild's `define`. Missing => empty string,
-//     which `telemetryService.initialize` short-circuits on.
 
 const esbuild = require('esbuild');
 const fs = require('fs');
 const path = require('path');
-
-require('dotenv').config({ quiet: true });
 
 const production = process.argv.includes('--production');
 const watch = process.argv.includes('--watch');
@@ -45,6 +36,10 @@ const extensionBuildOptions = {
     platform: 'node',
     format: 'cjs',
     target: 'node20',
+    // ESM entry points let esbuild tree-shake the Amplitude SDK (~130 KB less).
+    mainFields: ['module', 'main'],
+    // Keep non-ASCII prompt templates as UTF-8 instead of \uXXXX escapes.
+    charset: 'utf8',
     external: ['vscode'],
     sourcemap: !production,
     sourcesContent: false,
@@ -52,9 +47,6 @@ const extensionBuildOptions = {
     logLevel: 'info',
     metafile: analyze,
     plugins: [esbuildProblemMatcherPlugin],
-    define: {
-        'process.env.AMPLITUDE_API_KEY': JSON.stringify(process.env.AMPLITUDE_API_KEY ?? ''),
-    },
 };
 
 // Webview script ships to the browser-like webview frame; it must NOT pull in
@@ -97,20 +89,6 @@ async function main() {
         await Promise.all([extCtx.watch(), webCtx.watch(), cssCtx.watch()]);
         console.log('[esbuild] watching for changes…');
         return;
-    }
-
-    // Production builds emit no sourcemap; remove any leftover `.map` from a
-    // prior dev build so it doesn't get bundled into the vsix.
-    if (production) {
-        for (const stale of [
-            path.join('dist', 'extension.js.map'),
-            path.join('dist', 'webview', 'main.js.map'),
-            path.join('dist', 'webview', 'styles.css.map'),
-        ]) {
-            if (fs.existsSync(stale)) {
-                fs.unlinkSync(stale);
-            }
-        }
     }
 
     const [extResult] = await Promise.all([

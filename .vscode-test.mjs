@@ -35,7 +35,7 @@ export default defineConfig([
     // Dev bundle from `npm run compile`.
     { ...shared, label: 'dev', extensionDevelopmentPath: '.' },
     // The shipped artifact: production bundle unpacked from the .vsix, so
-    // `.vscodeignore`, `main` and minification are exercised too. The suite is
+    // the package.json `files` allowlist, `main` and minification are exercised too. The suite is
     // copied inside the extension folder: VS Code hands each extension its own
     // `vscode` API object by file path, and sinon stubs on `vscode.window` only
     // reach the extension when the tests share its object.

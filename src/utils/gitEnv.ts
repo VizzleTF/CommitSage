@@ -11,6 +11,12 @@ const GIT_ENV_WHITELIST = [
     'GIT_ASKPASS', 'SSH_ASKPASS', 'GIT_SSL_CAINFO', 'GIT_SSL_CAPATH',
     'GIT_SSH', 'GIT_SSH_COMMAND',
     'XDG_CONFIG_HOME', 'XDG_DATA_HOME', 'XDG_CACHE_HOME',
+    // Windows: without SYSTEMROOT child processes cannot start Winsock, so
+    // push and network hooks fail; COMSPEC/PATHEXT let hooks find their shell.
+    'SYSTEMROOT', 'WINDIR', 'COMSPEC', 'PATHEXT',
+    // git reads proxy settings only from the environment; both spellings exist.
+    'HTTP_PROXY', 'HTTPS_PROXY', 'ALL_PROXY', 'NO_PROXY',
+    'http_proxy', 'https_proxy', 'all_proxy', 'no_proxy',
 ] as const;
 
 export function buildGitEnv(): NodeJS.ProcessEnv {

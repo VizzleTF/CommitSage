@@ -1,14 +1,17 @@
 import * as vscode from 'vscode';
 import { PROVIDER_LABELS, PROVIDER_LIVE_SOURCES } from '../services/providerRegistry';
-import { WebviewL10n } from './webview/protocol';
 
 /**
  * Builds the localized + branded string bundle handed to the webview at render
  * time. Kept out of the provider so the host file stays focused on wiring, not
  * a wall of translation calls. Provider display names and live-source labels
  * come straight from the provider registry (single source of truth).
+ *
+ * The return type is left inferred: protocol.ts derives `WebviewL10n` from it,
+ * so each key is declared once, here.
  */
-export function buildWebviewL10n(): WebviewL10n {
+// eslint-disable-next-line @typescript-eslint/explicit-function-return-type
+export function buildWebviewL10n() {
     return {
         provider: vscode.l10n.t('Provider'),
         modelAuth: vscode.l10n.t('Model & authentication'),
@@ -70,7 +73,11 @@ export function buildWebviewL10n(): WebviewL10n {
         commitlintEngine: vscode.l10n.t('Validator'),
         commitlintMaxRetries: vscode.l10n.t('Max commitlint retries'),
         commitlintRulesPath: vscode.l10n.t('Commitlint rules path'),
-        enableCustom: vscode.l10n.t('Enable custom instructions'),
+        commitlintRulesPathHint: vscode.l10n.t('Path to the commitlint config file. Relative to the repo root, or absolute. Empty = auto-discover.'),
+        commitlintUnsupported: vscode.l10n.t('Not available for this format.'),
+        commitlintEngineBuiltin: vscode.l10n.t('Built-in static rules'),
+        commitlintEngineProject: vscode.l10n.t('Project commitlint (node_modules)'),
+        commitlintBuiltinOnly: vscode.l10n.t('This format is checked by built-in rules; project commitlint cannot parse it.'),
         customInstructionsPh: vscode.l10n.t('Free-form text appended to the prompt — e.g. ticket-tag conventions.'),
         useRecentCommits: vscode.l10n.t('Use recent commits as style examples'),
         useRecentCommitsHint: vscode.l10n.t('Show recent commit messages to the model so it matches your project\'s style.'),
@@ -94,8 +101,7 @@ export function buildWebviewL10n(): WebviewL10n {
         geminiThinkingLevelHint: vscode.l10n.t('Gemini 3 always thinks. Higher levels cost more tokens and time; low is ample for commit messages.'),
         ollamaNumCtx: vscode.l10n.t('Context window (num_ctx)'),
         ollamaNumCtxHint: vscode.l10n.t('Ollama context length. 0 = use model default. Larger values use more RAM/VRAM.'),
-        telemetry: vscode.l10n.t('Telemetry'),
-        autoOption: vscode.l10n.t('auto — try all available models'),
+        pinned: vscode.l10n.t('Pinned by .commitsage/config.json in this repo — change it there.'),
         providerLabels: PROVIDER_LABELS,
         liveSource: PROVIDER_LIVE_SOURCES,
     };

@@ -21,11 +21,11 @@ A format is a prompt template with one translation per bundled language, registe
 
    Each translation holds the full instructions for the model: format rules, commit type guidance, examples and constraints. Keep the section structure of an existing template such as `src/templates/formats/conventional.ts`.
 
-2. Register the template in `src/templates/index.ts`: import it, add `'<FORMAT_ID>'` to the `CommitFormat` union and add `<FORMAT_ID>: <FORMAT_NAME>Template` to the `templates` record.
+2. Add `'<FORMAT_ID>'` to `COMMIT_FORMATS` in `src/utils/constants.ts`, before `'custom'`. The `CommitFormat` type derives from it, and the array fills the format dropdown in the Commit Sage sidebar.
 
-3. Add `'<FORMAT_ID>'` to the `FORMATS` array in `src/views/settingsWebviewProvider.ts`, before `'custom'`. The array fills the format dropdown in the Commit Sage sidebar.
+3. Register the template in `src/templates/index.ts`: import it and add `<FORMAT_ID>: <FORMAT_NAME>Template` to the `templates` record.
 
-4. If the builtin commitlint engine should validate messages in the new format, add an entry to `FORMAT_RULE_SETS` in `src/services/formatRules.ts`. A format without an entry is not validated. If the repository's own commitlint config can check the format (the `project` engine), also add the id to `COMMITLINT_COMPATIBLE_FORMATS`.
+4. If the builtin commitlint engine should validate messages in the new format, add an entry to `FORMAT_RULE_SETS` in `src/services/formatRules.ts`. A format without an entry is not validated. If the repository's own commitlint config can check the format (the `project` engine), also add the id to `COMMITLINT_COMPATIBLE_FORMATS` in `src/utils/constants.ts`.
 
 5. In `package.json`, add the id to `contributes.configuration.properties["commitSage.commit.commitFormat"].enum` before `"custom"`, and a line to `enumDescriptions` at the same position:
 
@@ -65,6 +65,6 @@ npm run typecheck
 npm run test:unit
 ```
 
-`npm run typecheck` fails when the template misses a language or `CommitFormat` and `templates` disagree. `npm run compile` only bundles with esbuild and does not type-check.
+`npm run typecheck` fails when the template misses a language or `COMMIT_FORMATS` and `templates` disagree. `npm run test:unit` fails when the `package.json` enum and `COMMIT_FORMATS` differ. `npm run compile` only bundles with esbuild and does not type-check.
 
 Then start the extension, select the new format in the Commit Sage sidebar and generate a message. The message follows the structure from the template.

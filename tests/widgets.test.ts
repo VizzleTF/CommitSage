@@ -6,16 +6,19 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 const initEl = document.createElement('script');
 initEl.id = 'init-data';
 initEl.textContent = JSON.stringify({
-    providers: [], languages: [], formats: [],
-    commitlintCompatFormats: [], noRefreshProviders: [],
-    settingKeys: {}, apiKeyUrls: {},
-    l10n: { notInList: '(not in live list)' },
+    providers: [], noRefreshProviders: [], apiKeyUrls: {},
+    l10n: { notInList: '(not in live list)', pinned: 'Pinned by .commitsage/config.json' },
 });
 document.body.appendChild(initEl);
+// vscodeApi.ts acquires the webview API at module load.
+const postMessage = vi.fn();
+(globalThis as Record<string, unknown>).acquireVsCodeApi = () => ({
+    postMessage, getState: () => undefined, setState: () => undefined,
+});
 
 const {
     makeNumberInput, makeCheckbox, makeTextInput, makeTextarea, makeSelect,
-    fieldLabel, isPinned, pinnedHint,
+    fieldLabel, pinnedHint, field,
 } = await import('../src/views/webview/widgets');
 
 function key(target: HTMLElement, k: string): void {
@@ -98,6 +101,61 @@ describe('makeTextInput', () => {
     });
 });
 
+describe('text controls mark the pushed value', () => {
+    // preserveFocus compares value with defaultValue to tell a real edit apart.
+    it('sets defaultValue on text, number and textarea controls', () => {
+        expect(makeTextInput('t', 'a', () => {}).defaultValue).toBe('a');
+        expect(makeNumberInput('n', 3, () => {}).defaultValue).toBe('3');
+        const ta = makeTextarea('ta', 'b', () => {});
+        expect([ta.defaultValue, ta.value]).toEqual(['b', 'b']);
+    });
+});
+
+describe('disabled text controls', () => {
+    it('makeTextInput, makeNumberInput and makeTextarea honour opts.disabled', () => {
+        expect(makeTextInput('t', '', () => {}, { disabled: true, placeholder: 'ph' }).disabled).toBe(true);
+        expect(makeTextInput('t', '', () => {}, { placeholder: 'ph' }).placeholder).toBe('ph');
+        expect(makeNumberInput('n', 1, () => {}, { disabled: true }).disabled).toBe(true);
+        expect(makeTextarea('ta', '', () => {}, { disabled: true }).disabled).toBe(true);
+        expect(makeTextarea('ta', '', () => {}).disabled).toBe(false);
+    });
+});
+
+describe('field', () => {
+    const state = (projectOverrides: string[]) => ({
+        projectOverrides,
+        settings: { 'general.temperature': 0.7 },
+    }) as never;
+
+    it('passes value, saver and enabled flag; the saver posts setSetting with the flat key', () => {
+        postMessage.mockClear();
+        const body = document.createElement('div');
+        field(body, state([]), 'general.temperature', 'Temperature',
+            (v, save, disabled) => makeNumberInput('temperature', v, save, { disabled }), 'hint text');
+
+        expect(body.querySelector('label.field')?.textContent).toBe('Temperature');
+        const input = body.querySelector('input') as HTMLInputElement;
+        expect(input.value).toBe('0.7');
+        expect(input.disabled).toBe(false);
+        expect(body.querySelector('.hint.pinned')).toBeNull();
+        expect(body.querySelector('.hint')?.textContent).toBe('hint text');
+
+        input.value = '0.2';
+        input.dispatchEvent(new Event('change'));
+        expect(postMessage).toHaveBeenCalledWith({ type: 'setSetting', key: 'general.temperature', value: 0.2 });
+    });
+
+    it('disables a key pinned by the project config and adds the pinned note', () => {
+        const body = document.createElement('div');
+        field(body, state(['general.temperature']), 'general.temperature', undefined,
+            (v, save, disabled) => makeNumberInput('temperature', v, save, { disabled }));
+
+        expect(body.querySelector('label.field')).toBeNull();
+        expect((body.querySelector('input') as HTMLInputElement).disabled).toBe(true);
+        expect(body.querySelector('.hint.pinned')?.textContent).toContain('.commitsage/config.json');
+    });
+});
+
 describe('makeTextarea', () => {
     it('emits the changed value', () => {
         const onChange = vi.fn();
@@ -114,12 +172,6 @@ describe('small helpers', () => {
         const l = fieldLabel('Model');
         expect(l.className).toBe('field');
         expect(l.textContent).toBe('Model');
-    });
-
-    it('isPinned reflects projectOverrides membership', () => {
-        const state = { projectOverrides: ['commitFormat'] } as never;
-        expect(isPinned(state, 'commitFormat')).toBe(true);
-        expect(isPinned(state, 'provider')).toBe(false);
     });
 
     it('pinnedHint renders the .hint.pinned note', () => {

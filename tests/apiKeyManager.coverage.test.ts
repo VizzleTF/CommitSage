@@ -53,29 +53,16 @@ function makeSecretStorage(initial: SecretStore = {}) {
         delete: vi.fn(async (k: string) => {
             delete store[k];
         }),
-        onDidChange: vi.fn((_l: unknown) => ({ dispose: () => undefined })),
     };
 }
 
-function installSecretStorage(secrets: ReturnType<typeof makeSecretStorage>): {
-    listener?: (e: { key: string }) => void;
-    subscriptions: unknown[];
-} {
-    const subscriptions: unknown[] = [];
-    const captured: { listener?: (e: { key: string }) => void } = {};
-    secrets.onDidChange.mockImplementation((l: (e: { key: string }) => void) => {
-        captured.listener = l;
-        return { dispose: () => undefined };
-    });
+function installSecretStorage(secrets: ReturnType<typeof makeSecretStorage>): void {
     const secretStorage = {
         get: secrets.get,
         store: secrets.set,
         delete: secrets.delete,
-        onDidChange: secrets.onDidChange,
     } as unknown as import('vscode').SecretStorage;
-    const context = { subscriptions } as unknown as import('vscode').ExtensionContext;
-    ApiKeyManager.initialize(secretStorage, context);
-    return { ...captured, subscriptions };
+    ApiKeyManager.initialize(secretStorage);
 }
 
 beforeEach(() => {
@@ -84,17 +71,6 @@ beforeEach(() => {
 
 afterEach(() => {
     vi.restoreAllMocks();
-});
-
-describe('ApiKeyManager.initialize', () => {
-    it('registers an onDidChange listener that logs known key updates', () => {
-        const secrets = makeSecretStorage();
-        const ctx = installSecretStorage(secrets);
-        expect(ctx.subscriptions.length).toBe(1);
-        // Known key -> logs; unknown key -> ignored. Both must not throw.
-        ctx.listener?.({ key: 'commitsage.openaiApiKey' });
-        ctx.listener?.({ key: 'some.unrelated.key' });
-    });
 });
 
 describe('ApiKeyManager.getConfig (via public methods)', () => {
@@ -173,7 +149,7 @@ describe('ApiKeyManager.setKey', () => {
         );
     });
 
-    it('surfaces and re-throws a non-AiServiceError from secretStorage.store', async () => {
+    it('re-throws a non-AiServiceError from secretStorage.store', async () => {
         const secrets = makeSecretStorage();
         secrets.set.mockRejectedValueOnce(new Error('store failed'));
         installSecretStorage(secrets);

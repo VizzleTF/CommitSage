@@ -1,9 +1,7 @@
-import { Logger } from '../utils/logger';
 import { CommitMessage, ProgressReporter, GenerateOptions, ApiErrorResult } from '../models/types';
 import { ConfigService } from '../utils/configService';
 import { extractAndValidateMessage, getConfiguredTemperature, handleHttpError, resolveMaxOutputTokens, withRetryAndApiKeyGuard } from './baseAIService';
 import { HttpError, HttpUtils, NetworkError } from '../utils/httpUtils';
-import { RetryUtils } from '../utils/retryUtils';
 import { ApiKeyManager } from './apiKeyManager';
 import { TruncatedResponseError } from '../models/errors';
 
@@ -19,62 +17,41 @@ export class OllamaService {
     static async generateCommitMessage(
         prompt: string,
         progress: ProgressReporter,
-        attempt: number = 1,
         options?: GenerateOptions
     ): Promise<CommitMessage> {
-        const baseUrl = ConfigService.get('ollama.baseUrl');
+        const apiUrl = `${HttpUtils.stripTrailingSlashes(ConfigService.get('ollama.baseUrl'))}/api/chat`;
         const model = ConfigService.get('ollama.model');
-        const apiUrl = `${baseUrl}/api/chat`;
-
-        const payload: Record<string, unknown> = {
-            model: model,
-            messages: [
-                { role: 'user', content: prompt }
-            ],
-            stream: false
-        };
-        // Ollama nests sampling parameters under `options`. `num_ctx` stays
-        // conditional so Ollama keeps its own per-model default when the user
-        // hasn't overridden it; `num_predict` carries the shared output budget,
-        // which local reasoning models also draw their thinking from.
-        const ollamaOptions: Record<string, unknown> = { temperature: getConfiguredTemperature() };
-        ollamaOptions['num_predict'] = resolveMaxOutputTokens(options, attempt);
         const numCtx = ConfigService.get('ollama.numCtx');
-        if (typeof numCtx === 'number' && numCtx > 0) {
-            ollamaOptions['num_ctx'] = numCtx;
-        }
-        payload['options'] = ollamaOptions;
+        // Auth is opt-in for self-hosted Ollama: a token left in SecretStorage
+        // after the toggle is switched off must not be sent.
+        const authToken = ConfigService.get('ollama.useAuthToken')
+            ? await ApiKeyManager.getOptionalKey('ollama')
+            : undefined;
 
-        return withRetryAndApiKeyGuard(
-            'Ollama',
-            prompt,
-            progress,
-            attempt,
-            (p, pr, a) => this.generateCommitMessage(p, pr, a, options),
-            async () => {
-                Logger.log(`Attempt ${attempt}: Sending request to Ollama API`);
-                await RetryUtils.updateProgressForAttempt(progress, attempt);
+        return withRetryAndApiKeyGuard('Ollama', progress, async attempt => {
+            // Ollama nests sampling parameters under `options`. `num_ctx` stays
+            // conditional so Ollama keeps its own per-model default when the user
+            // hasn't overridden it; `num_predict` carries the shared output budget,
+            // which local reasoning models also draw their thinking from.
+            const ollamaOptions: Record<string, unknown> = { temperature: getConfiguredTemperature() };
+            ollamaOptions['num_predict'] = resolveMaxOutputTokens(options, attempt);
+            if (typeof numCtx === 'number' && numCtx > 0) {
+                ollamaOptions['num_ctx'] = numCtx;
+            }
+            const payload = {
+                model,
+                messages: [{ role: 'user', content: prompt }],
+                stream: false,
+                options: ollamaOptions,
+            };
 
-                const authToken = await ApiKeyManager.getOptionalKey('ollama');
-                const headers: Record<string, string> = { 'content-type': 'application/json' };
-                if (authToken) {
-                    headers['Authorization'] = `Bearer ${authToken}`;
-                }
+            const data = await HttpUtils.postJson<OllamaResponse>(apiUrl, payload, {
+                headers: HttpUtils.createRequestHeaders(authToken),
+                signal: options?.signal,
+            });
 
-                const data = await HttpUtils.postJson<OllamaResponse>(apiUrl, payload, {
-                    headers,
-                    signal: options?.signal,
-                });
-
-                Logger.log('Ollama API response received successfully');
-                progress.report({ message: 'Processing generated message...', increment: 100 });
-
-                const commitMessage = this.extractCommitMessage(data);
-                Logger.log(`Commit message generated using ${model} model`);
-                return { message: commitMessage, model };
-            },
-            this.mapOllamaError,
-        );
+            return { message: this.extractCommitMessage(data), model };
+        }, this.mapOllamaError);
     }
 
     /**

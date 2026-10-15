@@ -177,7 +177,7 @@ Effects:
 - `Details:`: up to 6 bullets, each at most 80 characters. Left out when the change is one trivial edit.
 - `Effects:`: up to 4 bullets, each at most 80 characters. Left out when the change has no runtime impact.
 
-The built-in validator requires both `Details:` and `Effects:` sections, so a message without them fails validation.
+The built-in validator checks only the `Summary:` line and its length, so a message without `Details:` or `Effects:` passes.
 
 ```
 Summary: Refactor user authentication to token-based flow
@@ -222,11 +222,11 @@ With `commitSage.commit.commitlint.enabled` and the `builtin` engine, the valida
 
 | Format | Types the validator accepts | Header limit |
 |---|---|---|
-| `conventional` | the 11 types above | 72 |
+| `conventional`, `atom` | the 11 types above | 72 |
 | `angular` | the 11 types above except `chore`; no `!` breaking marker | 72 |
-| `karma`, `semantic`, `atom`, `emojiKarma` | `feat`, `fix`, `docs`, `style`, `refactor`, `test`, `chore`; `semantic` allows no scope | 72; `emojiKarma` 80 |
-| `google` | `Feat`, `Fix`, `Docs`, `Style`, `Refactor`, `Test`, `Chore` | 72 |
+| `karma`, `semantic`, `emojiKarma` | `feat`, `fix`, `docs`, `style`, `refactor`, `test`, `chore`; `semantic` allows no scope | 72; `emojiKarma` 80 |
+| `google` | the 11 types above; the description may start with a capital letter | 72 |
 | `emoji` | any message after an emoji | 72 |
-| `detailed` | no types; requires the `Summary:`, `Details:` and `Effects:` sections | 72 after `Summary: ` |
+| `detailed` | no types; requires the `Summary:` line | 72 after `Summary: ` |
 
 For `conventional` and `angular`, the `builtin` engine also reads the repository's commitlint config. Validator settings are described in [configuration.md](configuration.md).

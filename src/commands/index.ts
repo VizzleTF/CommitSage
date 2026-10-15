@@ -1,9 +1,9 @@
 import * as vscode from 'vscode';
-import { registerGenerateCommitMessageCommand } from './generateCommitMessage';
 import { registerSetApiKeyCommands } from './setApiKeys';
 import { createProjectConfig } from './createProjectConfig';
 import { registerSelectGeminiModelCommand } from './selectGeminiModel';
 import { registerOpenRouterAuthCommands } from './openRouterAuth';
+import { CommitWorkflow } from '../services/commitWorkflow';
 import { Logger } from '../utils/logger';
 import { toError } from '../utils/errorUtils';
 
@@ -12,9 +12,13 @@ export function registerCommands(context: vscode.ExtensionContext): void {
 
     try {
         const disposables = [
-            registerGenerateCommitMessageCommand(context),
-            ...registerSetApiKeyCommands(context),
-            registerSelectGeminiModelCommand(context),
+            // generateAndSetCommitMessage handles and reports its own errors.
+            vscode.commands.registerCommand(
+                'commitsage.generateCommitMessage',
+                (repository?: vscode.SourceControl) => CommitWorkflow.generateAndSetCommitMessage(repository),
+            ),
+            ...registerSetApiKeyCommands(),
+            registerSelectGeminiModelCommand(),
             ...registerOpenRouterAuthCommands(context),
             vscode.commands.registerCommand('commitsage.createProjectConfig', createProjectConfig)
         ];

@@ -1,5 +1,5 @@
 import * as vscode from 'vscode';
-import { GitService } from './services/gitService';
+import { GitRepositoryProvider } from './services/gitRepository';
 import { Logger } from './utils/logger';
 import { ConfigService } from './utils/configService';
 import { SettingsValidator } from './services/settingsValidator';
@@ -10,20 +10,20 @@ import { toError } from './utils/errorUtils';
 import { validateGeminiModelOnStartup } from './services/geminiModelValidator';
 import { SettingsWebviewProvider } from './views/settingsWebviewProvider';
 import { RefStore } from './services/refStore';
-import { formatSupportsCommitlint } from './views/webview/commitFormatPolicy';
 
 export async function activate(context: vscode.ExtensionContext): Promise<void> {
+    // First: everything logged before this (e.g. project-config warnings) is dropped.
+    Logger.initialize();
     Logger.log('Starting extension activation');
 
     try {
         await ConfigService.initialize(context);
         RefStore.init(context);
-        ApiKeyManager.initialize(context.secrets, context);
-        Logger.initialize();
+        ApiKeyManager.initialize(context.secrets);
         await TelemetryService.initialize(context);
 
         Logger.log('Validating Git extension');
-        await GitService.initialize();
+        await GitRepositoryProvider.validateGitExtension();
     } catch (error) {
         Logger.error('Failed during initialization:', toError(error));
         void Logger.showError(vscode.l10n.t('Initialization failed: {0}', toError(error).message));
@@ -46,18 +46,6 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     context.subscriptions.push(
         ConfigService.onProjectConfigChange(() => {
             void SettingsValidator.validateProjectConfig();
-        }),
-        // Validation makes no sense for free-form custom prompts: switch the
-        // checkbox off whenever the user picks the custom format, also when the
-        // format is changed through the VS Code settings UI or settings.json.
-        vscode.workspace.onDidChangeConfiguration(e => {
-            if (!e.affectsConfiguration('commitSage.commit.commitFormat')) { return; }
-            const config = vscode.workspace.getConfiguration();
-            const format = config.get<string>('commitSage.commit.commitFormat') ?? '';
-            if (!formatSupportsCommitlint(format)
-                && config.get('commitSage.commit.commitlint.enabled')) {
-                void config.update('commitSage.commit.commitlint.enabled', false, vscode.ConfigurationTarget.Global);
-            }
         }),
     );
 

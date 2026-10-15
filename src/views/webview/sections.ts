@@ -1,12 +1,11 @@
 // Per-section renderers. Each takes the current ViewState and returns a
 // detached DOM subtree; main.ts assembles them into the document.
 
-import type { Provider, ViewState } from './protocol';
+import type { Provider, ViewState, WebviewSettingKey, WebviewSettings } from './protocol';
 import { el } from './dom';
 import {
+    field,
     fieldLabel,
-    pinnedHint,
-    isPinned,
     makeSelect,
     makeCheckbox,
     makeTextInput,
@@ -15,15 +14,32 @@ import {
 } from './widgets';
 import { makeCombobox } from './combobox';
 import { section } from './section';
-import { init, L, KEYS, COMMITLINT_COMPAT_FORMATS, NO_REFRESH_PROVIDERS } from './init';
+import { init, L, NO_REFRESH_PROVIDERS } from './init';
 import { send, setSetting } from './vscodeApi';
-import { formatSupportsCommitlint, formatUsesCustomInstructions } from './commitFormatPolicy';
+import {
+    COMMIT_FORMATS,
+    COMMITLINT_COMPATIBLE_FORMATS,
+    CONFIG_DRIVEN_FORMATS,
+    SUPPORTED_LANGUAGES,
+    THINKING_LEVELS,
+    formatSupportsCommitlint,
+    formatUsesCustomInstructions,
+} from '../../utils/constants';
 
-/** Mirrors the `commitSage.gemini.thinkingLevel` enum in package.json. */
-const THINKING_LEVELS = ['minimal', 'low', 'medium', 'high'] as const;
+type NumberKey = { [K in WebviewSettingKey]: WebviewSettings[K] extends number ? K : never }[WebviewSettingKey];
+
+function numberField(
+    body: HTMLElement,
+    state: ViewState,
+    key: NumberKey,
+    id: string,
+    label: string,
+    hint?: string,
+): void {
+    field(body, state, key, label, (v, save, disabled) => makeNumberInput(id, v, save, { disabled }), hint);
+}
 
 export function renderProviderPick(state: ViewState): HTMLElement {
-    const providerPinned = isPinned(state, 'provider');
     const options = init.providers.map(p => ({
         value: p,
         label: L.providerLabels[p],
@@ -32,97 +48,54 @@ export function renderProviderPick(state: ViewState): HTMLElement {
     // Surface providers with a configured key at the top; keep the original
     // order within each group (stable sort).
     options.sort((a, b) => Number(b.dot) - Number(a.dot));
-    return el('section', { class: 'provider-pick' }, [
-        fieldLabel(L.provider),
-        makeSelect(
-            'provider',
-            options,
-            state.provider,
-            v => setSetting(KEYS.provider, v),
-            { disabled: providerPinned },
-        ),
-        providerPinned ? pinnedHint() : undefined,
-    ]);
-}
-
-// A "Base URL" labeled text input wired to a setting. The three providers with
-// a configurable endpoint differ only in element id, state source, and key.
-function appendBaseUrl(body: HTMLElement, id: string, value: string, key: string): void {
-    body.appendChild(fieldLabel(L.baseUrl));
-    body.appendChild(makeTextInput(id, value, v => setSetting(key, v)));
+    const wrap = el('section', { class: 'provider-pick' });
+    // state.provider, not the raw setting: an invalid value shows the provider
+    // generation actually falls back to.
+    field(wrap, state, 'provider.type', L.provider, (_v, save, disabled) =>
+        makeSelect('provider', options, state.provider, save, { disabled }));
+    return wrap;
 }
 
 // Provider-specific endpoint config (baseUrl / path) above the model picker.
 // Only providers whose endpoint is configurable get these.
 function appendEndpointConfig(body: HTMLElement, state: ViewState, p: Provider): void {
     if (p === 'openai') {
-        appendBaseUrl(body, 'openai-baseurl', state.openai.baseUrl, KEYS.openaiBaseUrl);
+        field(body, state, 'openai.baseUrl', L.baseUrl, (v, save, disabled) =>
+            makeTextInput('openai-baseurl', v, save, { disabled }));
     } else if (p === 'ollama') {
-        appendBaseUrl(body, 'ollama-baseurl', state.ollama.baseUrl, KEYS.ollamaBaseUrl);
+        field(body, state, 'ollama.baseUrl', L.baseUrl, (v, save, disabled) =>
+            makeTextInput('ollama-baseurl', v, save, { disabled }));
     } else if (p === 'custom') {
-        appendBaseUrl(body, 'custom-baseurl', state.custom.baseUrl, KEYS.customBaseUrl);
-        body.appendChild(fieldLabel(L.path));
-        body.appendChild(makeTextInput(
-            'custom-path',
-            state.custom.chatCompletionsPath,
-            v => setSetting(KEYS.customChatCompletionsPath, v),
-        ));
-    }
-
-    if (p === 'openrouter') {
-        body.appendChild(makeCheckbox(
-            'openrouter-prefer-free',
-            L.preferFreeModels,
-            state.openrouter.preferFreeModels,
-            v => setSetting(KEYS.openrouterPreferFreeModels, v),
-        ));
+        field(body, state, 'custom.baseUrl', L.baseUrl, (v, save, disabled) =>
+            makeTextInput('custom-baseurl', v, save, { disabled }));
+        field(body, state, 'custom.chatCompletionsPath', L.path, (v, save, disabled) =>
+            makeTextInput('custom-path', v, save, { disabled }));
+    } else if (p === 'openrouter') {
+        field(body, state, 'openrouter.preferFreeModels', undefined, (v, save, disabled) =>
+            makeCheckbox('openrouter-prefer-free', L.preferFreeModels, v, save, { disabled }));
     }
 }
 
 function appendModelPicker(body: HTMLElement, state: ViewState, p: Provider): void {
     const slot = state.models[p];
-    body.appendChild(fieldLabel(L.model));
+    const options = p === 'gemini' ? ['auto', ...slot.list] : slot.list;
 
-    // Model setting key name is uniformly `<provider>Model` (matches SETTING_KEYS).
-    const settingKeyName = `${p}Model`;
-    const currentKey = KEYS[settingKeyName];
-    const currentValue = state.selected[p];
-
-    // Combobox (text input + datalist) instead of a plain <select>: lets the
+    // Combobox (text input + filterable popup) instead of a select: lets the
     // user type to filter the model list (essential for OpenRouter's 300+
-    // models) and lets them enter a brand-new model ID that isn't in the
-    // fetched list yet.
-    const modelOptions: string[] = [];
-    if (p === 'gemini') {
-        modelOptions.push('auto');
-    }
-    modelOptions.push(...slot.list);
-
-    const modelPinned = isPinned(state, settingKeyName);
-    const modelCombobox = makeCombobox(
-        'model',
-        modelOptions,
-        currentValue,
-        v => setSetting(currentKey, v),
-        L.modelPlaceholder,
-        { disabled: modelPinned },
-    );
-
-    if (NO_REFRESH_PROVIDERS.has(p)) {
-        body.appendChild(modelCombobox);
-    } else {
+    // models) and enter a brand-new model ID that isn't in the fetched list yet.
+    field(body, state, `${p}.model` as const, L.model, (v, save, disabled) => {
+        const combobox = makeCombobox('model', options, v, save, L.modelPlaceholder, { disabled });
+        if (NO_REFRESH_PROVIDERS.has(p)) {
+            return combobox;
+        }
         const refreshBtn = el('button', {
             id: 'refresh-models',
             title: slot.loading ? L.refreshing : L.refresh,
             disabled: slot.loading,
         }, ['⟳']) as HTMLButtonElement;
         refreshBtn.addEventListener('click', () => send({ type: 'refreshModels', provider: p }));
-        body.appendChild(el('div', { class: 'row' }, [modelCombobox, refreshBtn]));
-    }
-
-    if (modelPinned) { body.appendChild(pinnedHint()); }
-
-    body.appendChild(el('div', { class: 'hint' }, [`${L.liveFrom} ${L.liveSource[p]}`]));
+        return el('div', { class: 'row' }, [combobox, refreshBtn]);
+    }, `${L.liveFrom} ${L.liveSource[p]}`);
 
     if (slot.error) {
         body.appendChild(el('div', { class: 'error' }, [slot.error]));
@@ -131,24 +104,16 @@ function appendModelPicker(body: HTMLElement, state: ViewState, p: Provider): vo
 
 function appendAuthControls(body: HTMLElement, state: ViewState, p: Provider): void {
     if (p === 'ollama') {
-        body.appendChild(makeCheckbox(
-            'ollama-useauth',
-            L.useAuthToken,
-            state.ollama.useAuthToken,
-            v => setSetting(KEYS.ollamaUseAuthToken, v),
-        ));
-        if (state.ollama.useAuthToken) {
+        field(body, state, 'ollama.useAuthToken', undefined, (v, save, disabled) =>
+            makeCheckbox('ollama-useauth', L.useAuthToken, v, save, { disabled }));
+        if (state.settings['ollama.useAuthToken']) {
             body.appendChild(fieldLabel(L.authToken));
             body.appendChild(renderApiKeyButtons(state, 'ollama'));
         }
     } else if (p === 'custom') {
-        body.appendChild(makeCheckbox(
-            'custom-useapikey',
-            L.useApiKey,
-            state.custom.useApiKey,
-            v => setSetting(KEYS.customUseApiKey, v),
-        ));
-        if (state.custom.useApiKey) {
+        field(body, state, 'custom.useApiKey', undefined, (v, save, disabled) =>
+            makeCheckbox('custom-useapikey', L.useApiKey, v, save, { disabled }));
+        if (state.settings['custom.useApiKey']) {
             body.appendChild(fieldLabel(L.apiKey));
             body.appendChild(renderApiKeyButtons(state, 'custom'));
         }
@@ -202,132 +167,105 @@ function renderApiKeyButtons(state: ViewState, p: Provider): HTMLDivElement {
 
 export function renderCommitSection(state: ViewState): HTMLElement {
     const body = el('div');
+    const s = state.settings;
+    const format = s['commit.commitFormat'];
 
-    const formatPinned = isPinned(state, 'commitFormat');
-    body.appendChild(fieldLabel(L.format));
-    body.appendChild(makeSelect(
+    field(body, state, 'commit.commitFormat', L.format, (v, save, disabled) => makeSelect(
         'format',
-        init.formats.map(f => ({ value: f, label: f })),
-        state.commit.format,
-        v => {
-            setSetting(KEYS.commitFormat, v);
+        COMMIT_FORMATS.map(f => ({ value: f, label: f })),
+        v,
+        f => {
+            save(f);
             // `custom` format means "use customInstructions verbatim"; flip the
             // gate that promptService reads in lock-step so the user doesn't
-            // have to toggle two checkboxes.
-            setSetting(KEYS.useCustomInstructions, formatUsesCustomInstructions(v));
-            // Validation doesn't apply to free-form prompts.
-            if (!formatSupportsCommitlint(v) && state.commit.commitlintEnabled) {
-                setSetting(KEYS.commitlintEnabled, false);
+            // have to toggle two checkboxes. Only on a real change: a write to
+            // a pinned key warns about a setting the user did not touch.
+            const uci = formatUsesCustomInstructions(f);
+            if (uci !== s['commit.useCustomInstructions']) {
+                setSetting('commit.useCustomInstructions', uci);
             }
         },
-        { disabled: formatPinned },
+        { disabled },
     ));
-    if (formatPinned) { body.appendChild(pinnedHint()); }
 
-    if (formatUsesCustomInstructions(state.commit.format)) {
-        body.appendChild(fieldLabel(L.customInstructions));
-        body.appendChild(makeTextarea(
-            'custom-text',
-            state.commit.customInstructions,
-            v => setSetting(KEYS.customInstructions, v),
-        ));
-        body.appendChild(el('div', { class: 'hint' }, [L.customInstructionsPh]));
+    if (formatUsesCustomInstructions(format)) {
+        field(body, state, 'commit.customInstructions', L.customInstructions, (v, save, disabled) =>
+            makeTextarea('custom-text', v, save, { disabled }), L.customInstructionsPh);
     }
 
     // Recent-commits style examples. The `previous` format always uses them
     // (the examples ARE its style), so the count/scope controls show for it too.
-    const usesExamples = state.commit.useRecentCommitsAsContext || state.commit.format === 'previous';
-    if (state.commit.format !== 'previous') {
-        body.appendChild(makeCheckbox(
-            'use-recent-commits',
-            L.useRecentCommits,
-            state.commit.useRecentCommitsAsContext,
-            v => setSetting(KEYS.useRecentCommitsAsContext, v),
-            { hint: L.useRecentCommitsHint },
-        ));
+    if (format !== 'previous') {
+        field(body, state, 'commit.useRecentCommitsAsContext', undefined, (v, save, disabled) =>
+            makeCheckbox('use-recent-commits', L.useRecentCommits, v, save, {
+                disabled,
+                hint: L.useRecentCommitsHint,
+            }));
     }
-    if (usesExamples) {
-        body.appendChild(fieldLabel(L.recentCommitsCount));
-        body.appendChild(makeNumberInput(
-            'recent-commits-count',
-            state.commit.recentCommitsCount,
-            v => setSetting(KEYS.recentCommitsCount, v),
-        ));
-        body.appendChild(fieldLabel(L.recentCommitsScope));
-        body.appendChild(makeSelect(
+    if (s['commit.useRecentCommitsAsContext'] || format === 'previous') {
+        numberField(body, state, 'commit.recentCommitsCount', 'recent-commits-count', L.recentCommitsCount);
+        field(body, state, 'commit.recentCommitsScope', L.recentCommitsScope, (v, save, disabled) => makeSelect(
             'recent-commits-scope',
             [
                 { value: 'all', label: L.recentCommitsScopeAll },
                 { value: 'mine', label: L.recentCommitsScopeMine },
             ],
-            state.commit.recentCommitsScope,
-            v => setSetting(KEYS.recentCommitsScope, v),
+            v,
+            save,
+            { disabled },
         ));
     }
 
-    const languagePinned = isPinned(state, 'commitLanguage');
-    body.appendChild(fieldLabel(L.language));
-    body.appendChild(makeSelect(
+    field(body, state, 'commit.commitLanguage', L.language, (v, save, disabled) => makeSelect(
         'language',
-        init.languages.map(l => ({ value: l, label: l })),
-        state.commit.language,
-        v => setSetting(KEYS.commitLanguage, v),
-        { disabled: languagePinned },
+        SUPPORTED_LANGUAGES.map(l => ({ value: l, label: l })),
+        v,
+        save,
+        { disabled },
     ));
-    if (languagePinned) { body.appendChild(pinnedHint()); }
 
-    if (state.commit.language === 'custom') {
-        body.appendChild(fieldLabel(L.customLanguage));
-        body.appendChild(makeTextInput(
-            'custom-language',
-            state.commit.customLanguageName,
-            v => setSetting(KEYS.customLanguageName, v),
-        ));
+    if (s['commit.commitLanguage'] === 'custom') {
+        field(body, state, 'commit.customLanguageName', L.customLanguage, (v, save, disabled) =>
+            makeTextInput('custom-language', v, save, { disabled }));
     }
 
-    body.appendChild(makeCheckbox(
-        'only-staged',
-        L.onlyStaged,
-        state.commit.onlyStagedChanges,
-        v => setSetting(KEYS.onlyStagedChanges, v),
-    ));
+    field(body, state, 'commit.onlyStagedChanges', undefined, (v, save, disabled) =>
+        makeCheckbox('only-staged', L.onlyStaged, v, save, { disabled }));
 
     return section('commit', L.commit, true, body);
 }
 
 export function renderRefsSection(state: ViewState): HTMLElement {
     const body = el('div');
+    const s = state.settings;
 
-    body.appendChild(makeCheckbox(
-        'refs-enabled',
-        L.refsEnabled,
-        state.commit.refsEnabled,
-        v => setSetting(KEYS.refsEnabled, v),
-        { hint: L.refsEnabledHint },
-    ));
+    field(body, state, 'commit.refs.enabled', undefined, (v, save, disabled) =>
+        makeCheckbox('refs-enabled', L.refsEnabled, v, save, { disabled, hint: L.refsEnabledHint }));
 
-    if (state.commit.refsEnabled) {
-        body.appendChild(fieldLabel(L.refsSource));
-        body.appendChild(makeSelect(
+    if (s['commit.refs.enabled']) {
+        field(body, state, 'commit.refs.source', L.refsSource, (v, save, disabled) => makeSelect(
             'refs-source',
             [
                 { value: 'prompt', label: L.refsSourcePrompt },
                 { value: 'branch', label: L.refsSourceBranch },
                 { value: 'input', label: L.refsSourceInput },
             ],
-            state.commit.refsSource,
-            v => setSetting(KEYS.refsSource, v),
+            v,
+            save,
+            { disabled },
         ));
 
-        if (state.commit.refsSource === 'input') {
+        if (s['commit.refs.source'] === 'input') {
             body.appendChild(fieldLabel(L.refsValue));
             // Draft field: not auto-saved. The two buttons persist its current
             // value to either the current branch (workspaceState) or the project
             // (.commitsage/config.json).
-            const refInput = makeTextInput('refs-value', state.commit.refsValue, () => {}, L.refsValuePh);
+            const refInput = makeTextInput('refs-value', s['commit.refs.value'], () => {}, {
+                placeholder: L.refsValuePh,
+            });
             body.appendChild(refInput);
 
-            const branch = state.commit.refsBranch;
+            const branch = state.refsBranch;
             const saveBranchBtn = el('button', {
                 class: 'primary',
                 disabled: !branch,
@@ -344,44 +282,41 @@ export function renderRefsSection(state: ViewState): HTMLElement {
 
             // Status line — which saved ref actually wins (branch over project).
             let active: string;
-            if (state.commit.refsBranchRef) {
-                active = `${L.refsActiveBranch}: ${state.commit.refsBranchRef}`;
-            } else if (state.commit.refsValue) {
-                active = `${L.refsActiveProject}: ${state.commit.refsValue}`;
+            if (state.refsBranchRef) {
+                active = `${L.refsActiveBranch}: ${state.refsBranchRef}`;
+            } else if (s['commit.refs.value']) {
+                active = `${L.refsActiveProject}: ${s['commit.refs.value']}`;
             } else {
                 active = L.refsActiveNone;
             }
             const branchNote = branch ? `${branch} · ` : `${L.refsNoBranch} · `;
             body.appendChild(el('div', { class: 'hint' }, [branchNote + active]));
 
-            if (state.commit.refsBranchRef) {
+            if (state.refsBranchRef) {
                 const clearBtn = el('button', { class: 'primary' }, [L.refsClearBranch]) as HTMLButtonElement;
                 clearBtn.addEventListener('click', () => send({ type: 'clearBranchRef' }));
                 body.appendChild(el('div', { class: 'actions' }, [clearBtn]));
             }
         }
 
-        if (state.commit.refsSource === 'branch') {
-            body.appendChild(fieldLabel(L.refsBranchPattern));
-            body.appendChild(makeTextInput(
-                'refs-branch-pattern',
-                state.commit.refsBranchPattern,
-                v => setSetting(KEYS.refsBranchPattern, v),
-                '[A-Z][A-Z0-9]*-[0-9]+',
-            ));
-            body.appendChild(el('div', { class: 'hint' }, [L.refsBranchPatternHint]));
+        if (s['commit.refs.source'] === 'branch') {
+            field(body, state, 'commit.refs.branchPattern', L.refsBranchPattern, (v, save, disabled) =>
+                makeTextInput('refs-branch-pattern', v, save, {
+                    placeholder: '[A-Z][A-Z0-9]*-[0-9]+',
+                    disabled,
+                }), L.refsBranchPatternHint);
         }
 
-        body.appendChild(fieldLabel(L.refsPlacement));
-        body.appendChild(makeSelect(
+        field(body, state, 'commit.refs.placement', L.refsPlacement, (v, save, disabled) => makeSelect(
             'refs-placement',
             [
                 { value: 'end', label: L.refsPlacementEnd },
                 { value: 'start', label: L.refsPlacementStart },
                 { value: 'prefix', label: L.refsPlacementPrefix },
             ],
-            state.commit.refsPlacement,
-            v => setSetting(KEYS.refsPlacement, v),
+            v,
+            save,
+            { disabled },
         ));
     }
 
@@ -390,55 +325,40 @@ export function renderRefsSection(state: ViewState): HTMLElement {
 
 export function renderCommitlintSection(state: ViewState): HTMLElement {
     const body = el('div');
-    const isCustomFormat = !formatSupportsCommitlint(state.commit.format);
+    const s = state.settings;
+    const format = s['commit.commitFormat'];
+    // The setting itself is left alone: switching back to a validated format
+    // restores the user's choice.
+    const unsupported = !formatSupportsCommitlint(format);
 
-    body.appendChild(makeCheckbox(
-        'commitlint-enabled',
-        L.commitlintEnabled,
-        state.commit.commitlintEnabled && !isCustomFormat,
-        v => setSetting(KEYS.commitlintEnabled, v),
-        {
-            disabled: isCustomFormat,
-            hint: isCustomFormat ? 'Not available for the custom format.' : undefined,
-        },
-    ));
+    field(body, state, 'commit.commitlint.enabled', undefined, (v, save, disabled) =>
+        makeCheckbox('commitlint-enabled', L.commitlintEnabled, v && !unsupported, save, {
+            disabled: disabled || unsupported,
+            hint: unsupported ? L.commitlintUnsupported : undefined,
+        }));
 
-    if (state.commit.commitlintEnabled && !isCustomFormat) {
-        if (COMMITLINT_COMPAT_FORMATS.has(state.commit.format) && state.commit.commitlintCliAvailable) {
-            body.appendChild(fieldLabel(L.commitlintEngine));
-            body.appendChild(makeSelect(
+    if (s['commit.commitlint.enabled'] && !unsupported) {
+        if (COMMITLINT_COMPATIBLE_FORMATS.has(format) && state.commitlintCliAvailable) {
+            field(body, state, 'commit.commitlint.engine', L.commitlintEngine, (v, save, disabled) => makeSelect(
                 'commitlint-engine',
                 [
-                    { value: 'builtin', label: 'Built-in static rules' },
-                    { value: 'project', label: 'Project commitlint (node_modules)' },
+                    { value: 'builtin', label: L.commitlintEngineBuiltin },
+                    { value: 'project', label: L.commitlintEngineProject },
                 ],
-                state.commit.commitlintEngine,
-                v => setSetting(KEYS.commitlintEngine, v),
+                v,
+                save,
+                { disabled },
             ));
-        } else if (!COMMITLINT_COMPAT_FORMATS.has(state.commit.format)) {
-            body.appendChild(el('div', { class: 'hint' }, [
-                'This format is checked by built-in rules; project commitlint cannot parse it.',
-            ]));
+        } else if (!COMMITLINT_COMPATIBLE_FORMATS.has(format)) {
+            body.appendChild(el('div', { class: 'hint' }, [L.commitlintBuiltinOnly]));
         }
 
-        body.appendChild(fieldLabel(L.commitlintMaxRetries));
-        body.appendChild(makeNumberInput(
-            'commitlint-max-retries',
-            state.commit.commitlintMaxRetries,
-            v => setSetting(KEYS.commitlintMaxRetries, v),
-        ));
+        numberField(body, state, 'commit.commitlint.maxRetries', 'commitlint-max-retries', L.commitlintMaxRetries);
 
-        if (state.commit.format === 'conventional' || state.commit.format === 'angular') {
-            body.appendChild(fieldLabel(L.commitlintRulesPath));
-            body.appendChild(makeTextInput(
-                'commitlint-rules-path',
-                state.commit.commitlintRulesPath,
-                v => setSetting(KEYS.commitlintRulesPath, v),
-                './config',
-            ));
-            body.appendChild(el('div', { class: 'hint' }, [
-                'Path to the commitlint config file. Relative to the repo root, or absolute. Empty = auto-discover.',
-            ]));
+        if (CONFIG_DRIVEN_FORMATS.has(format)) {
+            field(body, state, 'commit.commitlint.rulesPath', L.commitlintRulesPath, (v, save, disabled) =>
+                makeTextInput('commitlint-rules-path', v, save, { placeholder: './config', disabled }),
+            L.commitlintRulesPathHint);
         }
     }
 
@@ -447,32 +367,25 @@ export function renderCommitlintSection(state: ViewState): HTMLElement {
 
 export function renderAutomationSection(state: ViewState): HTMLElement {
     const body = el('div');
-    const trustHint = state.trusted ? undefined : L.untrusted;
+    const autoCommit = state.settings['commit.autoCommit'];
 
-    body.appendChild(makeCheckbox(
-        'auto-commit',
-        L.autoCommit,
-        state.commit.autoCommit,
-        v => setSetting(KEYS.autoCommit, v),
-        { disabled: !state.trusted, hint: trustHint },
-    ));
+    field(body, state, 'commit.autoCommit', undefined, (v, save, disabled) =>
+        makeCheckbox('auto-commit', L.autoCommit, v, save, {
+            disabled: disabled || !state.trusted,
+            hint: state.trusted ? undefined : L.untrusted,
+        }));
 
     let autoPushHint: string | undefined;
     if (state.trusted) {
-        autoPushHint = state.commit.autoCommit ? undefined : L.autoPushNeedsCommit;
+        autoPushHint = autoCommit ? undefined : L.autoPushNeedsCommit;
     } else {
         autoPushHint = L.untrusted;
     }
-    body.appendChild(makeCheckbox(
-        'auto-push',
-        L.autoPush,
-        state.commit.autoPush,
-        v => setSetting(KEYS.autoPush, v),
-        {
-            disabled: !state.trusted || !state.commit.autoCommit,
+    field(body, state, 'commit.autoPush', undefined, (v, save, disabled) =>
+        makeCheckbox('auto-push', L.autoPush, v, save, {
+            disabled: disabled || !state.trusted || !autoCommit,
             hint: autoPushHint,
-        },
-    ));
+        }));
 
     return section('automation', L.automation, true, body);
 }
@@ -480,77 +393,32 @@ export function renderAutomationSection(state: ViewState): HTMLElement {
 export function renderAdvancedSection(state: ViewState): HTMLElement {
     const body = el('div');
 
-    body.appendChild(fieldLabel(L.apiTimeout));
-    body.appendChild(makeNumberInput(
-        'api-timeout',
-        state.advanced.apiRequestTimeout,
-        v => setSetting(KEYS.apiRequestTimeout, v),
-    ));
-    body.appendChild(fieldLabel(L.gitTimeout));
-    body.appendChild(makeNumberInput(
-        'git-timeout',
-        state.advanced.gitTimeout,
-        v => setSetting(KEYS.gitTimeout, v),
-    ));
-    body.appendChild(el('div', { class: 'hint' }, [L.timeoutHint]));
-
-    body.appendChild(fieldLabel(L.maxDiffSize));
-    body.appendChild(makeNumberInput(
-        'max-diff-size',
-        state.advanced.maxDiffSize,
-        v => setSetting(KEYS.maxDiffSize, v),
-    ));
-    body.appendChild(el('div', { class: 'hint' }, [L.maxDiffSizeHint]));
-
-    body.appendChild(fieldLabel(L.temperature));
-    body.appendChild(makeNumberInput(
-        'temperature',
-        state.advanced.temperature,
-        v => setSetting(KEYS.temperature, v),
-    ));
-    body.appendChild(el('div', { class: 'hint' }, [L.temperatureHint]));
-
-    body.appendChild(fieldLabel(L.maxOutputTokens));
-    body.appendChild(makeNumberInput(
-        'max-output-tokens',
-        state.advanced.maxOutputTokens,
-        v => setSetting(KEYS.maxOutputTokens, v),
-    ));
-    body.appendChild(el('div', { class: 'hint' }, [L.maxOutputTokensHint]));
+    numberField(body, state, 'apiRequestTimeout', 'api-timeout', L.apiTimeout);
+    numberField(body, state, 'gitTimeout', 'git-timeout', L.gitTimeout, L.timeoutHint);
+    numberField(body, state, 'general.maxDiffSize', 'max-diff-size', L.maxDiffSize, L.maxDiffSizeHint);
+    numberField(body, state, 'general.temperature', 'temperature', L.temperature, L.temperatureHint);
+    numberField(body, state, 'general.maxOutputTokens', 'max-output-tokens', L.maxOutputTokens, L.maxOutputTokensHint);
 
     // Gemini-only: the two thinking knobs. Both are shown because a single
     // Gemini install switches between 2.5 and 3.x models (and `auto` picks for
     // you), and each family only honours one of them.
     if (state.provider === 'gemini') {
-        body.appendChild(fieldLabel(L.geminiThinkingBudget));
-        body.appendChild(makeNumberInput(
-            'gemini-thinking-budget',
-            state.gemini.thinkingBudget,
-            v => setSetting(KEYS.geminiThinkingBudget, v),
-        ));
-        body.appendChild(el('div', { class: 'hint' }, [L.geminiThinkingBudgetHint]));
-
-        body.appendChild(fieldLabel(L.geminiThinkingLevel));
-        body.appendChild(makeSelect(
+        numberField(
+            body, state, 'gemini.thinkingBudget', 'gemini-thinking-budget',
+            L.geminiThinkingBudget, L.geminiThinkingBudgetHint,
+        );
+        field(body, state, 'gemini.thinkingLevel', L.geminiThinkingLevel, (v, save, disabled) => makeSelect(
             'gemini-thinking-level',
             THINKING_LEVELS.map(value => ({ value, label: value })),
-            state.gemini.thinkingLevel,
-            v => setSetting(KEYS.geminiThinkingLevel, v),
-        ));
-        body.appendChild(el('div', { class: 'hint' }, [L.geminiThinkingLevelHint]));
+            v,
+            save,
+            { disabled },
+        ), L.geminiThinkingLevelHint);
     }
 
-    // Ollama-only: context window override. Surfaced regardless of selected
-    // provider since the Advanced section already collects cross-cutting
-    // settings — keeps related Ollama settings discoverable.
+    // Ollama-only: context window override.
     if (state.provider === 'ollama') {
-        body.appendChild(fieldLabel(L.ollamaNumCtx));
-        body.appendChild(makeNumberInput(
-            'ollama-num-ctx',
-            state.ollama.numCtx,
-            v => setSetting(KEYS.ollamaNumCtx, v),
-        ));
-        body.appendChild(el('div', { class: 'hint' }, [L.ollamaNumCtxHint]));
+        numberField(body, state, 'ollama.numCtx', 'ollama-num-ctx', L.ollamaNumCtx, L.ollamaNumCtxHint);
     }
 
     return section('advanced', L.advanced, true, body);

@@ -1,8 +1,7 @@
 // Collapsible <details> section with open/closed state persisted via
 // vscode.setState, so the webview restores the previous expansion across
-// reloads / window restarts. Keys are stable section IDs ("modelAuth" /
-// "commit" / "automation" / "advanced") — not localized titles, which would
-// change with locale.
+// reloads / window restarts. Keys are stable section IDs (e.g. "modelAuth",
+// "refs") — not localized titles, which would change with locale.
 
 import { el } from './dom';
 import { vscode } from './vscodeApi';

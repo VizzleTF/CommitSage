@@ -33,7 +33,7 @@ Commit Sage asks the configured provider to translate the English template of th
 - Each language entry holds one template per format. A new format adds a key under the existing language.
 - A missing entry is translated again. To redo a translation, delete its entry or the whole file.
 - If `customLanguageName` is empty, the English template is used and nothing is translated.
-- With `useCustomInstructions` on and non-empty `customInstructions`, the prompt comes from `customInstructions` and nothing is translated, whatever the format. With `commitFormat` set to `custom` and without `useCustomInstructions`, the conventional template is translated and cached under the `custom` key.
+- With `useCustomInstructions` on and non-empty `customInstructions`, the prompt comes from `customInstructions` and nothing is translated, whatever the format. With `commitFormat` set to `custom` and without `useCustomInstructions`, the `conventional` translation is used.
 
 ## Cache file
 

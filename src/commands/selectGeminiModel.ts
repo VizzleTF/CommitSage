@@ -4,11 +4,10 @@ import { ApiKeyManager } from '../services/apiKeyManager';
 import { Logger } from '../utils/logger';
 import { toError } from '../utils/errorUtils';
 import { UserCancelledError } from '../models/errors';
+import { ConfigService } from '../utils/configService';
+import { handleHttpError } from '../services/baseAIService';
 
-const SETTING_KEY = 'commitSage.gemini.model';
-const AUTO_VALUE = 'auto';
-
-export function registerSelectGeminiModelCommand(_context: vscode.ExtensionContext): vscode.Disposable {
+export function registerSelectGeminiModelCommand(): vscode.Disposable {
     return vscode.commands.registerCommand('commitsage.selectGeminiModel', async () => {
         try {
             const apiKey = await ApiKeyManager.getKey('gemini');
@@ -27,13 +26,13 @@ export function registerSelectGeminiModelCommand(_context: vscode.ExtensionConte
                 return;
             }
 
-            const current = vscode.workspace.getConfiguration().get<string>(SETTING_KEY) ?? AUTO_VALUE;
+            const current = ConfigService.get('gemini.model');
 
             const items: vscode.QuickPickItem[] = [
                 {
-                    label: AUTO_VALUE,
+                    label: 'auto',
                     description: vscode.l10n.t('Try all models, prefer best quality'),
-                    picked: current === AUTO_VALUE,
+                    picked: current === 'auto',
                 },
                 ...models.map(m => ({
                     label: m,
@@ -52,9 +51,7 @@ export function registerSelectGeminiModelCommand(_context: vscode.ExtensionConte
                 return;
             }
 
-            await vscode.workspace
-                .getConfiguration()
-                .update(SETTING_KEY, picked.label, vscode.ConfigurationTarget.Global);
+            await ConfigService.set('gemini.model', picked.label);
 
             await Logger.showInfo(vscode.l10n.t('Gemini model set to {0}', picked.label));
         } catch (error) {
@@ -63,7 +60,7 @@ export function registerSelectGeminiModelCommand(_context: vscode.ExtensionConte
             }
             Logger.error('Failed to select Gemini model:', toError(error));
             await Logger.showError(
-                vscode.l10n.t('Failed to fetch Gemini models: {0}', toError(error).message),
+                vscode.l10n.t('Failed to fetch Gemini models: {0}', handleHttpError(toError(error), 'Gemini').errorMessage),
             );
         }
     });

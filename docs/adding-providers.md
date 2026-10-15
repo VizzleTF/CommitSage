@@ -43,46 +43,36 @@ The steps use `<PROVIDER_ID>` for the lowercase provider id (`deepseek`), `<NAME
 
      The other fields of `CompatProviderSpec` are optional: `extraHeaders`, `chatCompletionsPath`, `getApiKey` and `maxTokensParam`. The API key and the label come from the catalog, the model default from `SETTING_DEFAULTS` (step 5).
 
-   - Otherwise, create `src/services/<PROVIDER_ID>Service.ts` with a class that has a static `generateCommitMessage(prompt, progress, attempt, options)` returning `Promise<CommitMessage>`. Use the helpers from `src/services/baseAIService.ts`, as `anthropicService.ts` does:
-     - wrap the request in `withRetryAndApiKeyGuard()`: it maps HTTP errors through `handleHttpError()`, retries and turns an invalid key into `ApiKeyInvalidError`;
+   - Otherwise, create `src/services/<PROVIDER_ID>Service.ts` with a class that has a static `generateCommitMessage(prompt, progress, options)` returning `Promise<CommitMessage>`. Use the helpers from `src/services/baseAIService.ts`, as `anthropicService.ts` does:
+     - read the key and settings first, then pass the request to `withRetryAndApiKeyGuard(name, progress, attempt => ...)`: it calls the function once per attempt, maps HTTP errors through `handleHttpError()`, retries and turns an invalid key into `ApiKeyInvalidError`;
      - pass the response text to `extractAndValidateMessage()`;
-     - take the request limits from `getConfiguredTemperature()` and `resolveMaxOutputTokens()`, and pass `options?.signal` to the HTTP call.
+     - take the request limits from `getConfiguredTemperature()` and `resolveMaxOutputTokens(options, attempt)`, and pass `options?.signal` to the HTTP call.
 
      Then register the class in `NON_COMPAT_SERVICES` in `src/services/aiServiceFactory.ts`.
 
-4. Add an entry to `PROVIDER_BEHAVIOR` in `src/services/providerRegistry.ts` with `selectedModel` and `fetchModels`. Put a fetch function for the model list in `src/services/modelLists.ts`. A provider without a listing endpoint returns `[]` (as `custom` does) or a static list (as `fetchAnthropicModels` does).
+4. Add an entry to `FETCH_MODELS` in `src/services/providerRegistry.ts`. An OpenAI-compatible provider with a `GET <BASE_URL>/models` endpoint needs only `compatModels('<PROVIDER_ID>')`; other fetch functions live in `src/services/modelLists.ts`. A provider without a listing endpoint returns `[]` (as `custom` does) or a static list (as `codestral` does).
 
-5. Add the model setting default to `SETTING_DEFAULTS` in `src/utils/configService.ts`. `ConfigService.getModelFor()` reads `<PROVIDER_ID>.model` for every provider.
+5. Add the model setting default to `SETTING_DEFAULTS` in `src/utils/configService.ts`. `ConfigService.getModelFor()` and the model picker in the settings view read `<PROVIDER_ID>.model` for every provider.
 
    ```typescript
    '<PROVIDER_ID>.model': '<DEFAULT_MODEL>',
    ```
 
-6. Add `<PROVIDER_ID>Model: '<PROVIDER_ID>.model',` to `SETTING_PATHS` in `src/views/settingsWebviewProvider.ts`. The model picker in the settings view looks up the key `` `${provider}Model` ``.
-
-7. Add the provider section to `ProjectConfig` in `src/models/types.ts`. `provider.type` is a `string`, so it needs no change.
-
-   ```typescript
-   <PROVIDER_ID>?: {
-       model?: string;
-   };
-   ```
-
-8. Update `package.json` under `contributes`:
+6. Update `package.json` under `contributes`:
    - `configuration.properties["commitSage.provider.type"]`: add the id to `enum` and a line to `enumDescriptions` at the same position;
    - add a `commitSage.<PROVIDER_ID>.model` property with `"default": "<DEFAULT_MODEL>"`;
    - add the `setCmd` and `removeCmd` commands to `commands`, with titles `%command.set<NAME>ApiKey.title%` and `%command.remove<NAME>ApiKey.title%` and `"category": "%command.category%"`;
    - add `onCommand:commitsage.set<NAME>ApiKey` to `completionEvents` of the `setApiKey` walkthrough step.
 
-9. Add the two command titles to `package.nls.json`, and the provider name to `walkthrough.step.pickProvider.description`. In `walkthroughs/pick-provider.md`, update the provider count and list; in `walkthroughs/set-api-key.md`, add the `Commit Sage: Set <NAME> API Key` command.
+7. Add the two command titles to `package.nls.json`, and the provider name to `walkthrough.step.pickProvider.description`. In `walkthroughs/pick-provider.md`, update the provider count and list; in `walkthroughs/set-api-key.md`, add the `Commit Sage: Set <NAME> API Key` command.
 
-10. Update the tests:
+8. Update the tests:
     - `tests/providerRegistry.test.ts` asserts the full `PROVIDERS` list and the `NO_REFRESH_PROVIDERS` list; add the new id;
     - add a payload test to `tests/providerPayloads.test.ts` that checks the request URL and body;
     - `tests/providerDispatchCompleteness.test.ts` needs no edit: it fails when a catalog provider has no generation path;
     - hard-coded provider lists that do not fail but leave the new provider untested: `COMPAT` and `compatCases` in `tests/aiServiceFactory.test.ts` (OpenAI-compatible providers only) and the `ConfigService.getModel` cases in `tests/configService.coverage.test.ts`. A test in `tests/providerServices.coverage.test.ts` also needs `'<PROVIDER_ID>.model'` in its mocked `SETTINGS`.
 
-11. Update the user docs:
+9. Update the user docs:
     - [providers.md](providers.md): the provider count, the table row and a section for the provider;
     - [configuration.md](configuration.md): the `provider.type` values, the `<PROVIDER_ID>.model` setting and the two commands;
     - `README.md`: the provider count and list.
@@ -95,7 +85,7 @@ npm run test:unit
 npm run lint
 ```
 
-`npm run compile` only bundles with esbuild and does not type-check. `npm run typecheck` reports a missing `PROVIDER_BEHAVIOR` entry or a wrong `SETTING_PATHS` value.
+`npm run compile` only bundles with esbuild and does not type-check. `npm run typecheck` reports a missing `FETCH_MODELS` entry or a missing `<PROVIDER_ID>.model` default.
 
 Then start the extension in VS Code and check:
 
