@@ -148,6 +148,7 @@ export async function generateViaOpenAICompatible(
             );
             return { message, model: request.model };
         },
+        { signal: options?.signal },
     );
 }
 

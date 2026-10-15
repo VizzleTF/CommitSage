@@ -41,6 +41,8 @@ export const errorMessages = {
     paymentRequired: 'Payment Required: Your API key requires a valid subscription or has exceeded its quota. Please check your billing status.',
     invalidRequest: 'Invalid Request: The request was malformed or the input was invalid. This may happen if the content is too long or contains unsupported characters.',
     rateLimitExceeded: 'Rate Limit Exceeded: Too many requests in a short time period. Please wait a moment before trying again.',
+    rateLimitRetryAfter: 'Rate Limit Exceeded: The provider asks to wait {0} seconds before the next request.',
+    quotaExhausted: 'Quota Exhausted: The account is out of credit or reached its spend or daily limit. Retrying will not help until it resets.',
     serverError: 'Server Error: The service is temporarily unavailable. Please try again later.',
     authenticationError: 'Authentication Error: The API key is invalid or has been revoked. Please check your API key.',
     notFound: 'Not Found: The model may be retired or misspelled, or the base URL is wrong. Pick a current model in the Commit Sage sidebar.',

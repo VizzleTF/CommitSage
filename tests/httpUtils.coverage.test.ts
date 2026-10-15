@@ -81,23 +81,25 @@ describe('HttpUtils.getJson / postJson', () => {
         expect(init.method).toBe('POST');
     });
 
-    it('throws HttpError with parsed JSON body on non-2xx JSON response', async () => {
+    it('throws HttpError with parsed JSON body and Retry-After on non-2xx JSON response', async () => {
         const fetchMock = vi.fn(async () => ({
             ok: false,
             status: 429,
+            headers: new Headers({ 'Retry-After': '7' }),
             text: async () => JSON.stringify({ error: { message: 'rate limited' } }),
         }));
         vi.stubGlobal('fetch', fetchMock);
 
         await expect(
             HttpUtils.getJson('https://api.test', { headers: {} }),
-        ).rejects.toMatchObject({ name: 'HttpError', status: 429 });
+        ).rejects.toMatchObject({ name: 'HttpError', status: 429, retryAfter: '7', data: { error: { message: 'rate limited' } } });
     });
 
     it('throws HttpError with raw text body when body is non-JSON', async () => {
         const fetchMock = vi.fn(async () => ({
             ok: false,
             status: 500,
+            headers: new Headers(),
             text: async () => 'plain error',
         }));
         vi.stubGlobal('fetch', fetchMock);
@@ -115,6 +117,7 @@ describe('HttpUtils.getJson / postJson', () => {
         const fetchMock = vi.fn(async () => ({
             ok: false,
             status: 502,
+            headers: new Headers(),
             text: async () => '',
         }));
         vi.stubGlobal('fetch', fetchMock);

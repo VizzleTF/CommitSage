@@ -77,6 +77,6 @@ export class AnthropicService {
                 'Anthropic',
             );
             return { message, model };
-        });
+        }, { signal: options?.signal });
     }
 }

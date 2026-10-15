@@ -9,12 +9,15 @@ import { ConfigService } from './configService';
 export class HttpError extends Error {
   public readonly status: number;
   public readonly data: unknown;
+  /** The raw `Retry-After` header, if the response had one. */
+  public readonly retryAfter?: string;
 
-  constructor(status: number, data: unknown) {
+  constructor(status: number, data: unknown, retryAfter?: string) {
     super(`HTTP ${status}`);
     this.name = 'HttpError';
     this.status = status;
     this.data = data;
+    this.retryAfter = retryAfter;
   }
 }
 
@@ -141,7 +144,7 @@ export class HttpUtils {
 
     if (!response.ok) {
       const data = await this.readResponseBody(response);
-      throw new HttpError(response.status, data);
+      throw new HttpError(response.status, data, response.headers.get('retry-after') ?? undefined);
     }
 
     try {

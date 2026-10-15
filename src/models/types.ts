@@ -18,6 +18,8 @@ export interface ApiErrorResult {
     errorMessage: string;
     shouldRetry: boolean;
     statusCode?: number;
+    /** The wait the provider asked for (Retry-After); replaces the backoff. */
+    retryAfterMs?: number;
 }
 
 // CommitLint types

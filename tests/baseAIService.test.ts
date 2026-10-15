@@ -3,6 +3,7 @@ import {
     extractAndValidateMessage,
     handleHttpError,
     isInvalidApiKeyError,
+    parseRetryAfter,
     withRetryAndApiKeyGuard,
 } from '../src/services/baseAIService';
 import { HttpError, NetworkError } from '../src/utils/httpUtils';
@@ -317,8 +318,77 @@ describe('withRetryAndApiKeyGuard', () => {
     it('maps errors through a custom errorMapper', async () => {
         const fn = vi.fn().mockRejectedValue(makeHttpError(404));
         const mapper = vi.fn(() => ({ errorMessage: 'custom', shouldRetry: false }));
-        await expect(withRetryAndApiKeyGuard('Foo', progress, fn, mapper))
+        await expect(withRetryAndApiKeyGuard('Foo', progress, fn, { errorMapper: mapper }))
             .rejects.toThrow('Failed to generate commit message: custom');
         expect(mapper).toHaveBeenCalledTimes(1);
+    });
+});
+
+describe('parseRetryAfter', () => {
+    const now = Date.parse('Wed, 21 Oct 2026 07:28:00 GMT');
+
+    it('reads delta-seconds', () => {
+        expect(parseRetryAfter('7', now)).toBe(7000);
+        expect(parseRetryAfter('0', now)).toBe(0);
+    });
+
+    it('reads an HTTP-date, never below zero', () => {
+        expect(parseRetryAfter('Wed, 21 Oct 2026 07:28:30 GMT', now)).toBe(30_000);
+        expect(parseRetryAfter('Wed, 21 Oct 2026 07:27:00 GMT', now)).toBe(0);
+    });
+
+    it('ignores a missing, negative or unreadable value', () => {
+        expect(parseRetryAfter(undefined, now)).toBeUndefined();
+        expect(parseRetryAfter(' ', now)).toBeUndefined();
+        expect(parseRetryAfter('-5', now)).toBeUndefined();
+        expect(parseRetryAfter('soon', now)).toBeUndefined();
+    });
+});
+
+describe('handleHttpError on a 429', () => {
+    const quota = (data: unknown) => handleHttpError(new HttpError(429, data), 'X');
+
+    it('waits the Retry-After the provider sent', () => {
+        const r = handleHttpError(new HttpError(429, {}, '3'), 'X');
+        expect(r).toMatchObject({ shouldRetry: true, retryAfterMs: 3000, errorMessage: errorMessages.rateLimitExceeded });
+    });
+
+    it('stops and names the wait when Retry-After is too long to hold the progress', () => {
+        const r = handleHttpError(new HttpError(429, {}, '45'), 'X');
+        expect(r.shouldRetry).toBe(false);
+        expect(r.errorMessage).toBe(errorMessages.rateLimitRetryAfter.replace('{0}', '45'));
+    });
+
+    it('reads Gemini RetryInfo when there is no header', () => {
+        const details = [{ '@type': 'type.googleapis.com/google.rpc.RetryInfo', retryDelay: '2.5s' }];
+        expect(quota({ error: { code: 429, status: 'RESOURCE_EXHAUSTED', details } }).retryAfterMs).toBe(2500);
+        details[0].retryDelay = '27s';
+        expect(quota({ error: { code: 429, status: 'RESOURCE_EXHAUSTED', details } }).shouldRetry).toBe(false);
+    });
+
+    it('does not retry an exhausted OpenAI quota and keeps the provider text', () => {
+        const r = quota({ error: { message: 'You exceeded your current quota.', type: 'insufficient_quota', code: 'insufficient_quota' } });
+        expect(r.shouldRetry).toBe(false);
+        expect(r.errorMessage).toBe(`${errorMessages.quotaExhausted} (You exceeded your current quota.)`);
+        expect(quota({ error: { type: 'insufficient_quota', code: 'project_spend_limit_exceeded' } }).shouldRetry).toBe(false);
+    });
+
+    it('does not retry the Anthropic spend cap', () => {
+        const r = quota({ type: 'error', error: { type: 'rate_limit_error', message: 'limit', details: { error_code: 'enforced_spend_limit_reached' } } });
+        expect(r.shouldRetry).toBe(false);
+    });
+
+    it('does not retry a Gemini per-day quota, but does a per-minute one', () => {
+        const failure = (quotaId: string) => ({ error: { code: 429, status: 'RESOURCE_EXHAUSTED', details: [
+            { '@type': 'type.googleapis.com/google.rpc.QuotaFailure', violations: [{ quotaId }] },
+            { '@type': 'type.googleapis.com/google.rpc.RetryInfo', retryDelay: '1s' },
+        ] } });
+        expect(quota(failure('GenerateRequestsPerDayPerProjectPerModel-FreeTier')).shouldRetry).toBe(false);
+        expect(quota(failure('GenerateRequestsPerMinutePerProjectPerModel-FreeTier'))).toMatchObject({ shouldRetry: true, retryAfterMs: 1000 });
+    });
+
+    it('retries a plain rate-limit body with the backoff', () => {
+        const r = quota({ error: { type: 'rate_limit_error', message: 'slow down' } });
+        expect(r).toMatchObject({ shouldRetry: true, retryAfterMs: undefined });
     });
 });

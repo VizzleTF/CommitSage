@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, afterEach } from 'vitest';
 import { RetryUtils } from '../src/utils/retryUtils';
 import type { ProgressReporter, ApiErrorResult } from '../src/models/types';
 
@@ -24,11 +24,23 @@ describe('RetryUtils.updateProgressForAttempt', () => {
     });
 });
 
+afterEach(() => {
+    vi.restoreAllMocks();
+    vi.useRealTimers();
+});
+
 describe('RetryUtils.calculateRetryDelay', () => {
     it('uses exponential backoff', () => {
+        vi.spyOn(Math, 'random').mockReturnValue(0.5);
         expect(RetryUtils.calculateRetryDelay(1)).toBe(1000);
         expect(RetryUtils.calculateRetryDelay(2)).toBe(2000);
         expect(RetryUtils.calculateRetryDelay(3)).toBe(4000);
+    });
+
+    it('spreads each step by half either way', () => {
+        vi.spyOn(Math, 'random').mockReturnValueOnce(0).mockReturnValueOnce(0.999);
+        expect(RetryUtils.calculateRetryDelay(2)).toBe(1000);
+        expect(RetryUtils.calculateRetryDelay(2)).toBeCloseTo(2998);
     });
 });
 
@@ -40,11 +52,21 @@ describe('RetryUtils.delay', () => {
         await p;
         vi.useRealTimers();
     });
+
+    it('rejects as soon as the signal aborts', async () => {
+        vi.useFakeTimers();
+        const controller = new AbortController();
+        const p = RetryUtils.delay(10_000, controller.signal);
+        controller.abort();
+        await expect(p).rejects.toMatchObject({ name: 'AbortError' });
+        await expect(RetryUtils.delay(10, controller.signal)).rejects.toMatchObject({ name: 'AbortError' });
+    });
 });
 
 describe('RetryUtils.handleGenerationError', () => {
     it('waits out the backoff when shouldRetry and attempts remain', async () => {
         vi.useFakeTimers();
+        vi.spyOn(Math, 'random').mockReturnValue(0.5);
         const progress = makeProgress();
         const errorHandler = (): ApiErrorResult => ({ errorMessage: 'transient', shouldRetry: true });
 
@@ -60,6 +82,20 @@ describe('RetryUtils.handleGenerationError', () => {
         // reported a "Waiting ... before retry" message
         expect(progress.calls.some((c) => String((c as { message?: string }).message).includes('before retry'))).toBe(true);
         vi.useRealTimers();
+    });
+
+    it('waits the Retry-After of the provider instead of the backoff', async () => {
+        vi.useFakeTimers();
+        const errorHandler = (): ApiErrorResult => ({ errorMessage: 'slow down', shouldRetry: true, retryAfterMs: 3000 });
+
+        let settled = false;
+        const promise = RetryUtils.handleGenerationError(new Error('boom'), makeProgress(), 1, errorHandler)
+            .then(() => { settled = true; });
+        await vi.advanceTimersByTimeAsync(2999);
+        expect(settled).toBe(false);
+        await vi.advanceTimersByTimeAsync(1);
+        await promise;
+        expect(settled).toBe(true);
     });
 
     it('throws when shouldRetry is false', async () => {

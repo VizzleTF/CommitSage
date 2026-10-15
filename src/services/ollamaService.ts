@@ -56,7 +56,7 @@ export class OllamaService {
             });
 
             return { message: this.extractCommitMessage(data), model };
-        }, this.mapOllamaError);
+        }, { signal: options?.signal, errorMapper: this.mapOllamaError });
     }
 
     /**

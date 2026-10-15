@@ -65,13 +65,17 @@ export function resolveMaxOutputTokens(options?: GenerateOptions, attempt: numbe
  *
  * Used by every provider except Gemini's auto mode. Ollama passes a custom
  * `errorMapper` for its self-hosted 404/500/network wording; everyone else
- * gets the default `handleHttpError` mapping.
+ * gets the default `handleHttpError` mapping. `signal` cuts the wait between
+ * attempts short.
  */
 export async function withRetryAndApiKeyGuard(
     name: string,
     progress: ProgressReporter,
     fn: (attempt: number) => Promise<CommitMessage>,
-    errorMapper: (err: Error) => ApiErrorResult = err => handleHttpError(err, `${name} API`),
+    {
+        signal,
+        errorMapper = err => handleHttpError(err, `${name} API`),
+    }: { signal?: AbortSignal; errorMapper?: (err: Error) => ApiErrorResult } = {},
 ): Promise<CommitMessage> {
     for (let attempt = 1; ; attempt++) {
         RetryUtils.updateProgressForAttempt(progress, attempt);
@@ -84,7 +88,7 @@ export async function withRetryAndApiKeyGuard(
             if (error instanceof HttpError && isInvalidApiKeyError(error)) {
                 throw new ApiKeyInvalidError(name);
             }
-            await RetryUtils.handleGenerationError(toError(error), progress, attempt, errorMapper);
+            await RetryUtils.handleGenerationError(toError(error), progress, attempt, errorMapper, signal);
         }
     }
 }
@@ -164,6 +168,86 @@ export function extractAndValidateMessage(
     return cleanMessage;
 }
 
+/** Longest provider-requested wait worth keeping the progress open for. */
+const MAX_RETRY_AFTER_MS = 10_000;
+
+// 429s that a retry cannot fix until billing changes or the period resets.
+const EXHAUSTED_QUOTA_CODES = new Set([
+    // OpenAI: `error.type` (and legacy `error.code`) insufficient_quota, plus the billing `error.code`s.
+    'insufficient_quota',
+    'credit_balance_exhausted',
+    'organization_spend_limit_exceeded',
+    'project_spend_limit_exceeded',
+    'organization_usage_limit_exceeded',
+    // Anthropic tier spend cap: `error.details.error_code`, sent without retry-after.
+    'enforced_spend_limit_reached',
+]);
+
+/**
+ * Milliseconds from a `Retry-After` value: delta-seconds or an HTTP-date
+ * (RFC 9110 §10.2.3). `undefined` when absent or unreadable.
+ */
+export function parseRetryAfter(value: string | undefined, now: number = Date.now()): number | undefined {
+    if (!value?.trim()) {
+        return undefined;
+    }
+    const seconds = Number(value);
+    if (Number.isFinite(seconds)) {
+        return seconds >= 0 ? seconds * 1000 : undefined;
+    }
+    const date = Date.parse(value);
+    return Number.isNaN(date) ? undefined : Math.max(0, date - now);
+}
+
+type RateLimitBody = { error?: { type?: unknown; code?: unknown; details?: unknown } };
+// Gemini 429 `error.details` entries (google.rpc.QuotaFailure / RetryInfo).
+type GoogleRpcDetail = { violations?: Array<{ quotaId?: unknown }>; retryDelay?: unknown };
+
+function isQuotaExhausted(data: unknown): boolean {
+    const error = typeof data === 'object' ? (data as RateLimitBody | null)?.error : undefined;
+    if (typeof error !== 'object' || error === null) {
+        return false;
+    }
+    const { type, code, details } = error;
+    // eslint-disable-next-line @typescript-eslint/naming-convention
+    const detailCode = (details as { error_code?: unknown } | undefined)?.error_code;
+    if ([type, code, detailCode].some(value => typeof value === 'string' && EXHAUSTED_QUOTA_CODES.has(value))) {
+        return true;
+    }
+    // Gemini per-day quotas reset at midnight Pacific; a short retryDelay does not refill them.
+    return Array.isArray(details) && (details as GoogleRpcDetail[]).some(detail =>
+        detail?.violations?.some(v => typeof v?.quotaId === 'string' && v.quotaId.includes('PerDay')));
+}
+
+/** Gemini's wait from google.rpc.RetryInfo, a duration such as "27s". */
+function googleRetryDelayMs(data: unknown): number | undefined {
+    const details = typeof data === 'object' ? (data as RateLimitBody | null)?.error?.details : undefined;
+    const delay = Array.isArray(details)
+        ? (details as GoogleRpcDetail[]).find(detail => typeof detail?.retryDelay === 'string')?.retryDelay as string | undefined
+        : undefined;
+    return delay?.endsWith('s') ? parseRetryAfter(delay.slice(0, -1)) : undefined;
+}
+
+function handleRateLimit(error: HttpError, providerMessage: string | undefined): ApiErrorResult {
+    const statusCode = error.status;
+    if (isQuotaExhausted(error.data)) {
+        return {
+            errorMessage: providerMessage ? `${errorMessages.quotaExhausted} (${providerMessage})` : errorMessages.quotaExhausted,
+            shouldRetry: false,
+            statusCode,
+        };
+    }
+    const retryAfterMs = parseRetryAfter(error.retryAfter) ?? googleRetryDelayMs(error.data);
+    if (retryAfterMs !== undefined && retryAfterMs > MAX_RETRY_AFTER_MS) {
+        return {
+            errorMessage: errorMessages.rateLimitRetryAfter.replace('{0}', String(Math.ceil(retryAfterMs / 1000))),
+            shouldRetry: false,
+            statusCode,
+        };
+    }
+    return { errorMessage: errorMessages.rateLimitExceeded, shouldRetry: true, statusCode, retryAfterMs };
+}
+
 type HttpErrorData =
     | { error?: string | { message?: string }; code?: string }
     | string
@@ -190,8 +274,6 @@ function handleHttpStatus(
             const text = errorMessage ?? (typeof data === 'string' ? data : '');
             return { errorMessage: text || errorMessages.authenticationError, shouldRetry: false, statusCode: status };
         }
-        case 429:
-            return { errorMessage: errorMessages.rateLimitExceeded, shouldRetry: true, statusCode: status };
         case 404: {
             // Mostly a retired or mistyped model id (OpenAI `model_not_found`,
             // Anthropic `not_found_error`); keep the provider's text, it names the model.
@@ -228,7 +310,9 @@ export function handleHttpError(error: Error, serviceName: string): ApiErrorResu
         // some `{error: "..."}` (a string), some bare strings. Normalize.
         const data = error.data as HttpErrorData;
         const errorMessage = extractErrorMessage(data);
-        return handleHttpStatus(error.status, errorMessage, data);
+        return error.status === 429
+            ? handleRateLimit(error, errorMessage)
+            : handleHttpStatus(error.status, errorMessage, data);
     }
 
     if (error instanceof NetworkError) {

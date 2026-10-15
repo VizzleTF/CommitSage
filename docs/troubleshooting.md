@@ -38,11 +38,13 @@ The provider rejected the API key: HTTP 401, or HTTP 400 with an "invalid API ke
 
 ## Provider and network errors
 
-A failed request is tried up to three times (two retries, after 1 s and 2 s). After the last attempt, Commit Sage shows `Failed to generate commit message: <CAUSE>`. The table lists each `<CAUSE>`.
+A failed request is tried up to three times. The two retries wait about 1 s and 2 s with random jitter, or as long as the provider's `Retry-After` header asks, up to 10 s. Cancel stops the wait. After the last attempt, Commit Sage shows `Failed to generate commit message: <CAUSE>`. The table lists each `<CAUSE>`.
 
 | `<CAUSE>` after `Failed to generate commit message: ` | Cause | Action |
 |---|---|---|
 | `Rate Limit Exceeded: Too many requests in a short time period. Please wait a moment before trying again.` | The provider returned HTTP 429. | Wait and run the command again, or switch to another model or provider. |
+| `Rate Limit Exceeded: The provider asks to wait <N> seconds before the next request.` | The provider returned HTTP 429 with a wait longer than 10 s, so Commit Sage does not retry. | Run the command again after <N> seconds, or switch to another model or provider. |
+| `Quota Exhausted: The account is out of credit or reached its spend or daily limit. Retrying will not help until it resets.` | The provider returned HTTP 429 for an exhausted quota: OpenAI `insufficient_quota` or a spend limit, Anthropic `enforced_spend_limit_reached`, or a Gemini per-day quota. | Add credit or raise the limit in the provider console, wait for the daily reset, or switch provider. |
 | `Payment Required: Your API key requires a valid subscription or has exceeded its quota. Please check your billing status.` | The provider returned HTTP 402. | Add credit or a plan in the provider console. |
 | `Authentication Error: The API key is invalid or has been revoked. Please check your API key.` | The provider returned HTTP 403 without an error text. | Create a new key in the provider console and set it with **Commit Sage: Set <PROVIDER> API Key**. |
 | `Invalid Request: The request was malformed or the input was invalid. This may happen if the content is too long or contains unsupported characters.` | The provider returned HTTP 422 without an error text. | Lower `commitSage.general.maxDiffSize` or stage fewer files. |

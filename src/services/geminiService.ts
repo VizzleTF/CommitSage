@@ -271,7 +271,8 @@ export class GeminiService {
         }
 
         return withRetryAndApiKeyGuard('Gemini', progress, attempt =>
-            this.callGemini(configuredModel, prompt, apiKey, options, attempt)
+            this.callGemini(configuredModel, prompt, apiKey, options, attempt),
+            { signal: options?.signal },
         );
     }
 
