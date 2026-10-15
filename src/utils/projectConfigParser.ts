@@ -8,6 +8,11 @@ import { Logger } from './logger';
  * `ConfigService`.
  */
 
+/** `typeof`, with arrays told apart from objects. */
+function kindOf(value: unknown): string {
+    return Array.isArray(value) ? 'array' : typeof value;
+}
+
 /** Key names that address the prototype chain rather than a plain field. */
 const UNSAFE_KEYS: ReadonlySet<string> = new Set(['__proto__', 'constructor', 'prototype']);
 
@@ -67,11 +72,11 @@ function validateLevel(
         // Own keys only: a top-level `toString` must not match Object.prototype.
         const expected = Object.hasOwn(schema, fullKey) ? schema[fullKey] : undefined;
         if (expected !== undefined) {
-            if (typeof value === typeof expected) {
+            if (kindOf(value) === kindOf(expected)) {
                 validated[key] = value;
             } else {
                 Logger.warn(
-                    `Project config at ${source}: "${fullKey}" expected ${typeof expected}, got ${typeof value} — skipping.`,
+                    `Project config at ${source}: "${fullKey}" expected ${kindOf(expected)}, got ${kindOf(value)} — skipping.`,
                 );
             }
         } else if (isPlainObject(value)) {

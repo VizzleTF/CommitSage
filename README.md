@@ -41,7 +41,8 @@ The message appears in the Source Control input box. Review it and commit.
 ## Privacy
 
 - API keys are stored in VS Code SecretStorage, not in settings or project files.
-- Your diff is sent to the selected provider. Do not use a cloud provider on a repository that contains secrets. Ollama and a self-hosted Custom endpoint keep the diff on your network.
+- Your diff is sent to the selected provider. Ollama and a self-hosted Custom endpoint keep the diff on your network.
+- The content of `.env`, key and certificate files is never sent, only their path. Add your own patterns with `commitSage.general.excludeFiles` or a `.commitsageignore` file. Known secret formats in the rest of the diff (API keys, tokens, private keys) are masked. Masking is pattern-based, so prefer a local provider for a repository full of secrets. See [Sensitive files and secrets](docs/configuration.md#sensitive-files-and-secrets).
 - Telemetry is on by default. Turn it off with `commitSage.telemetry.enabled: false`; details in [docs/telemetry.md](docs/telemetry.md).
 
 ## Documentation

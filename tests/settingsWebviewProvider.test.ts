@@ -91,9 +91,10 @@ afterEach(() => {
 });
 
 describe('SettingsWebviewProvider state', () => {
-    it('sends every panel setting under its dotted key, without telemetry.enabled', async () => {
+    it('sends every panel setting under its dotted key, without telemetry.enabled or excludeFiles', async () => {
         const state = await pushedState(mount());
-        const expected = Object.keys(SETTING_DEFAULTS).filter(k => k !== 'telemetry.enabled').sort();
+        const expected = Object.keys(SETTING_DEFAULTS)
+            .filter(k => k !== 'telemetry.enabled' && k !== 'general.excludeFiles').sort();
         expect(Object.keys(state.settings).sort()).toEqual(expected);
         expect(state.settings['general.temperature']).toBe(SETTING_DEFAULTS['general.temperature']);
         expect(state.projectOverrides).toEqual([]);
@@ -176,6 +177,7 @@ describe('SettingsWebviewProvider setSetting', () => {
         ['an unknown key', 'git.path', '/tmp/evil'],
         ['a prototype key', 'constructor', 'x'],
         ['the telemetry toggle', 'telemetry.enabled', true],
+        ['the file exclusion list', 'general.excludeFiles', []],
         ['a value of the wrong type', 'general.temperature', '0.2'],
     ])('ignores %s', async (_label, key, value) => {
         const set = vi.spyOn(ConfigService, 'set').mockResolvedValue();

@@ -431,6 +431,11 @@ describe('parseAndValidateProjectConfig edge cases', () => {
         expect(out.commit.commitlint).toEqual({});
     });
 
+    it('tells an array setting from an object', () => {
+        expect(parse(JSON.stringify({ general: { excludeFiles: ['*.sql'] } }))).toEqual({ general: { excludeFiles: ['*.sql'] } });
+        expect(parse(JSON.stringify({ general: { excludeFiles: { a: 1 } } }))).toEqual({ general: {} });
+    });
+
     it('keeps correctly typed top-level settings and drops wrong-typed ones', () => {
         const out = parse(JSON.stringify({ gitTimeout: 300, apiRequestTimeout: '60', futureFlag: 1 }));
         expect(out).toEqual({ gitTimeout: 300, futureFlag: 1 });

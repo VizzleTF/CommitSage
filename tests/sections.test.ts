@@ -21,7 +21,7 @@ const postMessage = vi.fn();
 const sections = await import('../src/views/webview/sections');
 
 const KEYS = (Object.keys(SETTING_DEFAULTS) as Array<keyof typeof SETTING_DEFAULTS>)
-    .filter((k): k is WebviewSettingKey => k !== 'telemetry.enabled');
+    .filter((k): k is WebviewSettingKey => k !== 'telemetry.enabled' && k !== 'general.excludeFiles');
 
 function makeState(
     provider: Provider,

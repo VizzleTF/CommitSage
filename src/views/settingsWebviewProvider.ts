@@ -33,7 +33,7 @@ const VIEW_ID = 'commitsage.settings';
 
 // Every setting the panel reads and may write (see WebviewSettingKey).
 const WEBVIEW_SETTING_KEYS = (Object.keys(SETTING_DEFAULTS) as SettingKey[])
-    .filter((k): k is WebviewSettingKey => k !== 'telemetry.enabled');
+    .filter((k): k is WebviewSettingKey => k !== 'telemetry.enabled' && k !== 'general.excludeFiles');
 
 export class SettingsWebviewProvider implements vscode.WebviewViewProvider {
     public static readonly viewId = VIEW_ID;

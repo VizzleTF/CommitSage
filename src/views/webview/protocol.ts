@@ -32,10 +32,11 @@ export type WebviewL10n = ReturnType<typeof buildWebviewL10n>;
 
 /**
  * Settings the panel reads and writes, keyed like `ConfigService.get`.
- * `telemetry.enabled` has no control here, and the webview must not be able to
- * turn telemetry back on, so it stays out of the contract.
+ * `telemetry.enabled` and `general.excludeFiles` have no control here, and the
+ * webview must not be able to turn telemetry back on or shrink the exclusion
+ * list, so they stay out of the contract.
  */
-export type WebviewSettingKey = Exclude<SettingKey, 'telemetry.enabled'>;
+export type WebviewSettingKey = Exclude<SettingKey, 'telemetry.enabled' | 'general.excludeFiles'>;
 export type WebviewSettings = { [K in WebviewSettingKey]: SettingValue<K> };
 
 /** One-shot payload embedded in the page; never changes after first render. */

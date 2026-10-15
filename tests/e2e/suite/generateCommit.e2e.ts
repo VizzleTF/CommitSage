@@ -110,4 +110,24 @@ describe('Commit message generation', () => {
         assert.ok(!prompt.includes('unstaged.txt'),
             `prompt should NOT include unstaged.txt, got fragment:\n${prompt}`);
     });
+
+    it('sends excluded files by path only and masks secrets in the rest', async () => {
+        const token = `ghp_${'a1B2'.repeat(9)}`;
+        await fs.writeFile(path.join(repo.path, '.env'), 'DB_PASSWORD=env-file-content\n');
+        await fs.mkdir(path.join(repo.path, 'vault', 'deep'), { recursive: true });
+        await fs.writeFile(path.join(repo.path, 'vault', 'deep', 'notes.txt'), 'vault-file-content\n');
+        await fs.writeFile(path.join(repo.path, '.commitsageignore'), '# team rules\nvault/\n');
+        await fs.writeFile(path.join(repo.path, 'app.ts'), `const token = '${token}';\n`);
+
+        await vscode.commands.executeCommand('commitsage.generateCommitMessage');
+
+        assert.equal(mock.requests.length, 1);
+        const prompt = (mock.requests[0].body as { messages: { content: string }[] })
+            .messages[0].content;
+        assert.ok(prompt.includes('diff --git a/.env b/.env\n[content excluded]'), prompt);
+        assert.ok(prompt.includes('diff --git a/vault/deep/notes.txt b/vault/deep/notes.txt\n[content excluded]'), prompt);
+        assert.ok(!prompt.includes('env-file-content') && !prompt.includes('vault-file-content'), prompt);
+        assert.ok(prompt.includes("+const token = '<redacted>';"), prompt);
+        assert.ok(!prompt.includes(token), 'the token must not reach the model');
+    });
 });

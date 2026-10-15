@@ -56,7 +56,7 @@
     },
     "untrustedWorkspaces": {
       "supported": "limited",
-      "description": "Commit Sage generates commit messages from diffs in any workspace. In untrusted workspaces it ignores workspace and project values of provider endpoints, auto-commit, auto-push, the commitlint engine and the branch pattern, and skips auto-commit and auto-push.",
+      "description": "Commit Sage generates commit messages from diffs in any workspace. In untrusted workspaces it ignores workspace and project values of provider endpoints, auto-commit, auto-push, the commitlint engine, the branch pattern and the file exclusion list, and skips auto-commit and auto-push.",
       "restrictedConfigurations": [
         "commitSage.provider.type",
         "commitSage.custom.baseUrl",
@@ -70,7 +70,8 @@
         "commitSage.commit.commitlint.enabled",
         "commitSage.commit.commitlint.engine",
         "commitSage.commit.commitlint.rulesPath",
-        "commitSage.commit.refs.branchPattern"
+        "commitSage.commit.refs.branchPattern",
+        "commitSage.general.excludeFiles"
       ]
     }
   },
@@ -684,6 +685,28 @@
           "type": "number",
           "default": 100000,
           "markdownDescription": "Maximum diff size in characters sent to the LLM. Larger diffs are truncated with a `...(truncated)` marker. **Set to `-1` to disable truncation (sends the entire diff — only safe with long-context models); one file's diff is still cut at 1,000,000 characters.** Clamped to the range `[1000, 1000000]`.\n\n**Tighten this for low-TPM free tiers:**\n- **Groq free tier (6000 TPM)** — set to ~`20000` (~5000 tokens for the diff + room for prompt/response).\n- **OpenRouter free (20 RPM / 50 RPD)** — `40000` typically fine.\n- **Gemini / Anthropic / DeepSeek paid** — default `100000` is fine.\n\nRule of thumb: 1 token ≈ 4 chars, so `100000` chars ≈ 25000 tokens.",
+          "order": 19
+        },
+        "commitSage.general.excludeFiles": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [
+            ".env",
+            ".env.*",
+            "*.pem",
+            "*.key",
+            "*.p12",
+            "*.pfx",
+            "*.keystore",
+            "*.jks",
+            "id_rsa*",
+            "id_dsa*",
+            "id_ecdsa*",
+            "id_ed25519*"
+          ],
+          "markdownDescription": "Files whose content is never sent to the model: it sees only the path, marked `[content excluded]`. gitignore-style patterns: without a `/` a pattern matches at any depth, a leading `/` anchors it to the repository root, a trailing `/` matches a directory. Case-insensitive. A `.commitsageignore` file in the repository root adds patterns, one per line. Secrets in the rest of the diff (API keys, tokens, private keys, quoted `password = \"…\"` values) are masked either way.",
           "order": 19
         },
         "commitSage.apiRequestTimeout": {

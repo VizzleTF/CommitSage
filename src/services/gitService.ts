@@ -1,9 +1,11 @@
+import * as fs from 'node:fs/promises';
+import * as path from 'node:path';
 import { Logger } from '../utils/logger';
 import { NoChangesDetectedError } from '../models/errors';
 import { TelemetryService } from './telemetryService';
 import { toError, sanitizeErrorForTelemetry } from '../utils/errorUtils';
 import { GIT_FANOUT_CONCURRENCY, mapLimit } from '../utils/concurrency';
-import { ConfigService } from '../utils/configService';
+import { ConfigService, SETTING_DEFAULTS } from '../utils/configService';
 import { resolveMaxDiffLength } from '../utils/diffTruncation';
 import { GIT_OUTPUT_BUFFER_CAP, GitProcessRunner } from './gitProcessRunner';
 
@@ -95,8 +97,10 @@ export class GitService {
     listArgs: string[],
     repoPath: string,
     signal?: AbortSignal,
+    pathspecs: string[] = [],
   ): Promise<string[]> {
-    const { stdout, exitCode } = await this.execGit([...listArgs, '-z'], repoPath, { signal });
+    const args = [...listArgs, '-z', ...(pathspecs.length > 0 ? ['--', ...pathspecs] : [])];
+    const { stdout, exitCode } = await this.execGit(args, repoPath, { signal });
     if (exitCode === -1) {
       throw new Error(`git ${listArgs[0]} output is too large`);
     }
@@ -104,17 +108,42 @@ export class GitService {
   }
 
   /**
+   * Changed paths (staged, unstaged or untracked) that match
+   * `general.excludeFiles` or the repo's `.commitsageignore`. git does the
+   * matching (glob pathspecs), so there is no glob engine of ours to get wrong.
+   * Errors propagate: sending a diff without knowing what to hold back is the
+   * unsafe default.
+   */
+  static async getExcludedPaths(repoPath: string, signal?: AbortSignal): Promise<Set<string>> {
+    const configured = ConfigService.get('general.excludeFiles');
+    const pathspecs = toExcludePathspecs([
+      // A hand-edited non-array value falls back to the defaults, not to nothing.
+      ...(Array.isArray(configured) ? configured : SETTING_DEFAULTS['general.excludeFiles']),
+      ...(await readIgnoreFile(repoPath)),
+    ]);
+    if (pathspecs.length === 0) {
+      return new Set();
+    }
+    // `-uall` names each file inside an untracked directory, like `ls-files --others`.
+    const fields = await this.listFiles(['status', '--porcelain', '--untracked-files=all'], repoPath, signal, pathspecs);
+    return new Set(parseStatus(fields).map((file) => file.path));
+  }
+
+  /**
    * The diff the message is generated from: the index when `staged`,
    * otherwise the whole worktree (tracked edits plus untracked files), which
    * the commit then stages with `add -A`. Submodule pointer moves are included,
-   * dirty submodule content is not.
+   * dirty submodule content is not. A file in `excluded` (default:
+   * `getExcludedPaths`) appears by path only; its content is never read.
    */
   static async getDiff(
     repoPath: string,
     staged: boolean,
     signal?: AbortSignal,
+    excluded?: ReadonlySet<string>,
   ): Promise<string> {
     try {
+      excluded ??= await this.getExcludedPaths(repoPath, signal);
       // Never cut one file's diff below what `general.maxDiffSize` would send;
       // `-1` (Infinity) still caps one file at 1M chars to bound memory.
       const maxBuffer = Math.max(
@@ -130,13 +159,13 @@ export class GitService {
           );
         }
         const renames = await this.getStagedRenameMap(repoPath, signal);
-        diff = (await this.diffFiles(files, repoPath, ['diff', '--cached'], maxBuffer, signal, renames)).join('\n');
+        diff = (await this.diffFiles(files, repoPath, ['diff', '--cached'], maxBuffer, excluded, signal, renames)).join('\n');
       } else {
         const tracked = await this.listFiles(['diff', '--name-only'], repoPath, signal);
         const untracked = await this.listFiles(['ls-files', '--others', '--exclude-standard'], repoPath, signal);
         diff = [
-          section('# Unstaged changes:\n', await this.diffFiles(tracked, repoPath, ['diff'], maxBuffer, signal)),
-          section('# New files:\n', await this.getUntrackedDiffs(untracked, repoPath, maxBuffer, signal)),
+          section('# Unstaged changes:\n', await this.diffFiles(tracked, repoPath, ['diff'], maxBuffer, excluded, signal)),
+          section('# New files:\n', await this.getUntrackedDiffs(untracked, repoPath, maxBuffer, excluded, signal)),
         ].filter(Boolean).join('\n');
       }
 
@@ -204,11 +233,16 @@ export class GitService {
     repoPath: string,
     diffArgs: string[],
     maxBuffer: number,
+    excluded: ReadonlySet<string>,
     signal?: AbortSignal,
     renames?: Map<string, string>,
   ): Promise<string[]> {
     const diffs = await mapLimit(files, GIT_FANOUT_CONCURRENCY, async (file) => {
       const renamedFrom = renames?.get(file);
+      // A rename diff would show the old file's content too.
+      if (excluded.has(file) || (renamedFrom !== undefined && excluded.has(renamedFrom))) {
+        return excludedFileBlock(file);
+      }
       // Literal pathspecs: `[id].tsx` must not also match `i.tsx`. No color or
       // external diff tool, whatever the user's git config says.
       const args = ['--literal-pathspecs', ...diffArgs, '--no-color', '--no-ext-diff', '--ignore-submodules=dirty'];
@@ -226,9 +260,13 @@ export class GitService {
     files: string[],
     repoPath: string,
     maxBuffer: number,
+    excluded: ReadonlySet<string>,
     signal?: AbortSignal,
   ): Promise<string[]> {
     const diffs = await mapLimit(files, GIT_FANOUT_CONCURRENCY, async (file) => {
+      if (excluded.has(file)) {
+        return excludedFileBlock(file);
+      }
       try {
         // `git diff --no-index` always exits with 1 when the two inputs
         // differ (and 0 when they are identical), so we pass
@@ -273,17 +311,7 @@ export class GitService {
     repoPath: string,
     signal?: AbortSignal,
   ): Promise<ChangedFile[]> {
-    const fields = await this.listFiles(['status', '--porcelain'], repoPath, signal);
-    const files: ChangedFile[] = [];
-    for (let i = 0; i < fields.length; i++) {
-      const status = fields[i].substring(0, 2);
-      files.push({ path: fields[i].substring(3), status });
-      // With -z a rename/copy record is "XY new\0old\0"; skip the old path.
-      if (/[RC]/.test(status)) {
-        i++;
-      }
-    }
-    return files;
+    return parseStatus(await this.listFiles(['status', '--porcelain'], repoPath, signal));
   }
 
   /**
@@ -348,6 +376,67 @@ export class GitService {
 
 function section(header: string, diffs: string[]): string {
   return diffs.length > 0 ? header + diffs.join('\n') : '';
+}
+
+/** `git status --porcelain -z` records, one entry per changed path. */
+function parseStatus(fields: string[]): ChangedFile[] {
+  const files: ChangedFile[] = [];
+  for (let i = 0; i < fields.length; i++) {
+    const status = fields[i].substring(0, 2);
+    files.push({ path: fields[i].substring(3), status });
+    // With -z a rename/copy record is "XY new\0old\0"; skip the old path.
+    if (/[RC]/.test(status)) {
+      i++;
+    }
+  }
+  return files;
+}
+
+// What the model gets instead of an excluded file's diff. The `diff --git`
+// header keeps it a file block of its own when the diff is truncated.
+function excludedFileBlock(file: string): string {
+  return `diff --git a/${file} b/${file}\n[content excluded]\n`;
+}
+
+/** Lines of the repo's `.commitsageignore`; none when the file is absent. */
+async function readIgnoreFile(repoPath: string): Promise<string[]> {
+  try {
+    return (await fs.readFile(path.join(repoPath, '.commitsageignore'), 'utf8')).split('\n');
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+      return [];
+    }
+    throw error;
+  }
+}
+
+/**
+ * gitignore-style patterns as git pathspecs. A pattern without an inner `/`
+ * matches at any depth, a leading `/` anchors it to the repo root, a trailing
+ * `/` matches only a directory, and a matched directory covers the files in
+ * it. Matching ignores case (`.ENV` on a case-insensitive disk). Blank lines
+ * and `#` comments are skipped; `!` negation is not supported.
+ */
+export function toExcludePathspecs(patterns: readonly string[]): string[] {
+  return patterns.flatMap((raw) => {
+    const pattern = typeof raw === 'string' ? raw.trim() : '';
+    if (!pattern || pattern.startsWith('#')) {
+      return [];
+    }
+    // Index loops, not /\/+$/: the ignore file comes from the repo, and a long
+    // run of slashes would make that regex quadratic.
+    let start = 0;
+    while (pattern[start] === '/') { start++; }
+    let end = pattern.length;
+    while (end > start && pattern[end - 1] === '/') { end--; }
+    const core = pattern.slice(start, end);
+    if (!core) {
+      return [];
+    }
+    const anchored = start > 0 || core.includes('/');
+    const spec = `:(top,glob,icase)${anchored ? '' : '**/'}${core}`;
+    return end < pattern.length ? [`${spec}/**`] : [spec, `${spec}/**`];
+  });
 }
 
 /** Result of `getChangedFiles`. `status` is the raw 2-char `git status --porcelain` code. */

@@ -24,6 +24,7 @@ vi.mock('../src/services/gitService', () => ({
     GitService: {
         getChangedFiles: async () => [{ path: 'a.txt', status: ' M' }],
         getDiff: async () => 'diff',
+        getExcludedPaths: async () => new Set(),
         hasHead: async () => false,
     },
     isIndexStaged: () => false,

@@ -1,5 +1,8 @@
 import { describe, it, expect, afterEach, vi } from 'vitest';
-import { GitService } from '../src/services/gitService';
+import * as fs from 'node:fs';
+import * as os from 'node:os';
+import * as path from 'node:path';
+import { GitService, toExcludePathspecs } from '../src/services/gitService';
 import { NoChangesDetectedError } from '../src/models/errors';
 import { ConfigService } from '../src/utils/configService';
 
@@ -199,5 +202,105 @@ describe('GitService.getDiff output caps', () => {
             name: 'TypeError',
             message: expect.stringContaining('Failed to get diff:'),
         });
+    });
+});
+
+describe('excluded files', () => {
+    const spec = (glob: string) => `:(top,glob,icase)${glob}`;
+
+    it('turns gitignore-style patterns into git pathspecs', () => {
+        expect(toExcludePathspecs([
+            '.env', ' /config/prod.yml ', 'secrets/', 'a/*.key', '# comment', '', '///', 'x\r',
+        ])).toEqual([
+            spec('**/.env'), spec('**/.env/**'),
+            spec('config/prod.yml'), spec('config/prod.yml/**'),
+            spec('**/secrets/**'),
+            spec('a/*.key'), spec('a/*.key/**'),
+            spec('**/x'), spec('**/x/**'),
+        ]);
+    });
+
+    it('lists changed paths that match the setting or .commitsageignore', async () => {
+        const repo = fs.mkdtempSync(path.join(os.tmpdir(), 'commitsage-exclude-'));
+        try {
+            fs.writeFileSync(path.join(repo, '.commitsageignore'), '# team rules\r\nvault/\r\n');
+            configSpy = vi.spyOn(ConfigService, 'get').mockImplementation(((key: string) =>
+                key === 'general.excludeFiles' ? ['.env'] : undefined) as never);
+            installExecGit((key) => (key.startsWith('status ') ? ' M .env\0R  b.env\0a.txt\0?? vault/x\0' : ''));
+
+            const excluded = await GitService.getExcludedPaths(repo);
+
+            expect([...excluded]).toEqual(['.env', 'b.env', 'vault/x']);
+            expect(calls[0].args).toEqual([
+                'status', '--porcelain', '--untracked-files=all', '-z', '--',
+                spec('**/.env'), spec('**/.env/**'), spec('**/vault/**'),
+            ]);
+        } finally {
+            fs.rmSync(repo, { recursive: true, force: true });
+        }
+    });
+
+    it('runs no git when there is nothing to exclude, and falls back to the defaults on a non-array value', async () => {
+        let value: unknown = [];
+        configSpy = vi.spyOn(ConfigService, 'get').mockImplementation(((key: string) =>
+            key === 'general.excludeFiles' ? value : undefined) as never);
+        installExecGit(() => '');
+
+        expect((await GitService.getExcludedPaths(REPO)).size).toBe(0);
+        expect(calls).toHaveLength(0);
+
+        value = '.env';
+        await GitService.getExcludedPaths(REPO);
+        expect(calls[0].args).toContain(spec('**/*.pem'));
+    });
+
+    it('sends a staged excluded file, or a rename from one, by path only', async () => {
+        installExecGit((key) => ({
+            'diff --cached --name-only -z': '.env\0a.txt\0renamed.txt\0',
+            'diff --cached --name-status -M -z': 'R100\0old.key\0renamed.txt\0',
+            '--literal-pathspecs diff --cached --no-color --no-ext-diff --ignore-submodules=dirty -- a.txt': 'diff --git a/a.txt b/a.txt\n+line\n',
+        } as Record<string, string>)[key]);
+
+        const diff = await GitService.getDiff(REPO, true, undefined, new Set(['.env', 'old.key']));
+
+        expect(diff).toContain('diff --git a/.env b/.env\n[content excluded]');
+        expect(diff).toContain('diff --git a/renamed.txt b/renamed.txt\n[content excluded]');
+        expect(diff).toContain('+line');
+        const diffed = calls.filter((c) => c.args.includes('--literal-pathspecs')).map((c) => c.args.at(-1));
+        expect(diffed).toEqual(['a.txt']);
+    });
+
+    it('never reads an excluded tracked or untracked file in worktree mode', async () => {
+        installExecGit((key) => ({
+            'diff --name-only -z': '.env\0',
+            'ls-files --others --exclude-standard -z': 'id_rsa\0new.txt\0',
+            'diff --no-color --no-ext-diff --no-index -- /dev/null new.txt': { stdout: '+new\n', stderr: '', exitCode: 1 },
+        } as Record<string, string | ExecResult>)[key]);
+
+        const diff = await GitService.getDiff(REPO, false, undefined, new Set(['.env', 'id_rsa']));
+
+        expect(diff).toBe([
+            '# Unstaged changes:',
+            'diff --git a/.env b/.env',
+            '[content excluded]',
+            '',
+            '# New files:',
+            'diff --git a/id_rsa b/id_rsa',
+            '[content excluded]',
+            '',
+            '+new',
+        ].join('\n'));
+        expect(calls.some((c) => c.args.at(-1) === '.env' || c.args.at(-1) === 'id_rsa')).toBe(false);
+    });
+
+    it('looks the exclusions up itself when the caller passes none', async () => {
+        installExecGit((key) => {
+            if (key.startsWith('status ')) {
+                return ' M .env\0';
+            }
+            return key === 'diff --name-only -z' ? '.env\0' : '';
+        });
+
+        await expect(GitService.getDiff(REPO, false)).resolves.toContain('[content excluded]');
     });
 });

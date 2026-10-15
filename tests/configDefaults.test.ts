@@ -34,7 +34,7 @@ describe('Settings schema (F036 + general)', () => {
         for (const [leaf, expected] of Object.entries(SETTING_DEFAULTS)) {
             const fullKey = `commitSage.${leaf}`;
             expect(pkgProps[fullKey], `package.json missing ${fullKey}`).toBeDefined();
-            expect(pkgProps[fullKey].default, `package.json default for ${fullKey} drifts from SETTING_DEFAULTS`).toBe(expected);
+            expect(pkgProps[fullKey].default, `package.json default for ${fullKey} drifts from SETTING_DEFAULTS`).toEqual(expected);
         }
     });
 

@@ -192,7 +192,9 @@ export class CommitWorkflow {
         const hasStagedChanges = allChangedFiles.some(file => isIndexStaged(file.status));
         const useStagedChanges = ConfigService.get('commit.onlyStagedChanges') || hasStagedChanges;
 
-        const diff = await GitService.getDiff(repoPath, useStagedChanges, signal);
+        // Sensitive files reach the model by path only: no diff, no blame.
+        const excluded = await GitService.getExcludedPaths(repoPath, signal);
+        const diff = await GitService.getDiff(repoPath, useStagedChanges, signal, excluded);
 
         const changedFiles = useStagedChanges
             ? allChangedFiles.filter(file => isIndexStaged(file.status))
@@ -200,7 +202,7 @@ export class CommitWorkflow {
         // Blame reads HEAD, so a repo without commits has nothing to blame.
         const blameAnalyses = await GitService.hasHead(repoPath, signal)
             ? await mapLimit(
-                changedFiles,
+                changedFiles.filter(file => !excluded.has(file.path)),
                 GIT_FANOUT_CONCURRENCY,
                 (file) => GitBlameAnalyzer.analyzeChanges(repoPath, file.path, file.status, useStagedChanges, signal),
                 signal,

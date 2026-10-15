@@ -7,6 +7,7 @@ import { capBlameAnalysis, resolveMaxDiffLength, truncateDiff } from '../utils/d
 import { Provider } from '../views/webview/protocol';
 import { CommitLintService, CommitLintEngine } from './commitLintService';
 import { Logger } from '../utils/logger';
+import { redactDiffSecrets } from '../utils/errorUtils';
 import { formatSupportsCommitlint } from '../utils/constants';
 
 interface GenerateContext {
@@ -46,7 +47,11 @@ export class AIService {
         // them, and the project engine spawns a CLI for each extraction.
         const rules = commitlintEnabled ? await PromptService.loadRules(repoPath, commitFormat, context.signal) : '';
 
-        const truncatedDiff = truncateDiff(diff, maxDiffLength);
+        const maskedDiff = redactDiffSecrets(diff);
+        if (maskedDiff !== diff) {
+            Logger.log('Masked secrets in the diff before sending it to the model');
+        }
+        const truncatedDiff = truncateDiff(maskedDiff, maxDiffLength);
         const prompt = await PromptService.generatePrompt(
             repoPath, truncatedDiff, capBlameAnalysis(blameAnalysis, maxDiffLength), progress, rules,
         );

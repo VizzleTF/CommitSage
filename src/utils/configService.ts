@@ -8,7 +8,7 @@ import type { Provider } from '../views/webview/protocol';
 import { statOrUndefined } from './fsUtils';
 import { isPlainObject, parseAndValidateProjectConfig } from './projectConfigParser';
 
-type CacheValue = string | boolean | number;
+type CacheValue = string | boolean | number | readonly string[];
 
 /**
  * Single source of truth for every commitSage.* setting we read.
@@ -55,6 +55,10 @@ export const SETTING_DEFAULTS = {
     'custom.useApiKey': false,
     'custom.chatCompletionsPath': '/chat/completions',
     'general.maxDiffSize': 100000,
+    'general.excludeFiles': [
+        '.env', '.env.*', '*.pem', '*.key', '*.p12', '*.pfx', '*.keystore', '*.jks',
+        'id_rsa*', 'id_dsa*', 'id_ecdsa*', 'id_ed25519*',
+    ],
     'general.temperature': 0.7,
     'general.maxOutputTokens': 4096,
     'gemini.thinkingBudget': 0,
@@ -105,6 +109,8 @@ export const TRUST_SENSITIVE_KEYS: ReadonlySet<string> = new Set<string>([
     'commit.commitlint.rulesPath',
     // ReDoS: compiled and run against the branch name.
     'commit.refs.branchPattern',
+    // Privacy: a repo must not shrink the list of files kept from the model.
+    'general.excludeFiles',
 ]);
 
 export type SettingKey = keyof typeof SETTING_DEFAULTS;
@@ -115,6 +121,7 @@ type Widened<T> =
   T extends boolean ? boolean :
   T extends number ? number :
   T extends string ? string :
+  T extends readonly string[] ? readonly string[] :
   T;
 export type SettingValue<K extends SettingKey> = Widened<(typeof SETTING_DEFAULTS)[K]>;
 

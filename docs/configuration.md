@@ -27,6 +27,7 @@ When Commit Sage changes a setting itself (the sidebar, startup dialogs, **Selec
 |---|---|---|---|
 | `commitSage.general.temperature` | `number` | `0.7` | Sampling temperature for every provider. Range `0`–`2`. |
 | `commitSage.general.maxDiffSize` | `number` | `100000` | Maximum diff size in characters sent to the model. A longer diff is truncated with a `...(truncated)` marker. `-1` disables truncation, but one file's diff is still cut at 1,000,000 characters. Other values are clamped to `1000`–`1000000`. The git blame summary takes at most a tenth of this size, up to 4000 characters. |
+| `commitSage.general.excludeFiles` | `string[]` | `.env`, `.env.*`, `*.pem`, `*.key`, `*.p12`, `*.pfx`, `*.keystore`, `*.jks`, `id_rsa*`, `id_dsa*`, `id_ecdsa*`, `id_ed25519*` | Files whose content is never sent to the model; it sees only their path. Setting the list replaces the defaults, so copy the ones you keep. See [Sensitive files and secrets](#sensitive-files-and-secrets). |
 | `commitSage.general.maxOutputTokens` | `number` | `4096` | Maximum tokens the model may generate for one message, thinking tokens included. Minimum `1`. On truncation each retry doubles the budget (at most 3 times), capped at `32768`. |
 | `commitSage.apiRequestTimeout` | `number` | `30` | Timeout for provider HTTP requests, in seconds. `-1` disables the timeout. |
 | `commitSage.gitTimeout` | `number` | `120` | Timeout for `git` subprocesses (diff, blame, push), in seconds. Increase for slow pushes or large diffs. `-1` disables the timeout. |
@@ -55,6 +56,37 @@ When Commit Sage changes a setting itself (the sidebar, startup dialogs, **Selec
 | `commitSage.commit.refs.value` | `string` | `""` | Fixed ref used when `refs.source` is `input`. The settings panel buttons **Save for this branch**, **Save for project** and **Clear branch ref** manage it; a branch ref, kept in VS Code workspace state, wins over the project value. |
 | `commitSage.commit.refs.placement` | `string` | `"end"` | Where the ref goes. `end`: own line after the message. `start`: own line before the message. `prefix`: start of the subject line. The ref is never placed in the subject scope. |
 | `commitSage.commit.refs.branchPattern` | `string` | `"[A-Z][A-Z0-9]*-[0-9]+"` | Regular expression that extracts the ref from the branch name when `refs.source` is `branch`. The first capture group is used if present, otherwise the whole match. |
+
+## Sensitive files and secrets
+
+Before a diff goes to the model, Commit Sage removes the content of sensitive files and masks secrets in the rest.
+
+**Excluded files.** A changed file that matches `commitSage.general.excludeFiles` or a line of `.commitsageignore` reaches the model as its path followed by `[content excluded]`. Its diff, its content as a new file and its blame are never read. The patterns follow `.gitignore` syntax:
+
+- Without a `/`, a pattern matches at any depth: `.env` matches `.env` and `app/.env`.
+- A leading `/` anchors the pattern to the repository root: `/config/prod.yml`.
+- A trailing `/` matches a directory and everything in it: `secrets/`.
+- `*` stays within one path segment, `**` spans directories.
+- Matching ignores case. `!` negation is not supported.
+
+Like any setting, the list can be replaced by workspace settings or `.commitsage/config.json`, but only in a trusted workspace; see [Workspace trust](#workspace-trust).
+
+**`.commitsageignore`.** An optional file in the repository root with one pattern per line. Blank lines and lines starting with `#` are skipped. It adds to the setting and cannot remove a pattern, so it is read in untrusted workspaces too:
+
+```gitignore
+# Customer data exports
+exports/
+*.sql
+```
+
+**Masking.** Secrets left in the diff are replaced with `<redacted>`, line by line, so the diff keeps its structure. The patterns are a subset of the [gitleaks](https://github.com/gitleaks/gitleaks) default rules:
+
+- AWS access key IDs; GitHub (`ghp_`, `gho_`, `ghu_`, `ghs_`, `ghr_`, `github_pat_`), GitLab (`glpat-`) and Slack (`xox…-`, `xapp-`) tokens.
+- Stripe (`sk_live_`, `rk_live_` and test keys), Google API (`AIza…`), OpenAI (`sk-…`, `sk-proj-…`) and Anthropic (`sk-ant-…`) keys.
+- Private key blocks (`-----BEGIN … PRIVATE KEY-----`), JWTs, `Authorization` and `Bearer` header values.
+- Quoted values of 8 or more characters assigned to a name ending in `password`, `secret`, `token`, `api_key` and similar, such as `db_password = "…"`.
+
+Masking is pattern-based and misses secrets in other formats; the exclusion list is the reliable control. The Output panel logs `Masked secrets in the diff` when something was masked.
 
 ## Per provider
 
@@ -154,5 +186,6 @@ In an untrusted workspace, neither the project config nor the workspace settings
 - `commit.autoCommit`, `commit.autoPush`
 - `commit.commitlint.enabled`, `commit.commitlint.engine`, `commit.commitlint.rulesPath`
 - `commit.refs.branchPattern`
+- `general.excludeFiles`
 
-A cloned repository could otherwise send your API key and diff to its own server, run its own code, or commit and push on your behalf. The extension logs a warning for each ignored project key, and VS Code ignores the workspace values (`restrictedConfigurations`), so your user value applies. Auto-commit and auto-push are skipped in an untrusted workspace whatever the settings say. Granting trust applies the ignored values without a reload.
+A cloned repository could otherwise send your API key and diff to its own server, run its own code, commit and push on your behalf, or send files you excluded. The extension logs a warning for each ignored project key, and VS Code ignores the workspace values (`restrictedConfigurations`), so your user value applies. Auto-commit and auto-push are skipped in an untrusted workspace whatever the settings say. Granting trust applies the ignored values without a reload.
