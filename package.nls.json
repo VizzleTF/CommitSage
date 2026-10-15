@@ -1,6 +1,7 @@
 {
   "command.category": "Commit Sage",
   "command.generateCommitMessage.title": "Generate Commit Message",
+  "command.generatingCommitMessage.title": "Generating Commit Message…",
   "command.setApiKey.title": "Set Gemini API Key",
   "command.setOpenAIApiKey.title": "Set OpenAI API Key",
   "command.setCodestralApiKey.title": "Set Codestral API Key",

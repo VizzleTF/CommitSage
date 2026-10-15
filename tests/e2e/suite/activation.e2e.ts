@@ -4,6 +4,7 @@ import { activateExtension } from '../helpers/settings';
 
 const EXPECTED_COMMANDS = [
     'commitsage.generateCommitMessage',
+    'commitsage.generatingCommitMessage',
     'commitsage.setApiKey',
     'commitsage.setOpenAIApiKey',
     'commitsage.setCodestralApiKey',

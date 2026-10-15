@@ -14,16 +14,18 @@ import { toError } from '../utils/errorUtils';
 export function registerCommands(context: vscode.ExtensionContext, ready: Promise<unknown>): void {
     Logger.log('Registering commands and views');
 
+    // generateAndSetCommitMessage handles and reports its own errors.
+    const generate = async (repository?: vscode.SourceControl): Promise<void> => {
+        await ready;
+        return CommitWorkflow.generateAndSetCommitMessage(repository);
+    };
+
     try {
         const disposables = [
-            // generateAndSetCommitMessage handles and reports its own errors.
-            vscode.commands.registerCommand(
-                'commitsage.generateCommitMessage',
-                async (repository?: vscode.SourceControl) => {
-                    await ready;
-                    return CommitWorkflow.generateAndSetCommitMessage(repository);
-                },
-            ),
+            vscode.commands.registerCommand('commitsage.generateCommitMessage', generate),
+            // The spinner that replaces the SCM button during a run; a click
+            // lands in the per-repository guard, which says a run is active.
+            vscode.commands.registerCommand('commitsage.generatingCommitMessage', generate),
             ...registerSetApiKeyCommands(),
             registerSelectGeminiModelCommand(),
             ...registerOpenRouterAuthCommands(context),

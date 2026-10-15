@@ -89,6 +89,12 @@
         }
       },
       {
+        "command": "commitsage.generatingCommitMessage",
+        "title": "%command.generatingCommitMessage.title%",
+        "category": "%command.category%",
+        "icon": "$(loading~spin)"
+      },
+      {
         "command": "commitsage.setApiKey",
         "title": "%command.setApiKey.title%",
         "category": "%command.category%"
@@ -235,8 +241,16 @@
     "menus": {
       "scm/title": [
         {
-          "when": "scmProvider == git",
+          "when": "scmProvider == git && scmProviderRootUri not in commitsage.generatingRepos",
           "command": "commitsage.generateCommitMessage",
+          "group": "navigation",
+          "arguments": [
+            "$scmProvider"
+          ]
+        },
+        {
+          "when": "scmProvider == git && scmProviderRootUri in commitsage.generatingRepos",
+          "command": "commitsage.generatingCommitMessage",
           "group": "navigation",
           "arguments": [
             "$scmProvider"
@@ -252,6 +266,10 @@
         {
           "command": "commitsage.generateCommitMessage",
           "when": "workspaceFolderCount != 0"
+        },
+        {
+          "command": "commitsage.generatingCommitMessage",
+          "when": "false"
         }
       ]
     },
