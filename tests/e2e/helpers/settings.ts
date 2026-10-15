@@ -22,6 +22,7 @@ export async function resetCommitSettings(): Promise<void> {
     await cfg.update('commit.autoCommit', false, vscode.ConfigurationTarget.Workspace);
     await cfg.update('commit.autoPush', false, vscode.ConfigurationTarget.Workspace);
     await cfg.update('commit.onlyStagedChanges', false, vscode.ConfigurationTarget.Workspace);
+    await cfg.update('commit.suggestionCount', undefined, vscode.ConfigurationTarget.Workspace);
 }
 
 export async function ensureOpenAIKey(key = 'e2e-test-key'): Promise<void> {

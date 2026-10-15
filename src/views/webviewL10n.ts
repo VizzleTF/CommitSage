@@ -85,6 +85,8 @@ export function buildWebviewL10n() {
         recentCommitsScope: vscode.l10n.t('Examples from'),
         recentCommitsScopeAll: vscode.l10n.t('All authors'),
         recentCommitsScopeMine: vscode.l10n.t('Only me'),
+        suggestionCount: vscode.l10n.t('Suggestions to pick from'),
+        suggestionCountHint: vscode.l10n.t('Each suggestion is a separate request.'),
         useBlame: vscode.l10n.t('Use git blame as context'),
         useBlameHint: vscode.l10n.t('Tell the model who last changed the modified lines. Adds a git call per file.'),
         advanced: vscode.l10n.t('Advanced'),

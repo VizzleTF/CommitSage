@@ -215,6 +215,7 @@ export function renderCommitSection(state: ViewState): HTMLElement {
             { disabled },
         ));
     }
+    numberField(body, state, 'commit.suggestionCount', 'suggestion-count', L.suggestionCount, L.suggestionCountHint);
     field(body, state, 'commit.useBlameAsContext', undefined, (v, save, disabled) =>
         makeCheckbox('use-blame', L.useBlame, v, save, { disabled, hint: L.useBlameHint }));
 

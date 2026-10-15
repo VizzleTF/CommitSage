@@ -17,7 +17,7 @@ import {
     resetCommitSettings,
     setProviderToMockOpenAI,
 } from '../helpers/settings';
-import { installDefaultUiStubs, restoreStubs } from '../helpers/vscodeStubs';
+import { installDefaultUiStubs, restoreStubs, stubQuickPick } from '../helpers/vscodeStubs';
 
 describe('Commit message generation', () => {
     let mock: MockLlmServer;
@@ -64,6 +64,23 @@ describe('Commit message generation', () => {
         const body = mock.requests[0].body as { messages: { content: string }[] };
         assert.ok(body.messages?.[0]?.content?.includes('README.md'),
             `prompt should contain README.md, got: ${body.messages?.[0]?.content?.slice(0, 200)}`);
+    });
+
+    it('writes the suggestion picked from several', async () => {
+        await vscode.workspace.getConfiguration('commitSage')
+            .update('commit.suggestionCount', 2, vscode.ConfigurationTarget.Workspace);
+        mock.enqueue(
+            { body: { choices: [{ message: { content: 'feat: first idea' } }] } },
+            { body: { choices: [{ message: { content: 'feat: second idea' } }] } },
+        );
+        const pick = stubQuickPick(undefined).callsFake(async (items: unknown) => (await items as unknown[])[1]);
+        await fs.appendFile(path.join(repo.path, 'README.md'), '\nmodified\n');
+
+        await vscode.commands.executeCommand('commitsage.generateCommitMessage');
+
+        assert.equal(mock.requests.length, 2);
+        assert.equal(pick.callCount, 1);
+        assert.equal(getRepository(repo.path).inputBox.value, 'feat: second idea');
     });
 
     it('auto-stages and commits an untracked file when autoCommit is on', async () => {

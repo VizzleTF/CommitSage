@@ -461,6 +461,14 @@
           "markdownDescription": "Tell the model who last changed the lines this commit modifies (`git blame`). Off by default: it adds a git call per file and prompt text that rarely improves the message.",
           "order": 8
         },
+        "commitSage.commit.suggestionCount": {
+          "type": "number",
+          "default": 1,
+          "minimum": 1,
+          "maximum": 5,
+          "markdownDescription": "How many messages to generate. With more than 1, pick one from a list. Each is a separate request, so the diff is sent (and billed) that many times. Identical messages are shown once.",
+          "order": 8
+        },
         "commitSage.commit.recentCommitsCount": {
           "type": "number",
           "default": 5,

@@ -138,3 +138,28 @@ describe('AIService large diff summaries', () => {
         expect(generatePrompt.mock.calls[0][1].length).toBeLessThan(1100);
     });
 });
+
+describe('AIService several suggestions', () => {
+    beforeEach(() => {
+        settings['commit.commitFormat'] = 'custom';
+    });
+
+    it('requests count messages and drops duplicates and failures', async () => {
+        generate
+            .mockResolvedValueOnce({ message: 'feat: a', model: 'm' })
+            .mockRejectedValueOnce(new Error('boom'))
+            .mockResolvedValueOnce({ message: 'feat: a', model: 'm' })
+            .mockResolvedValueOnce({ message: 'feat: b', model: 'm' });
+
+        const out = await AIService.generateCommitMessages('/repo', 'diff', '', progress, { count: 4 });
+
+        expect(generate).toHaveBeenCalledTimes(4);
+        expect(generatePrompt).toHaveBeenCalledOnce();
+        expect(out.map(m => m.message)).toEqual(['feat: a', 'feat: b']);
+    });
+
+    it('throws when every request fails', async () => {
+        generate.mockRejectedValue(new Error('boom'));
+        await expect(AIService.generateCommitMessages('/repo', 'diff', '', progress, { count: 2 })).rejects.toThrow('boom');
+    });
+});

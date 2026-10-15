@@ -254,13 +254,15 @@ export class CommitWorkflow {
             throw new UserCancelledError();
         }
 
-        const commitMessage = await AIService.generateCommitMessage(repoPath, diff, blameAnalysis, progress, {
+        const suggestions = await AIService.generateCommitMessages(repoPath, diff, blameAnalysis, progress, {
             fileCount: changedFiles.length,
             onlyStagedChanges: useStagedChanges,
             signal,
             draft,
             rejected,
+            count: ConfigService.get('commit.suggestionCount'),
         });
+        const commitMessage = await this.pickSuggestion(suggestions);
 
         const finalMessage = applyRef(commitMessage.message, ref, ConfigService.get('commit.refs.placement'));
         sourceControlRepository.inputBox.value = finalMessage;
@@ -280,6 +282,24 @@ export class CommitWorkflow {
         }
 
         return { ...commitMessage, message: finalMessage };
+    }
+
+    /** The only suggestion, or the one the developer picks; Escape cancels. */
+    private static async pickSuggestion(suggestions: CommitMessage[]): Promise<CommitMessage> {
+        if (suggestions.length === 1) {
+            return suggestions[0];
+        }
+        const picked = await vscode.window.showQuickPick(
+            suggestions.map(suggestion => {
+                const [subject, ...body] = suggestion.message.split('\n');
+                return { label: subject, detail: body.join(' ').trim() || undefined, suggestion };
+            }),
+            { title: vscode.l10n.t('Pick a commit message'), ignoreFocusOut: true, matchOnDetail: true },
+        );
+        if (!picked) {
+            throw new UserCancelledError();
+        }
+        return picked.suggestion;
     }
 
     private static async handleError(error: Error): Promise<void> {

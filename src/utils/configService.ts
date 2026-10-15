@@ -35,6 +35,7 @@ export const SETTING_DEFAULTS = {
     'commit.autoPush': false,
     'commit.useRecentCommitsAsContext': false,
     'commit.useBlameAsContext': false,
+    'commit.suggestionCount': 1,
     'commit.recentCommitsCount': 5,
     'commit.recentCommitsScope': 'all',
     'codestral.model': 'codestral-latest',

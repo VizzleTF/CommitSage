@@ -33,7 +33,13 @@ vi.mock('../src/services/gitService', () => ({
     isIndexStaged: () => false,
 }));
 vi.mock('../src/services/aiService', () => ({
-    AIService: { generateCommitMessage: generate },
+    AIService: {
+        // A test returns one message, or an array to exercise the picker.
+        generateCommitMessages: async (...args: unknown[]) => {
+            const result = await generate(...args);
+            return Array.isArray(result) ? result : [result];
+        },
+    },
 }));
 vi.mock('../src/services/apiKeyManager', () => ({
     ApiKeyManager: {
@@ -146,6 +152,32 @@ describe('CommitWorkflow commit box draft', () => {
         await CommitWorkflow.generateAndSetCommitMessage();
 
         expect(repo.inputBox.value).toBe('my draft');
+    });
+});
+
+describe('CommitWorkflow suggestion picker', () => {
+    const two = [{ message: 'feat: one\n\n- body', model: 'm' }, { message: 'feat: two', model: 'm' }];
+
+    it('writes the suggestion the developer picks', async () => {
+        generate.mockReset().mockResolvedValue(two);
+        const pick = vi.spyOn(vscode.window, 'showQuickPick')
+            .mockImplementation(async (items: unknown) => (await items as unknown[])[1] as never);
+
+        await CommitWorkflow.generateAndSetCommitMessage();
+
+        const items = await pick.mock.calls[0][0] as Array<{ label: string; detail?: string }>;
+        expect(items.map(i => [i.label, i.detail])).toEqual([['feat: one', '- body'], ['feat: two', undefined]]);
+        expect(repo.inputBox.value).toBe('feat: two');
+    });
+
+    it('leaves the box alone when the pick is dismissed', async () => {
+        repo.inputBox.value = 'keep me';
+        generate.mockReset().mockResolvedValue(two);
+        vi.spyOn(vscode.window, 'showQuickPick').mockResolvedValue(undefined);
+
+        await CommitWorkflow.generateAndSetCommitMessage();
+
+        expect(repo.inputBox.value).toBe('keep me');
     });
 });
 

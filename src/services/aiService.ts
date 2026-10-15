@@ -9,6 +9,7 @@ import { CommitLintService, CommitLintEngine } from './commitLintService';
 import { Logger } from '../utils/logger';
 import { redactDiffSecrets } from '../utils/errorUtils';
 import { formatSupportsCommitlint } from '../utils/constants';
+import { mapLimit } from '../utils/concurrency';
 
 // Summary calls per generation for a diff over budget; a larger diff is
 // truncated to this many budgets first.
@@ -22,6 +23,8 @@ interface GenerateContext {
     draft?: string;
     /** Commit Sage's own last message, still in the commit box on a re-run. */
     rejected?: string;
+    /** How many messages to request; duplicates are dropped. Default 1. */
+    count?: number;
 }
 
 export class AIService {
@@ -32,6 +35,21 @@ export class AIService {
         progress: ProgressReporter,
         context: GenerateContext = {}
     ): Promise<CommitMessage> {
+        return (await this.generateCommitMessages(repoPath, diff, blameAnalysis, progress, { ...context, count: 1 }))[0];
+    }
+
+    /**
+     * `context.count` messages from one prompt, as separate requests: `n` and
+     * `candidateCount` are not supported by every provider. A failed request
+     * is dropped unless all of them fail.
+     */
+    static async generateCommitMessages(
+        repoPath: string,
+        diff: string,
+        blameAnalysis: string,
+        progress: ProgressReporter,
+        context: GenerateContext = {}
+    ): Promise<CommitMessage[]> {
         const provider = ConfigService.getProvider();
         const model = ConfigService.getModel();
         const language = ConfigService.get('commit.commitLanguage');
@@ -69,16 +87,25 @@ export class AIService {
 
         progress.report({ message: 'Generating commit message...', increment: 50 });
 
-        let result = await AIServiceFactory.generateCommitMessage(
-            provider,
-            prompt,
-            progress,
-            { signal: context.signal }
+        const generateOne = async (): Promise<CommitMessage> => {
+            const result = await AIServiceFactory.generateCommitMessage(provider, prompt, progress, { signal: context.signal });
+            return commitlintEnabled
+                ? this.applyCommitLint(result, repoPath, commitFormat, rules, provider, progress, context)
+                : result;
+        };
+        const count = Math.max(1, context.count ?? 1);
+        // A local Ollama model answers one request at a time anyway.
+        const settled = await mapLimit(
+            Array.from({ length: count }), provider === 'ollama' ? 1 : count,
+            () => generateOne().then(value => ({ value }), (error: unknown) => ({ error })),
         );
-
-        if (commitlintEnabled) {
-            result = await this.applyCommitLint(result, repoPath, commitFormat, rules, provider, progress, context);
+        context.signal?.throwIfAborted();
+        const results = settled.flatMap(s => ('value' in s ? [s.value] : []));
+        if (results.length === 0) {
+            throw (settled[0] as { error: unknown }).error;
         }
+        const unique = results.filter((r, i) => results.findIndex(o => o.message === r.message) === i);
+        const result = unique[0];
 
         TelemetryService.sendEvent({
             name: 'message_generation_completed',
@@ -88,7 +115,7 @@ export class AIService {
             language,
             onlyStagedChanges: context.onlyStagedChanges ?? false,
         });
-        return result;
+        return unique;
     }
 
     /**
