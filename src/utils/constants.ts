@@ -43,4 +43,5 @@ export const errorMessages = {
     rateLimitExceeded: 'Rate Limit Exceeded: Too many requests in a short time period. Please wait a moment before trying again.',
     serverError: 'Server Error: The service is temporarily unavailable. Please try again later.',
     authenticationError: 'Authentication Error: The API key is invalid or has been revoked. Please check your API key.',
+    notFound: 'Not Found: The model may be retired or misspelled, or the base URL is wrong. Pick a current model in the Commit Sage sidebar.',
 };

@@ -42,14 +42,14 @@ export const SETTING_DEFAULTS = {
     'ollama.baseUrl': 'http://localhost:11434',
     'ollama.model': 'llama3.2',
     'ollama.useAuthToken': false,
-    'openai.model': 'gpt-3.5-turbo',
+    'openai.model': 'gpt-6-luna',
     'openai.baseUrl': 'https://api.openai.com/v1',
-    'openrouter.model': 'meta-llama/llama-3.3-70b-instruct:free',
+    'openrouter.model': 'openrouter/free',
     'openrouter.preferFreeModels': false,
-    'groq.model': 'llama-3.3-70b-versatile',
-    'anthropic.model': 'claude-sonnet-4-5-20250929',
-    'deepseek.model': 'deepseek-chat',
-    'xai.model': 'grok-3-mini',
+    'groq.model': 'openai/gpt-oss-20b',
+    'anthropic.model': 'claude-haiku-5-5',
+    'deepseek.model': 'deepseek-flash',
+    'xai.model': 'grok-4.3',
     'custom.baseUrl': 'http://localhost:1234/v1',
     'custom.model': '',
     'custom.useApiKey': false,
@@ -489,7 +489,7 @@ export class ConfigService {
 
   /**
    * Configured model for the active provider (e.g. `gemini-2.5-flash`,
-   * `gpt-3.5-turbo`, `llama3.2`, `codestral-latest`). Reads `<provider>.model`
+   * `gpt-6-luna`, `llama3.2`, `codestral-latest`). Reads `<provider>.model`
    * from settings — for `gemini` this can be the literal `'auto'`, which
    * resolves to the actual model only inside `geminiService`. The resolved
    * model is reported by `message_generation_completed.model`; this helper

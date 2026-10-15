@@ -99,18 +99,18 @@ Each key applies only when `commitSage.provider.type` selects that provider.
 | `commitSage.gemini.thinkingLevel` | `string` | `"low"` | Thinking depth for Gemini 3.x models. One of `minimal`, `low`, `medium`, `high`. Ignored by Gemini 2.5 and older. |
 | `commitSage.codestral.model` | `string` | `"codestral-latest"` | Codestral model ID. |
 | `commitSage.mistral.model` | `string` | `"mistral-small-latest"` | Mistral La Plateforme model ID. |
-| `commitSage.openai.model` | `string` | `"gpt-3.5-turbo"` | OpenAI model ID. |
+| `commitSage.openai.model` | `string` | `"gpt-6-luna"` | OpenAI model ID. |
 | `commitSage.openai.baseUrl` | `string` | `"https://api.openai.com/v1"` | OpenAI API base URL, for example an Azure OpenAI endpoint. A URL without a scheme gets `https://`. |
 | `commitSage.ollama.baseUrl` | `string` | `"http://localhost:11434"` | Ollama server URL. |
 | `commitSage.ollama.model` | `string` | `"llama3.2"` | Ollama model name. The model must be installed on the server. |
 | `commitSage.ollama.useAuthToken` | `boolean` | `false` | Sends the auth token set with `Set Ollama Auth Token`. |
 | `commitSage.ollama.numCtx` | `number` | `0` | Context window passed to Ollama as `options.num_ctx`. `0` keeps the model's default. |
-| `commitSage.openrouter.model` | `string` | `"meta-llama/llama-3.3-70b-instruct:free"` | OpenRouter model ID. |
+| `commitSage.openrouter.model` | `string` | `"openrouter/free"` | OpenRouter model ID. |
 | `commitSage.openrouter.preferFreeModels` | `boolean` | `false` | Limits the model picker to free models (`:free` suffix or zero pricing). |
-| `commitSage.groq.model` | `string` | `"llama-3.3-70b-versatile"` | Groq model ID. |
-| `commitSage.anthropic.model` | `string` | `"claude-sonnet-4-5-20250929"` | Anthropic model ID. |
-| `commitSage.deepseek.model` | `string` | `"deepseek-chat"` | DeepSeek model ID. |
-| `commitSage.xai.model` | `string` | `"grok-3-mini"` | xAI model ID. |
+| `commitSage.groq.model` | `string` | `"openai/gpt-oss-20b"` | Groq model ID. |
+| `commitSage.anthropic.model` | `string` | `"claude-haiku-5-5"` | Anthropic model ID. |
+| `commitSage.deepseek.model` | `string` | `"deepseek-flash"` | DeepSeek model ID. |
+| `commitSage.xai.model` | `string` | `"grok-4.3"` | xAI model ID. |
 | `commitSage.custom.baseUrl` | `string` | `"http://localhost:1234/v1"` | Base URL of an OpenAI-compatible `chat/completions` endpoint. |
 | `commitSage.custom.model` | `string` | `""` | Model ID sent to the custom endpoint. |
 | `commitSage.custom.useApiKey` | `boolean` | `false` | Sends the key set with `Set Custom API Key`. |

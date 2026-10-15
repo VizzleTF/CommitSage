@@ -134,12 +134,13 @@ export async function fetchOllamaModels(
 // usable on fresh accounts; inference still gates on credits separately.
 // Keep this list in sync with https://docs.x.ai/docs/models.
 const XAI_KNOWN_MODELS = [
-    'grok-4-1-fast',
-    'grok-4-fast',
-    'grok-4-fast-non-reasoning',
-    'grok-3',
-    'grok-3-mini',
-    'grok-code-fast-1',
+    'grok-4.7',
+    'grok-4.6',
+    'grok-4.5',
+    'grok-4.3',
+    'grok-4.20-0309-reasoning',
+    'grok-4.20-0309-non-reasoning',
+    'grok-build-0.1',
 ];
 
 export async function fetchXaiModels(baseUrl: string, apiKey: string): Promise<string[]> {

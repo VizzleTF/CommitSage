@@ -476,7 +476,7 @@ describe('fetchXaiModels fallback', () => {
 
         const models = await fetchXaiModels('https://api.x.ai/v1', 'test-key');
         expect(models.length).toBeGreaterThan(0);
-        expect(models).toContain('grok-3-mini');
+        expect(models).toContain('grok-4.3');
     });
 
     it('returns live list when /v1/models succeeds', async () => {

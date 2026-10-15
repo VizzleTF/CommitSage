@@ -55,13 +55,13 @@ describe('modelLists static fallbacks', () => {
     it('fetchXaiModels falls back to the static list when the live list is empty', async () => {
         mockedGetJson.mockResolvedValueOnce({ data: [] });
         const result = await fetchXaiModels('https://api.x.ai/v1', 'key');
-        expect(result).toContain('grok-4-fast');
+        expect(result).toContain('grok-4.3');
         expect(result.length).toBeGreaterThan(0);
     });
 
     it('fetchXaiModels falls back to the static list when the request fails', async () => {
         mockedGetJson.mockRejectedValueOnce(new Error('boom'));
-        await expect(fetchXaiModels('https://api.x.ai/v1', 'key')).resolves.toContain('grok-3-mini');
+        await expect(fetchXaiModels('https://api.x.ai/v1', 'key')).resolves.toContain('grok-4.3');
     });
 
     it('fetchCodestralModels returns the static known-models list', () => {

@@ -51,7 +51,7 @@ One key for models from many vendors, routed through `openrouter.ai`.
 - Key: [openrouter.ai/keys](https://openrouter.ai/keys), or press `Sign in with OpenRouter` in the sidebar. The sign-in uses OAuth with PKCE and stores the created key.
 - Commands: `Commit Sage: Set OpenRouter API Key`, `Commit Sage: Sign in to OpenRouter`
 - Settings:
-  - `openrouter.model`: default `meta-llama/llama-3.3-70b-instruct:free`.
+  - `openrouter.model`: default `openrouter/free`, OpenRouter's router that sends each request to one of the free models available at that moment.
   - `openrouter.preferFreeModels`: default `false`. When `true`, the model list shows only free models: IDs ending in `:free` or with zero prompt and completion pricing. In the sidebar this is `Show free models only`.
 
 ## Groq
@@ -60,7 +60,7 @@ Open-weight models served by Groq.
 
 - Key: [console.groq.com/keys](https://console.groq.com/keys)
 - Command: `Commit Sage: Set Groq API Key`
-- Settings: `groq.model`, default `llama-3.3-70b-versatile`.
+- Settings: `groq.model`, default `openai/gpt-oss-20b`.
 
 ## Anthropic Claude
 
@@ -68,7 +68,7 @@ Claude models from the Anthropic API.
 
 - Key: [console.anthropic.com/settings/keys](https://console.anthropic.com/settings/keys)
 - Command: `Commit Sage: Set Anthropic API Key`
-- Settings: `anthropic.model`, default `claude-sonnet-4-5-20250929`.
+- Settings: `anthropic.model`, default `claude-haiku-5-5`.
 
 The model list in the sidebar comes from the Anthropic `/v1/models` endpoint, so it shows the models your key can use.
 
@@ -81,7 +81,7 @@ OpenAI models from the OpenAI API.
 - Key: [platform.openai.com/api-keys](https://platform.openai.com/api-keys)
 - Command: `Commit Sage: Set OpenAI API Key`
 - Settings:
-  - `openai.model`: default `gpt-3.5-turbo`. To pick a current model, press `Refresh` in the sidebar and choose from the list.
+  - `openai.model`: default `gpt-6-luna`.
   - `openai.baseUrl`: default `https://api.openai.com/v1`. Change it for Azure OpenAI or another OpenAI-compatible endpoint.
 
 The model list keeps only IDs that start with `gpt-`, `chatgpt-`, `o1`, `o3` or `o4`. For a self-hosted server, use the Custom provider: it has its own base URL, path and optional key, and leaves the OpenAI settings unchanged.
@@ -92,7 +92,7 @@ DeepSeek models from the DeepSeek API.
 
 - Key: [platform.deepseek.com/api_keys](https://platform.deepseek.com/api_keys)
 - Command: `Commit Sage: Set DeepSeek API Key`
-- Settings: `deepseek.model`, default `deepseek-chat`.
+- Settings: `deepseek.model`, default `deepseek-flash`.
 
 ## xAI Grok
 
@@ -100,9 +100,9 @@ Grok models from the xAI API.
 
 - Key: [console.x.ai](https://console.x.ai/)
 - Command: `Commit Sage: Set xAI API Key`
-- Settings: `xai.model`, default `grok-3-mini`.
+- Settings: `xai.model`, default `grok-4.3`.
 
-If the request to `/v1/models` fails or returns no models, the sidebar shows a built-in list: `grok-4-1-fast`, `grok-4-fast`, `grok-4-fast-non-reasoning`, `grok-3`, `grok-3-mini`, `grok-code-fast-1`. One cause is an account without credits or a license, where xAI rejects the request. Generating a message still needs credits.
+If the request to `/v1/models` fails or returns no models, the sidebar shows a built-in list: `grok-4.7`, `grok-4.6`, `grok-4.5`, `grok-4.3`, `grok-4.20-0309-reasoning`, `grok-4.20-0309-non-reasoning`, `grok-build-0.1`. One cause is an account without credits or a license, where xAI rejects the request. Generating a message still needs credits.
 
 ## Codestral
 

@@ -239,9 +239,17 @@ describe('handleHttpError', () => {
     });
 
     it('default branch with string body uses the string directly', () => {
-        const r = handleHttpError(makeHttpError(404, 'not found'), 'X');
-        expect(r.errorMessage).toContain('404');
-        expect(r.errorMessage).toContain('not found');
+        const r = handleHttpError(makeHttpError(409, 'conflict'), 'X');
+        expect(r.errorMessage).toContain('409');
+        expect(r.errorMessage).toContain('conflict');
+    });
+
+    it('404 points to the model picker and keeps the provider text', () => {
+        const r = handleHttpError(makeHttpError(404, { error: { message: 'model: claude-old' } }), 'X');
+        expect(r.shouldRetry).toBe(false);
+        expect(r.statusCode).toBe(404);
+        expect(r.errorMessage).toBe(`${errorMessages.notFound} (model: claude-old)`);
+        expect(handleHttpError(makeHttpError(404, {}), 'X').errorMessage).toBe(errorMessages.notFound);
     });
 });
 

@@ -192,6 +192,16 @@ function handleHttpStatus(
         }
         case 429:
             return { errorMessage: errorMessages.rateLimitExceeded, shouldRetry: true, statusCode: status };
+        case 404: {
+            // Mostly a retired or mistyped model id (OpenAI `model_not_found`,
+            // Anthropic `not_found_error`); keep the provider's text, it names the model.
+            const text = errorMessage ?? (typeof data === 'string' ? data : '');
+            return {
+                errorMessage: text ? `${errorMessages.notFound} (${text})` : errorMessages.notFound,
+                shouldRetry: false,
+                statusCode: status,
+            };
+        }
         case 422:
             return { errorMessage: errorMessage || errorMessages.invalidRequest, shouldRetry: false, statusCode: status };
         case 500:

@@ -148,14 +148,14 @@ describe('ConfigService.getProvider', () => {
 describe('ConfigService.getModel', () => {
     const cases: Array<[string, string, string]> = [
         ['gemini', 'gemini.model', 'auto'],
-        ['openai', 'openai.model', 'gpt-3.5-turbo'],
+        ['openai', 'openai.model', 'gpt-6-luna'],
         ['codestral', 'codestral.model', 'codestral-latest'],
         ['ollama', 'ollama.model', 'llama3.2'],
-        ['openrouter', 'openrouter.model', 'meta-llama/llama-3.3-70b-instruct:free'],
-        ['groq', 'groq.model', 'llama-3.3-70b-versatile'],
-        ['anthropic', 'anthropic.model', 'claude-sonnet-4-5-20250929'],
-        ['deepseek', 'deepseek.model', 'deepseek-chat'],
-        ['xai', 'xai.model', 'grok-3-mini'],
+        ['openrouter', 'openrouter.model', 'openrouter/free'],
+        ['groq', 'groq.model', 'openai/gpt-oss-20b'],
+        ['anthropic', 'anthropic.model', 'claude-haiku-5-5'],
+        ['deepseek', 'deepseek.model', 'deepseek-flash'],
+        ['xai', 'xai.model', 'grok-4.3'],
         ['custom', 'custom.model', ''],
     ];
 
