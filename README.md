@@ -30,6 +30,8 @@ The message appears in the Source Control input box. Review it and commit.
 
 To steer the message, type a draft in the input box first, for example `fix login for SSO users`. The model keeps its intent and facts and rewrites it in the selected format. A message Commit Sage wrote is not taken as a draft: running it again sends that message as a rejected suggestion, and the model writes a different one. If generation fails or you cancel it, your draft stays in the box.
 
+To turn a mixed change into several commits, run `Commit Sage: Split Changes into Commits` from the Source Control `...` menu. The model groups whole files into logical commits and writes a message for each; Commit Sage shows the plan and commits only after you confirm. A staged file that also has unstaged changes stops the split.
+
 ## Features
 
 - 11 providers: Gemini, OpenRouter, Groq, Anthropic, OpenAI, DeepSeek, xAI, Codestral, Mistral, Ollama and Custom (any OpenAI-compatible endpoint). Setup per provider: [docs/providers.md](docs/providers.md).
@@ -87,6 +89,8 @@ code --install-extension VizzleTF.geminicommit
 Сообщение появится в поле ввода Source Control. Проверьте его и закоммитьте.
 
 Чтобы направить модель, сначала напишите черновик в поле ввода, например `fix login for SSO users`. Модель сохранит его смысл и факты и перепишет в выбранном формате. Сообщение, которое написал сам Commit Sage, черновиком не считается: при повторном запуске оно уходит модели как отклонённый вариант, и она пишет другое. Если генерация завершилась ошибкой или вы её отменили, черновик остаётся в поле.
+
+Чтобы разложить смешанные изменения на несколько коммитов, выполните `Commit Sage: Split Changes into Commits` из меню `...` панели Source Control. Модель группирует файлы целиком в логические коммиты и пишет сообщение для каждого; Commit Sage показывает план и коммитит только после подтверждения. Если у застейдженного файла есть и незастейдженные изменения, разбиение не запускается.
 
 ## Документация
 

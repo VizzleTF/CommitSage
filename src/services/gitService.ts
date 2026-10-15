@@ -28,22 +28,27 @@ export class GitService {
     repoPath: string,
     stageAll: boolean,
     signOff = false,
+    paths?: string[],
   ): Promise<void> {
     try {
+      // With `paths`, only those files are committed (`git commit -- paths`
+      // takes their worktree state), leaving the rest of the index alone.
+      const pathspec = paths ? ['--', ...paths] : [];
+      const literal = paths ? ['--literal-pathspecs'] : [];
       if (stageAll) {
         // `-A` = modified + deleted + untracked, i.e. exactly the set the
         // unstaged diff was built from (the index equals HEAD in this branch).
-        await this.executeGitCommand(['add', '-A'], repoPath);
+        await this.executeGitCommand([...literal, 'add', '-A', ...pathspec], repoPath);
       }
       // Not listFiles: after `add -A` a listing over the output cap must not
       // fail the commit; the count only feeds telemetry.
-      const { stdout } = await this.execGit(['diff', '--cached', '--name-only', '-z'], repoPath);
+      const { stdout } = await this.execGit([...literal, 'diff', '--cached', '--name-only', '-z', ...pathspec], repoPath);
       const fileCount = stdout.split('\0').filter(Boolean).length;
       if (fileCount === 0) {
         throw new NoChangesDetectedError();
       }
 
-      await this.executeGitCommand(['commit', ...(signOff ? ['--signoff'] : []), '-m', message], repoPath);
+      await this.executeGitCommand([...literal, 'commit', ...(signOff ? ['--signoff'] : []), '-m', message, ...pathspec], repoPath);
       Logger.log('Changes committed successfully');
 
       TelemetryService.sendEvent({
@@ -385,11 +390,12 @@ function parseStatus(fields: string[]): ChangedFile[] {
   const files: ChangedFile[] = [];
   for (let i = 0; i < fields.length; i++) {
     const status = fields[i].substring(0, 2);
-    files.push({ path: fields[i].substring(3), status });
-    // With -z a rename/copy record is "XY new\0old\0"; skip the old path.
+    const file: ChangedFile = { path: fields[i].substring(3), status };
+    // With -z a rename/copy record is "XY new\0old\0".
     if (/[RC]/.test(status)) {
-      i++;
+      file.from = fields[++i];
     }
+    files.push(file);
   }
   return files;
 }
@@ -445,6 +451,8 @@ export function toExcludePathspecs(patterns: readonly string[]): string[] {
 interface ChangedFile {
   path: string;
   status: string;
+  /** Old path of a rename or copy. */
+  from?: string;
 }
 
 /**

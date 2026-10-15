@@ -15,6 +15,7 @@ const EXPECTED_COMMANDS = [
     'commitsage.removeOllamaAuthToken',
     'commitsage.createProjectConfig',
     'commitsage.selectGeminiModel',
+    'commitsage.splitCommits',
 ];
 
 const EXPECTED_VIEW_COMMANDS = [

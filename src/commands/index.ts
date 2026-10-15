@@ -29,7 +29,11 @@ export function registerCommands(context: vscode.ExtensionContext, ready: Promis
             ...registerSetApiKeyCommands(),
             registerSelectGeminiModelCommand(),
             ...registerOpenRouterAuthCommands(context),
-            vscode.commands.registerCommand('commitsage.createProjectConfig', createProjectConfig)
+            vscode.commands.registerCommand('commitsage.createProjectConfig', createProjectConfig),
+            vscode.commands.registerCommand('commitsage.splitCommits', async (repository?: vscode.SourceControl) => {
+                await ready;
+                return CommitWorkflow.splitAndCommit(repository);
+            }),
         ];
 
         context.subscriptions.push(...disposables);

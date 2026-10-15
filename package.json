@@ -218,6 +218,12 @@
         "command": "commitsage.selectGeminiModel",
         "title": "%command.selectGeminiModel.title%",
         "category": "%command.category%"
+      },
+      {
+        "command": "commitsage.splitCommits",
+        "title": "%command.splitCommits.title%",
+        "category": "%command.category%",
+        "enablement": "scmProviderRootUri not in commitsage.generatingRepos"
       }
     ],
     "viewsContainers": {
@@ -260,6 +266,14 @@
           "when": "scmProvider == git",
           "command": "commitsage.createProjectConfig",
           "group": "1_config@1"
+        },
+        {
+          "when": "scmProvider == git",
+          "command": "commitsage.splitCommits",
+          "group": "1_config@2",
+          "arguments": [
+            "$scmProvider"
+          ]
         }
       ],
       "commandPalette": [
@@ -270,6 +284,10 @@
         {
           "command": "commitsage.generatingCommitMessage",
           "when": "false"
+        },
+        {
+          "command": "commitsage.splitCommits",
+          "when": "workspaceFolderCount != 0"
         }
       ]
     },

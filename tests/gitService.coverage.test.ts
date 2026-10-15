@@ -84,6 +84,20 @@ describe('GitService.commitChanges', () => {
         expect(calls.some((c) => c[0] === 'commit' && c[2] === 'feat: x')).toBe(true);
     });
 
+    it('commits only the given paths, staging them first in worktree mode', async () => {
+        const calls: string[] = [];
+        installExecGit((args) => {
+            calls.push(args.join(' '));
+            return args.includes('--name-only') ? 'a.txt\0b.txt\0' : '';
+        });
+        await GitService.commitChanges('feat: x', '/repo', true, false, ['a.txt', 'b.txt']);
+        expect(calls).toEqual([
+            '--literal-pathspecs add -A -- a.txt b.txt',
+            '--literal-pathspecs diff --cached --name-only -z -- a.txt b.txt',
+            '--literal-pathspecs commit -m feat: x -- a.txt b.txt',
+        ]);
+    });
+
     it('passes --signoff only when asked', async () => {
         const commits: string[][] = [];
         installExecGit((args) => {
@@ -213,7 +227,7 @@ describe('GitService.getChangedFiles', () => {
         ]);
     });
 
-    it('takes the new path of a rename and skips the old one', async () => {
+    it('takes the new path of a rename and keeps the old one as from', async () => {
         installExecGit((args) => {
             if (args.join(' ') === 'status --porcelain -z') {
                 return 'RM new.txt\0old.txt\0 M other.txt\0';
@@ -221,7 +235,7 @@ describe('GitService.getChangedFiles', () => {
             return '';
         });
         expect(await GitService.getChangedFiles('/repo')).toEqual([
-            { path: 'new.txt', status: 'RM' },
+            { path: 'new.txt', status: 'RM', from: 'old.txt' },
             { path: 'other.txt', status: ' M' },
         ]);
     });

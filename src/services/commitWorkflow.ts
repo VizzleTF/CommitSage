@@ -14,6 +14,10 @@ import { GIT_FANOUT_CONCURRENCY, mapLimit } from '../utils/concurrency';
 import { applyRef, extractRef } from '../utils/refUtils';
 import { RefStore } from './refStore';
 import { providerMeta } from './providerCatalog';
+import { AIServiceFactory } from './aiServiceFactory';
+import { generateSplitPrompt, parseSplitPlan } from './commitSplitter';
+import { blockPath, resolveMaxDiffLength, splitIntoFileBlocks, truncateDiff } from '../utils/diffTruncation';
+import { redactDiffSecrets } from '../utils/errorUtils';
 
 const MAX_API_KEY_RETRIES = 3;
 
@@ -92,6 +96,152 @@ export class CommitWorkflow {
             });
             await this.handleError(err);
         }
+    }
+
+    /**
+     * Groups the changed files into logical commits with the model, writes a
+     * message for each group and, once the developer confirms the plan,
+     * commits the groups one after another.
+     */
+    static async splitAndCommit(sourceControlRepository?: vscode.SourceControl): Promise<void> {
+        let runKey: string | undefined;
+        try {
+            if (!vscode.workspace.workspaceFolders) {
+                throw new Error('No workspace folder is open');
+            }
+            const repository = await GitRepositoryProvider.getActiveRepository(sourceControlRepository);
+            const repoKey = repository.rootUri?.toString() ?? '';
+            if (this.running.has(repoKey)) {
+                void vscode.window.showInformationMessage(vscode.l10n.t(
+                    'Commit Sage is already generating a message for this repository.',
+                ));
+                return;
+            }
+            runKey = repoKey;
+            this.setRunning(runKey, true);
+
+            const provider = ConfigService.getProvider();
+            if (ApiKeyManager.requiresKeyForCurrentConfig(provider)) {
+                await ApiKeyManager.getKey(provider);
+            }
+            const ref = await this.resolveRef(repository);
+            const plan = await vscode.window.withProgress({
+                location: vscode.ProgressLocation.Notification,
+                title: vscode.l10n.t('Commit Sage'),
+                cancellable: true,
+            }, async (progress, token) => {
+                const controller = new AbortController();
+                const subscription = token.onCancellationRequested(() => controller.abort());
+                try {
+                    return await this.planSplit(progress, repository, controller.signal);
+                } catch (error) {
+                    throw controller.signal.aborted ? new UserCancelledError() : error;
+                } finally {
+                    subscription.dispose();
+                }
+            });
+            if (plan) {
+                await this.commitSplit(plan, repository, ref);
+            }
+        } catch (error: unknown) {
+            if (error instanceof UserCancelledError) {
+                Logger.log('Operation cancelled by user');
+                return;
+            }
+            await this.handleError(toError(error));
+        } finally {
+            if (runKey !== undefined) {
+                this.setRunning(runKey, false);
+            }
+        }
+    }
+
+    /** The groups and their messages, or undefined when there is nothing to split. */
+    private static async planSplit(
+        progress: vscode.Progress<{ message?: string; increment?: number }>,
+        repository: vscode.SourceControl,
+        signal: AbortSignal,
+    ): Promise<{ groups: Array<{ paths: string[]; message: CommitMessage }>; staged: boolean } | undefined> {
+        progress.report({ message: vscode.l10n.t('Analyzing changes…') });
+        const repoPath = repository.rootUri?.fsPath;
+        if (!repoPath) {
+            throw new Error('No Git repository found');
+        }
+        const files = await GitService.getChangedFiles(repoPath, signal);
+        const staged = ConfigService.get('commit.onlyStagedChanges') || files.some(file => isIndexStaged(file.status));
+        const candidates = staged ? files.filter(file => isIndexStaged(file.status)) : files;
+        // `git commit -- <path>` takes the worktree state, so it would also
+        // commit the unstaged part of a partly staged file.
+        if (staged && candidates.some(file => file.status[1] !== ' ')) {
+            throw new Error(vscode.l10n.t('Some staged files also have unstaged changes. Stage or stash them before splitting.'));
+        }
+        if (candidates.length < 2) {
+            void vscode.window.showInformationMessage(vscode.l10n.t('Only one file changed, so there is nothing to split.'));
+            return undefined;
+        }
+
+        const excluded = await GitService.getExcludedPaths(repoPath, signal);
+        const diff = redactDiffSecrets(await GitService.getDiff(repoPath, staged, signal, excluded));
+        const paths = candidates.map(file => file.path);
+        const provider = ConfigService.getProvider();
+        const prompt = generateSplitPrompt(paths, truncateDiff(diff, resolveMaxDiffLength(ConfigService.get('general.maxDiffSize'))));
+        progress.report({ message: vscode.l10n.t('Grouping changes…') });
+        let plan = parseSplitPlan((await AIServiceFactory.generateCommitMessage(provider, prompt, progress, { signal })).message, paths);
+        if (!('groups' in plan)) {
+            const correction = `\n\nYour previous reply was invalid. Missing files: ${plan.missing.join(', ') || 'none'}. `
+                + `Unknown or repeated files: ${plan.unknown.join(', ') || 'none'}. Reply again with every file exactly once.`;
+            plan = parseSplitPlan((await AIServiceFactory.generateCommitMessage(provider, prompt + correction, progress, { signal })).message, paths);
+        }
+        if (!('groups' in plan)) {
+            throw new Error(vscode.l10n.t('The model did not return a valid commit plan. Try again or use a stronger model.'));
+        }
+
+        const byPath = new Map(candidates.map(file => [file.path, file]));
+        const blocks = splitIntoFileBlocks(diff);
+        const groups: Array<{ paths: string[]; message: CommitMessage }> = [];
+        for (const [i, group] of plan.groups.entries()) {
+            progress.report({ message: vscode.l10n.t('Writing commit message {0} of {1}…', i + 1, plan.groups.length) });
+            // A rename is committed with its old path, so the deletion goes along.
+            const own = group.flatMap(path => [path, byPath.get(path)?.from ?? []].flat());
+            const groupDiff = blocks.filter(block => own.includes(blockPath(block))).join('');
+            const message = await AIService.generateCommitMessage(repoPath, groupDiff || group.join('\n'), '', progress, {
+                fileCount: group.length,
+                onlyStagedChanges: staged,
+                signal,
+            });
+            groups.push({ paths: own, message });
+        }
+        return { groups, staged };
+    }
+
+    private static async commitSplit(
+        plan: { groups: Array<{ paths: string[]; message: CommitMessage }>; staged: boolean },
+        repository: vscode.SourceControl,
+        ref: string,
+    ): Promise<void> {
+        const placement = ConfigService.get('commit.refs.placement');
+        const messages = plan.groups.map(group => applyRef(group.message.message, ref, placement));
+        const commit = vscode.l10n.t('Commit');
+        const answer = await vscode.window.showInformationMessage(
+            vscode.l10n.t('Create {0} commits?', plan.groups.length),
+            {
+                modal: true,
+                detail: plan.groups.map((group, i) => `${i + 1}. ${messages[i].split('\n')[0]}\n    ${group.paths.join(', ')}`).join('\n'),
+            },
+            commit,
+        );
+        if (answer !== commit) {
+            throw new UserCancelledError();
+        }
+        const repoPath = repository.rootUri?.fsPath ?? '';
+        for (const [i, group] of plan.groups.entries()) {
+            try {
+                await GitService.commitChanges(messages[i], repoPath, !plan.staged, group.message.signOff === true, group.paths);
+            } catch (error) {
+                throw new Error(vscode.l10n.t('Created {0} of {1} commits. {2}', i, plan.groups.length, toError(error).message), { cause: error });
+            }
+        }
+        void vscode.window.showInformationMessage(vscode.l10n.t('Created {0} commits.', plan.groups.length));
     }
 
     private static setRunning(runKey: string, running: boolean): void {
