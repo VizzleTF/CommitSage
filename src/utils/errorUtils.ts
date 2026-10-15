@@ -35,6 +35,13 @@ const TOKEN_PATTERN = new RegExp([
     // `sk-` + 32 alphanumerics (legacy OpenAI, DeepSeek).
     String.raw`\bsk-(?:proj|svcacct|admin)-[\w-]{20,300}`,
     String.raw`\bsk-[a-zA-Z0-9]{32,300}`,
+    // Not in gitleaks: keys of providers this extension calls, by their
+    // documented prefix (OpenRouter `sk-or-v1-`, Groq `gsk_`, xAI `xai-`).
+    String.raw`\bsk-or-v1-[\w-]{20,300}`,
+    String.raw`\bgsk_[a-zA-Z0-9]{20,300}`,
+    String.raw`\bxai-[a-zA-Z0-9]{20,300}`,
+    String.raw`\bhf_[a-zA-Z]{34}\b`, // huggingface-access-token
+    String.raw`\bnpm_[a-zA-Z0-9]{36}\b`, // npm-access-token
     String.raw`\bey[a-zA-Z0-9]{17,}\.ey[\w/\\-]{17,}\.(?:[\w/\\-]{10,}={0,2})?`, // jwt
 ].join('|'), 'g');
 

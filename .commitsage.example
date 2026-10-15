@@ -19,7 +19,7 @@
     "model": "codestral-latest"
   },
   "openai": {
-    "model": "gpt-3.5-turbo",
+    "model": "gpt-6-luna",
     "baseUrl": "https://api.openai.com/v1"
   },
   "ollama": {

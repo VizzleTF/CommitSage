@@ -83,6 +83,7 @@ exports/
 
 - AWS access key IDs; GitHub (`ghp_`, `gho_`, `ghu_`, `ghs_`, `ghr_`, `github_pat_`), GitLab (`glpat-`) and Slack (`xox…-`, `xapp-`) tokens.
 - Stripe (`sk_live_`, `rk_live_` and test keys), Google API (`AIza…`), OpenAI (`sk-…`, `sk-proj-…`) and Anthropic (`sk-ant-…`) keys.
+- OpenRouter (`sk-or-v1-…`), Groq (`gsk_…`) and xAI (`xai-…`) keys, which gitleaks does not cover; Hugging Face (`hf_…`) and npm (`npm_…`) tokens.
 - Private key blocks (`-----BEGIN … PRIVATE KEY-----`), JWTs, `Authorization` and `Bearer` header values.
 - Quoted values of 8 or more characters assigned to a name ending in `password`, `secret`, `token`, `api_key` and similar, such as `db_password = "…"`.
 

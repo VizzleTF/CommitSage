@@ -131,6 +131,11 @@ describe('redactDiffSecrets', () => {
         ['anthropic-api-key', `sk-ant-api03-${'x1Y2'.repeat(24)}AA`],
         ['openai-api-key (project)', `sk-proj-${'a1B2c3'.repeat(10)}`],
         ['openai-api-key (legacy)', `sk-${'a1B2'.repeat(12)}`],
+        ['openrouter-api-key', `sk-or-v1-${'0a1b2c3d'.repeat(8)}`],
+        ['groq-api-key', `gsk_${'a1B2'.repeat(13)}`],
+        ['xai-api-key', `xai-${'a1B2'.repeat(20)}`],
+        ['huggingface-access-token', `hf_${'aBcD'.repeat(8)}ef`],
+        ['npm-access-token', `npm_${'a1B2'.repeat(9)}`],
         ['jwt', `eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.${'dozjgNryP4J3jVmNHl0w5N_'.repeat(2)}`],
     ];
 
