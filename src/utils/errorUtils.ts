@@ -124,11 +124,59 @@ export function redactSecrets(text: string): string {
     return redactApiSecrets(text.replace(PATH_PATTERN, '<path>'));
 }
 
-export function sanitizeErrorForTelemetry(error: Error): { error: string; errorType: string } {
+/** Coarse error class sent to telemetry instead of the message. */
+export type ErrorCategory =
+    | 'auth' | 'rate_limit' | 'network' | 'timeout' | 'server' | 'http' | 'git' | 'cancelled' | 'other';
+
+const CATEGORY_BY_NAME = new Map<string, ErrorCategory>([
+    ['UserCancelledError', 'cancelled'],
+    ['AbortError', 'cancelled'],
+    ['ApiKeyInvalidError', 'auth'],
+    ['NetworkError', 'network'],
+    ['TimeoutError', 'timeout'],
+    ['GitTimeoutError', 'timeout'],
+    ['GitCommandError', 'git'],
+]);
+
+function httpCategory(status: number): ErrorCategory {
+    if (status === 401 || status === 403) {
+        return 'auth';
+    }
+    if (status === 429) {
+        return 'rate_limit';
+    }
+    return status >= 500 ? 'server' : 'http';
+}
+
+/**
+ * Walks the `cause` chain, where the deepest known error wins: the retry
+ * wrapper hides an HttpError, a NetworkError hides the fetch TimeoutError.
+ * Matches `name`, not classes, so this module imports nothing.
+ */
+export function categorizeError(error: Error): ErrorCategory {
+    let category: ErrorCategory = 'other';
+    let current: unknown = error;
+    for (let depth = 0; depth < 5 && current && typeof current === 'object'; depth++) {
+        const { name, status, cause } = current as { name?: unknown; status?: unknown; cause?: unknown };
+        if (name === 'HttpError' && typeof status === 'number') {
+            category = httpCategory(status);
+        } else if (typeof name === 'string') {
+            category = CATEGORY_BY_NAME.get(name) ?? category;
+        }
+        current = cause;
+    }
+    return category;
+}
+
+/**
+ * Never the message: it can quote git stderr (hook output, remote URLs,
+ * branch names) or a provider's reply.
+ */
+export function sanitizeErrorForTelemetry(error: Error): { errorType: string; errorCategory: ErrorCategory } {
     return {
-        error: redactSecrets(error.message),
         // Not `constructor.name`: the production bundle is minified, so class
         // names come out as `At` / `_r`. Every custom error sets `name`.
         errorType: error.name,
+        errorCategory: categorizeError(error),
     };
 }

@@ -3,7 +3,7 @@ import * as amplitude from '@amplitude/analytics-node';
 import { Logger } from '../utils/logger';
 import { ConfigService } from '../utils/configService';
 import { AMPLITUDE_API_KEY } from '../constants/apiKeys';
-import { redactSecrets } from '../utils/errorUtils';
+import { categorizeError, ErrorCategory, redactSecrets } from '../utils/errorUtils';
 
 const FLUSH_QUEUE_SIZE = 30;
 const FLUSH_INTERVAL_MS = 30_000;
@@ -13,19 +13,12 @@ type TelemetryEvent =
     | { name: 'extension_deactivated' }
     | { name: 'message_generation_started'; diffSize: number; fileCount: number; truncated: boolean; provider: string; model: string }
     | { name: 'message_generation_completed'; provider: string; model: string; durationMs: number; language: string; onlyStagedChanges: boolean }
-    | { name: 'message_generation_failed'; provider: string; model: string; error: string; errorType: string }
+    | { name: 'message_generation_failed'; provider: string; model: string; errorType: string; errorCategory: ErrorCategory }
     | { name: 'commit_completed'; fileCount: number; messageLength: number }
-    | { name: 'commit_failed'; error: string; errorType: string }
+    | { name: 'commit_failed'; errorType: string; errorCategory: ErrorCategory }
     | { name: 'settings_changed'; setting: string }
     | { name: 'push_completed' }
-    | { name: 'push_failed'; error: string; errorType: string };
-
-interface TelemetryEventProperties {
-    vsCodeVersion: string;
-    extensionVersion: string | undefined;
-    platform: string;
-    [key: string]: unknown;
-}
+    | { name: 'push_failed'; errorType: string; errorCategory: ErrorCategory };
 
 /**
  * Bridges VSCode's TelemetryLogger to Amplitude. The logger handles VSCode's
@@ -49,14 +42,17 @@ class AmplitudeTelemetrySender implements vscode.TelemetrySender {
     }
 
     sendErrorData(error: Error, data?: Record<string, unknown>): void {
-        // Called by `TelemetryLogger.logError(error, data)` — including for
-        // unhandled errors the logger auto-captures, whose message/stack can
-        // contain API keys, bearer tokens, or file paths. Redact before send.
+        // Called by `TelemetryLogger.logError(error, data)`, including for
+        // unhandled errors the logger auto-captures. The message (and the stack
+        // lines that repeat it) can quote git stderr or a provider reply, so
+        // only the name, a category and the redacted `at …` frames are sent.
         const eventName = typeof data?.name === 'string' ? data.name : 'extension_error';
+        const frames = error.stack?.split('\n').filter(line => /^\s+at /.test(line)).join('\n');
         this.sendEventData(eventName, {
             ...data,
-            errorMessage: redactSecrets(error.message),
-            errorStack: error.stack ? redactSecrets(error.stack) : undefined,
+            errorType: error.name,
+            errorCategory: categorizeError(error),
+            errorStack: frames ? redactSecrets(frames) : undefined,
         });
     }
 }
@@ -65,7 +61,6 @@ export class TelemetryService {
     private static disposables: vscode.Disposable[] = [];
     private static logger: vscode.TelemetryLogger | null = null;
     private static initialized: boolean = false;
-    private static extensionVersion: string | undefined;
 
     static async initialize(context: vscode.ExtensionContext): Promise<void> {
         Logger.log('Initializing telemetry service');
@@ -75,8 +70,6 @@ export class TelemetryService {
                 Logger.error('Amplitude API key not found');
                 return;
             }
-
-            this.extensionVersion = context.extension.packageJSON.version as string | undefined;
 
             // Amplitude SDK handles batching/retry/periodic flush. We `track()`
             // and `flush()` on shutdown.
@@ -92,7 +85,16 @@ export class TelemetryService {
             // VSCode's TelemetryLogger natively respects `isTelemetryEnabled`
             // and the user's per-extension toggle, mirrors events into the
             // telemetry output channel for transparency, and sanitizes PII.
-            this.logger = vscode.env.createTelemetryLogger(new AmplitudeTelemetrySender());
+            // The built-in common properties carry machine, session and SQM ids,
+            // so only the three documented ones are added, to every event.
+            this.logger = vscode.env.createTelemetryLogger(new AmplitudeTelemetrySender(), {
+                ignoreBuiltInCommonProperties: true,
+                additionalCommonProperties: {
+                    vsCodeVersion: vscode.version,
+                    extensionVersion: context.extension.packageJSON.version as string | undefined,
+                    platform: process.platform,
+                },
+            });
 
             this.initialized = true;
             Logger.log('Telemetry service initialized');
@@ -132,15 +134,7 @@ export class TelemetryService {
         }
 
         const { name, ...eventProps } = event;
-
-        const properties: TelemetryEventProperties = {
-            vsCodeVersion: vscode.version,
-            extensionVersion: this.extensionVersion,
-            platform: process.platform,
-            ...eventProps,
-        };
-
-        this.logger.logUsage(name, properties);
+        this.logger.logUsage(name, eventProps);
     }
 
     private static handleConfigChange(event: vscode.ConfigurationChangeEvent): void {

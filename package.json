@@ -47,6 +47,7 @@
     "walkthroughs/*.md",
     "l10n/bundle.l10n.json",
     "package.nls.json",
+    "telemetry.json",
     "LICENSE"
   ],
   "capabilities": {
@@ -725,6 +726,10 @@
           "type": "boolean",
           "default": true,
           "description": "Enable telemetry for Commit Sage",
+          "tags": [
+            "telemetry",
+            "usesOnlineServices"
+          ],
           "order": 22
         },
         "commitSage.general.maxOutputTokens": {

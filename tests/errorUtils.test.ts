@@ -1,5 +1,7 @@
 import { describe, it, expect } from 'vitest';
-import { redactDiffSecrets, sanitizeErrorForTelemetry, toError } from '../src/utils/errorUtils';
+import { categorizeError, redactDiffSecrets, redactSecrets, sanitizeErrorForTelemetry, toError } from '../src/utils/errorUtils';
+import { HttpError, NetworkError } from '../src/utils/httpUtils';
+import { ApiKeyInvalidError, GitCommandError, GitTimeoutError, UserCancelledError } from '../src/models/errors';
 
 describe('toError', () => {
     it('passes Error instances through', () => {
@@ -14,32 +16,32 @@ describe('toError', () => {
     });
 });
 
-describe('sanitizeErrorForTelemetry', () => {
+describe('redactSecrets', () => {
     it('redacts file paths', () => {
         const e = new Error('failed at /Users/jane/proj/src/foo.ts:23');
-        expect(sanitizeErrorForTelemetry(e).error).toContain('<path>');
-        expect(sanitizeErrorForTelemetry(e).error).not.toContain('/Users/jane');
+        expect(redactSecrets(e.message)).toContain('<path>');
+        expect(redactSecrets(e.message)).not.toContain('/Users/jane');
     });
 
     it('redacts ?key= URL secrets', () => {
         const e = new Error(
             'GET https://generativelanguage.googleapis.com/v1/models?key=AIzaSyABCDEFG failed'
         );
-        const out = sanitizeErrorForTelemetry(e).error;
+        const out = redactSecrets(e.message);
         expect(out).toContain('key=<redacted>');
         expect(out).not.toContain('AIzaSyABCDEFG');
     });
 
     it('redacts &key= URL secrets', () => {
         const e = new Error('foo?bar=1&key=AIzaSyABCDEFG&baz=2');
-        const out = sanitizeErrorForTelemetry(e).error;
+        const out = redactSecrets(e.message);
         expect(out).toContain('key=<redacted>');
         expect(out).not.toContain('AIzaSyABCDEFG');
     });
 
     it('redacts Bearer tokens (header form)', () => {
         const e = new Error('Authorization: Bearer sk-abc123XYZ failed');
-        const out = sanitizeErrorForTelemetry(e).error;
+        const out = redactSecrets(e.message);
         // Either Authorization or Bearer redaction may match first; key
         // requirement is that the secret itself never appears.
         expect(out).not.toContain('sk-abc123XYZ');
@@ -48,16 +50,23 @@ describe('sanitizeErrorForTelemetry', () => {
 
     it('redacts standalone Bearer token', () => {
         const e = new Error('got Bearer abc.def-ghi back');
-        const out = sanitizeErrorForTelemetry(e).error;
+        const out = redactSecrets(e.message);
         expect(out).toContain('Bearer <redacted>');
         expect(out).not.toContain('abc.def-ghi');
     });
 
     it('redacts x-goog-api-key header strings', () => {
         const e = new Error('x-goog-api-key: AIzaSyABCDEFG');
-        const out = sanitizeErrorForTelemetry(e).error;
+        const out = redactSecrets(e.message);
         expect(out).toContain('x-goog-api-key: <redacted>');
         expect(out).not.toContain('AIzaSyABCDEFG');
+    });
+});
+
+describe('sanitizeErrorForTelemetry', () => {
+    it('sends the name and a category, never the message', () => {
+        const out = sanitizeErrorForTelemetry(new GitCommandError('Git command failed with code 1: lint-staged: const key = 1'));
+        expect(out).toEqual({ errorType: 'GitCommandError', errorCategory: 'git' });
     });
 
     it('takes errorType from error.name, which survives minification', () => {
@@ -74,8 +83,37 @@ describe('sanitizeErrorForTelemetry', () => {
 describe('redactApiSecrets on known token formats', () => {
     it('masks a GitHub token inside an error message', () => {
         const token = `ghp_${'a1B2'.repeat(9)}`;
-        const out = sanitizeErrorForTelemetry(new Error(`push rejected for ${token}`)).error;
+        const out = redactSecrets(`push rejected for ${token}`);
         expect(out).toBe('push rejected for <redacted>');
+    });
+});
+
+describe('categorizeError', () => {
+    const wrap = (cause: unknown) => new Error('Failed to generate commit message: x', { cause });
+    const timeout = Object.assign(new Error('aborted'), { name: 'TimeoutError' });
+
+    it.each([
+        ['an invalid API key', new ApiKeyInvalidError('OpenAI'), 'auth'],
+        ['a wrapped 401', wrap(new HttpError(401, {})), 'auth'],
+        ['a wrapped 403', wrap(new HttpError(403, {})), 'auth'],
+        ['a wrapped 429', wrap(new HttpError(429, {})), 'rate_limit'],
+        ['a wrapped 503', wrap(new HttpError(503, {})), 'server'],
+        ['a wrapped 404', wrap(new HttpError(404, {})), 'http'],
+        ['a wrapped network failure', wrap(new NetworkError('ECONNREFUSED', new TypeError('fetch failed'))), 'network'],
+        ['a fetch timeout under a network error', wrap(new NetworkError('Request timed out.', timeout)), 'timeout'],
+        ['a git failure', new GitCommandError('Git command failed with code 1: hook output'), 'git'],
+        ['a git timeout', new GitTimeoutError('Git command timed out after 30s'), 'timeout'],
+        ['a cancellation', new UserCancelledError(), 'cancelled'],
+        ['a plain error', new Error('Repository has no configured remotes'), 'other'],
+    ] as const)('maps %s to %s', (_what, error, category) => {
+        expect(categorizeError(error)).toBe(category);
+    });
+
+    it('stops on a cause cycle', () => {
+        const a = new Error('a');
+        const b = new Error('b', { cause: a });
+        Object.assign(a, { cause: b });
+        expect(categorizeError(a)).toBe('other');
     });
 });
 

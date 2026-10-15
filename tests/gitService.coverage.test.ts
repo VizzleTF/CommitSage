@@ -366,6 +366,7 @@ describe('GitService.execGit (spawn machinery)', () => {
         child.stderr.emit('data', Buffer.from('fatal: bad'));
         child.emit('close', 2, null);
         await expect(p).rejects.toThrow(/Git command failed with code 2: fatal: bad/);
+        await expect(p).rejects.toMatchObject({ name: 'GitCommandError' });
     });
 
     it('resolves a non-zero exit when allowNonZeroExit is set', async () => {
@@ -385,6 +386,7 @@ describe('GitService.execGit (spawn machinery)', () => {
         const p = execGit(['fetch'], '/repo');
         child.emit('close', null, 'SIGTERM');
         await expect(p).rejects.toThrow(/timed out after/);
+        await expect(p).rejects.toMatchObject({ name: 'GitTimeoutError' });
     });
 
     it('raises the stdout cap to options.maxBuffer', async () => {

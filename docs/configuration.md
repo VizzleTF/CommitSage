@@ -120,7 +120,7 @@ Each key applies only when `commitSage.provider.type` selects that provider.
 
 | Setting | Type | Default | Description |
 |---|---|---|---|
-| `commitSage.telemetry.enabled` | `boolean` | `true` | Sends anonymous usage telemetry. `false` in user settings, workspace settings or the project config turns it off; a workspace or project `true` does not override a user `false`. Details: [telemetry.md](telemetry.md). |
+| `commitSage.telemetry.enabled` | `boolean` | `true` | Sends pseudonymous usage telemetry. `false` in user settings, workspace settings or the project config turns it off; a workspace or project `true` does not override a user `false`. Details: [telemetry.md](telemetry.md). |
 
 ## Commands
 

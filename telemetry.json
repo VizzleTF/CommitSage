@@ -1,0 +1,195 @@
+{
+  "events": {
+    "VizzleTF.geminicommit/extension_activated": {
+      "owner": "VizzleTF",
+      "comment": "The extension starts."
+    },
+    "VizzleTF.geminicommit/extension_deactivated": {
+      "owner": "VizzleTF",
+      "comment": "VS Code closes or the extension is disabled."
+    },
+    "VizzleTF.geminicommit/message_generation_started": {
+      "owner": "VizzleTF",
+      "comment": "Commit message generation begins.",
+      "provider": {
+        "classification": "SystemMetaData",
+        "purpose": "FeatureInsight",
+        "comment": "Value of commitSage.provider.type."
+      },
+      "model": {
+        "classification": "SystemMetaData",
+        "purpose": "FeatureInsight",
+        "comment": "Configured model ID."
+      },
+      "diffSize": {
+        "classification": "SystemMetaData",
+        "purpose": "PerformanceAndHealth",
+        "comment": "Diff length in characters, before truncation.",
+        "isMeasurement": true
+      },
+      "fileCount": {
+        "classification": "SystemMetaData",
+        "purpose": "FeatureInsight",
+        "comment": "Number of changed files analyzed.",
+        "isMeasurement": true
+      },
+      "truncated": {
+        "classification": "SystemMetaData",
+        "purpose": "PerformanceAndHealth",
+        "comment": "True when the diff is longer than commitSage.general.maxDiffSize."
+      }
+    },
+    "VizzleTF.geminicommit/message_generation_completed": {
+      "owner": "VizzleTF",
+      "comment": "The provider returned a commit message.",
+      "provider": {
+        "classification": "SystemMetaData",
+        "purpose": "FeatureInsight",
+        "comment": "Value of commitSage.provider.type."
+      },
+      "model": {
+        "classification": "SystemMetaData",
+        "purpose": "FeatureInsight",
+        "comment": "Model that produced the message."
+      },
+      "durationMs": {
+        "classification": "SystemMetaData",
+        "purpose": "PerformanceAndHealth",
+        "comment": "Milliseconds from the start of generation to the result.",
+        "isMeasurement": true
+      },
+      "language": {
+        "classification": "SystemMetaData",
+        "purpose": "FeatureInsight",
+        "comment": "Value of commitSage.commit.commitLanguage."
+      },
+      "onlyStagedChanges": {
+        "classification": "SystemMetaData",
+        "purpose": "FeatureInsight",
+        "comment": "True when only staged changes were analyzed."
+      }
+    },
+    "VizzleTF.geminicommit/message_generation_failed": {
+      "owner": "VizzleTF",
+      "comment": "Generation failed, except for an invalid API key and a cancellation.",
+      "provider": {
+        "classification": "SystemMetaData",
+        "purpose": "FeatureInsight",
+        "comment": "Value of commitSage.provider.type."
+      },
+      "model": {
+        "classification": "SystemMetaData",
+        "purpose": "FeatureInsight",
+        "comment": "Configured model ID."
+      },
+      "errorType": {
+        "classification": "SystemMetaData",
+        "purpose": "PerformanceAndHealth",
+        "comment": "error.name of the failure, for example GitCommandError or HttpError. The error message is never sent."
+      },
+      "errorCategory": {
+        "classification": "SystemMetaData",
+        "purpose": "PerformanceAndHealth",
+        "comment": "Coarse failure class: auth, rate_limit, network, timeout, server, http, git, cancelled or other."
+      }
+    },
+    "VizzleTF.geminicommit/commit_completed": {
+      "owner": "VizzleTF",
+      "comment": "Auto-commit ran git commit successfully.",
+      "fileCount": {
+        "classification": "SystemMetaData",
+        "purpose": "FeatureInsight",
+        "comment": "Number of files in the commit.",
+        "isMeasurement": true
+      },
+      "messageLength": {
+        "classification": "SystemMetaData",
+        "purpose": "FeatureInsight",
+        "comment": "Commit message length in characters.",
+        "isMeasurement": true
+      }
+    },
+    "VizzleTF.geminicommit/commit_failed": {
+      "owner": "VizzleTF",
+      "comment": "Auto-commit failed.",
+      "errorType": {
+        "classification": "SystemMetaData",
+        "purpose": "PerformanceAndHealth",
+        "comment": "error.name of the failure, for example GitCommandError or HttpError. The error message is never sent."
+      },
+      "errorCategory": {
+        "classification": "SystemMetaData",
+        "purpose": "PerformanceAndHealth",
+        "comment": "Coarse failure class: auth, rate_limit, network, timeout, server, http, git, cancelled or other."
+      }
+    },
+    "VizzleTF.geminicommit/push_completed": {
+      "owner": "VizzleTF",
+      "comment": "Auto-push ran git push successfully."
+    },
+    "VizzleTF.geminicommit/push_failed": {
+      "owner": "VizzleTF",
+      "comment": "Auto-push failed.",
+      "errorType": {
+        "classification": "SystemMetaData",
+        "purpose": "PerformanceAndHealth",
+        "comment": "error.name of the failure, for example GitCommandError or HttpError. The error message is never sent."
+      },
+      "errorCategory": {
+        "classification": "SystemMetaData",
+        "purpose": "PerformanceAndHealth",
+        "comment": "Coarse failure class: auth, rate_limit, network, timeout, server, http, git, cancelled or other."
+      }
+    },
+    "VizzleTF.geminicommit/settings_changed": {
+      "owner": "VizzleTF",
+      "comment": "A commitSage.* setting changed in VS Code settings.",
+      "setting": {
+        "classification": "SystemMetaData",
+        "purpose": "FeatureInsight",
+        "comment": "Setting name without the commitSage. prefix, for example commit.commitFormat."
+      }
+    },
+    "extension_error": {
+      "owner": "VizzleTF",
+      "comment": "An unhandled error in Commit Sage code reached the VS Code telemetry logger.",
+      "errorType": {
+        "classification": "SystemMetaData",
+        "purpose": "PerformanceAndHealth",
+        "comment": "error.name of the failure, for example GitCommandError or HttpError. The error message is never sent."
+      },
+      "errorCategory": {
+        "classification": "SystemMetaData",
+        "purpose": "PerformanceAndHealth",
+        "comment": "Coarse failure class: auth, rate_limit, network, timeout, server, http, git, cancelled or other."
+      },
+      "errorStack": {
+        "classification": "CallstackOrException",
+        "purpose": "PerformanceAndHealth",
+        "comment": "Stack frames only (the lines that start with \"at\"), file paths replaced with <path>, secrets redacted."
+      }
+    }
+  },
+  "commonProperties": {
+    "vsCodeVersion": {
+      "classification": "SystemMetaData",
+      "purpose": "PerformanceAndHealth",
+      "comment": "VS Code version."
+    },
+    "extensionVersion": {
+      "classification": "SystemMetaData",
+      "purpose": "PerformanceAndHealth",
+      "comment": "Commit Sage version."
+    },
+    "platform": {
+      "classification": "SystemMetaData",
+      "purpose": "PerformanceAndHealth",
+      "comment": "Operating system (process.platform)."
+    },
+    "device_id": {
+      "classification": "EndUserPseudonymizedInformation",
+      "purpose": "FeatureInsight",
+      "comment": "vscode.env.machineId, sent as the Amplitude device ID, not as an event property."
+    }
+  }
+}

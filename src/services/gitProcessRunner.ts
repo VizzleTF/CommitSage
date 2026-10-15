@@ -4,6 +4,7 @@ import { spawn } from 'node:child_process';
 import { Logger } from '../utils/logger';
 import { ConfigService } from '../utils/configService';
 import { buildGitEnv } from '../utils/gitEnv';
+import { GitCommandError, GitTimeoutError } from '../models/errors';
 
 // Resolve git to an absolute path instead of letting `spawn` walk $PATH at
 // launch time. Prefer VS Code's own `git.path` setting, then the bundled git
@@ -168,7 +169,7 @@ export class GitProcessRunner {
         if (signal === 'SIGTERM' || signal === 'SIGKILL') {
           // Likely killed by the spawn `timeout` option
           reject(
-            new Error(
+            new GitTimeoutError(
               `Git command timed out after ${timeoutSeconds}s: git ${args.find((a) => !a.startsWith('-')) ?? ''}. Increase commitSage.gitTimeout if this is a slow operation.`,
             ),
           );
@@ -179,7 +180,7 @@ export class GitProcessRunner {
           resolve({ stdout, stderr, exitCode });
         } else {
           reject(
-            new Error(`Git command failed with code ${code}: ${stderr}`),
+            new GitCommandError(`Git command failed with code ${code}: ${stderr}`),
           );
         }
       });

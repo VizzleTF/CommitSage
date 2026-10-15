@@ -36,7 +36,8 @@ export class RetryUtils {
         const { errorMessage, shouldRetry } = errorHandler(error);
 
         if (!shouldRetry || attempt >= MAX_RETRIES) {
-            throw new Error(`Failed to generate commit message: ${errorMessage}`);
+            // The cause keeps the HttpError/NetworkError for the telemetry category.
+            throw new Error(`Failed to generate commit message: ${errorMessage}`, { cause: error });
         }
 
         const delayMs = this.calculateRetryDelay(attempt);

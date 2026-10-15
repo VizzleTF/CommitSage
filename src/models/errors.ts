@@ -68,3 +68,18 @@ export class TruncatedResponseError extends Error {
         this.name = 'TruncatedResponseError';
     }
 }
+/** A git command exited non-zero. The message quotes git's stderr, so telemetry sends only the name. */
+export class GitCommandError extends Error {
+    constructor(message: string) {
+        super(message);
+        this.name = 'GitCommandError';
+    }
+}
+
+/** A git command ran longer than `commitSage.gitTimeout`. */
+export class GitTimeoutError extends Error {
+    constructor(message: string) {
+        super(message);
+        this.name = 'GitTimeoutError';
+    }
+}

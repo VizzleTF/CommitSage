@@ -66,9 +66,11 @@ describe('RetryUtils.handleGenerationError', () => {
         const progress = makeProgress();
         const errorHandler = (): ApiErrorResult => ({ errorMessage: 'fatal', shouldRetry: false });
 
-        await expect(
-            RetryUtils.handleGenerationError(new Error('boom'), progress, 1, errorHandler),
-        ).rejects.toThrow('Failed to generate commit message: fatal');
+        const cause = new Error('boom');
+        const thrown = RetryUtils.handleGenerationError(cause, progress, 1, errorHandler);
+        await expect(thrown).rejects.toThrow('Failed to generate commit message: fatal');
+        // Telemetry reads the category from the original error.
+        await expect(thrown).rejects.toMatchObject({ cause });
     });
 
     it('throws when max attempts reached even if shouldRetry', async () => {

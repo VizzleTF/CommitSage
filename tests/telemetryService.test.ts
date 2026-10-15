@@ -46,7 +46,7 @@ vi.mock('../src/utils/configService', () => ({
 // --- vscode mock ------------------------------------------------------------
 const logUsage = vi.fn();
 const loggerDispose = vi.fn();
-const createTelemetryLogger = vi.fn((sender: unknown) => {
+const createTelemetryLogger = vi.fn((sender: unknown, _options?: unknown) => {
     capturedSender = sender as {
         sendEventData: (n: string, d?: Record<string, unknown>) => void;
         sendErrorData: (e: Error, d?: Record<string, unknown>) => void;
@@ -75,7 +75,7 @@ vi.mock('vscode', () => ({
     version: '1.99.0',
     env: {
         machineId: 'mid',
-        createTelemetryLogger: (...a: unknown[]) => createTelemetryLogger(a[0]),
+        createTelemetryLogger: (...a: unknown[]) => createTelemetryLogger(a[0], a[1]),
     },
     workspace: {
         getConfiguration: () => ({ inspect: () => telemetryInspect }),
@@ -203,17 +203,22 @@ describe('TelemetryService.initialize', () => {
 });
 
 describe('TelemetryService.sendEvent', () => {
-    it('forwards usage events with the standard property envelope', async () => {
+    it('drops the built-in common properties and adds only the documented ones', async () => {
         await TelemetryService.initialize(makeContext());
-        TelemetryService.sendEvent({ name: 'push_completed' });
-        expect(logUsage).toHaveBeenCalledWith(
-            'push_completed',
-            expect.objectContaining({
+        expect(createTelemetryLogger).toHaveBeenCalledWith(expect.anything(), {
+            ignoreBuiltInCommonProperties: true,
+            additionalCommonProperties: {
                 vsCodeVersion: '1.99.0',
                 extensionVersion: '9.9.9',
                 platform: process.platform,
-            }),
-        );
+            },
+        });
+    });
+
+    it('forwards usage events without the event name in the payload', async () => {
+        await TelemetryService.initialize(makeContext());
+        TelemetryService.sendEvent({ name: 'push_completed' });
+        expect(logUsage).toHaveBeenCalledWith('push_completed', {});
     });
 
     it('spreads extra event props into the payload', async () => {
@@ -276,13 +281,32 @@ describe('AmplitudeTelemetrySender (via the captured sender)', () => {
         expect(amplitudeTrack).toHaveBeenCalled();
     });
 
-    it('sendErrorData forwards error message/stack and a default event name', async () => {
+    it('sendErrorData sends the name, a category and the frames, never the message', async () => {
         await TelemetryService.initialize(makeContext());
-        const err = new Error('kaboom');
+        const err = new Error('Git command failed with code 1: hook printed const secret = 1\nsecond line');
+        err.name = 'GitCommandError';
+        err.stack = `${err.name}: ${err.message}\n    at run (/home/jane/ext/dist/extension.js:2:345)\n    at node:internal/process:1:1`;
         capturedSender!.sendErrorData(err, { foo: 'bar' });
         expect(amplitudeTrack).toHaveBeenCalledWith(
             'extension_error',
-            expect.objectContaining({ foo: 'bar', errorMessage: 'kaboom' }),
+            {
+                foo: 'bar',
+                errorType: 'GitCommandError',
+                errorCategory: 'git',
+                errorStack: '    at run (<path>:2:345)\n    at node:internal/process:1:1',
+            },
+            expect.any(Object),
+        );
+    });
+
+    it('sendErrorData omits errorStack when the error has no frames', async () => {
+        await TelemetryService.initialize(makeContext());
+        const err = new Error('kaboom');
+        err.stack = undefined;
+        capturedSender!.sendErrorData(err);
+        expect(amplitudeTrack).toHaveBeenCalledWith(
+            'extension_error',
+            { errorType: 'Error', errorCategory: 'other', errorStack: undefined },
             expect.any(Object),
         );
     });
