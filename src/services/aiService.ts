@@ -3,12 +3,16 @@ import { CommitLintResult, CommitMessage, ProgressReporter } from '../models/typ
 import { PromptService } from './promptService';
 import { TelemetryService } from './telemetryService';
 import { AIServiceFactory } from './aiServiceFactory';
-import { capBlameAnalysis, resolveMaxDiffLength, truncateDiff } from '../utils/diffTruncation';
+import { blockPath, capBlameAnalysis, fileList, isNoisyPath, packFileBlocks, resolveMaxDiffLength, splitIntoFileBlocks, truncateDiff } from '../utils/diffTruncation';
 import { Provider } from '../views/webview/protocol';
 import { CommitLintService, CommitLintEngine } from './commitLintService';
 import { Logger } from '../utils/logger';
 import { redactDiffSecrets } from '../utils/errorUtils';
 import { formatSupportsCommitlint } from '../utils/constants';
+
+// Summary calls per generation for a diff over budget; a larger diff is
+// truncated to this many budgets first.
+const MAX_SUMMARY_CHUNKS = 4;
 
 interface GenerateContext {
     fileCount?: number;
@@ -53,9 +57,12 @@ export class AIService {
         if (maskedDiff !== diff) {
             Logger.log('Masked secrets in the diff before sending it to the model');
         }
-        const truncatedDiff = truncateDiff(maskedDiff, maxDiffLength);
+        const summaries = truncated && ConfigService.get('general.summarizeLargeDiffs')
+            ? await this.summarizeDiff(maskedDiff, maxDiffLength, provider, progress, context.signal)
+            : undefined;
         const prompt = await PromptService.generatePrompt(
-            repoPath, truncatedDiff, capBlameAnalysis(blameAnalysis, maxDiffLength), progress, rules, context.draft, context.signal,
+            repoPath, summaries ? '' : truncateDiff(maskedDiff, maxDiffLength), capBlameAnalysis(blameAnalysis, maxDiffLength), progress,
+            { rules, draft: context.draft, summaries, signal: context.signal },
         );
 
         progress.report({ message: 'Generating commit message...', increment: 50 });
@@ -80,6 +87,40 @@ export class AIService {
             onlyStagedChanges: context.onlyStagedChanges ?? false,
         });
         return result;
+    }
+
+    /**
+     * Map step for a diff over budget: summarizes it in budget-sized parts,
+     * one call each and in sequence (gentler on local models and rate
+     * limits), so the message is written from every file rather than from a
+     * truncated diff. Generated files are listed but not summarized.
+     */
+    private static async summarizeDiff(
+        diff: string,
+        maxDiffLength: number,
+        provider: Provider,
+        progress: ProgressReporter,
+        signal?: AbortSignal,
+    ): Promise<{ files: string; text: string } | undefined> {
+        const blocks = splitIntoFileBlocks(diff);
+        const meaningful = blocks.filter(block => !isNoisyPath(blockPath(block))).join('');
+        const chunks = packFileBlocks(
+            splitIntoFileBlocks(truncateDiff(meaningful, maxDiffLength * MAX_SUMMARY_CHUNKS)),
+            maxDiffLength,
+        );
+        if (chunks.length === 0) {
+            // Only generated files: the truncated diff already shows them all.
+            return undefined;
+        }
+        const parts: string[] = [];
+        for (const [i, chunk] of chunks.entries()) {
+            progress.report({ message: `Summarizing changes (${i + 1}/${chunks.length})...` });
+            const reply = await AIServiceFactory.generateCommitMessage(
+                provider, PromptService.generateChunkSummaryPrompt(chunk), progress, { signal },
+            );
+            parts.push(reply.message);
+        }
+        return { files: fileList(blocks), text: parts.join('\n') };
     }
 
     private static async applyCommitLint(

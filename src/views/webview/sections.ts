@@ -398,6 +398,8 @@ export function renderAdvancedSection(state: ViewState): HTMLElement {
     numberField(body, state, 'apiRequestTimeout', 'api-timeout', L.apiTimeout);
     numberField(body, state, 'gitTimeout', 'git-timeout', L.gitTimeout, L.timeoutHint);
     numberField(body, state, 'general.maxDiffSize', 'max-diff-size', L.maxDiffSize, L.maxDiffSizeHint);
+    field(body, state, 'general.summarizeLargeDiffs', undefined, (v, save, disabled) =>
+        makeCheckbox('summarize-large-diffs', L.summarizeLargeDiffs, v, save, { disabled, hint: L.summarizeLargeDiffsHint }));
     numberField(body, state, 'general.temperature', 'temperature', L.temperature, L.temperatureHint);
     numberField(body, state, 'general.maxOutputTokens', 'max-output-tokens', L.maxOutputTokens, L.maxOutputTokensHint);
 

@@ -117,7 +117,7 @@ describe('generatePrompt — reminder + commitlint', () => {
 
     it('appends the rules passed by the caller to the template', async () => {
         cfg({ 'commit.commitFormat': 'conventional', 'commit.commitLanguage': 'english' });
-        const out = await PromptService.generatePrompt('/repo', 'DIFF', 'BLAME', progress as never, 'RULES');
+        const out = await PromptService.generatePrompt('/repo', 'DIFF', 'BLAME', progress as never, { rules: 'RULES' });
         expect(out).toContain('TEMPLATE[english]\n\nRULES');
         expect(mockExtractRules).not.toHaveBeenCalled();
     });
@@ -247,7 +247,7 @@ describe('generatePrompt — recent-commit style examples', () => {
         });
         const signal = new AbortController().signal;
 
-        await PromptService.generatePrompt('/repo', 'DIFF', 'BLAME', progress as never, '', '', signal);
+        await PromptService.generatePrompt('/repo', 'DIFF', 'BLAME', progress as never, { signal });
 
         expect(mockRecent).toHaveBeenCalledWith('/repo', 2, 'all', signal);
         expect(mockGetCustomTemplate).toHaveBeenCalledWith('conventional', 'Klingon', progress, signal);
@@ -267,7 +267,7 @@ describe('generatePrompt — developer draft', () => {
     beforeEach(() => cfg({ 'commit.commitFormat': 'conventional', 'commit.commitLanguage': 'english' }));
 
     it('adds the draft between the blame analysis and the output rules', async () => {
-        const out = await PromptService.generatePrompt('/repo', 'DIFF', 'BLAME', progress as never, '', '  fix login for SSO users\n');
+        const out = await PromptService.generatePrompt('/repo', 'DIFF', 'BLAME', progress as never, { draft: '  fix login for SSO users\n' });
         const draft = out.indexOf('<developer_draft>\nfix login for SSO users\n</developer_draft>');
         expect(draft).toBeGreaterThan(out.indexOf('BLAME'));
         expect(draft).toBeLessThan(out.indexOf('STRICT OUTPUT RULES'));
@@ -276,17 +276,17 @@ describe('generatePrompt — developer draft', () => {
 
     it('adds the draft to a custom-instructions prompt too', async () => {
         cfg({ 'commit.useCustomInstructions': true, 'commit.customInstructions': 'MY RULES' });
-        const out = await PromptService.generatePrompt('/repo', 'DIFF', 'BLAME', progress as never, '', 'wip: parser');
+        const out = await PromptService.generatePrompt('/repo', 'DIFF', 'BLAME', progress as never, { draft: 'wip: parser' });
         expect(out).toContain('<developer_draft>\nwip: parser\n</developer_draft>');
     });
 
     it('leaves the section out for a blank draft', async () => {
-        const out = await PromptService.generatePrompt('/repo', 'DIFF', 'BLAME', progress as never, '', ' \n ');
+        const out = await PromptService.generatePrompt('/repo', 'DIFF', 'BLAME', progress as never, { draft: ' \n ' });
         expect(out).not.toContain('developer_draft');
     });
 
     it('caps the draft length', async () => {
-        const out = await PromptService.generatePrompt('/repo', 'DIFF', 'BLAME', progress as never, '', 'a'.repeat(MAX_DRAFT_LENGTH) + 'b'.repeat(500));
+        const out = await PromptService.generatePrompt('/repo', 'DIFF', 'BLAME', progress as never, { draft: 'a'.repeat(MAX_DRAFT_LENGTH) + 'b'.repeat(500) });
         expect(out).toContain(`<developer_draft>\n${'a'.repeat(MAX_DRAFT_LENGTH)}\n</developer_draft>`);
     });
 });

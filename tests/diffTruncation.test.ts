@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { truncateDiff, splitIntoFileBlocks, isNoisyPath, blockPath, resolveMaxDiffLength, capBlameAnalysis } from '../src/utils/diffTruncation';
+import { truncateDiff, splitIntoFileBlocks, isNoisyPath, blockPath, resolveMaxDiffLength, capBlameAnalysis, packFileBlocks, fileList } from '../src/utils/diffTruncation';
 
 function fileBlock(path: string, bodyLines: number): string {
     const body = Array.from({ length: bodyLines }, (_, i) => `+line ${i} of ${path}`).join('\n');
@@ -183,5 +183,28 @@ describe('capBlameAnalysis', () => {
         // The smallest maxDiffSize (1000) leaves 100 chars for blame.
         const long = `src/${'deep/'.repeat(20)}x.ts: modifies lines last changed by Alice (1)\n${line(2)}`;
         expect(capBlameAnalysis(long, 1000)).toBe('');
+    });
+});
+
+describe('packFileBlocks', () => {
+    it('packs whole blocks in order without exceeding the limit', () => {
+        const blocks = ['a'.repeat(40), 'b'.repeat(40), 'c'.repeat(40)];
+        expect(packFileBlocks(blocks, 100)).toEqual(['a'.repeat(40) + 'b'.repeat(40), 'c'.repeat(40)]);
+    });
+
+    it('truncates a block larger than the limit into a chunk of its own', () => {
+        const big = fileBlock('src/big.ts', 200);
+        const chunks = packFileBlocks([fileBlock('src/a.ts', 1), big], 1000);
+        expect(chunks).toHaveLength(2);
+        expect(chunks[1].startsWith('diff --git a/src/big.ts')).toBe(true);
+        expect(chunks[1].length).toBeLessThan(1100);
+    });
+});
+
+describe('fileList', () => {
+    it('counts added and removed lines per file and flags generated files', () => {
+        const code = 'diff --git a/src/a.ts b/src/a.ts\n--- a/src/a.ts\n+++ b/src/a.ts\n@@ -1,2 +1,2 @@\n-old\n+new\n+more\n';
+        const lock = 'diff --git a/package-lock.json b/package-lock.json\n+x\n';
+        expect(fileList([code, lock])).toBe('src/a.ts (+2 -1)\npackage-lock.json (+1 -0) generated');
     });
 });

@@ -56,6 +56,7 @@ export const SETTING_DEFAULTS = {
     'custom.useApiKey': false,
     'custom.chatCompletionsPath': '/chat/completions',
     'general.maxDiffSize': 100000,
+    'general.summarizeLargeDiffs': true,
     'general.excludeFiles': [
         '.env', '.env.*', '*.pem', '*.key', '*.p12', '*.pfx', '*.keystore', '*.jks',
         'id_rsa*', 'id_dsa*', 'id_ecdsa*', 'id_ed25519*',

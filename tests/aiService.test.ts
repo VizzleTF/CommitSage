@@ -18,7 +18,10 @@ vi.mock('../src/utils/configService', () => ({
     },
 }));
 vi.mock('../src/services/promptService', () => ({
-    PromptService: { loadRules, generatePrompt, generateRefinementPrompt: refinementPrompt },
+    PromptService: {
+        loadRules, generatePrompt, generateRefinementPrompt: refinementPrompt,
+        generateChunkSummaryPrompt: (chunk: string) => `SUMMARIZE ${chunk.length}`,
+    },
 }));
 vi.mock('../src/services/commitLintService', () => ({
     CommitLintService: { validate, autoFix },
@@ -59,7 +62,7 @@ describe('AIService commitlint gate', () => {
 
         expect(loadRules).not.toHaveBeenCalled();
         expect(validate).not.toHaveBeenCalled();
-        expect(generatePrompt).toHaveBeenCalledWith('/repo', 'diff', '', progress, '', undefined, undefined);
+        expect(generatePrompt).toHaveBeenCalledWith('/repo', 'diff', '', progress, { rules: '', draft: undefined, summaries: undefined, signal: undefined });
     });
 
     it('loads rules once with the signal and reuses them for refinement', async () => {
@@ -73,7 +76,7 @@ describe('AIService commitlint gate', () => {
 
         expect(loadRules).toHaveBeenCalledOnce();
         expect(loadRules).toHaveBeenCalledWith('/repo', 'conventional', signal);
-        expect(generatePrompt).toHaveBeenCalledWith('/repo', 'diff', '', progress, 'RULES', 'my draft', signal);
+        expect(generatePrompt).toHaveBeenCalledWith('/repo', 'diff', '', progress, { rules: 'RULES', draft: 'my draft', summaries: undefined, signal });
         expect(refinementPrompt).toHaveBeenCalledWith('feat: x', ['subject-case'], 'RULES');
         expect(generate).toHaveBeenCalledTimes(2);
     });
@@ -98,5 +101,40 @@ describe('AIService commitlint gate', () => {
 
         expect(result.signOff).toBe(true);
         expect(generate).toHaveBeenCalledTimes(2);
+    });
+});
+
+describe('AIService large diff summaries', () => {
+    const block = (path: string) => `diff --git a/${path} b/${path}\n${'+line\n'.repeat(150)}`;
+    const diff = block('src/a.ts') + block('src/b.ts') + block('package-lock.json');
+
+    beforeEach(() => {
+        Object.assign(settings, { 'commit.commitFormat': 'custom', 'general.maxDiffSize': 1000 });
+    });
+
+    it('summarizes an over-budget diff in parts and prompts with the summaries', async () => {
+        settings['general.summarizeLargeDiffs'] = true;
+        generate.mockImplementation(async (_p: string, prompt: string) => ({
+            message: prompt.startsWith('SUMMARIZE') ? '- part' : 'feat: x', model: 'gpt-test',
+        }));
+
+        await AIService.generateCommitMessage('/repo', diff, '', progress);
+
+        // two meaningful files of ~1k each → two parts, then the message
+        expect(generate).toHaveBeenCalledTimes(3);
+        const options = generatePrompt.mock.calls[0][4];
+        expect(options.summaries.text).toBe('- part\n- part');
+        expect(options.summaries.files).toContain('package-lock.json (+150 -0) generated');
+        expect(generatePrompt.mock.calls[0][1]).toBe('');
+    });
+
+    it('sends the truncated diff in one call when summaries are off', async () => {
+        settings['general.summarizeLargeDiffs'] = false;
+
+        await AIService.generateCommitMessage('/repo', diff, '', progress);
+
+        expect(generate).toHaveBeenCalledTimes(1);
+        expect(generatePrompt.mock.calls[0][4].summaries).toBeUndefined();
+        expect(generatePrompt.mock.calls[0][1].length).toBeLessThan(1100);
     });
 });

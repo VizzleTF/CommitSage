@@ -713,6 +713,12 @@
           "markdownDescription": "Maximum diff size in characters sent to the LLM. Larger diffs are truncated with a `...(truncated)` marker. **Set to `-1` to disable truncation (sends the entire diff — only safe with long-context models); one file's diff is still cut at 1,000,000 characters.** Clamped to the range `[1000, 1000000]`.\n\n**Tighten this for low-TPM free tiers:**\n- **Groq free tier (6000 TPM)** — set to ~`20000` (~5000 tokens for the diff + room for prompt/response).\n- **OpenRouter free (20 RPM / 50 RPD)** — `40000` typically fine.\n- **Gemini / Anthropic / DeepSeek paid** — default `100000` is fine.\n\nRule of thumb: 1 token ≈ 4 chars, so `100000` chars ≈ 25000 tokens.",
           "order": 19
         },
+        "commitSage.general.summarizeLargeDiffs": {
+          "type": "boolean",
+          "default": true,
+          "markdownDescription": "When the diff is larger than `#commitSage.general.maxDiffSize#`, summarize it in parts of that size (up to 4 extra requests) and write the message from the summaries instead of from a truncated diff. Turn off for rate-limited free tiers: each part is a separate request.",
+          "order": 19
+        },
         "commitSage.general.excludeFiles": {
           "type": "array",
           "items": {

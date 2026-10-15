@@ -92,6 +92,8 @@ export function buildWebviewL10n() {
         gitTimeout: vscode.l10n.t('Git timeout (seconds)'),
         timeoutHint: vscode.l10n.t('-1 disables the timeout'),
         maxDiffSize: vscode.l10n.t('Max diff size (characters)'),
+        summarizeLargeDiffs: vscode.l10n.t('Summarize diffs over the size limit'),
+        summarizeLargeDiffsHint: vscode.l10n.t('Up to 4 extra requests that summarize the diff in parts, instead of truncating it.'),
         maxDiffSizeHint: vscode.l10n.t('-1 disables truncation. For Groq free tier set ~20000. Default 100000 ≈ 25000 tokens.'),
         temperature: vscode.l10n.t('Temperature'),
         temperatureHint: vscode.l10n.t('-1 = provider default, not sent (recommended). 0 = deterministic, 1+ = more varied. Claude 4.7+ rejects other values.'),

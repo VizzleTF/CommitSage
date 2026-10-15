@@ -223,3 +223,41 @@ export function capBlameAnalysis(blame: string, maxDiffLength: number): string {
     // No whole line fits (tiny maxDiffSize) → drop the section.
     return lastNewline > 0 ? blame.slice(0, lastNewline) : '';
 }
+
+/**
+ * Packs whole file blocks, in order, into chunks of at most `max` characters
+ * for summarizing; a block larger than `max` is truncated into its own chunk.
+ */
+export function packFileBlocks(blocks: string[], max: number): string[] {
+    const chunks: string[] = [];
+    let current = '';
+    for (const block of blocks) {
+        const piece = block.length > max ? truncateDiff(block, max) : block;
+        if (current && current.length + piece.length > max) {
+            chunks.push(current);
+            current = '';
+        }
+        current += piece;
+    }
+    if (current) {
+        chunks.push(current);
+    }
+    return chunks;
+}
+
+/** One `path (+added -removed)` line per file block; generated files are flagged. */
+export function fileList(blocks: string[]): string {
+    return blocks.map(block => {
+        let added = 0;
+        let removed = 0;
+        for (const line of block.split('\n')) {
+            if (line.startsWith('+') && !line.startsWith('+++')) {
+                added++;
+            } else if (line.startsWith('-') && !line.startsWith('---')) {
+                removed++;
+            }
+        }
+        const path = blockPath(block);
+        return `${path} (+${added} -${removed})${isNoisyPath(path) ? ' generated' : ''}`;
+    }).join('\n');
+}
