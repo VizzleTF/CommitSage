@@ -280,6 +280,19 @@ describe('generatePrompt — developer draft', () => {
         expect(out).toContain('<developer_draft>\nwip: parser\n</developer_draft>');
     });
 
+    it('shows a rejected suggestion where the draft goes', async () => {
+        const out = await PromptService.generatePrompt('/repo', 'DIFF', '', progress as never, { rejected: 'feat: old idea' });
+        const block = out.indexOf('<rejected_message>\nfeat: old idea\n</rejected_message>');
+        expect(block).toBeGreaterThan(out.indexOf('</diff>'));
+        expect(block).toBeLessThan(out.indexOf('STRICT OUTPUT RULES'));
+    });
+
+    it('prefers the draft over a rejected suggestion', async () => {
+        const out = await PromptService.generatePrompt('/repo', 'DIFF', '', progress as never, { draft: 'mine', rejected: 'theirs' });
+        expect(out).toContain('<developer_draft>\nmine');
+        expect(out).not.toContain('rejected_message');
+    });
+
     it('leaves the section out for a blank draft', async () => {
         const out = await PromptService.generatePrompt('/repo', 'DIFF', 'BLAME', progress as never, { draft: ' \n ' });
         expect(out).not.toContain('developer_draft');

@@ -20,6 +20,8 @@ interface GenerateContext {
     signal?: AbortSignal;
     /** The developer's own text from the commit box. */
     draft?: string;
+    /** Commit Sage's own last message, still in the commit box on a re-run. */
+    rejected?: string;
 }
 
 export class AIService {
@@ -62,7 +64,7 @@ export class AIService {
             : undefined;
         const prompt = await PromptService.generatePrompt(
             repoPath, summaries ? '' : truncateDiff(maskedDiff, maxDiffLength), capBlameAnalysis(blameAnalysis, maxDiffLength), progress,
-            { rules, draft: context.draft, summaries, signal: context.signal },
+            { rules, draft: context.draft, rejected: context.rejected, summaries, signal: context.signal },
         );
 
         progress.report({ message: 'Generating commit message...', increment: 50 });

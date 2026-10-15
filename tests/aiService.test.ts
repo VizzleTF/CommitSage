@@ -62,7 +62,7 @@ describe('AIService commitlint gate', () => {
 
         expect(loadRules).not.toHaveBeenCalled();
         expect(validate).not.toHaveBeenCalled();
-        expect(generatePrompt).toHaveBeenCalledWith('/repo', 'diff', '', progress, { rules: '', draft: undefined, summaries: undefined, signal: undefined });
+        expect(generatePrompt).toHaveBeenCalledWith('/repo', 'diff', '', progress, { rules: '', draft: undefined, rejected: undefined, summaries: undefined, signal: undefined });
     });
 
     it('loads rules once with the signal and reuses them for refinement', async () => {
@@ -76,7 +76,7 @@ describe('AIService commitlint gate', () => {
 
         expect(loadRules).toHaveBeenCalledOnce();
         expect(loadRules).toHaveBeenCalledWith('/repo', 'conventional', signal);
-        expect(generatePrompt).toHaveBeenCalledWith('/repo', 'diff', '', progress, { rules: 'RULES', draft: 'my draft', summaries: undefined, signal });
+        expect(generatePrompt).toHaveBeenCalledWith('/repo', 'diff', '', progress, { rules: 'RULES', draft: 'my draft', rejected: undefined, summaries: undefined, signal });
         expect(refinementPrompt).toHaveBeenCalledWith('feat: x', ['subject-case'], 'RULES');
         expect(generate).toHaveBeenCalledTimes(2);
     });

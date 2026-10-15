@@ -222,7 +222,10 @@ export class CommitWorkflow {
 
         const repoPath = sourceControlRepository.rootUri.fsPath;
         const boxValue = sourceControlRepository.inputBox.value.trim();
-        const draft = boxValue !== this.lastGenerated.get(repoPath) ? boxValue : '';
+        // The box still holding our own message means a re-run: regenerate.
+        const isOwnMessage = boxValue === this.lastGenerated.get(repoPath);
+        const draft = isOwnMessage ? '' : boxValue;
+        const rejected = isOwnMessage ? boxValue : '';
         // One `git status --porcelain` pass drives the staged-vs-worktree
         // decision AND the per-file blame list.
         const allChangedFiles = await GitService.getChangedFiles(repoPath, signal);
@@ -256,6 +259,7 @@ export class CommitWorkflow {
             onlyStagedChanges: useStagedChanges,
             signal,
             draft,
+            rejected,
         });
 
         const finalMessage = applyRef(commitMessage.message, ref, ConfigService.get('commit.refs.placement'));

@@ -28,7 +28,7 @@ code --install-extension VizzleTF.geminicommit
 
 The message appears in the Source Control input box. Review it and commit.
 
-To steer the message, type a draft in the input box first, for example `fix login for SSO users`. The model keeps its intent and facts and rewrites it in the selected format. A message Commit Sage wrote is not taken as a draft, so running it again gives a fresh message. If generation fails or you cancel it, your draft stays in the box.
+To steer the message, type a draft in the input box first, for example `fix login for SSO users`. The model keeps its intent and facts and rewrites it in the selected format. A message Commit Sage wrote is not taken as a draft: running it again sends that message as a rejected suggestion, and the model writes a different one. If generation fails or you cancel it, your draft stays in the box.
 
 ## Features
 
@@ -86,7 +86,7 @@ code --install-extension VizzleTF.geminicommit
 
 Сообщение появится в поле ввода Source Control. Проверьте его и закоммитьте.
 
-Чтобы направить модель, сначала напишите черновик в поле ввода, например `fix login for SSO users`. Модель сохранит его смысл и факты и перепишет в выбранном формате. Сообщение, которое написал сам Commit Sage, черновиком не считается, поэтому повторный запуск даёт новое сообщение. Если генерация завершилась ошибкой или вы её отменили, черновик остаётся в поле.
+Чтобы направить модель, сначала напишите черновик в поле ввода, например `fix login for SSO users`. Модель сохранит его смысл и факты и перепишет в выбранном формате. Сообщение, которое написал сам Commit Sage, черновиком не считается: при повторном запуске оно уходит модели как отклонённый вариант, и она пишет другое. Если генерация завершилась ошибкой или вы её отменили, черновик остаётся в поле.
 
 ## Документация
 

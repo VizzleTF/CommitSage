@@ -120,13 +120,14 @@ describe('CommitWorkflow commit box draft', () => {
         expect(repo.inputBox.value).toBe('fix(auth): accept SSO logins');
     });
 
-    it('does not take its own previous message for a draft', async () => {
+    it('passes its own previous message as rejected, not as a draft', async () => {
         generate.mockReset().mockResolvedValue({ message: 'feat(ui): add dark theme', model: 'm' });
 
         await CommitWorkflow.generateAndSetCommitMessage();
         await CommitWorkflow.generateAndSetCommitMessage();
 
         expect(draftOf(1)).toBe('');
+        expect((generate.mock.calls[1][4] as { rejected: string }).rejected).toBe('feat(ui): add dark theme');
     });
 
     it('sends no draft for an empty box', async () => {
