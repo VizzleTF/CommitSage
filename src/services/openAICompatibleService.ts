@@ -1,6 +1,6 @@
 import { Logger } from '../utils/logger';
 import type { CommitMessage, ProgressReporter, GenerateOptions } from '../models/types';
-import { extractAndValidateMessage, getConfiguredTemperature, resolveMaxOutputTokens, withRetryAndApiKeyGuard } from './baseAIService';
+import { extractAndValidateMessage, getConfiguredTemperature, resolveMaxOutputTokens, sendWithThinkingLadder, ThinkingLadder, withRetryAndApiKeyGuard } from './baseAIService';
 import { HttpError, HttpUtils } from '../utils/httpUtils';
 import { ConfigService } from '../utils/configService';
 import { ApiKeyManager } from './apiKeyManager';
@@ -35,6 +35,8 @@ export interface OpenAICompatibleRequest {
     extraHeaders?: Record<string, string>;
     /** Initial output-budget field name; a 400 naming it flips it (see `fixPayloadFromError`). */
     maxTokensParam?: TokenParam;
+    /** Sent when `general.disableThinking` is on; see `sendWithThinkingLadder`. */
+    thinkingOff?: ThinkingLadder;
 }
 
 type TokenParam = 'max_tokens' | 'max_completion_tokens';
@@ -98,38 +100,41 @@ export async function generateViaOpenAICompatible(
             };
 
             const temperature = getConfiguredTemperature();
-            let data: OpenAIResponse;
-            // At most two corrections (token field + temperature), then the error stands.
-            for (let fixes = 0; ; fixes++) {
-                const payload = {
-                    model: request.model,
-                    messages: [{ role: 'user', content: prompt }],
-                    ...(shape.omitTemperature || temperature === undefined ? {} : { temperature }),
-                    [shape.tokenParam]: resolveMaxOutputTokens(options, attempt),
-                };
-                try {
-                    data = await HttpUtils.postJson<OpenAIResponse>(
-                        `${baseUrl}${path}`,
-                        payload,
-                        {
-                            headers: HttpUtils.createRequestHeaders(
-                                request.apiKey,
-                                request.extraHeaders,
-                            ),
-                            signal: options?.signal,
-                        },
-                    );
-                    break;
-                } catch (error) {
-                    const fixed = fixes < 2 ? fixPayloadFromError(error, shape) : undefined;
-                    if (!fixed) {
-                        throw error;
+            // The thinking ladder wraps the shape fixes: a 400 they don't
+            // recognize may be about the thinking fragment.
+            const data = await sendWithThinkingLadder(shapeKey, request.thinkingOff ?? [], async thinking => {
+                // At most two corrections (token field + temperature), then the error stands.
+                for (let fixes = 0; ; fixes++) {
+                    const payload = {
+                        model: request.model,
+                        messages: [{ role: 'user', content: prompt }],
+                        ...(shape.omitTemperature || temperature === undefined ? {} : { temperature }),
+                        [shape.tokenParam]: resolveMaxOutputTokens(options, attempt),
+                        ...thinking,
+                    };
+                    try {
+                        return await HttpUtils.postJson<OpenAIResponse>(
+                            `${baseUrl}${path}`,
+                            payload,
+                            {
+                                headers: HttpUtils.createRequestHeaders(
+                                    request.apiKey,
+                                    request.extraHeaders,
+                                ),
+                                signal: options?.signal,
+                            },
+                        );
+                    } catch (error) {
+                        const fixed = fixes < 2 ? fixPayloadFromError(error, shape) : undefined;
+                        if (!fixed) {
+                            throw error;
+                        }
+                        Logger.log(`${request.model} rejected request parameters, retrying with ${JSON.stringify(fixed)}`);
+                        shape = fixed;
+                        learnedShapes.set(shapeKey, shape);
                     }
-                    Logger.log(`${request.model} rejected request parameters, retrying with ${JSON.stringify(fixed)}`);
-                    shape = fixed;
-                    learnedShapes.set(shapeKey, shape);
                 }
-            }
+            });
 
             const choice = data.choices?.[0];
             // `length` means the model ran out of `max_tokens` mid-message. Reasoning
@@ -170,7 +175,20 @@ interface CompatProviderSpec {
     /** Override key acquisition (e.g. Custom's optional `useApiKey` toggle). */
     getApiKey?: () => Promise<string | undefined>;
     maxTokensParam?: TokenParam;
+    /** How to switch thinking off; none means the provider has no switch. */
+    thinkingOff?: ThinkingLadder;
 }
+
+// OpenAI `reasoning_effort` values from the least thinking up; the API notes
+// that not every reasoning model supports every value.
+const REASONING_EFFORT_LADDER: ThinkingLadder = [
+    // eslint-disable-next-line @typescript-eslint/naming-convention
+    { reasoning_effort: 'none' },
+    // eslint-disable-next-line @typescript-eslint/naming-convention
+    { reasoning_effort: 'minimal' },
+    // eslint-disable-next-line @typescript-eslint/naming-convention
+    { reasoning_effort: 'low' },
+];
 
 const COMPAT_SPECS: Partial<Record<Provider, CompatProviderSpec>> = {
     openai: {
@@ -183,15 +201,34 @@ const COMPAT_SPECS: Partial<Record<Provider, CompatProviderSpec>> = {
         // `max_tokens` is deprecated on OpenAI and rejected by gpt-5/o-series;
         // `max_completion_tokens` works for every current OpenAI chat model.
         maxTokensParam: 'max_completion_tokens',
+        thinkingOff: REASONING_EFFORT_LADDER,
     },
-    groq: { baseUrl: () => 'https://api.groq.com/openai/v1' },
-    xai: { baseUrl: () => 'https://api.x.ai/v1' },
-    deepseek: { baseUrl: () => 'https://api.deepseek.com' },
+    // Qwen3 takes `none`; gpt-oss only `low`/`medium`/`high`, other values are a 400.
+    groq: {
+        baseUrl: () => 'https://api.groq.com/openai/v1',
+        // eslint-disable-next-line @typescript-eslint/naming-convention
+        thinkingOff: [{ reasoning_effort: 'none' }, { reasoning_effort: 'low' }],
+    },
+    // grok-4.5+ cannot disable reasoning; `low` is their least effort.
+    xai: {
+        baseUrl: () => 'https://api.x.ai/v1',
+        // eslint-disable-next-line @typescript-eslint/naming-convention
+        thinkingOff: [{ reasoning_effort: 'low' }],
+    },
+    deepseek: {
+        baseUrl: () => 'https://api.deepseek.com',
+        thinkingOff: [{ thinking: { type: 'disabled' } }],
+    },
     codestral: { baseUrl: () => 'https://codestral.mistral.ai/v1' },
     // La Plateforme — the full Mistral catalog (mistral-large/medium/small,
     // magistral, ministral, …). Distinct from `codestral`, which is the
     // code-only endpoint with its own free-tier key.
-    mistral: { baseUrl: () => 'https://api.mistral.ai/v1' },
+    mistral: {
+        baseUrl: () => 'https://api.mistral.ai/v1',
+        // `none`: "thinks minimally", no thinking chunk (mistral-small, medium-3-5, large-4-0).
+        // eslint-disable-next-line @typescript-eslint/naming-convention
+        thinkingOff: [{ reasoning_effort: 'none' }],
+    },
     openrouter: {
         baseUrl: () => 'https://openrouter.ai/api/v1',
         extraHeaders: {
@@ -202,6 +239,9 @@ const COMPAT_SPECS: Partial<Record<Provider, CompatProviderSpec>> = {
             // eslint-disable-next-line @typescript-eslint/naming-convention
             'X-Title': 'Commit Sage',
         },
+        // OpenRouter's unified `reasoning` field; `effort: low` for models
+        // that cannot turn reasoning off.
+        thinkingOff: [{ reasoning: { enabled: false } }, { reasoning: { effort: 'low' } }],
     },
     custom: {
         // User-configured OpenAI-compatible endpoint (LM Studio, vLLM,
@@ -214,6 +254,9 @@ const COMPAT_SPECS: Partial<Record<Provider, CompatProviderSpec>> = {
             ConfigService.get('custom.useApiKey')
                 ? ApiKeyManager.getKey('custom')
                 : undefined,
+        // vLLM documents this chat-template switch for Qwen3.
+        // eslint-disable-next-line @typescript-eslint/naming-convention
+        thinkingOff: [{ chat_template_kwargs: { enable_thinking: false } }],
     },
 };
 
@@ -261,6 +304,7 @@ export async function generateViaOpenAICompatibleProvider(
             chatCompletionsPath: spec.chatCompletionsPath?.(),
             extraHeaders: spec.extraHeaders,
             maxTokensParam: spec.maxTokensParam,
+            thinkingOff: spec.thinkingOff,
         },
         prompt,
         progress,

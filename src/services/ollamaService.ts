@@ -1,6 +1,6 @@
 import { CommitMessage, ProgressReporter, GenerateOptions, ApiErrorResult } from '../models/types';
 import { ConfigService } from '../utils/configService';
-import { extractAndValidateMessage, getConfiguredTemperature, handleHttpError, resolveMaxOutputTokens, withRetryAndApiKeyGuard } from './baseAIService';
+import { extractAndValidateMessage, getConfiguredTemperature, handleHttpError, resolveMaxOutputTokens, sendWithThinkingLadder, ThinkingLadder, withRetryAndApiKeyGuard } from './baseAIService';
 import { HttpError, HttpUtils, NetworkError } from '../utils/httpUtils';
 import { ApiKeyManager } from './apiKeyManager';
 import { TruncatedResponseError } from '../models/errors';
@@ -12,6 +12,10 @@ interface OllamaResponse {
     // eslint-disable-next-line @typescript-eslint/naming-convention
     done_reason?: string;
 }
+
+// Ollama errors only on `think: true` for a model that cannot think, so
+// `false` is safe for every model.
+const OLLAMA_THINKING_LADDER: ThinkingLadder = [{ think: false }];
 
 export class OllamaService {
     static async generateCommitMessage(
@@ -43,17 +47,17 @@ export class OllamaService {
             if (typeof numCtx === 'number' && numCtx > 0) {
                 ollamaOptions['num_ctx'] = numCtx;
             }
-            const payload = {
-                model,
-                messages: [{ role: 'user', content: prompt }],
-                stream: false,
-                options: ollamaOptions,
-            };
-
-            const data = await HttpUtils.postJson<OllamaResponse>(apiUrl, payload, {
-                headers: HttpUtils.createRequestHeaders(authToken),
-                signal: options?.signal,
-            });
+            const data = await sendWithThinkingLadder(`ollama|${apiUrl}|${model}`, OLLAMA_THINKING_LADDER, thinking =>
+                HttpUtils.postJson<OllamaResponse>(apiUrl, {
+                    model,
+                    messages: [{ role: 'user', content: prompt }],
+                    stream: false,
+                    options: ollamaOptions,
+                    ...thinking,
+                }, {
+                    headers: HttpUtils.createRequestHeaders(authToken),
+                    signal: options?.signal,
+                }));
 
             return { message: this.extractCommitMessage(data), model };
         }, { signal: options?.signal, errorMapper: this.mapOllamaError });

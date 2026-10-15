@@ -2,7 +2,7 @@ import { Logger } from '../utils/logger';
 import { ConfigService } from '../utils/configService';
 import { ProgressReporter, CommitMessage, GenerateOptions } from '../models/types';
 import { ApiKeyInvalidError, TruncatedResponseError } from '../models/errors';
-import { extractAndValidateMessage, getConfiguredTemperature, isInvalidApiKeyError, resolveMaxOutputTokens, withRetryAndApiKeyGuard } from './baseAIService';
+import { extractAndValidateMessage, getConfiguredTemperature, isInvalidApiKeyError, resolveMaxOutputTokens, sendWithThinkingLadder, ThinkingLadder, withRetryAndApiKeyGuard } from './baseAIService';
 import { HttpError, HttpUtils } from '../utils/httpUtils';
 import { ApiKeyManager } from './apiKeyManager';
 import { toError } from '../utils/errorUtils';
@@ -63,18 +63,22 @@ function readThinkingLevel(): string {
  * unbounded, the model spends the whole budget reasoning and its commit message
  * comes back cut off mid-line, or the reasoning summary is returned in place of
  * the message (#447).
+ *
+ * `general.disableThinking` overrides both knobs: Gemini 2.5 gets budget `0`,
+ * Gemini 3.x the `GEMINI3_THINKING_LADDER` (sent by `callGemini`).
  */
 function buildThinkingConfig(model: string): Record<string, unknown> | undefined {
     if (!model.startsWith('gemini-')) {
         return undefined;
     }
     const version = geminiVersionScore(model);
+    const off = ConfigService.get('general.disableThinking') === true;
 
     if (version >= 3) {
-        return { thinkingLevel: readThinkingLevel() };
+        return off ? undefined : { thinkingLevel: readThinkingLevel() };
     }
     if (version >= 2.5) {
-        const budget = readThinkingBudget();
+        const budget = off ? 0 : readThinkingBudget();
         if (budget < 0) {
             return { thinkingBudget: -1 };
         }
@@ -98,6 +102,12 @@ function buildGeminiGenerationConfig(model: string, options?: GenerateOptions, a
     }
     return cfg;
 }
+
+// `minimal` is "little to no thinking"; not every Gemini 3 model takes every level.
+const GEMINI3_THINKING_LADDER: ThinkingLadder = [
+    { thinkingConfig: { thinkingLevel: 'minimal' } },
+    { thinkingConfig: { thinkingLevel: 'low' } },
+];
 
 // Quality tiers for Gemini auto-mode fallback. Lower = preferred.
 // pro > flash > flash-lite. Unknown / non-flash families fall into the flash
@@ -145,12 +155,16 @@ function sortGeminiModelsByQuality(models: string[]): string[] {
     });
 }
 
-/** Auto mode's model list when the live one can't be fetched, best first. */
+/**
+ * Auto mode's model list when the live one can't be fetched, best first.
+ * Stable models only: Gemini 2.5 is open to past users only, previews get shut down.
+ * Keep in sync with https://ai.google.dev/gemini-api/docs/models.
+ */
 const FALLBACK_GEMINI_MODELS = [
-    'gemini-2.5-pro',
-    'gemini-3-flash-preview',
-    'gemini-2.5-flash',
-    'gemini-2.5-flash-lite',
+    'gemini-3.8-flash',
+    'gemini-3.6-flash',
+    'gemini-3.5-flash-lite',
+    'gemini-3.1-flash-lite',
 ];
 
 export class GeminiService {
@@ -189,14 +203,15 @@ export class GeminiService {
         attempt: number = 1,
     ): Promise<CommitMessage> {
         const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
-        const payload = {
-            contents: [{ parts: [{ text: prompt }] }],
-            generationConfig: buildGeminiGenerationConfig(model, options, attempt),
-        };
-        const data = await HttpUtils.postJson<GeminiResponse>(apiUrl, payload, {
-            headers: { 'content-type': 'application/json', 'x-goog-api-key': apiKey },
-            signal: options?.signal,
-        });
+        const ladder = model.startsWith('gemini-') && geminiVersionScore(model) >= 3 ? GEMINI3_THINKING_LADDER : [];
+        const data = await sendWithThinkingLadder(`gemini|${model}`, ladder, thinking =>
+            HttpUtils.postJson<GeminiResponse>(apiUrl, {
+                contents: [{ parts: [{ text: prompt }] }],
+                generationConfig: { ...buildGeminiGenerationConfig(model, options, attempt), ...thinking },
+            }, {
+                headers: { 'content-type': 'application/json', 'x-goog-api-key': apiKey },
+                signal: options?.signal,
+            }));
         return { message: this.extractCommitMessage(data, model), model };
     }
 

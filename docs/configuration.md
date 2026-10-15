@@ -29,6 +29,7 @@ When Commit Sage changes a setting itself (the sidebar, startup dialogs, **Selec
 | `commitSage.general.maxDiffSize` | `number` | `100000` | Maximum diff size in characters sent to the model. A longer diff is truncated with a `...(truncated)` marker. `-1` disables truncation, but one file's diff is still cut at 1,000,000 characters. Other values are clamped to `1000`–`1000000`. The git blame summary takes at most a tenth of this size, up to 4000 characters. |
 | `commitSage.general.excludeFiles` | `string[]` | `.env`, `.env.*`, `*.pem`, `*.key`, `*.p12`, `*.pfx`, `*.keystore`, `*.jks`, `id_rsa*`, `id_dsa*`, `id_ecdsa*`, `id_ed25519*` | Files whose content is never sent to the model; it sees only their path. Setting the list replaces the defaults, so copy the ones you keep. See [Sensitive files and secrets](#sensitive-files-and-secrets). |
 | `commitSage.general.maxOutputTokens` | `number` | `4096` | Maximum tokens the model may generate for one message, thinking tokens included. Minimum `1`. On truncation each retry doubles the budget (at most 3 times), capped at `32768`. |
+| `commitSage.general.disableThinking` | `boolean` | `false` | Asks reasoning models to skip thinking. Each provider gets its own field; a model that rejects it with HTTP 400 gets the next weaker value, then none. Overrides `gemini.thinkingBudget` and `gemini.thinkingLevel`. No effect on Codestral. See [Thinking](providers.md#thinking). |
 | `commitSage.apiRequestTimeout` | `number` | `30` | Timeout for provider HTTP requests, in seconds. `-1` disables the timeout. |
 | `commitSage.gitTimeout` | `number` | `120` | Timeout for `git` subprocesses (diff, blame, push), in seconds. Increase for slow pushes or large diffs. `-1` disables the timeout. |
 
@@ -96,8 +97,8 @@ Each key applies only when `commitSage.provider.type` selects that provider.
 | Setting | Type | Default | Description |
 |---|---|---|---|
 | `commitSage.gemini.model` | `string` | `"auto"` | Gemini model ID. `auto` tries the available models and prefers the best quality. |
-| `commitSage.gemini.thinkingBudget` | `number` | `0` | Thinking token budget for Gemini 2.5 models. `0` disables thinking, `-1` lets the model decide, a positive number caps it. Minimum `-1`. Gemini 2.5 Pro raises `0` to `128`. Ignored by Gemini 3.x. |
-| `commitSage.gemini.thinkingLevel` | `string` | `"low"` | Thinking depth for Gemini 3.x models. One of `minimal`, `low`, `medium`, `high`. Ignored by Gemini 2.5 and older. |
+| `commitSage.gemini.thinkingBudget` | `number` | `0` | Thinking token budget for Gemini 2.5 models. `0` disables thinking, `-1` lets the model decide, a positive number caps it. Minimum `-1`. Gemini 2.5 Pro raises `0` to `128`. Ignored by Gemini 3.x and while `general.disableThinking` is on. |
+| `commitSage.gemini.thinkingLevel` | `string` | `"low"` | Thinking depth for Gemini 3.x models. One of `minimal`, `low`, `medium`, `high`. Ignored by Gemini 2.5 and older and while `general.disableThinking` is on. |
 | `commitSage.codestral.model` | `string` | `"codestral-latest"` | Codestral model ID. |
 | `commitSage.mistral.model` | `string` | `"mistral-small-latest"` | Mistral La Plateforme model ID. |
 | `commitSage.openai.model` | `string` | `"gpt-6-luna"` | OpenAI model ID. |

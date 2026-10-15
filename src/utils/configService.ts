@@ -61,6 +61,7 @@ export const SETTING_DEFAULTS = {
     ],
     'general.temperature': -1,
     'general.maxOutputTokens': 4096,
+    'general.disableThinking': false,
     'gemini.thinkingBudget': 0,
     'gemini.thinkingLevel': 'low',
     'ollama.numCtx': 0,

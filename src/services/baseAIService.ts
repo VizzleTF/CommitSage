@@ -56,6 +56,86 @@ export function resolveMaxOutputTokens(options?: GenerateOptions, attempt: numbe
 }
 
 /**
+ * Request fragments that switch a provider's thinking off, strongest first.
+ * Each API (and often each model behind it) accepts a different field or
+ * value and answers the wrong one with HTTP 400, so the 400 picks the step:
+ * see `nextThinkingStep`. Past the last step nothing is sent, which is the
+ * behavior without `general.disableThinking`.
+ */
+export type ThinkingLadder = readonly Record<string, unknown>[];
+
+/** Ladder step learned per `<provider>|<model>` from 400s, kept for the session. */
+const learnedThinkingSteps = new Map<string, number>();
+
+// The field itself is unknown to the API, so a weaker value of it fails too.
+const UNKNOWN_FIELD = /unsupported parameter|unrecognized|unknown (?:parameter|field|name)|extra (?:inputs|fields)|not permitted/;
+
+/**
+ * Step to try after `error`, or `undefined` when the error is not about the
+ * current fragment (it then stands). A 400 that names the fragment's field,
+ * quotes one of its values (OpenAI: "Unsupported value: 'minimal' is not
+ * supported with the 'gpt-5.6-sol' model."), or mentions thinking/reasoning at
+ * all moves one step down; one that says the field is unknown skips every step
+ * that sends the same field.
+ */
+export function nextThinkingStep(error: unknown, ladder: ThinkingLadder, step: number): number | undefined {
+    const fragment = ladder[step];
+    if (!fragment || !(error instanceof HttpError) || error.status !== 400) {
+        return undefined;
+    }
+    const text = (typeof error.data === 'string' ? error.data : JSON.stringify(error.data ?? '')).toLowerCase();
+    const keys = Object.keys(fragment);
+    const quoted = stringValues(fragment).some(value => text.includes(`'${value}'`) || text.includes(`\\"${value}\\"`));
+    if (!quoted && !keys.some(key => text.includes(key.toLowerCase())) && !/think|reason/.test(text)) {
+        return undefined;
+    }
+    let next = step + 1;
+    if (UNKNOWN_FIELD.test(text)) {
+        while (next < ladder.length && Object.keys(ladder[next]).some(key => keys.includes(key))) {
+            next++;
+        }
+    }
+    return next;
+}
+
+function stringValues(value: unknown): string[] {
+    if (typeof value === 'string') {
+        return [value.toLowerCase()];
+    }
+    return typeof value === 'object' && value !== null ? Object.values(value).flatMap(stringValues) : [];
+}
+
+/**
+ * Sends one request through `send`, adding the thinking-off fragment when
+ * `general.disableThinking` is on and walking `ladder` down on each 400 about
+ * it. Without the setting `send` gets `{}` and runs once.
+ */
+export async function sendWithThinkingLadder<T>(
+    key: string,
+    ladder: ThinkingLadder,
+    send: (fragment: Record<string, unknown>) => Promise<T>,
+): Promise<T> {
+    // `=== true`: `.commitsage/config.json` is parsed leniently and may hold a string.
+    if (ConfigService.get('general.disableThinking') !== true || ladder.length === 0) {
+        return send({});
+    }
+    let step = learnedThinkingSteps.get(key) ?? 0;
+    for (;;) {
+        try {
+            return await send(ladder[step] ?? {});
+        } catch (error) {
+            const next = nextThinkingStep(error, ladder, step);
+            if (next === undefined) {
+                throw error;
+            }
+            Logger.log(`${key} rejected ${JSON.stringify(ladder[step])}, retrying with ${JSON.stringify(ladder[next] ?? {})}`);
+            step = next;
+            learnedThinkingSteps.set(key, step);
+        }
+    }
+}
+
+/**
  * Runs the per-attempt body of an HTTP-LLM provider inside the shared
  * error-handling envelope: an invalid key (see `isInvalidApiKeyError`) throws
  * `ApiKeyInvalidError` so `commitWorkflow.handleInvalidApiKey` reprompts the

@@ -183,6 +183,35 @@ describe('GeminiService thinkingConfig (#447)', () => {
         expect(generationConfigOf(0).thinkingConfig).toEqual({ thinkingLevel: 'low' });
     });
 
+    it('lets general.disableThinking override both knobs with the least thinking', async () => {
+        SETTINGS['general.disableThinking'] = true;
+        SETTINGS['gemini.thinkingBudget'] = 2048;
+        SETTINGS['gemini.thinkingLevel'] = 'high';
+        try {
+            await generateWith('gemini-2.5-flash');
+            expect(generationConfigOf(0).thinkingConfig).toEqual({ thinkingBudget: 0 });
+
+            mockedPostJson.mockReset();
+            await generateWith('gemini-2.5-pro');
+            expect(generationConfigOf(0).thinkingConfig).toEqual({ thinkingBudget: 128 });
+
+            mockedPostJson.mockReset();
+            await generateWith('gemini-3.5-flash');
+            expect(generationConfigOf(0).thinkingConfig).toEqual({ thinkingLevel: 'minimal' });
+
+            // A model that rejects `minimal` gets `low`.
+            mockedPostJson.mockReset();
+            mockedPostJson.mockRejectedValueOnce(new HttpError(400, { error: {
+                code: 400, message: 'Thinking level MINIMAL is not supported for this model.', status: 'INVALID_ARGUMENT',
+            } }));
+            await generateWith('gemini-3-pro-preview');
+            expect(generationConfigOf(0).thinkingConfig).toEqual({ thinkingLevel: 'minimal' });
+            expect(generationConfigOf(1).thinkingConfig).toEqual({ thinkingLevel: 'low' });
+        } finally {
+            SETTINGS['general.disableThinking'] = false;
+        }
+    });
+
     it('sends general.maxOutputTokens as the output budget', async () => {
         SETTINGS['general.maxOutputTokens'] = 2048;
         await generateWith('gemini-2.5-flash');
@@ -279,7 +308,7 @@ describe('GeminiService auto-mode (tryGenerateWithModels)', () => {
         });
 
         const result = await GeminiService.generateCommitMessage('hi', progress);
-        expect(result.model).toBe('gemini-2.5-pro');
+        expect(result.model).toBe('gemini-3.8-flash');
     });
 
     it('throws an aggregated "All models failed" error on mixed failures', async () => {

@@ -1,6 +1,6 @@
 import { ConfigService } from '../utils/configService';
 import type { CommitMessage, ProgressReporter, GenerateOptions } from '../models/types';
-import { extractAndValidateMessage, getConfiguredTemperature, resolveMaxOutputTokens, withRetryAndApiKeyGuard } from './baseAIService';
+import { extractAndValidateMessage, getConfiguredTemperature, resolveMaxOutputTokens, sendWithThinkingLadder, ThinkingLadder, withRetryAndApiKeyGuard } from './baseAIService';
 import { HttpUtils } from '../utils/httpUtils';
 import { ApiKeyManager } from './apiKeyManager';
 import { TruncatedResponseError } from '../models/errors';
@@ -30,6 +30,19 @@ interface AnthropicResponse {
 const ANTHROPIC_API_URL = 'https://api.anthropic.com/v1/messages';
 export const ANTHROPIC_VERSION = '2023-06-01';
 
+/**
+ * Claude 5 models think by default, and each takes a different off switch:
+ * Haiku 5.5 and Opus 5 accept `disabled` at their default effort, Sonnet 5.5
+ * answers it with a 400 and takes `between_tools` instead, Opus 5.5 and Fable
+ * cannot stop thinking, so `low` effort is the least left.
+ */
+const ANTHROPIC_THINKING_LADDER: ThinkingLadder = [
+    { thinking: { type: 'disabled' } },
+    { thinking: { type: 'between_tools' } },
+    // eslint-disable-next-line @typescript-eslint/naming-convention
+    { output_config: { effort: 'low' } },
+];
+
 export class AnthropicService {
     static async generateCommitMessage(
         prompt: string,
@@ -41,27 +54,27 @@ export class AnthropicService {
         const temperature = getConfiguredTemperature();
 
         return withRetryAndApiKeyGuard('Anthropic', progress, async attempt => {
-            const payload = {
-                model,
-                // eslint-disable-next-line @typescript-eslint/naming-convention
-                max_tokens: resolveMaxOutputTokens(options, attempt),
-                ...(temperature === undefined ? {} : { temperature }),
-                messages: [{ role: 'user', content: prompt }],
-            };
-
-            const data = await HttpUtils.postJson<AnthropicResponse>(
-                ANTHROPIC_API_URL,
-                payload,
-                {
-                    headers: HttpUtils.createRequestHeaders(
-                        apiKey,
+            const data = await sendWithThinkingLadder(`anthropic|${model}`, ANTHROPIC_THINKING_LADDER, thinking =>
+                HttpUtils.postJson<AnthropicResponse>(
+                    ANTHROPIC_API_URL,
+                    {
+                        model,
                         // eslint-disable-next-line @typescript-eslint/naming-convention
-                        { 'anthropic-version': ANTHROPIC_VERSION },
-                        'x-api-key',
-                    ),
-                    signal: options?.signal,
-                },
-            );
+                        max_tokens: resolveMaxOutputTokens(options, attempt),
+                        ...(temperature === undefined ? {} : { temperature }),
+                        messages: [{ role: 'user', content: prompt }],
+                        ...thinking,
+                    },
+                    {
+                        headers: HttpUtils.createRequestHeaders(
+                            apiKey,
+                            // eslint-disable-next-line @typescript-eslint/naming-convention
+                            { 'anthropic-version': ANTHROPIC_VERSION },
+                            'x-api-key',
+                        ),
+                        signal: options?.signal,
+                    },
+                ));
 
             if (data.stop_reason === 'max_tokens') {
                 throw new TruncatedResponseError('Anthropic', `${model} exhausted max_tokens`);

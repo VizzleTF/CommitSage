@@ -53,7 +53,7 @@ A failed request is tried up to three times. The two retries wait about 1 s and 
 | `Invalid response format from <PROVIDER> API` | The response held no message text. | Run the command again, or pick another model. |
 | `Generated commit message is empty.` | Nothing was left of the reply after cleanup: Commit Sage removes `<think>` blocks, an outer code fence, wrapping quotes, a leading "Here is the commit message:" line, `Signed-off-by` lines and invisible control characters. | Run the command again, or pick another model. |
 | `API Error: <STATUS>: <DETAIL>` | The provider returned another HTTP status. | Read `<DETAIL>`: it is the provider's own error text. |
-| ``<PROVIDER> stopped generating before the message was complete (<DETAIL>). Raise `commitSage.general.maxOutputTokens` if this keeps happening.`` | The model used up its output token budget, often on reasoning. | Raise `commitSage.general.maxOutputTokens` or pick a model without reasoning. |
+| ``<PROVIDER> stopped generating before the message was complete (<DETAIL>). Raise `commitSage.general.maxOutputTokens` if this keeps happening.`` | The model used up its output token budget, often on reasoning. | Turn on `commitSage.general.disableThinking`, raise `commitSage.general.maxOutputTokens`, or pick a model without reasoning. |
 
 ### `Failed to generate commit message: Could not connect to <PROVIDER> API. Please check your internet connection.`
 

@@ -39,6 +39,26 @@ Commit Sage sends your diff and prompt to the provider you pick. What happens to
 
 Whatever the provider, Commit Sage sends only the path of `.env`, key and certificate files and masks known secret formats in the rest of the diff. See [Sensitive files and secrets](configuration.md#sensitive-files-and-secrets).
 
+## Thinking
+
+Reasoning models think before they answer. The thinking costs time and tokens from `general.maxOutputTokens`, and a commit message does not need it. Turn on `commitSage.general.disableThinking` (sidebar: `Disable thinking` under Advanced) to ask every provider to skip it:
+
+| Provider | What is sent |
+|---|---|
+| Anthropic | `thinking: {type: "disabled"}`, then `{type: "between_tools"}` (Claude Sonnet 5.5), then `output_config.effort: "low"` (models that always think, such as Claude Opus 5.5) |
+| OpenAI | `reasoning_effort` `none`, then `minimal`, then `low` |
+| Groq | `reasoning_effort` `none` (Qwen3), then `low` (gpt-oss) |
+| xAI | `reasoning_effort: "low"`: Grok 4.5 and later cannot turn reasoning off |
+| OpenRouter | `reasoning.enabled: false`, then `reasoning.effort: "low"` |
+| DeepSeek | `thinking: {type: "disabled"}` |
+| Custom | `chat_template_kwargs: {enable_thinking: false}` (vLLM, Qwen3) |
+| Ollama | `think: false` |
+| Gemini | 2.5: `thinkingBudget: 0` (2.5 Pro: `128`); 3.x: `thinkingLevel` `minimal`, then `low` |
+| Mistral | `reasoning_effort: "none"` |
+| Codestral | nothing: there is no switch |
+
+When a model answers a value with HTTP 400, Commit Sage tries the next one in the row, and after the last sends no thinking field. The step that worked is kept for the model until VS Code restarts. Some models cannot stop thinking at all; they get their lowest level.
+
 ## Set up a provider
 
 1. Open the Commit Sage sidebar and pick the provider.
@@ -61,7 +81,7 @@ Google Gemini models through the Gemini API. This is the default provider.
 
 With `auto`, the extension fetches the models that support `generateContent` and keeps names that start with `gemini-`, which drops Gemma and LearnLM. It also drops image, audio, TTS, embedding and other non-text variants. It sorts the rest `pro` first, then `flash`, then `flash-lite`, newer versions first within each group, and tries each model in that order until one returns a message. If the model list cannot be fetched, it uses a built-in list of four models. If Google rejects the key, Commit Sage asks for a new one instead.
 
-Gemini 3.x models cannot turn thinking off and ignore `gemini.thinkingBudget`. Gemini 2.5 Pro cannot disable thinking either: a budget of `0` is raised to `128` for that model.
+Gemini 3.x models cannot turn thinking off and ignore `gemini.thinkingBudget`. Gemini 2.5 Pro cannot disable thinking either: a budget of `0` is raised to `128` for that model. With `general.disableThinking` on, both Gemini settings are ignored; see [Thinking](#thinking).
 
 ## OpenRouter
 
@@ -129,7 +149,7 @@ Mistral's code models on the dedicated endpoint `codestral.mistral.ai`.
 
 - Key: [console.mistral.ai/codestral](https://console.mistral.ai/codestral)
 - Command: `Commit Sage: Set Codestral API Key`
-- Settings: `codestral.model`, default `codestral-latest`. The built-in list also has `codestral-2508`, `codestral-2501` and `codestral-2405`.
+- Settings: `codestral.model`, default `codestral-latest`. The built-in list also has `codestral-2508`.
 
 The Codestral key and the Mistral (La Plateforme) key are issued in different sections of the console. One does not work in place of the other.
 

@@ -399,10 +399,17 @@ export function renderAdvancedSection(state: ViewState): HTMLElement {
     numberField(body, state, 'general.temperature', 'temperature', L.temperature, L.temperatureHint);
     numberField(body, state, 'general.maxOutputTokens', 'max-output-tokens', L.maxOutputTokens, L.maxOutputTokensHint);
 
-    // Gemini-only: the two thinking knobs. Both are shown because a single
-    // Gemini install switches between 2.5 and 3.x models (and `auto` picks for
-    // you), and each family only honours one of them.
-    if (state.provider === 'gemini') {
+    const noThinkingSwitch = state.provider === 'codestral';
+    field(body, state, 'general.disableThinking', undefined, (v, save, disabled) =>
+        makeCheckbox('disable-thinking', L.disableThinking, v, save, {
+            disabled,
+            hint: noThinkingSwitch ? L.disableThinkingUnsupported : L.disableThinkingHint,
+        }));
+
+    // Gemini-only: the two thinking knobs, overridden by `disableThinking`.
+    // Both are shown because a single Gemini install switches between 2.5 and
+    // 3.x models (and `auto` picks for you), and each family only honours one.
+    if (state.provider === 'gemini' && !state.settings['general.disableThinking']) {
         numberField(
             body, state, 'gemini.thinkingBudget', 'gemini-thinking-budget',
             L.geminiThinkingBudget, L.geminiThinkingBudgetHint,
