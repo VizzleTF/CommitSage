@@ -2,6 +2,8 @@
 
 Commit Sage writes commit messages in one of 11 formats, set by `commitSage.commit.commitFormat` (default `conventional`). Each format sends the model a prompt template. The skeletons, limits and examples below come from the English templates.
 
+A draft you typed in the Source Control input box goes to the model as well, up to 2,000 characters. The model keeps its intent and facts and rewrites it in the selected format. A message Commit Sage wrote earlier in the session is not sent as a draft.
+
 | Value | Skeleton |
 |---|---|
 | `conventional` | `type(scope): description` + optional bullet body |

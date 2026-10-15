@@ -14,6 +14,8 @@ interface GenerateContext {
     fileCount?: number;
     onlyStagedChanges?: boolean;
     signal?: AbortSignal;
+    /** The developer's own text from the commit box. */
+    draft?: string;
 }
 
 export class AIService {
@@ -53,7 +55,7 @@ export class AIService {
         }
         const truncatedDiff = truncateDiff(maskedDiff, maxDiffLength);
         const prompt = await PromptService.generatePrompt(
-            repoPath, truncatedDiff, capBlameAnalysis(blameAnalysis, maxDiffLength), progress, rules,
+            repoPath, truncatedDiff, capBlameAnalysis(blameAnalysis, maxDiffLength), progress, rules, context.draft,
         );
 
         progress.report({ message: 'Generating commit message...', increment: 50 });

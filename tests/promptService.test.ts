@@ -30,7 +30,7 @@ vi.mock('../src/services/customLanguageService', () => ({
     CustomLanguageService: { getTemplate: mockGetCustomTemplate },
 }));
 
-import { PromptService } from '../src/services/promptService';
+import { PromptService, MAX_DRAFT_LENGTH } from '../src/services/promptService';
 
 const progress = { report: vi.fn() };
 
@@ -217,5 +217,33 @@ describe('generatePrompt — recent-commit style examples', () => {
         await PromptService.generatePrompt('/repo', 'DIFF', 'BLAME', progress as never);
 
         expect(mockGetTemplate).toHaveBeenCalledWith('conventional', 'english');
+    });
+});
+
+describe('generatePrompt — developer draft', () => {
+    beforeEach(() => cfg({ 'commit.commitFormat': 'conventional', 'commit.commitLanguage': 'english' }));
+
+    it('adds the draft between the blame analysis and the output rules', async () => {
+        const out = await PromptService.generatePrompt('/repo', 'DIFF', 'BLAME', progress as never, '', '  fix login for SSO users\n');
+        const draft = out.indexOf('<developer_draft>\nfix login for SSO users\n</developer_draft>');
+        expect(draft).toBeGreaterThan(out.indexOf('BLAME'));
+        expect(draft).toBeLessThan(out.indexOf('STRICT OUTPUT RULES'));
+        expect(out).toContain('Keep the intent and facts of the draft');
+    });
+
+    it('adds the draft to a custom-instructions prompt too', async () => {
+        cfg({ 'commit.useCustomInstructions': true, 'commit.customInstructions': 'MY RULES' });
+        const out = await PromptService.generatePrompt('/repo', 'DIFF', 'BLAME', progress as never, '', 'wip: parser');
+        expect(out).toContain('<developer_draft>\nwip: parser\n</developer_draft>');
+    });
+
+    it('leaves the section out for a blank draft', async () => {
+        const out = await PromptService.generatePrompt('/repo', 'DIFF', 'BLAME', progress as never, '', ' \n ');
+        expect(out).not.toContain('developer_draft');
+    });
+
+    it('caps the draft length', async () => {
+        const out = await PromptService.generatePrompt('/repo', 'DIFF', 'BLAME', progress as never, '', 'a'.repeat(MAX_DRAFT_LENGTH) + 'b'.repeat(500));
+        expect(out).toContain(`<developer_draft>\n${'a'.repeat(MAX_DRAFT_LENGTH)}\n</developer_draft>`);
     });
 });

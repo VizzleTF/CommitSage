@@ -1,8 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import * as vscode from 'vscode';
 
-const { settings, generate, promptForKey, removeKey, commitChanges } = vi.hoisted(() => ({
+const { settings, repo, generate, promptForKey, removeKey, commitChanges } = vi.hoisted(() => ({
     settings: {} as Record<string, unknown>,
+    repo: { rootUri: { fsPath: '/repo' }, inputBox: { value: '' } },
     generate: vi.fn(),
     commitChanges: vi.fn(),
     promptForKey: vi.fn(),
@@ -18,7 +19,7 @@ vi.mock('../src/utils/configService', () => ({
 }));
 vi.mock('../src/services/gitRepository', () => ({
     GitRepositoryProvider: {
-        getActiveRepository: async () => ({ rootUri: { fsPath: '/repo' }, inputBox: { value: '' } }),
+        getActiveRepository: async () => repo,
     },
 }));
 vi.mock('../src/services/gitService', () => ({
@@ -56,6 +57,7 @@ beforeEach(() => {
     promptForKey.mockReset();
     removeKey.mockReset();
     commitChanges.mockReset();
+    repo.inputBox.value = '';
     Object.assign(settings, {
         'provider.type': 'ollama',
         'ollama.useAuthToken': false,
@@ -101,5 +103,46 @@ describe('CommitWorkflow auto-commit', () => {
         await CommitWorkflow.generateAndSetCommitMessage();
 
         expect(commitChanges).toHaveBeenCalledWith('feat: x', '/repo', true, true);
+    });
+});
+
+describe('CommitWorkflow commit box draft', () => {
+    const draftOf = (call: number) => (generate.mock.calls[call][4] as { draft: string }).draft;
+
+    it('sends what the developer typed as the draft', async () => {
+        repo.inputBox.value = '  fix login for SSO users\n';
+        generate.mockReset().mockResolvedValue({ message: 'fix(auth): accept SSO logins', model: 'm' });
+
+        await CommitWorkflow.generateAndSetCommitMessage();
+
+        expect(draftOf(0)).toBe('fix login for SSO users');
+        expect(repo.inputBox.value).toBe('fix(auth): accept SSO logins');
+    });
+
+    it('does not take its own previous message for a draft', async () => {
+        generate.mockReset().mockResolvedValue({ message: 'feat(ui): add dark theme', model: 'm' });
+
+        await CommitWorkflow.generateAndSetCommitMessage();
+        await CommitWorkflow.generateAndSetCommitMessage();
+
+        expect(draftOf(1)).toBe('');
+    });
+
+    it('sends no draft for an empty box', async () => {
+        repo.inputBox.value = ' \n ';
+        generate.mockReset().mockResolvedValue({ message: 'chore: x', model: 'm' });
+
+        await CommitWorkflow.generateAndSetCommitMessage();
+
+        expect(draftOf(0)).toBe('');
+    });
+
+    it('leaves the draft in the box when generation fails', async () => {
+        repo.inputBox.value = 'my draft';
+        generate.mockReset().mockRejectedValue(new Error('boom'));
+
+        await CommitWorkflow.generateAndSetCommitMessage();
+
+        expect(repo.inputBox.value).toBe('my draft');
     });
 });

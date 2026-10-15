@@ -28,6 +28,8 @@ code --install-extension VizzleTF.geminicommit
 
 The message appears in the Source Control input box. Review it and commit.
 
+To steer the message, type a draft in the input box first, for example `fix login for SSO users`. The model keeps its intent and facts and rewrites it in the selected format. A message Commit Sage wrote is not taken as a draft, so running it again gives a fresh message. If generation fails or you cancel it, your draft stays in the box.
+
 ## Features
 
 - 11 providers: Gemini, OpenRouter, Groq, Anthropic, OpenAI, DeepSeek, xAI, Codestral, Mistral, Ollama and Custom (any OpenAI-compatible endpoint). Setup per provider: [docs/providers.md](docs/providers.md).
@@ -41,7 +43,7 @@ The message appears in the Source Control input box. Review it and commit.
 ## Privacy
 
 - API keys are stored in VS Code SecretStorage, not in settings or project files.
-- Your diff is sent to the selected provider. Ollama and a self-hosted Custom endpoint keep the diff on your network.
+- Your diff and the draft in the Source Control input box are sent to the selected provider. Ollama and a self-hosted Custom endpoint keep them on your network.
 - The content of `.env`, key and certificate files is never sent, only their path. Add your own patterns with `commitSage.general.excludeFiles` or a `.commitsageignore` file. Known secret formats in the rest of the diff (API keys, tokens, private keys) are masked. Masking is pattern-based, so prefer a local provider for a repository full of secrets. See [Sensitive files and secrets](docs/configuration.md#sensitive-files-and-secrets).
 - Telemetry is on by default. Turn it off with `commitSage.telemetry.enabled: false`; details in [docs/telemetry.md](docs/telemetry.md).
 
@@ -82,6 +84,8 @@ code --install-extension VizzleTF.geminicommit
 3. Добавьте изменения в индекс и нажмите иконку Commit Sage в заголовке Source Control, `Ctrl+G` (`Cmd+G` на macOS) в панели Source Control или выполните `Commit Sage: Generate Commit Message`.
 
 Сообщение появится в поле ввода Source Control. Проверьте его и закоммитьте.
+
+Чтобы направить модель, сначала напишите черновик в поле ввода, например `fix login for SSO users`. Модель сохранит его смысл и факты и перепишет в выбранном формате. Сообщение, которое написал сам Commit Sage, черновиком не считается, поэтому повторный запуск даёт новое сообщение. Если генерация завершилась ошибкой или вы её отменили, черновик остаётся в поле.
 
 ## Документация
 

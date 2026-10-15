@@ -17,6 +17,10 @@ import { RefStore } from './refStore';
 const MAX_API_KEY_RETRIES = 3;
 
 export class CommitWorkflow {
+    // Last message written to each repository's commit box this session, so
+    // a re-run does not take Commit Sage's own output for the developer's draft.
+    private static readonly lastGenerated = new Map<string, string>();
+
     static async generateAndSetCommitMessage(
         sourceControlRepository?: vscode.SourceControl,
         apiKeyRetryCount: number = 0,
@@ -186,6 +190,8 @@ export class CommitWorkflow {
         }
 
         const repoPath = sourceControlRepository.rootUri.fsPath;
+        const boxValue = sourceControlRepository.inputBox.value.trim();
+        const draft = boxValue !== this.lastGenerated.get(repoPath) ? boxValue : '';
         // One `git status --porcelain` pass drives the staged-vs-worktree
         // decision AND the per-file blame list.
         const allChangedFiles = await GitService.getChangedFiles(repoPath, signal);
@@ -218,10 +224,12 @@ export class CommitWorkflow {
             fileCount: changedFiles.length,
             onlyStagedChanges: useStagedChanges,
             signal,
+            draft,
         });
 
         const finalMessage = applyRef(commitMessage.message, ref, ConfigService.get('commit.refs.placement'));
         sourceControlRepository.inputBox.value = finalMessage;
+        this.lastGenerated.set(repoPath, finalMessage.trim());
 
         if (ConfigService.get('commit.autoCommit')) {
             try {

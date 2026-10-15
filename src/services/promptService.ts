@@ -26,6 +26,10 @@ const DETAILED_FORMAT_REMINDER = `STRICT OUTPUT RULES:
 - Capture WHY the change was made (its intent and effect) in the Summary, not just what changed.
 - Produce exactly ONE commit message for the whole diff.`;
 
+// A draft is a commit message, not a document: the cap keeps a pasted log
+// from crowding out the diff.
+export const MAX_DRAFT_LENGTH = 2000;
+
 const LANGUAGE_PROMPTS: Record<Exclude<CommitLanguage, 'custom'>, string> = {
     english: 'Please write the commit message in English.',
     russian: 'Пожалуйста, напиши сообщение коммита на русском языке.',
@@ -69,14 +73,15 @@ export class PromptService {
         return CommitLintService.extractRules(repoPath, rulesPath, { engine, format, signal });
     }
 
-    /** Joins the prompt sections; an empty language prompt or examples block is left out. */
-    private static buildPrompt(mainInstructions: string, languagePrompt: string, diff: string, blameAnalysis: string, reminder: string, examplesBlock = ''): string {
+    /** Joins the prompt sections; an empty language prompt, examples or draft block is left out. */
+    private static buildPrompt(mainInstructions: string, languagePrompt: string, diff: string, blameAnalysis: string, reminder: string, examplesBlock = '', draftBlock = ''): string {
         return [
             mainInstructions,
             examplesBlock,
             languagePrompt,
             `Git diff to analyze:\n${diff}`,
             `Git blame analysis:\n${blameAnalysis}`,
+            draftBlock,
             reminder,
             'Please provide ONLY the commit message, without any additional text or explanations.',
         ].filter(Boolean).join('\n\n');
@@ -113,16 +118,32 @@ export class PromptService {
     }
 
     /**
+     * What the developer already typed in the commit box, framed as intent:
+     * the model keeps what it says and fixes how it is written.
+     */
+    private static buildDraftBlock(draft: string): string {
+        const text = draft.trim().slice(0, MAX_DRAFT_LENGTH);
+        if (!text) {
+            return '';
+        }
+        return 'The developer started this commit message. Keep the intent and facts of the draft, '
+            + 'use the diff for what it leaves out, and rewrite it in the required format and language:\n'
+            + `<developer_draft>\n${text}\n</developer_draft>`;
+    }
+
+    /**
      * @param rules commitlint rules from `loadRules`, or '' when validation is
      *   off — they ride along with the format template so the model sees
      *   exactly what the validator will check.
+     * @param draft the developer's text from the commit box, or '' for none.
      */
-    static async generatePrompt(repoPath: string, diff: string, blameAnalysis: string, progress: ProgressReporter, rules = ''): Promise<string> {
+    static async generatePrompt(repoPath: string, diff: string, blameAnalysis: string, progress: ProgressReporter, rules = '', draft = ''): Promise<string> {
         const useCustomInstructions = ConfigService.get('commit.useCustomInstructions');
         const customInstructions = ConfigService.get('commit.customInstructions');
+        const draftBlock = this.buildDraftBlock(draft);
 
         if (useCustomInstructions && customInstructions.trim()) {
-            return this.buildPrompt(customInstructions, '', diff, blameAnalysis, STRICT_FORMAT_REMINDER);
+            return this.buildPrompt(customInstructions, '', diff, blameAnalysis, STRICT_FORMAT_REMINDER, '', draftBlock);
         }
 
         const formatSetting = ConfigService.get('commit.commitFormat');
@@ -141,7 +162,7 @@ export class PromptService {
         const mainInstructions = rules ? `${template}\n\n${rules}` : template;
 
         const examplesBlock = this.buildExamplesBlock(examples, formatSetting !== 'previous');
-        return this.buildPrompt(mainInstructions, this.languagePrompt(), diff, blameAnalysis, reminder, examplesBlock);
+        return this.buildPrompt(mainInstructions, this.languagePrompt(), diff, blameAnalysis, reminder, examplesBlock, draftBlock);
     }
 
     static generateRefinementPrompt(originalMessage: string, errors: string[], rules: string): string {
