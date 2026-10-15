@@ -145,7 +145,7 @@ The project config holds the same keys as VS Code settings, without the `commitS
 
 ## Workspace trust
 
-In an untrusted workspace, the project config cannot set these keys:
+In an untrusted workspace, neither the project config nor the workspace settings (`.vscode/settings.json`) can set these keys:
 
 - `provider.type`
 - `custom.baseUrl`, `custom.chatCompletionsPath`, `custom.useApiKey`
@@ -153,5 +153,6 @@ In an untrusted workspace, the project config cannot set these keys:
 - `ollama.baseUrl`, `ollama.useAuthToken`
 - `commit.autoCommit`, `commit.autoPush`
 - `commit.commitlint.enabled`, `commit.commitlint.engine`, `commit.commitlint.rulesPath`
+- `commit.refs.branchPattern`
 
-The extension logs a warning for each ignored key and uses the workspace or user value instead. VS Code also ignores workspace values of `commitSage.commit.autoCommit` and `commitSage.commit.autoPush`. Auto-commit and auto-push are skipped in an untrusted workspace whatever the settings say. Granting trust applies the ignored project values without a reload.
+A cloned repository could otherwise send your API key and diff to its own server, run its own code, or commit and push on your behalf. The extension logs a warning for each ignored project key, and VS Code ignores the workspace values (`restrictedConfigurations`), so your user value applies. Auto-commit and auto-push are skipped in an untrusted workspace whatever the settings say. Granting trust applies the ignored values without a reload.

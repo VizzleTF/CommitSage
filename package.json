@@ -56,10 +56,21 @@
     },
     "untrustedWorkspaces": {
       "supported": "limited",
-      "description": "Commit Sage generates commit messages from diffs in any workspace, but auto-commit and auto-push are disabled in untrusted workspaces.",
+      "description": "Commit Sage generates commit messages from diffs in any workspace. In untrusted workspaces it ignores workspace and project values of provider endpoints, auto-commit, auto-push, the commitlint engine and the branch pattern, and skips auto-commit and auto-push.",
       "restrictedConfigurations": [
+        "commitSage.provider.type",
+        "commitSage.custom.baseUrl",
+        "commitSage.custom.chatCompletionsPath",
+        "commitSage.custom.useApiKey",
+        "commitSage.openai.baseUrl",
+        "commitSage.ollama.baseUrl",
+        "commitSage.ollama.useAuthToken",
         "commitSage.commit.autoCommit",
-        "commitSage.commit.autoPush"
+        "commitSage.commit.autoPush",
+        "commitSage.commit.commitlint.enabled",
+        "commitSage.commit.commitlint.engine",
+        "commitSage.commit.commitlint.rulesPath",
+        "commitSage.commit.refs.branchPattern"
       ]
     }
   },

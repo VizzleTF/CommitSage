@@ -86,7 +86,7 @@ export const SETTING_DEFAULTS = {
  * and granting trust re-reads the project value (see the
  * `onDidGrantWorkspaceTrust` listener in `initialize`).
  */
-const TRUST_SENSITIVE_KEYS: ReadonlySet<string> = new Set<string>([
+export const TRUST_SENSITIVE_KEYS: ReadonlySet<string> = new Set<string>([
     // Network egress — where the diff is sent.
     'provider.type',
     'custom.baseUrl',
@@ -103,6 +103,8 @@ const TRUST_SENSITIVE_KEYS: ReadonlySet<string> = new Set<string>([
     'commit.commitlint.enabled',
     'commit.commitlint.engine',
     'commit.commitlint.rulesPath',
+    // ReDoS: compiled and run against the branch name.
+    'commit.refs.branchPattern',
 ]);
 
 export type SettingKey = keyof typeof SETTING_DEFAULTS;
