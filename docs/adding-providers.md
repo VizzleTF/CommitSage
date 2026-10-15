@@ -46,7 +46,7 @@ The steps use `<PROVIDER_ID>` for the lowercase provider id (`deepseek`), `<NAME
    - Otherwise, create `src/services/<PROVIDER_ID>Service.ts` with a class that has a static `generateCommitMessage(prompt, progress, options)` returning `Promise<CommitMessage>`. Use the helpers from `src/services/baseAIService.ts`, as `anthropicService.ts` does:
      - read the key and settings first, then pass the request to `withRetryAndApiKeyGuard(name, progress, attempt => ...)`: it calls the function once per attempt, maps HTTP errors through `handleHttpError()`, retries and turns an invalid key into `ApiKeyInvalidError`;
      - pass the response text to `extractAndValidateMessage()`;
-     - take the request limits from `getConfiguredTemperature()` and `resolveMaxOutputTokens(options, attempt)`, and pass `options?.signal` to the HTTP call.
+     - take the request limits from `getConfiguredTemperature()` and `resolveMaxOutputTokens(options, attempt)`, and pass `options?.signal` to the HTTP call. Send `temperature` only when `getConfiguredTemperature()` returns a number: `undefined` means the user left it at the provider default.
 
      Then register the class in `NON_COMPAT_SERVICES` in `src/services/aiServiceFactory.ts`.
 

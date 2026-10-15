@@ -59,7 +59,7 @@ export const SETTING_DEFAULTS = {
         '.env', '.env.*', '*.pem', '*.key', '*.p12', '*.pfx', '*.keystore', '*.jks',
         'id_rsa*', 'id_dsa*', 'id_ecdsa*', 'id_ed25519*',
     ],
-    'general.temperature': 0.7,
+    'general.temperature': -1,
     'general.maxOutputTokens': 4096,
     'gemini.thinkingBudget': 0,
     'gemini.thinkingLevel': 'low',

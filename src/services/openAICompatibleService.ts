@@ -97,13 +97,14 @@ export async function generateViaOpenAICompatible(
                 omitTemperature: false,
             };
 
+            const temperature = getConfiguredTemperature();
             let data: OpenAIResponse;
             // At most two corrections (token field + temperature), then the error stands.
             for (let fixes = 0; ; fixes++) {
                 const payload = {
                     model: request.model,
                     messages: [{ role: 'user', content: prompt }],
-                    ...(shape.omitTemperature ? {} : { temperature: getConfiguredTemperature() }),
+                    ...(shape.omitTemperature || temperature === undefined ? {} : { temperature }),
                     [shape.tokenParam]: resolveMaxOutputTokens(options, attempt),
                 };
                 try {

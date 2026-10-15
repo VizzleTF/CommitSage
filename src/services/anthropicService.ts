@@ -38,13 +38,14 @@ export class AnthropicService {
     ): Promise<CommitMessage> {
         const apiKey = await ApiKeyManager.getKey('anthropic');
         const model = ConfigService.get('anthropic.model');
+        const temperature = getConfiguredTemperature();
 
         return withRetryAndApiKeyGuard('Anthropic', progress, async attempt => {
             const payload = {
                 model,
                 // eslint-disable-next-line @typescript-eslint/naming-convention
                 max_tokens: resolveMaxOutputTokens(options, attempt),
-                temperature: getConfiguredTemperature(),
+                ...(temperature === undefined ? {} : { temperature }),
                 messages: [{ role: 'user', content: prompt }],
             };
 

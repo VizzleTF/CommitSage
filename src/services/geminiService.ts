@@ -33,11 +33,6 @@ interface GeminiModelsResponse {
     models: GeminiModel[];
 }
 
-const GEMINI_GENERATION_CONFIG_BASE = {
-    topK: 40,
-    topP: 0.95,
-} as const;
-
 /** Gemini 2.5 Pro is the one 2.5 model that cannot switch thinking off. */
 const GEMINI_PRO_MIN_THINKING_BUDGET = 128;
 
@@ -91,10 +86,12 @@ function buildThinkingConfig(model: string): Record<string, unknown> | undefined
 
 function buildGeminiGenerationConfig(model: string, options?: GenerateOptions, attempt: number = 1): Record<string, unknown> {
     const cfg: Record<string, unknown> = {
-        ...GEMINI_GENERATION_CONFIG_BASE,
-        temperature: getConfiguredTemperature(),
         maxOutputTokens: resolveMaxOutputTokens(options, attempt),
     };
+    const temperature = getConfiguredTemperature();
+    if (temperature !== undefined) {
+        cfg.temperature = temperature;
+    }
     const thinkingConfig = buildThinkingConfig(model);
     if (thinkingConfig) {
         cfg.thinkingConfig = thinkingConfig;

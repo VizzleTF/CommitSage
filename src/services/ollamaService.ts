@@ -29,11 +29,16 @@ export class OllamaService {
             : undefined;
 
         return withRetryAndApiKeyGuard('Ollama', progress, async attempt => {
-            // Ollama nests sampling parameters under `options`. `num_ctx` stays
-            // conditional so Ollama keeps its own per-model default when the user
-            // hasn't overridden it; `num_predict` carries the shared output budget,
-            // which local reasoning models also draw their thinking from.
-            const ollamaOptions: Record<string, unknown> = { temperature: getConfiguredTemperature() };
+            // Ollama nests sampling parameters under `options`. `num_ctx` and
+            // `temperature` stay conditional so Ollama keeps its own per-model
+            // defaults when the user hasn't overridden them; `num_predict` carries
+            // the shared output budget, which local reasoning models also draw
+            // their thinking from.
+            const ollamaOptions: Record<string, unknown> = {};
+            const temperature = getConfiguredTemperature();
+            if (temperature !== undefined) {
+                ollamaOptions.temperature = temperature;
+            }
             ollamaOptions['num_predict'] = resolveMaxOutputTokens(options, attempt);
             if (typeof numCtx === 'number' && numCtx > 0) {
                 ollamaOptions['num_ctx'] = numCtx;

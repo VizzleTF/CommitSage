@@ -50,6 +50,8 @@ describe('LLM errors and recovery', () => {
         mock.reset();
         restoreStubs();
         await cleanupRepo(repo);
+        await vscode.workspace.getConfiguration('commitSage')
+            .update('general.temperature', undefined, vscode.ConfigurationTarget.Workspace);
     });
 
     it('retries on 429 and eventually succeeds', async function () {
@@ -87,6 +89,9 @@ describe('LLM errors and recovery', () => {
     });
 
     it('drops temperature and retries when the model rejects it (#539)', async () => {
+        // The default (-1) sends no temperature; only an explicit value can be rejected.
+        await vscode.workspace.getConfiguration('commitSage')
+            .update('general.temperature', 0.7, vscode.ConfigurationTarget.Workspace);
         await ensureOpenAIKey();
         mock.enqueue({
             status: 400,

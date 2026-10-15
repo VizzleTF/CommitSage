@@ -121,29 +121,30 @@ function retryOnce(): void {
 // ---------------------------------------------------------------------------
 
 describe('getConfiguredTemperature', () => {
-    it('returns 0.7 when value is not a number', async () => {
+    it('is undefined (send none) when value is not a number', async () => {
         const { getConfiguredTemperature } = await import('../src/services/baseAIService');
         SETTINGS['general.temperature'] = 'nope' as unknown as number;
-        expect(getConfiguredTemperature()).toBe(0.7);
-        SETTINGS['general.temperature'] = 0.7;
-    });
-
-    it('returns 0.7 when value is NaN (non-finite)', async () => {
-        const { getConfiguredTemperature } = await import('../src/services/baseAIService');
+        expect(getConfiguredTemperature()).toBeUndefined();
         SETTINGS['general.temperature'] = Number.NaN;
-        expect(getConfiguredTemperature()).toBe(0.7);
-        SETTINGS['general.temperature'] = 0.7;
+        expect(getConfiguredTemperature()).toBeUndefined();
     });
 
-    it('clamps to [0, 2]', async () => {
+    it('is undefined for the -1 default and any other negative value', async () => {
         const { getConfiguredTemperature } = await import('../src/services/baseAIService');
-        SETTINGS['general.temperature'] = 5;
-        expect(getConfiguredTemperature()).toBe(2);
+        SETTINGS['general.temperature'] = -1;
+        expect(getConfiguredTemperature()).toBeUndefined();
         SETTINGS['general.temperature'] = -3;
+        expect(getConfiguredTemperature()).toBeUndefined();
+    });
+
+    it('passes an explicit value through, capped at 2', async () => {
+        const { getConfiguredTemperature } = await import('../src/services/baseAIService');
+        SETTINGS['general.temperature'] = 0;
         expect(getConfiguredTemperature()).toBe(0);
         SETTINGS['general.temperature'] = 1.2;
         expect(getConfiguredTemperature()).toBe(1.2);
-        SETTINGS['general.temperature'] = 0.7;
+        SETTINGS['general.temperature'] = 5;
+        expect(getConfiguredTemperature()).toBe(2);
     });
 });
 

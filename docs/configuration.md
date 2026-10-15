@@ -25,7 +25,7 @@ When Commit Sage changes a setting itself (the sidebar, startup dialogs, **Selec
 
 | Setting | Type | Default | Description |
 |---|---|---|---|
-| `commitSage.general.temperature` | `number` | `0.7` | Sampling temperature for every provider. Range `0`–`2`. |
+| `commitSage.general.temperature` | `number` | `-1` | Sampling temperature for every provider. `-1` sends none, so each model uses its provider's default. `0`–`2` sends that value; Claude 4.7 and later reject any value but the default with HTTP 400, and OpenAI reasoning models accept only `1`. |
 | `commitSage.general.maxDiffSize` | `number` | `100000` | Maximum diff size in characters sent to the model. A longer diff is truncated with a `...(truncated)` marker. `-1` disables truncation, but one file's diff is still cut at 1,000,000 characters. Other values are clamped to `1000`–`1000000`. The git blame summary takes at most a tenth of this size, up to 4000 characters. |
 | `commitSage.general.excludeFiles` | `string[]` | `.env`, `.env.*`, `*.pem`, `*.key`, `*.p12`, `*.pfx`, `*.keystore`, `*.jks`, `id_rsa*`, `id_dsa*`, `id_ecdsa*`, `id_ed25519*` | Files whose content is never sent to the model; it sees only their path. Setting the list replaces the defaults, so copy the ones you keep. See [Sensitive files and secrets](#sensitive-files-and-secrets). |
 | `commitSage.general.maxOutputTokens` | `number` | `4096` | Maximum tokens the model may generate for one message, thinking tokens included. Minimum `1`. On truncation each retry doubles the budget (at most 3 times), capped at `32768`. |

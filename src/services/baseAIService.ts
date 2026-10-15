@@ -8,17 +8,18 @@ import { ConfigService } from '../utils/configService';
 import { Logger } from '../utils/logger';
 
 /**
- * Shared LLM sampling temperature (`general.temperature`, default 0.7).
- * Clamped to [0, 2] — most providers reject values outside this range,
- * and a project config can't legitimately need otherwise. Defaults to
- * 0.7 if the setting is unreadable or out of type.
+ * Shared LLM sampling temperature (`general.temperature`), or `undefined` when
+ * the request must not carry one. The default `-1` (any negative or unreadable
+ * value) keeps each model on its provider default: Claude 4.7+ answers HTTP 400
+ * to any other value, OpenAI reasoning models accept only 1, Gemini 3 is tuned
+ * for 1.0. Capped at 2, which most providers enforce.
  */
-export function getConfiguredTemperature(): number {
+export function getConfiguredTemperature(): number | undefined {
     const raw = ConfigService.get('general.temperature');
-    if (typeof raw !== 'number' || !Number.isFinite(raw)) {
-        return 0.7;
+    if (typeof raw !== 'number' || !Number.isFinite(raw) || raw < 0) {
+        return undefined;
     }
-    return Math.max(0, Math.min(2, raw));
+    return Math.min(2, raw);
 }
 
 /** Absolute cap on the output budget, so a hand-edited config can't ask a provider for millions of tokens. */

@@ -92,7 +92,7 @@ export function buildWebviewL10n() {
         maxDiffSize: vscode.l10n.t('Max diff size (characters)'),
         maxDiffSizeHint: vscode.l10n.t('-1 disables truncation. For Groq free tier set ~20000. Default 100000 ≈ 25000 tokens.'),
         temperature: vscode.l10n.t('Temperature'),
-        temperatureHint: vscode.l10n.t('LLM sampling temperature. 0 = deterministic, 0.7 = default, 1+ = more varied.'),
+        temperatureHint: vscode.l10n.t('-1 = provider default, not sent (recommended). 0 = deterministic, 1+ = more varied. Claude 4.7+ rejects other values.'),
         maxOutputTokens: vscode.l10n.t('Max output tokens'),
         maxOutputTokensHint: vscode.l10n.t('Output budget per message, all providers. Reasoning models spend it on thinking too, so a low value cuts the message off. Default 4096.'),
         geminiThinkingBudget: vscode.l10n.t('Thinking budget (Gemini 2.5)'),

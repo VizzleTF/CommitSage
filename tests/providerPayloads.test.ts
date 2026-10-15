@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach, beforeAll } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach, beforeAll } from 'vitest';
 
 // Loaded lazily in beforeAll: a static import would force module resolution
 // during vi.mock hoisting, before the mocked-fn consts below are initialized.
@@ -270,6 +270,46 @@ describe('OllamaService payload', () => {
         await expect(
             OllamaService.generateCommitMessage('hi', progress)
         ).rejects.toBeInstanceOf(ApiKeyInvalidError);
+    });
+});
+
+describe('temperature left at the provider default (-1)', () => {
+    beforeEach(() => {
+        SETTINGS['general.temperature'] = -1;
+    });
+    afterEach(() => {
+        SETTINGS['general.temperature'] = 0.7;
+    });
+
+    it('OpenAI-compatible sends no temperature', async () => {
+        mockedPostJson.mockResolvedValueOnce({ choices: [{ message: { content: 'feat: ok' } }] });
+        await generateViaOpenAICompatibleProvider('groq', 'hi', progress);
+        expect(mockedPostJson.mock.calls[0][1]).not.toHaveProperty('temperature');
+    });
+
+    it('Anthropic sends no temperature, which Claude 4.7+ would reject', async () => {
+        const { AnthropicService } = await import('../src/services/anthropicService');
+        mockedPostJson.mockResolvedValueOnce({ content: [{ type: 'text', text: 'feat: ok' }] });
+        await AnthropicService.generateCommitMessage('hi', progress);
+        expect(mockedPostJson.mock.calls[0][1]).not.toHaveProperty('temperature');
+    });
+
+    it('Ollama sends no options.temperature', async () => {
+        const { OllamaService } = await import('../src/services/ollamaService');
+        mockedPostJson.mockResolvedValueOnce({ message: { content: 'feat: ok' } });
+        await OllamaService.generateCommitMessage('hi', progress);
+        const options = (mockedPostJson.mock.calls[0][1] as { options: Record<string, unknown> }).options;
+        expect(options).toEqual({ num_predict: 4096 });
+    });
+
+    it('Gemini sends no temperature, topK or topP', async () => {
+        const { GeminiService } = await import('../src/services/geminiService');
+        mockedPostJson.mockResolvedValueOnce({ candidates: [{ content: { parts: [{ text: 'feat: ok' }] } }] });
+        await GeminiService.generateCommitMessage('hi', progress);
+        const cfg = (mockedPostJson.mock.calls[0][1] as { generationConfig: Record<string, unknown> }).generationConfig;
+        expect(cfg).not.toHaveProperty('temperature');
+        expect(cfg).not.toHaveProperty('topK');
+        expect(cfg).not.toHaveProperty('topP');
     });
 });
 

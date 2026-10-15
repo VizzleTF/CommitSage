@@ -675,10 +675,10 @@
         },
         "commitSage.general.temperature": {
           "type": "number",
-          "default": 0.7,
-          "minimum": 0,
+          "default": -1,
+          "minimum": -1,
           "maximum": 2,
-          "markdownDescription": "LLM sampling temperature applied to all providers. Lower (e.g. `0.2`) = more deterministic / repeatable commit messages; higher (e.g. `1.0`) = more varied wording. Range `[0, 2]`. For Ollama it's threaded into `options.temperature`; for Gemini into `generationConfig.temperature`; for OpenAI-compatible providers (OpenAI/Groq/OpenRouter/DeepSeek/xAI/Codestral/Custom) and Anthropic — into the top-level `temperature` field.",
+          "markdownDescription": "LLM sampling temperature applied to all providers. **`-1` (default) sends no temperature, so every model uses its provider's default** — Claude 4.7 and later reject any other value with HTTP 400, and OpenAI reasoning models accept only `1`. Set `0`–`2` to override: lower (e.g. `0.2`) = more deterministic / repeatable commit messages; higher (e.g. `1.0`) = more varied wording. For Ollama it's threaded into `options.temperature`; for Gemini into `generationConfig.temperature`; for OpenAI-compatible providers (OpenAI/Groq/OpenRouter/DeepSeek/xAI/Codestral/Mistral/Custom) and Anthropic — into the top-level `temperature` field.",
           "order": 18
         },
         "commitSage.general.maxDiffSize": {
