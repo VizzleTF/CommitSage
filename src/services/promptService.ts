@@ -80,7 +80,7 @@ export class PromptService {
             examplesBlock,
             languagePrompt,
             `Git diff to analyze:\n${diff}`,
-            `Git blame analysis:\n${blameAnalysis}`,
+            blameAnalysis && `Git blame analysis:\n${blameAnalysis}`,
             draftBlock,
             reminder,
             'Please provide ONLY the commit message, without any additional text or explanations.',

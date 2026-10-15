@@ -455,6 +455,12 @@
           "markdownDescription": "Show the repository's recent commit messages to the model as style examples, so the generated message matches the project's tone and conventions. The selected `#commitSage.commit.commitFormat#` still leads on structure (use the `previous` format to let the examples fully drive the style).",
           "order": 7
         },
+        "commitSage.commit.useBlameAsContext": {
+          "type": "boolean",
+          "default": false,
+          "markdownDescription": "Tell the model who last changed the lines this commit modifies (`git blame`). Off by default: it adds a git call per file and prompt text that rarely improves the message.",
+          "order": 8
+        },
         "commitSage.commit.recentCommitsCount": {
           "type": "number",
           "default": 5,

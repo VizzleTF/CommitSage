@@ -44,6 +44,7 @@ When Commit Sage changes a setting itself (the sidebar, startup dialogs, **Selec
 | `commitSage.commit.customInstructions` | `string` | `""` | Prompt text used when `useCustomInstructions` is `true`. |
 | `commitSage.commit.useRecentCommitsAsContext` | `boolean` | `false` | Sends recent commit messages to the model as style examples. The selected format still sets the structure. |
 | `commitSage.commit.recentCommitsCount` | `number` | `5` | Number of recent commits used as examples, with `useRecentCommitsAsContext` on or the `previous` format. Range `1`–`20`. Merge, version-bump, revert and WIP commits and messages under 10 characters are skipped. |
+| `commitSage.commit.useBlameAsContext` | `boolean` | `false` | Sends `git blame` authorship of the modified lines to the model. Adds one git call per changed file. |
 | `commitSage.commit.recentCommitsScope` | `string` | `"all"` | Whose commits are used as examples: `all` (any author) or `mine` (only yours). |
 | `commitSage.commit.commitlint.enabled` | `boolean` | `false` | Validates the message against the rules of the selected format, fixes mechanical violations and retries with the model. Has no effect with the `custom` and `previous` formats. |
 | `commitSage.commit.commitlint.maxRetries` | `number` | `3` | Maximum validation and refinement cycles. Range `1`–`10`. |

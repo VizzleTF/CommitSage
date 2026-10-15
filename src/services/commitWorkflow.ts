@@ -237,7 +237,7 @@ export class CommitWorkflow {
             ? allChangedFiles.filter(file => isIndexStaged(file.status))
             : allChangedFiles;
         // Blame reads HEAD, so a repo without commits has nothing to blame.
-        const blameAnalyses = await GitService.hasHead(repoPath, signal)
+        const blameAnalyses = ConfigService.get('commit.useBlameAsContext') && await GitService.hasHead(repoPath, signal)
             ? await mapLimit(
                 changedFiles.filter(file => !excluded.has(file.path)),
                 GIT_FANOUT_CONCURRENCY,

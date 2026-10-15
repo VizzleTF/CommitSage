@@ -132,6 +132,12 @@ describe('generatePrompt — reminder + commitlint', () => {
         expect(out.startsWith('MY RULES\n\nGit diff to analyze:\nDIFF')).toBe(true);
         expect(out).not.toContain('на русском');
     });
+
+    it('leaves the blame header out when there is no blame analysis', async () => {
+        cfg({ 'commit.commitFormat': 'conventional', 'commit.commitLanguage': 'english' });
+        const out = await PromptService.generatePrompt('/repo', 'DIFF', '', progress as never);
+        expect(out).not.toContain('Git blame analysis');
+    });
 });
 
 describe('loadRules', () => {

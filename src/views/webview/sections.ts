@@ -215,6 +215,8 @@ export function renderCommitSection(state: ViewState): HTMLElement {
             { disabled },
         ));
     }
+    field(body, state, 'commit.useBlameAsContext', undefined, (v, save, disabled) =>
+        makeCheckbox('use-blame', L.useBlame, v, save, { disabled, hint: L.useBlameHint }));
 
     field(body, state, 'commit.commitLanguage', L.language, (v, save, disabled) => makeSelect(
         'language',
