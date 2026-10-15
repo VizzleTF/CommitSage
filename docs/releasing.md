@@ -33,10 +33,12 @@ A `v*` tag pushed to `main` starts `.github/workflows/release.yml`. The workflow
    gh run watch <run-id> --exit-status
    ```
 
+   The two publish jobs run in the `marketplace` environment. If the environment requires a reviewer, the run waits until you approve the deployment on the run page (`gh run view <run-id> --web`).
+
 6. Confirm both marketplaces serve the new version:
 
    ```bash
-   npx -y @vscode/vsce show VizzleTF.geminicommit --json | jq -r '.versions[0].version'
+   npx vsce show VizzleTF.geminicommit --json | jq -r '.versions[0].version'
    curl -s https://open-vsx.org/api/VizzleTF/geminicommit | jq -r .version
    ```
 

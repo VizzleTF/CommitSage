@@ -31,7 +31,7 @@ jobs:
           fetch-depth: 0
 
       - name: Setup Node.js
-        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v6
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: '24'
           cache: 'npm'
@@ -115,11 +115,28 @@ jobs:
               core.setFailed(`VSIX file not found: ${vsixFile}`);
             }
 
+  # The publish jobs run vsce and ovsx from package-lock.json: `npx --no`
+  # fails instead of downloading whatever version npm has at that moment.
+  # Both CLIs read the token from the environment, so it never appears in
+  # the command line.
   publish-vscode:
     needs: build
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    environment: marketplace
     steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Setup Node.js
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '24'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
       - name: Download VSIX artifact
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
         with:
@@ -128,13 +145,26 @@ jobs:
       - name: Publish to Visual Studio Marketplace
         env:
           VSCE_PAT: ${{ secrets.VS_MARKETPLACE_TOKEN }}
-        run: npx @vscode/vsce publish --packagePath "geminicommit-${{ needs.build.outputs.version }}.vsix" -p "$VSCE_PAT"
+        run: npx --no vsce publish --packagePath "geminicommit-${{ needs.build.outputs.version }}.vsix"
 
   publish-openvsx:
     needs: build
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    environment: marketplace
     steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Setup Node.js
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '24'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
       - name: Download VSIX artifact
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
         with:
@@ -143,7 +173,7 @@ jobs:
       - name: Publish to Open VSX Registry
         env:
           OVSX_PAT: ${{ secrets.OPEN_VSX_TOKEN }}
-        run: npx ovsx publish "geminicommit-${{ needs.build.outputs.version }}.vsix" -p "$OVSX_PAT"
+        run: npx --no ovsx publish "geminicommit-${{ needs.build.outputs.version }}.vsix"
 
   notify:
     needs: [build, release, publish-vscode, publish-openvsx]
