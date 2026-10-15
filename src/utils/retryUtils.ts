@@ -16,7 +16,7 @@ export class RetryUtils {
 
     /** 1 s, 2 s, 4 s… each scaled by a random 0.5–1.5 so clients that failed together do not retry together. */
     static calculateRetryDelay(attempt: number): number {
-        return 1000 * Math.pow(2, attempt - 1) * (0.5 + Math.random());
+        return 1000 * Math.pow(2, attempt - 1) * (0.5 + Math.random()); // NOSONAR: backoff jitter, not a security use
     }
 
     /** Resolves after `ms`, or rejects with the abort reason as soon as `signal` aborts. */
