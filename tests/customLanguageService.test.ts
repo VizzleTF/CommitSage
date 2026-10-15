@@ -165,8 +165,9 @@ describe('getTemplate', () => {
 
     it('generates a new template when no cache exists', async () => {
         mockGenerate.mockResolvedValue({ message: 'fresh', model: 'm' });
-        const result = await CustomLanguageService.getTemplate('conventional' as never, 'Klingon', progress as never);
+        const signal = new AbortController().signal;
+        const result = await CustomLanguageService.getTemplate('conventional' as never, 'Klingon', progress as never, signal);
         expect(result).toBe('fresh');
-        expect(mockGenerate).toHaveBeenCalled();
+        expect(mockGenerate).toHaveBeenCalledWith('gemini', expect.any(String), progress, { maxTokens: 4096, signal });
     });
 });

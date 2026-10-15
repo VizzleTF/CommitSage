@@ -83,7 +83,8 @@ export class CustomLanguageService {
     static async generateAndCacheTemplate(
         format: CommitFormat,
         customLanguageName: string,
-        progress: ProgressReporter
+        progress: ProgressReporter,
+        signal?: AbortSignal,
     ): Promise<string> {
         progress.report({ message: `Translating commit format to ${customLanguageName}...`, increment: 20 });
 
@@ -111,7 +112,7 @@ Rules:
 --- ${customLanguageName.toUpperCase()} TRANSLATION ---`;
 
         const provider = ConfigService.getProvider();
-        const result = await AIServiceFactory.generateCommitMessage(provider, translationPrompt, progress, { maxTokens: 4096 });
+        const result = await AIServiceFactory.generateCommitMessage(provider, translationPrompt, progress, { maxTokens: 4096, signal });
         const translatedTemplate = result.message.trim();
 
         await this.saveCachedTemplate(format, customLanguageName, translatedTemplate);
@@ -121,7 +122,8 @@ Rules:
     static async getTemplate(
         format: CommitFormat,
         customLanguageName: string,
-        progress: ProgressReporter
+        progress: ProgressReporter,
+        signal?: AbortSignal,
     ): Promise<string> {
         if (!customLanguageName.trim()) {
             Logger.warn('customLanguageName is empty, falling back to English template');
@@ -133,6 +135,6 @@ Rules:
             return cached;
         }
 
-        return this.generateAndCacheTemplate(format, customLanguageName, progress);
+        return this.generateAndCacheTemplate(format, customLanguageName, progress, signal);
     }
 }

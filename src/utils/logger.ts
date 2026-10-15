@@ -67,6 +67,10 @@ export class Logger {
         }
     }
 
+    static show(): void {
+        this.channel?.show(true);
+    }
+
     static async showError(message: string, ...actions: string[]): Promise<string | undefined> {
         return await vscode.window.showErrorMessage(`Commit Sage: ${this.redact(message)}`, ...actions);
     }

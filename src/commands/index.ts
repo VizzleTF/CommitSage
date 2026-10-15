@@ -7,7 +7,11 @@ import { CommitWorkflow } from '../services/commitWorkflow';
 import { Logger } from '../utils/logger';
 import { toError } from '../utils/errorUtils';
 
-export function registerCommands(context: vscode.ExtensionContext): void {
+/**
+ * @param ready settles when activation finishes its async setup; generation
+ *   reads the project config and the git extension, so it waits for it.
+ */
+export function registerCommands(context: vscode.ExtensionContext, ready: Promise<unknown>): void {
     Logger.log('Registering commands and views');
 
     try {
@@ -15,7 +19,10 @@ export function registerCommands(context: vscode.ExtensionContext): void {
             // generateAndSetCommitMessage handles and reports its own errors.
             vscode.commands.registerCommand(
                 'commitsage.generateCommitMessage',
-                (repository?: vscode.SourceControl) => CommitWorkflow.generateAndSetCommitMessage(repository),
+                async (repository?: vscode.SourceControl) => {
+                    await ready;
+                    return CommitWorkflow.generateAndSetCommitMessage(repository);
+                },
             ),
             ...registerSetApiKeyCommands(),
             registerSelectGeminiModelCommand(),

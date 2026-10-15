@@ -82,6 +82,7 @@
         "command": "commitsage.generateCommitMessage",
         "title": "%command.generateCommitMessage.title%",
         "category": "%command.category%",
+        "enablement": "scmProviderRootUri not in commitsage.generatingRepos",
         "icon": {
           "light": "./icons/button-light.svg",
           "dark": "./icons/button-dark.svg"

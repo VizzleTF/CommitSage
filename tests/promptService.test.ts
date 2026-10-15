@@ -179,7 +179,7 @@ describe('generatePrompt — recent-commit style examples', () => {
 
         const out = await PromptService.generatePrompt('/repo', 'DIFF', 'BLAME', progress as never);
 
-        expect(mockRecent).toHaveBeenCalledWith('/repo', 5, 'all');
+        expect(mockRecent).toHaveBeenCalledWith('/repo', 5, 'all', undefined);
         expect(out).toContain('feat: alpha');
         expect(out).toContain('fix: beta');
         expect(out).toContain('STYLE reference only'); // format leads
@@ -204,10 +204,27 @@ describe('generatePrompt — recent-commit style examples', () => {
 
         const out = await PromptService.generatePrompt('/repo', 'DIFF', 'BLAME', progress as never);
 
-        expect(mockRecent).toHaveBeenCalledWith('/repo', 3, 'mine');
+        expect(mockRecent).toHaveBeenCalledWith('/repo', 3, 'mine', undefined);
         expect(mockGetTemplate).toHaveBeenCalledWith('previous', 'english');
         expect(out).toContain('match their style');
         expect(out).not.toContain('STYLE reference only');
+    });
+
+    it('passes the abort signal to the git log read and the template translation', async () => {
+        cfg({
+            'commit.commitFormat': 'conventional',
+            'commit.commitLanguage': 'custom',
+            'commit.customLanguageName': 'Klingon',
+            'commit.useRecentCommitsAsContext': true,
+            'commit.recentCommitsCount': 2,
+            'commit.recentCommitsScope': 'all',
+        });
+        const signal = new AbortController().signal;
+
+        await PromptService.generatePrompt('/repo', 'DIFF', 'BLAME', progress as never, '', '', signal);
+
+        expect(mockRecent).toHaveBeenCalledWith('/repo', 2, 'all', signal);
+        expect(mockGetCustomTemplate).toHaveBeenCalledWith('conventional', 'Klingon', progress, signal);
     });
 
     it('previous format with no history falls back to the conventional template', async () => {

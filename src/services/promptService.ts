@@ -43,10 +43,10 @@ const LANGUAGE_PROMPTS: Record<Exclude<CommitLanguage, 'custom'>, string> = {
 };
 
 export class PromptService {
-    private static resolveTemplate(format: CommitFormat, progress: ProgressReporter): Promise<string> {
+    private static resolveTemplate(format: CommitFormat, progress: ProgressReporter, signal?: AbortSignal): Promise<string> {
         const commitLanguage = ConfigService.get('commit.commitLanguage');
         if (commitLanguage === 'custom') {
-            return CustomLanguageService.getTemplate(format, ConfigService.get('commit.customLanguageName'), progress);
+            return CustomLanguageService.getTemplate(format, ConfigService.get('commit.customLanguageName'), progress, signal);
         }
         return Promise.resolve(getTemplate(format, commitLanguage as CommitLanguage));
     }
@@ -92,14 +92,14 @@ export class PromptService {
      * `useRecentCommitsAsContext` or picked the `previous` format. Empty when
      * disabled or when the repo has no usable history (best-effort context).
      */
-    private static loadRecentCommitExamples(repoPath: string, formatSetting: string): Promise<string[]> {
+    private static loadRecentCommitExamples(repoPath: string, formatSetting: string, signal?: AbortSignal): Promise<string[]> {
         const enabled = ConfigService.get('commit.useRecentCommitsAsContext') || formatSetting === 'previous';
         if (!enabled) {
             return Promise.resolve([]);
         }
         const count = ConfigService.get('commit.recentCommitsCount');
         const scope = ConfigService.get('commit.recentCommitsScope') as 'all' | 'mine';
-        return GitService.getRecentCommitMessages(repoPath, count, scope);
+        return GitService.getRecentCommitMessages(repoPath, count, scope, signal);
     }
 
     /**
@@ -136,8 +136,9 @@ export class PromptService {
      *   off — they ride along with the format template so the model sees
      *   exactly what the validator will check.
      * @param draft the developer's text from the commit box, or '' for none.
+     * @param signal cancels the git log read and a custom-language translation.
      */
-    static async generatePrompt(repoPath: string, diff: string, blameAnalysis: string, progress: ProgressReporter, rules = '', draft = ''): Promise<string> {
+    static async generatePrompt(repoPath: string, diff: string, blameAnalysis: string, progress: ProgressReporter, rules = '', draft = '', signal?: AbortSignal): Promise<string> {
         const useCustomInstructions = ConfigService.get('commit.useCustomInstructions');
         const customInstructions = ConfigService.get('commit.customInstructions');
         const draftBlock = this.buildDraftBlock(draft);
@@ -147,7 +148,7 @@ export class PromptService {
         }
 
         const formatSetting = ConfigService.get('commit.commitFormat');
-        const examples = await this.loadRecentCommitExamples(repoPath, formatSetting);
+        const examples = await this.loadRecentCommitExamples(repoPath, formatSetting, signal);
 
         // `custom` without usable instructions has no template of its own, and
         // `previous` needs example commits to define its style; both fall back
@@ -157,7 +158,7 @@ export class PromptService {
             ? 'conventional'
             : formatSetting as CommitFormat;
 
-        const template = await this.resolveTemplate(format, progress);
+        const template = await this.resolveTemplate(format, progress, signal);
         const reminder = format === 'detailed' ? DETAILED_FORMAT_REMINDER : STRICT_FORMAT_REMINDER;
         const mainInstructions = rules ? `${template}\n\n${rules}` : template;
 

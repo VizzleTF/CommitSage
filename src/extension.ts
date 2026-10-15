@@ -16,21 +16,15 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     Logger.initialize();
     Logger.log('Starting extension activation');
 
-    try {
-        await ConfigService.initialize(context);
-        RefStore.init(context);
-        ApiKeyManager.initialize(context.secrets);
-        await TelemetryService.initialize(context);
-
-        Logger.log('Validating Git extension');
-        await GitRepositoryProvider.validateGitExtension();
-    } catch (error) {
-        Logger.error('Failed during initialization:', toError(error));
-        void Logger.showError(vscode.l10n.t('Initialization failed: {0}', toError(error).message));
+    RefStore.init(context);
+    ApiKeyManager.initialize(context.secrets);
+    // Commands go in before the slow setup: a click during activation waits for
+    // it in the handler, and a failed setup no longer leaves "command not found".
+    const ready = initialize(context);
+    registerCommands(context, ready);
+    if (!await ready) {
         return;
     }
-
-    registerCommands(context);
 
     context.subscriptions.push(
         vscode.window.registerWebviewViewProvider(
@@ -53,6 +47,21 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     Logger.log('Extension activated successfully');
 
     void validateGeminiModelOnStartup();
+}
+
+async function initialize(context: vscode.ExtensionContext): Promise<boolean> {
+    try {
+        await ConfigService.initialize(context);
+        await TelemetryService.initialize(context);
+
+        Logger.log('Validating Git extension');
+        await GitRepositoryProvider.validateGitExtension();
+        return true;
+    } catch (error) {
+        Logger.error('Failed during initialization:', toError(error));
+        void Logger.showError(vscode.l10n.t('Initialization failed: {0}', toError(error).message));
+        return false;
+    }
 }
 
 export async function deactivate(): Promise<void> {

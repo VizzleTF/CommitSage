@@ -55,7 +55,7 @@ export class AIService {
         }
         const truncatedDiff = truncateDiff(maskedDiff, maxDiffLength);
         const prompt = await PromptService.generatePrompt(
-            repoPath, truncatedDiff, capBlameAnalysis(blameAnalysis, maxDiffLength), progress, rules, context.draft,
+            repoPath, truncatedDiff, capBlameAnalysis(blameAnalysis, maxDiffLength), progress, rules, context.draft, context.signal,
         );
 
         progress.report({ message: 'Generating commit message...', increment: 50 });

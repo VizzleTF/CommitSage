@@ -9,10 +9,11 @@ import { TelemetryService } from './telemetryService';
 import { AIService } from './aiService';
 import { ApiKeyManager } from './apiKeyManager';
 import { UserCancelledError, ApiKeyInvalidError } from '../models/errors';
-import { toError, sanitizeErrorForTelemetry } from '../utils/errorUtils';
+import { toError, sanitizeErrorForTelemetry, categorizeError } from '../utils/errorUtils';
 import { GIT_FANOUT_CONCURRENCY, mapLimit } from '../utils/concurrency';
 import { applyRef, extractRef } from '../utils/refUtils';
 import { RefStore } from './refStore';
+import { providerMeta } from './providerCatalog';
 
 const MAX_API_KEY_RETRIES = 3;
 
@@ -20,6 +21,9 @@ export class CommitWorkflow {
     // Last message written to each repository's commit box this session, so
     // a re-run does not take Commit Sage's own output for the developer's draft.
     private static readonly lastGenerated = new Map<string, string>();
+    // Root URIs of the repositories with a run in progress, in the form of the
+    // `scmProviderRootUri` context key that the command's `enablement` checks.
+    private static readonly running = new Set<string>();
 
     static async generateAndSetCommitMessage(
         sourceControlRepository?: vscode.SourceControl,
@@ -33,50 +37,20 @@ export class CommitWorkflow {
             // Reassigned so the invalid-API-key retry reuses the picked repo.
             sourceControlRepository = await GitRepositoryProvider.getActiveRepository(sourceControlRepository);
 
-            // Pre-check API key if required for the provider
-            const provider = ConfigService.getProvider();
-            if (ApiKeyManager.requiresKeyForCurrentConfig(provider)) {
-                await ApiKeyManager.getKey(provider);
+            const runKey = sourceControlRepository.rootUri?.toString() ?? '';
+            if (this.running.has(runKey)) {
+                void vscode.window.showInformationMessage(vscode.l10n.t(
+                    'Commit Sage is already generating a message for this repository.',
+                ));
+                return;
             }
-
-            // Resolve the ref before generation (may show an input box for the
-            // 'prompt' source) so the progress UI stays clean.
-            const ref = await this.resolveRef(sourceControlRepository);
-
-            await vscode.window.withProgress({
-                location: vscode.ProgressLocation.Notification,
-                title: vscode.l10n.t('Commit Sage'),
-                cancellable: true,
-            }, async (progress, token) => {
-                const controller = new AbortController();
-                const cancelSubscription = token.onCancellationRequested(() => {
-                    controller.abort();
-                });
-                try {
-                    const commitMessage = await this.generateAndApplyMessage(
-                        progress,
-                        sourceControlRepository!,
-                        token,
-                        controller.signal,
-                        ref
-                    );
-                    Logger.log(`Commit message generated: ${commitMessage.message}`);
-                } catch (error) {
-                    // Anything that fails *after* the user hit Cancel is a
-                    // symptom of the abort, not a real failure: git spawns and
-                    // fetch both reject with AbortError, and Gemini's auto mode
-                    // walks the rest of its fallback list first. Left as-is the
-                    // user gets an error popup ("operation was aborted") plus a
-                    // message_generation_failed telemetry event for their own
-                    // cancellation.
-                    if (controller.signal.aborted && !(error instanceof UserCancelledError)) {
-                        throw new UserCancelledError();
-                    }
-                    throw error;
-                } finally {
-                    cancelSubscription.dispose();
-                }
-            });
+            this.setRunning(runKey, true);
+            try {
+                await this.generateWithProgress(sourceControlRepository);
+            } finally {
+                // Released before the catch below: the invalid-key retry starts a run of its own.
+                this.setRunning(runKey, false);
+            }
         } catch (error: unknown) {
             // Don't show error for user cancellation
             if (error instanceof UserCancelledError) {
@@ -90,6 +64,7 @@ export class CommitWorkflow {
                     Logger.error('Max API key retries reached', error);
                     await this.handleError(new Error(
                         vscode.l10n.t('Invalid or expired API key. Maximum retry attempts reached.'),
+                        { cause: error },
                     ));
                     return;
                 }
@@ -117,6 +92,62 @@ export class CommitWorkflow {
             });
             await this.handleError(err);
         }
+    }
+
+    private static setRunning(runKey: string, running: boolean): void {
+        if (running) {
+            this.running.add(runKey);
+        } else {
+            this.running.delete(runKey);
+        }
+        void vscode.commands.executeCommand('setContext', 'commitsage.generatingRepos', [...this.running]);
+    }
+
+    private static async generateWithProgress(sourceControlRepository: vscode.SourceControl): Promise<void> {
+        // Pre-check API key if required for the provider
+        const provider = ConfigService.getProvider();
+        if (ApiKeyManager.requiresKeyForCurrentConfig(provider)) {
+            await ApiKeyManager.getKey(provider);
+        }
+
+        // Resolve the ref before generation (may show an input box for the
+        // 'prompt' source) so the progress UI stays clean.
+        const ref = await this.resolveRef(sourceControlRepository);
+
+        await vscode.window.withProgress({
+            location: vscode.ProgressLocation.Notification,
+            title: vscode.l10n.t('Commit Sage'),
+            cancellable: true,
+        }, async (progress, token) => {
+            const controller = new AbortController();
+            const cancelSubscription = token.onCancellationRequested(() => {
+                controller.abort();
+            });
+            try {
+                const commitMessage = await this.generateAndApplyMessage(
+                    progress,
+                    sourceControlRepository,
+                    token,
+                    controller.signal,
+                    ref
+                );
+                Logger.log(`Commit message generated: ${commitMessage.message}`);
+            } catch (error) {
+                // Anything that fails *after* the user hit Cancel is a
+                // symptom of the abort, not a real failure: git spawns and
+                // fetch both reject with AbortError, and Gemini's auto mode
+                // walks the rest of its fallback list first. Left as-is the
+                // user gets an error popup ("operation was aborted") plus a
+                // message_generation_failed telemetry event for their own
+                // cancellation.
+                if (controller.signal.aborted && !(error instanceof UserCancelledError)) {
+                    throw new UserCancelledError();
+                }
+                throw error;
+            } finally {
+                cancelSubscription.dispose();
+            }
+        });
     }
 
     private static async resolveRef(repository?: vscode.SourceControl): Promise<string> {
@@ -249,7 +280,26 @@ export class CommitWorkflow {
 
     private static async handleError(error: Error): Promise<void> {
         Logger.error('Error in CommitWorkflow:', error);
-        await vscode.window.showErrorMessage(vscode.l10n.t('Commit Sage: {0}', error.message));
+        const category = categorizeError(error);
+        const setKey = vscode.l10n.t('Set API Key');
+        const openSettings = vscode.l10n.t('Open Settings');
+        const showLog = vscode.l10n.t('Show Log');
+        // The action most likely to fix it first: a key for auth errors, the
+        // endpoint, model or timeout for connection and request errors.
+        const fix = category === 'auth' ? setKey
+            : category === 'network' || category === 'timeout' || category === 'http' ? openSettings
+            : undefined;
+        const picked = await vscode.window.showErrorMessage(
+            vscode.l10n.t('Commit Sage: {0}', error.message),
+            ...(fix ? [fix, showLog] : [showLog]),
+        );
+        if (picked === setKey) {
+            void vscode.commands.executeCommand(providerMeta(ConfigService.getProvider()).setCmd);
+        } else if (picked === openSettings) {
+            void vscode.commands.executeCommand('workbench.action.openSettings', 'commitSage');
+        } else if (picked === showLog) {
+            Logger.show();
+        }
     }
 
     private static async handleAutoCommit(

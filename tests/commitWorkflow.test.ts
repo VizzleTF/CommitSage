@@ -50,6 +50,7 @@ vi.mock('../src/services/telemetryService', () => ({
 
 import { CommitWorkflow } from '../src/services/commitWorkflow';
 import { ApiKeyInvalidError } from '../src/models/errors';
+import { NetworkError } from '../src/utils/httpUtils';
 
 beforeEach(() => {
     vi.restoreAllMocks();
@@ -79,7 +80,7 @@ describe('CommitWorkflow on a 401', () => {
         expect(promptForKey).not.toHaveBeenCalled();
         expect(removeKey).not.toHaveBeenCalled();
         expect(generate).toHaveBeenCalledOnce();
-        expect(showError).toHaveBeenCalledWith(expect.stringContaining('commitSage.ollama.useAuthToken'));
+        expect(showError).toHaveBeenCalledWith(expect.stringContaining('commitSage.ollama.useAuthToken'), 'Show Log');
     });
 
     it('asks for a new key when the key is sent', async () => {
@@ -144,5 +145,62 @@ describe('CommitWorkflow commit box draft', () => {
         await CommitWorkflow.generateAndSetCommitMessage();
 
         expect(repo.inputBox.value).toBe('my draft');
+    });
+});
+
+describe('CommitWorkflow concurrent runs', () => {
+    it('does not start a second run while the repository is still generating', async () => {
+        let finish!: (value: unknown) => void;
+        generate.mockReset().mockReturnValueOnce(new Promise(resolve => { finish = resolve; }));
+        const info = vi.spyOn(vscode.window, 'showInformationMessage');
+        const exec = vi.spyOn(vscode.commands, 'executeCommand');
+
+        const first = CommitWorkflow.generateAndSetCommitMessage();
+        await vi.waitFor(() => expect(generate).toHaveBeenCalledOnce());
+        await CommitWorkflow.generateAndSetCommitMessage();
+
+        expect(generate).toHaveBeenCalledOnce();
+        expect(info).toHaveBeenCalledWith(expect.stringContaining('already generating'));
+        expect(exec).toHaveBeenCalledWith('setContext', 'commitsage.generatingRepos', [String(repo.rootUri)]);
+
+        finish({ message: 'feat: x', model: 'm' });
+        await first;
+        expect(exec).toHaveBeenLastCalledWith('setContext', 'commitsage.generatingRepos', []);
+
+        generate.mockResolvedValueOnce({ message: 'feat: y', model: 'm' });
+        await CommitWorkflow.generateAndSetCommitMessage();
+        expect(generate).toHaveBeenCalledTimes(2);
+    });
+});
+
+describe('CommitWorkflow error notifications', () => {
+    it('offers the settings for a connection error', async () => {
+        generate.mockReset().mockRejectedValue(new Error('Failed', { cause: new NetworkError('ECONNREFUSED', null) }));
+        const showError = vi.spyOn(vscode.window, 'showErrorMessage').mockResolvedValue('Open Settings' as never);
+        const exec = vi.spyOn(vscode.commands, 'executeCommand');
+
+        await CommitWorkflow.generateAndSetCommitMessage();
+
+        expect(showError).toHaveBeenCalledWith(expect.any(String), 'Open Settings', 'Show Log');
+        expect(exec).toHaveBeenCalledWith('workbench.action.openSettings', 'commitSage');
+    });
+
+    it('offers the provider key command once the key retries run out', async () => {
+        const showError = vi.spyOn(vscode.window, 'showErrorMessage').mockResolvedValue('Set API Key' as never);
+        const exec = vi.spyOn(vscode.commands, 'executeCommand');
+
+        await CommitWorkflow.generateAndSetCommitMessage(undefined, 3);
+
+        expect(showError).toHaveBeenCalledWith(expect.stringContaining('Maximum retry'), 'Set API Key', 'Show Log');
+        expect(exec).toHaveBeenCalledWith('commitsage.setOllamaAuthToken');
+    });
+
+    it('offers only the log for other errors', async () => {
+        generate.mockReset().mockRejectedValue(new Error('boom'));
+        const showError = vi.spyOn(vscode.window, 'showErrorMessage');
+
+        await CommitWorkflow.generateAndSetCommitMessage();
+
+        expect(showError).toHaveBeenCalledWith('Commit Sage: boom', 'Show Log');
     });
 });
