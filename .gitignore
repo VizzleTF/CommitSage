@@ -16,3 +16,4 @@ test-gemini-api.sh
 .cursor
 .vscode
 .claude
+eval-out/

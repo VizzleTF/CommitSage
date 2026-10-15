@@ -1,0 +1,8 @@
+feat(scm): show a spinner in place of the generate button while running
+
+The guard from the previous commit disabled the SCM button during a
+run, but a greyed-out icon did not tell users that generation was in
+progress. While a repository has a run in flight, its SCM title now
+shows a spinning icon instead; clicking it reports the active run.
+
+Closes #492

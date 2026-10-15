@@ -1,0 +1,7 @@
+feat(providers): add Anthropic, DeepSeek, Groq, OpenRouter, xAI, custom OpenAI-compatible providers
+
+- New services: anthropic, deepseek, groq, openrouter, xai, customOpenAI, openAICompatible base
+- New detailed template format
+- Settings webview, API key manager, validator, prompt service updates for new providers
+- Provider docs and README updates
+- Tests for new provider payloads and key manager

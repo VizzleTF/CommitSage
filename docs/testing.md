@@ -138,6 +138,36 @@ The mock server cannot intercept providers without a `baseUrl` setting, because 
 3. Call `installDefaultUiStubs({ inputBox: 'e2e-test-key' })` in `beforeEach`, so a UI path without a stub does not block the run.
 4. Run `npm run test:e2e -- --grep "<DESCRIBE_TEXT>"` while you iterate.
 
+## Prompt quality eval
+
+Unit and E2E tests check the prompt's shape, not the quality of the message a model writes from it. Before you change the prompt, compare the replies of a real model before and after the change. `tests/promptEval.test.ts` sends every diff in `tests/fixtures/eval/` through the full generation pipeline and writes the replies, next to the commit message that was actually used, to `eval-out/<EVAL_LABEL>.md`. It is skipped unless `COMMITSAGE_EVAL` is set.
+
+1. Check out the version without your change in a worktree:
+
+   ```bash
+   git worktree add ../cs-base HEAD
+   (cd ../cs-base && npm ci)
+   ```
+
+2. Run the eval in both trees with the same settings:
+
+   ```bash
+   export EVAL_SETTINGS='{"provider.type":"ollama","ollama.model":"qwen2.5-coder:1.5b"}'
+   (cd ../cs-base && COMMITSAGE_EVAL=1 EVAL_LABEL=old EVAL_OUT=$PWD/../CommitSage/eval-out npx vitest run tests/promptEval.test.ts)
+   COMMITSAGE_EVAL=1 EVAL_LABEL=new npx vitest run tests/promptEval.test.ts
+   ```
+
+3. Compare the reports: `code --diff eval-out/old.md eval-out/new.md`.
+
+| Variable | Meaning |
+|---|---|
+| `EVAL_SETTINGS` | JSON object of `commitSage.*` settings, e.g. `{"provider.type":"gemini","gemini.model":"gemini-2.5-flash-lite"}`. `general.temperature` defaults to `0`. |
+| `EVAL_API_KEY` | API key for a provider that needs one. |
+| `EVAL_RUNS` | Replies per fixture, default `3`. |
+| `EVAL_LABEL`, `EVAL_OUT` | Report name and folder, default `eval` and `eval-out`. |
+
+Check at least one small local model (`qwen2.5-coder:1.5b`, `llama3.2:3b`) and one cheap API model. To check another language, add `"commit.commitLanguage":"russian"` to `EVAL_SETTINGS`. To add a fixture, save a diff as `<name>.diff` and the reference message as `<name>.expected.txt`.
+
 ## CI
 
 The reusable workflow `.github/workflows/test.yml` runs the tests. `pr-check.yml` calls it for pull requests to `main`, `release.yml` for `v*` tags, and `security-release.yml` for Dependabot pull requests that change `package.json` or `package-lock.json` when its security check reports a critical advisory. On Node.js 24 it runs:

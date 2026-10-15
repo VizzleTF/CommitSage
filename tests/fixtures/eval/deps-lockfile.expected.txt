@@ -1,0 +1,15 @@
+chore(deps): bump @amplitude/analytics-node from 1.5.76 to 1.5.79
+
+Bumps [@amplitude/analytics-node](https://github.com/amplitude/Amplitude-TypeScript) from 1.5.76 to 1.5.79.
+- [Release notes](https://github.com/amplitude/Amplitude-TypeScript/releases)
+- [Commits](https://github.com/amplitude/Amplitude-TypeScript/compare/@amplitude/analytics-node@1.5.76...@amplitude/analytics-node@1.5.79)
+
+---
+updated-dependencies:
+- dependency-name: "@amplitude/analytics-node"
+  dependency-version: 1.5.79
+  dependency-type: direct:production
+  update-type: version-update:semver-patch
+...
+
+Signed-off-by: dependabot[bot] <support@github.com>

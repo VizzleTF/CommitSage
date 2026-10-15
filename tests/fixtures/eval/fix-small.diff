@@ -1,0 +1,13 @@
+diff --git a/src/utils/retryUtils.ts b/src/utils/retryUtils.ts
+index cd9f3ae..9e55622 100644
+--- a/src/utils/retryUtils.ts
++++ b/src/utils/retryUtils.ts
+@@ -16,7 +16,7 @@ export class RetryUtils {
+ 
+     /** 1 s, 2 s, 4 s… each scaled by a random 0.5–1.5 so clients that failed together do not retry together. */
+     static calculateRetryDelay(attempt: number): number {
+-        return 1000 * Math.pow(2, attempt - 1) * (0.5 + Math.random());
++        return 1000 * Math.pow(2, attempt - 1) * (0.5 + Math.random()); // NOSONAR: backoff jitter, not a security use
+     }
+ 
+     /** Resolves after `ms`, or rejects with the abort reason as soon as `signal` aborts. */

@@ -1,0 +1,3 @@
+fix(ai): mark retry jitter as non-security randomness for Sonar
+
+SonarCloud flags Math.random() (typescript:S2245) and failed the quality gate on new_security_rating. The value only spreads retry timing; it guards nothing.

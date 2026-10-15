@@ -1,0 +1,3604 @@
+diff --git a/.vscodeignore b/.vscodeignore
+index 53e79e6..dda2ea6 100644
+--- a/.vscodeignore
++++ b/.vscodeignore
+@@ -12,6 +12,7 @@ docs/**
+ .commitsage/**
+ TECH_DEBT_AUDIT.md
+ VSCODE_API_AUDIT.md
++new providers.md
+ 
+ # Configuration files
+ .gitignore
+diff --git a/README.md b/README.md
+index eba0126..ebca57b 100644
+--- a/README.md
++++ b/README.md
+@@ -3,10 +3,16 @@
+ <img alt="Visual Studio Marketplace Version" src="https://img.shields.io/visual-studio-marketplace/v/VizzleTF.geminicommit"> <img alt="Visual Studio Marketplace Last Updated" src="https://img.shields.io/visual-studio-marketplace/last-updated/VizzleTF.geminicommit"> <img alt="Visual Studio Marketplace Installs" src="https://img.shields.io/visual-studio-marketplace/i/VizzleTF.geminicommit"> <img alt="Visual Studio Marketplace Rating" src="https://img.shields.io/visual-studio-marketplace/stars/VizzleTF.geminicommit"> [![Ask DeepWiki](deepwiki.png)](https://deepwiki.com/VizzleTF/CommitSage)
+ 
+ Commit Sage is a VSCode extension that automatically generates commit messages using various AI providers:
+-- Gemini (default, requires API key, free)
+-- OpenAI (requires API key or compatible provider)
+-- Codestral (requires API key, free)
+-- Ollama (local, free)
++- **Gemini** (default, requires API key, free tier)
++- **OpenRouter** (300+ models behind one key, free-tier models available)
++- **Groq** (fast inference, generous free tier)
++- **Anthropic Claude** (requires API key)
++- **OpenAI** (requires API key)
++- **DeepSeek** (works without VPN in restricted regions)
++- **xAI Grok** (requires API key)
++- **Codestral** (requires API key, free tier)
++- **Ollama** (local, free, no key)
++- **Custom OpenAI-compatible** — LM Studio, vLLM, llama.cpp, LocalAI, Together AI, Fireworks, any self-hosted endpoint
+ 
+ ![Commit Sage in action](example.gif)
+ 
+@@ -23,39 +29,52 @@ Commit Sage is a VSCode extension that automatically generates commit messages u
+ 
+ ## Configuration
+ 
+-Get your API key:
+-   - For Gemini: Get it from [Google AI Studio](https://makersuite.google.com/app/apikey)
+-   - For Codestral: [Mistral AI Console](https://console.mistral.ai/codestral)
+-   - For custom endpoint: Use your OpenAI API key or other compatible service
++The fastest way is the **Commit Sage sidebar** (Activity Bar icon): pick a provider, paste an API key, and the model dropdown is populated live from each provider's `/models` endpoint.
++
++Where to get keys:
++- **Gemini** — [Google AI Studio](https://makersuite.google.com/app/apikey)
++- **OpenRouter** — [openrouter.ai/keys](https://openrouter.ai/keys) (one key → 300+ models)
++- **Groq** — [console.groq.com/keys](https://console.groq.com/keys)
++- **Anthropic** — [console.anthropic.com/settings/keys](https://console.anthropic.com/settings/keys)
++- **OpenAI** — [platform.openai.com/api-keys](https://platform.openai.com/api-keys)
++- **DeepSeek** — [platform.deepseek.com/api_keys](https://platform.deepseek.com/api_keys)
++- **xAI** — [console.x.ai](https://console.x.ai/)
++- **Codestral** — [Mistral AI Console](https://console.mistral.ai/codestral)
++- **Ollama** — no key needed (local)
++- **Custom** — depends on your endpoint; key is optional
+ 
+ ### AI Provider Settings
+ 
+ - **Provider Selection** (`commitSage.provider.type`):
+-  - Choose between: `gemini`, `openai`, `codestral`, `ollama`
++  - Choose between: `gemini`, `openrouter`, `groq`, `anthropic`, `openai`, `deepseek`, `xai`, `codestral`, `ollama`, `custom`
+   - Default: `gemini`
+ 
+-- **Gemini Settings**:
+-  - Model (`commitSage.gemini.model`):
+-    - Default: `auto` (recommended) — see [Auto Mode](#auto-mode) below.
+-    - Explicit options are also available; the canonical list lives in `package.json` (`commitSage.gemini.model.enum`) and is updated as Google ships new models.
+-  - **Auto Mode** (`auto`):
+-    - Automatically fetches the list of available Gemini models from the API
+-    - Tries each model sequentially until one succeeds
+-    - Useful when you don't want to manually update model names or when specific models are unavailable
+-    - Provides maximum reliability by automatically switching to working models
+-
+-- **OpenAI Settings**:
+-  - Model (`commitSage.openai.model`): Default `gpt-3.5-turbo`
+-  - Base URL (`commitSage.openai.baseUrl`): For custom endpoints/Azure
+-
+-- **Codestral Settings**:
+-  - Model (`commitSage.codestral.model`):
+-    - Options: `codestral-2405`, `codestral-latest`
+-    - Default: `codestral-latest`
+-
+-- **Ollama Settings**:
+-  - Base URL (`commitSage.ollama.baseUrl`): Default `http://localhost:11434`
+-  - Model (`commitSage.ollama.model`): Default `llama3.2`
++- **Gemini** — Model (`commitSage.gemini.model`): default `auto` (recommended). Auto mode fetches the live model list from the API and tries each sequentially until one succeeds — robust to model deprecations.
++
++- **OpenRouter** — Model (`commitSage.openrouter.model`): default `meta-llama/llama-3.3-70b-instruct:free`. Toggle `commitSage.openrouter.preferFreeModels` to filter the model picker to free models only (default `true`).
++
++- **Groq** — Model (`commitSage.groq.model`): default `llama-3.3-70b-versatile`. Free tier covers ~14 400 RPD on `llama-3.1-8b-instant`.
++
++- **Anthropic** — Model (`commitSage.anthropic.model`): default `claude-sonnet-4-5-20250929`. Anthropic has no public `/models` endpoint, so the dropdown is a curated static list — see [docs/providers.md](docs/providers.md) for current options.
++
++- **OpenAI** — Model (`commitSage.openai.model`) + Base URL (`commitSage.openai.baseUrl`, change only for Azure or another OpenAI-compatible deployment).
++
++- **DeepSeek** — Model (`commitSage.deepseek.model`): default `deepseek-chat`.
++
++- **xAI** — Model (`commitSage.xai.model`): default `grok-2-1212`.
++
++- **Codestral** — Model (`commitSage.codestral.model`): default `codestral-latest`.
++
++- **Ollama**:
++  - Base URL (`commitSage.ollama.baseUrl`): default `http://localhost:11434`
++  - Model (`commitSage.ollama.model`): default `llama3.2`
++  - Auth token (`commitSage.ollama.useAuthToken`): off by default; enable for hosted Ollama instances behind auth.
++
++- **Custom OpenAI-compatible**:
++  - Base URL (`commitSage.custom.baseUrl`): e.g. `http://localhost:1234/v1` (LM Studio), `http://localhost:8000/v1` (vLLM), `https://api.together.xyz/v1`
++  - Model (`commitSage.custom.model`): free-form ID your endpoint exposes
++  - Send API key (`commitSage.custom.useApiKey`): off by default; enable for endpoints that require auth
++  - Path (`commitSage.custom.chatCompletionsPath`): default `/chat/completions`
+ 
+ ### Commit Settings
+ 
+@@ -164,8 +183,8 @@ Settings are loaded in the following order (higher priority overrides lower):
+ 
+ - VSCode 1.93.0 or higher
+ - Git installed and configured
+-- Internet connection (except for Ollama)
+-- API key for OpenAI/Codestral (if using those providers)
++- Internet connection (except for Ollama and self-hosted Custom endpoints)
++- API key for the selected cloud provider (none for Ollama, optional for Custom)
+ 
+ ## Documentation
+ 
+@@ -201,19 +220,35 @@ For troubleshooting common problems, see [docs/troubleshooting.md](docs/troubles
+ 
+ # Commit Sage (на русском)
+ 
+-Commit Sage - расширение VSCode для автоматической генерации сообщений коммитов с использованием Gemini AI от Google, Codestral API или OpenAI API (OpenAI, Ollama, LocalAI и другие).
++Commit Sage — расширение VSCode для автоматической генерации commit-сообщений через AI-провайдеров: Gemini, OpenRouter, Groq, Anthropic Claude, OpenAI, DeepSeek, xAI Grok, Codestral, локальный Ollama или любой OpenAI-совместимый endpoint (LM Studio, vLLM, llama.cpp, Together, Fireworks).
++
++Для пользователей из РФ без VPN рабочие варианты: **DeepSeek**, **Ollama** локально, **Custom** (свой self-hosted endpoint).
+ 
+ ## Установка
+ 
+ 1. Установите из [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=VizzleTF.commitsage)
+-2. Получите API ключ:
+-   - Для Gemini: [Google AI Studio](https://makersuite.google.com/app/apikey)
+-   - Для Codestral: [Mistral AI Console](https://console.mistral.ai/codestral)
+-   - Для других: Используйте ключ от OpenAI или другого совместимого сервиса
+-3. Настройте ключ в VS Code:
+-   - Откройте палитру команд (Ctrl+Shift+P / Cmd+Shift+P)
+-   - Введите "Commit Sage: Set Gemini API Key", "Commit Sage: Set Codestral API Key" или "Commit Sage: Set Custom API Key"
+-   - Введите ваш API ключ
++2. Откройте sidebar **Commit Sage** (иконка в Activity Bar) — там выбор провайдера, ввод ключа и live-список моделей в одном окне
++3. Альтернатива через палитру команд:
++   - `Commit Sage: Set Gemini API Key`
++   - `Commit Sage: Set OpenRouter API Key`
++   - `Commit Sage: Set Groq API Key`
++   - `Commit Sage: Set Anthropic API Key`
++   - `Commit Sage: Set DeepSeek API Key`
++   - `Commit Sage: Set xAI API Key`
++   - `Commit Sage: Set OpenAI API Key`
++   - `Commit Sage: Set Codestral API Key`
++   - `Commit Sage: Set Ollama Auth Token`
++   - `Commit Sage: Set Custom API Key`
++
++Где получить ключи:
++- Gemini → [Google AI Studio](https://makersuite.google.com/app/apikey)
++- OpenRouter → [openrouter.ai/keys](https://openrouter.ai/keys)
++- Groq → [console.groq.com/keys](https://console.groq.com/keys)
++- Anthropic → [console.anthropic.com/settings/keys](https://console.anthropic.com/settings/keys)
++- OpenAI → [platform.openai.com/api-keys](https://platform.openai.com/api-keys)
++- DeepSeek → [platform.deepseek.com/api_keys](https://platform.deepseek.com/api_keys)
++- xAI → [console.x.ai](https://console.x.ai/)
++- Codestral → [console.mistral.ai/codestral](https://console.mistral.ai/codestral)
+ 
+ ## Использование
+ 
+diff --git a/docs/providers.md b/docs/providers.md
+index d534b01..061a70e 100644
+--- a/docs/providers.md
++++ b/docs/providers.md
+@@ -1,17 +1,23 @@
+ # AI Providers
+ 
+-CommitSage supports 4 AI providers. This guide covers setup, features, and trade-offs for each.
++CommitSage supports 10 AI providers — 6 cloud, 1 aggregator, 1 local, plus a generic OpenAI-compatible adapter that closes any self-hosted endpoint. This guide covers setup, features, and trade-offs.
+ 
+ ---
+ 
+ ## Provider Comparison
+ 
+-| Provider | Cost | Runs Locally | API Key Required | Custom Endpoint |
+-|----------|------|-------------|-----------------|-----------------|
+-| Gemini | Free | No | Yes | No |
+-| OpenAI | Paid | No | Yes | Yes |
+-| Codestral | Free | No | Yes | No |
+-| Ollama | Free | Yes | No | No |
++| Provider | Cost | Runs Locally | API Key | Region notes (RU) |
++|----------|------|-------------|---------|-------------------|
++| Gemini | Free tier | No | Yes | VPN required |
++| OpenRouter | Free + paid | No | Yes | Works |
++| Groq | Free tier | No | Yes | Works |
++| Anthropic | Paid | No | Yes | VPN required |
++| OpenAI | Paid | No | Yes | Blocked, VPN required |
++| DeepSeek | Paid (cheap) | No | Yes | **Works without VPN** |
++| xAI | Paid | No | Yes | VPN required |
++| Codestral | Free | No | Yes | Works |
++| Ollama | Free | **Yes** | No | Works (local) |
++| Custom | Depends | Depends | Optional | Depends |
+ 
+ ---
+ 
+@@ -21,16 +27,9 @@ Google's AI models via Google AI Studio.
+ 
+ **Setup:**
+ 1. Get a free API key from [Google AI Studio](https://makersuite.google.com/app/apikey)
+-2. In VS Code: Command Palette → "Commit Sage: Set Gemini API Key"
++2. Sidebar → pick Gemini → `Set` → paste key — or Command Palette → `Commit Sage: Set Gemini API Key`
+ 
+-**Models:**
+-- `auto` (default) — automatically fetches available models and tries each until one succeeds
+-- `gemini-2.0-flash` — fast, good quality
+-- `gemini-2.5-pro` — highest quality
+-- `gemini-2.5-flash` — balanced speed and quality
+-- And other available Gemini models
+-
+-**Auto Mode:** When set to `auto`, CommitSage queries the Gemini API for all available models and tries them sequentially. This provides maximum reliability — if one model is temporarily unavailable, the next one is used automatically.
++**Models:** `auto` (default) — fetches available models and tries each until one succeeds. Robust to model deprecations.
+ 
+ **Settings:**
+ ```json
+@@ -42,42 +41,149 @@ Google's AI models via Google AI Studio.
+ 
+ ---
+ 
++## OpenRouter
++
++One API key, 300+ models from OpenAI, Anthropic, Google, xAI, DeepSeek, Meta, Mistral, Qwen, and more.
++
++**Setup:**
++1. Sign up at [openrouter.ai/keys](https://openrouter.ai/keys)
++2. Sidebar → OpenRouter → `Set`
++
++**Free tier:** 25+ models with `:free` suffix (Llama 3.3 70B, DeepSeek V3, GPT-OSS 120B, Qwen3 Coder, etc.). 20 RPM / 50 RPD at $0 balance; 1000 RPD after a $10 top-up.
++
++**Free models filter:** `commitSage.openrouter.preferFreeModels` (default `true`) restricts the model dropdown to free models only. Toggle off to browse all 300+.
++
++**Settings:**
++```json
++{
++  "commitSage.provider.type": "openrouter",
++  "commitSage.openrouter.model": "meta-llama/llama-3.3-70b-instruct:free",
++  "commitSage.openrouter.preferFreeModels": true
++}
++```
++
++---
++
++## Groq
++
++Fastest commercial inference on the market (~200–500 ms for Llama 3.3 70B).
++
++**Setup:**
++1. Get a key from [console.groq.com/keys](https://console.groq.com/keys) (email + phone, no card)
++2. Sidebar → Groq → `Set`
++
++**Free tier:** 30 RPM / 1000 RPD on 70B; up to 14 400 RPD on `llama-3.1-8b-instant` (effectively unlimited for commit messages).
++
++**Recommended models:** `llama-3.1-8b-instant` (max throughput), `llama-3.3-70b-versatile` (quality, default), `mixtral-8x7b-32768`.
++
++**Settings:**
++```json
++{
++  "commitSage.provider.type": "groq",
++  "commitSage.groq.model": "llama-3.3-70b-versatile"
++}
++```
++
++---
++
++## Anthropic Claude
++
++Claude models directly from Anthropic.
++
++**Setup:**
++1. Get an API key from [console.anthropic.com/settings/keys](https://console.anthropic.com/settings/keys)
++2. Sidebar → Anthropic Claude → `Set`
++
++**Models (curated static list — Anthropic has no public `/models` endpoint):**
++- `claude-opus-4-1-20250805` — highest quality
++- `claude-sonnet-4-5-20250929` — default, balanced
++- `claude-haiku-4-5-20251001` — fastest, cheapest
++- `claude-3-5-sonnet-20241022`, `claude-3-5-haiku-20241022` — previous generation
++
++Keep the list in sync with [docs.anthropic.com/en/docs/about-claude/models](https://docs.anthropic.com/en/docs/about-claude/models).
++
++**Note:** Pro/Max subscription OAuth tokens are not usable here — Anthropic's Usage Policy restricts those to native Anthropic clients. Use an API key from the console.
++
++**Settings:**
++```json
++{
++  "commitSage.provider.type": "anthropic",
++  "commitSage.anthropic.model": "claude-sonnet-4-5-20250929"
++}
++```
++
++---
++
+ ## OpenAI
+ 
+-OpenAI models (GPT-3.5, GPT-4, etc.) or any OpenAI-compatible API.
++OpenAI models (GPT-4o, GPT-4.1, o-series).
+ 
+ **Setup:**
+-1. Get an API key from [OpenAI Platform](https://platform.openai.com/api-keys)
+-2. In VS Code: Command Palette → "Commit Sage: Set OpenAI API Key"
++1. Get an API key from [platform.openai.com/api-keys](https://platform.openai.com/api-keys)
++2. Sidebar → OpenAI → `Set`
+ 
+-**Custom Endpoints:** Supports any OpenAI-compatible API by changing the base URL. Works with:
+-- Azure OpenAI
+-- LocalAI
+-- LM Studio
+-- Any other OpenAI-compatible service
++**Custom endpoint:** `commitSage.openai.baseUrl` accepts any OpenAI-compatible URL (Azure OpenAI, LocalAI). For self-hosted setups prefer the dedicated **Custom** provider instead — it doesn't conflate official OpenAI defaults with self-hosted overrides.
+ 
+ **Settings:**
+ ```json
+ {
+   "commitSage.provider.type": "openai",
+-  "commitSage.openai.model": "gpt-3.5-turbo",
++  "commitSage.openai.model": "gpt-4o-mini",
+   "commitSage.openai.baseUrl": "https://api.openai.com/v1"
+ }
+ ```
+ 
+ ---
+ 
++## DeepSeek
++
++DeepSeek's flagship models. **Works without VPN in restricted regions.**
++
++**Setup:**
++1. Get a key from [platform.deepseek.com/api_keys](https://platform.deepseek.com/api_keys)
++2. Sidebar → DeepSeek → `Set`
++
++**Models:** `deepseek-chat` (default), `deepseek-reasoner`.
++
++**Settings:**
++```json
++{
++  "commitSage.provider.type": "deepseek",
++  "commitSage.deepseek.model": "deepseek-chat"
++}
++```
++
++---
++
++## xAI Grok
++
++xAI's Grok models.
++
++**Setup:**
++1. Get a key from [console.x.ai](https://console.x.ai/)
++2. Sidebar → xAI Grok → `Set`
++
++**Models:** `grok-2-1212` (default, stable), `grok-3-mini`, others as released.
++
++**Settings:**
++```json
++{
++  "commitSage.provider.type": "xai",
++  "commitSage.xai.model": "grok-2-1212"
++}
++```
++
++---
++
+ ## Codestral
+ 
+-Mistral AI's code-specialized model, available for free.
++Mistral AI's code-specialized model on the dedicated Codestral subdomain. Free tier.
+ 
+ **Setup:**
+-1. Get a free API key from [Mistral AI Console](https://console.mistral.ai/codestral)
+-2. In VS Code: Command Palette → "Commit Sage: Set Codestral API Key"
++1. Get a free API key from [console.mistral.ai/codestral](https://console.mistral.ai/codestral)
++2. Sidebar → Codestral → `Set`
+ 
+-**Models:**
+-- `codestral-latest` (default)
+-- `codestral-2405`
++**Models:** `codestral-latest` (default), `codestral-2508`, `codestral-2501`, `codestral-2405`.
+ 
+ **Settings:**
+ ```json
+@@ -91,19 +197,16 @@ Mistral AI's code-specialized model, available for free.
+ 
+ ## Ollama
+ 
+-Run AI models locally on your machine. No API key needed, no data sent to external services.
++Run models locally. No API key, no data leaves your machine.
+ 
+ **Setup:**
+ 1. Install Ollama from [ollama.com](https://ollama.com)
+-2. Pull a model: `ollama pull llama3.2`
+-3. Ollama runs at `http://localhost:11434` by default
++2. Pull a model: `ollama pull llama3.2` (or `qwen2.5-coder:7b` for code-specialized)
++3. Sidebar → Ollama (default base URL `http://localhost:11434`)
+ 
+-**Recommended models:**
+-- `llama3.2` (default) — good balance of speed and quality
+-- `codellama` — code-specialized
+-- `mistral` — fast, good quality
++**Recommended models:** `qwen2.5-coder:7b` (code), `llama3.2:3b` (fits 4 GB RAM), `deepseek-coder-v2:16b` (powerful hardware).
+ 
+-**Auth Token:** If your Ollama instance requires authentication, enable `commitSage.ollama.useAuthToken` and set the token via Command Palette → "Commit Sage: Set Ollama Authentication Token".
++**Auth token:** For hosted Ollama instances behind auth, enable `commitSage.ollama.useAuthToken` and set the token via `Commit Sage: Set Ollama Auth Token`.
+ 
+ **Settings:**
+ ```json
+@@ -116,9 +219,50 @@ Run AI models locally on your machine. No API key needed, no data sent to extern
+ 
+ ---
+ 
++## Custom OpenAI-compatible
++
++Any OpenAI-compatible `chat/completions` endpoint — local or remote, with or without auth.
++
++**Common targets:**
++- **LM Studio** — `http://localhost:1234/v1`
++- **Ollama (OpenAI-compat mode)** — `http://localhost:11434/v1` (alternative to the native Ollama provider above)
++- **vLLM** — `http://localhost:8000/v1` (any self-hosted Mistral/Llama/Qwen/etc. served via vLLM)
++- **TGI (HuggingFace Text Generation Inference)** — `http://your-tgi-host/v1`
++- **llama.cpp server** — `http://localhost:8080/v1`
++- **LocalAI** — `http://localhost:8080/v1`
++- **NVIDIA NIM (free hosted models)** — `https://integrate.api.nvidia.com/v1` + key from <https://build.nvidia.com/settings/api-keys>; covers free coding models like `meta/llama-3.3-70b-instruct`, `qwen/qwen2.5-coder-32b-instruct`
++- **Together AI** — `https://api.together.xyz/v1` (needs key)
++- **Fireworks** — `https://api.fireworks.ai/inference/v1` (needs key)
++- **Cerebras**, **DeepInfra**, **private deployments** — any URL exposing OpenAI wire format
++
++**Setup:**
++1. Sidebar → Custom (OpenAI-compatible)
++2. Set **Base URL** to your endpoint
++3. Set **Model** to whatever model ID your endpoint exposes (free-form text — no listing available)
++4. If your endpoint requires auth: enable `Send API key`, then `Set` to paste the key
++
++**Settings:**
++```json
++{
++  "commitSage.provider.type": "custom",
++  "commitSage.custom.baseUrl": "http://localhost:1234/v1",
++  "commitSage.custom.model": "qwen2.5-coder",
++  "commitSage.custom.useApiKey": false,
++  "commitSage.custom.chatCompletionsPath": "/chat/completions"
++}
++```
++
++---
++
+ ## Choosing a Provider
+ 
+-- **Gemini** — best starting point: free, reliable with auto mode, no local setup
+-- **Ollama** — best for privacy: everything runs locally, no data leaves your machine
+-- **OpenAI** — best for quality with GPT-4, or when you need a custom endpoint
+-- **Codestral** — free alternative optimized for code tasks
++- **Gemini** — best free starting point, auto-mode handles model rotation
++- **OpenRouter** — one key, access to almost everything (incl. 25+ free models)
++- **Groq** — fastest replies + the most generous free tier
++- **Anthropic** — best output quality at higher cost
++- **DeepSeek** — works from regions where US providers are blocked
++- **Ollama** — best for privacy / offline / sensitive repos
++- **Custom** — any self-hosted server (LM Studio, vLLM, llama.cpp) without per-vendor wiring
++- **OpenAI** — when you specifically want GPT models
++- **xAI** — when you specifically want Grok
++- **Codestral** — free code-specialized fallback
+diff --git a/package.nls.json b/package.nls.json
+index b535f90..7b065b9 100644
+--- a/package.nls.json
++++ b/package.nls.json
+@@ -9,13 +9,25 @@
+   "command.removeCodestralApiKey.title": "Remove Codestral API Key",
+   "command.setOllamaAuthToken.title": "Set Ollama Auth Token",
+   "command.removeOllamaAuthToken.title": "Remove Ollama Auth Token",
++  "command.setOpenRouterApiKey.title": "Set OpenRouter API Key",
++  "command.removeOpenRouterApiKey.title": "Remove OpenRouter API Key",
++  "command.setGroqApiKey.title": "Set Groq API Key",
++  "command.removeGroqApiKey.title": "Remove Groq API Key",
++  "command.setAnthropicApiKey.title": "Set Anthropic API Key",
++  "command.removeAnthropicApiKey.title": "Remove Anthropic API Key",
++  "command.setDeepSeekApiKey.title": "Set DeepSeek API Key",
++  "command.removeDeepSeekApiKey.title": "Remove DeepSeek API Key",
++  "command.setXaiApiKey.title": "Set xAI API Key",
++  "command.removeXaiApiKey.title": "Remove xAI API Key",
++  "command.setCustomApiKey.title": "Set Custom API Key",
++  "command.removeCustomApiKey.title": "Remove Custom API Key",
+   "command.createProjectConfig.title": "Create Project Config (.commitsage)",
+   "command.selectGeminiModel.title": "Select Gemini Model",
+   "view.settings.title": "Settings",
+   "walkthrough.title": "Get started with Commit Sage",
+   "walkthrough.description": "Pick a provider, set your API key, and generate your first AI-written commit message.",
+   "walkthrough.step.pickProvider.title": "Pick an AI provider",
+-  "walkthrough.step.pickProvider.description": "Choose between Gemini, OpenAI, Codestral, or self-hosted Ollama.\n[Open Settings](command:workbench.action.openSettings?%22commitSage.provider.type%22)",
++  "walkthrough.step.pickProvider.description": "Choose between Gemini, OpenRouter, Groq, Anthropic, OpenAI, DeepSeek, xAI, Codestral, self-hosted Ollama, or any OpenAI-compatible endpoint.\n[Open Settings](command:workbench.action.openSettings?%22commitSage.provider.type%22)",
+   "walkthrough.step.setApiKey.title": "Provide credentials",
+   "walkthrough.step.setApiKey.description": "API keys are stored in VS Code SecretStorage. Run a Set … API Key command from the Palette.\n[Set Gemini API Key](command:commitsage.setApiKey)",
+   "walkthrough.step.generate.title": "Generate your first commit message",
+diff --git a/src/commands/setApiKeys.ts b/src/commands/setApiKeys.ts
+index 2b0cb9a..35d09fb 100644
+--- a/src/commands/setApiKeys.ts
++++ b/src/commands/setApiKeys.ts
+@@ -3,55 +3,58 @@ import { ApiKeyManager } from '../services/apiKeyManager';
+ import { Logger } from '../utils/logger';
+ import { toError } from '../utils/errorUtils';
+ 
++/**
++ * Per-provider command IDs and the friendly display name used in success/error
++ * notifications. Order matches the order they appear in the Command Palette.
++ * Adding a new provider here is the only change needed to expose its
++ * set/remove commands — `registerSetApiKeyCommands` iterates over this list.
++ */
++interface ProviderCommandSpec {
++    provider: string;
++    label: string;
++    setCommand: string;
++    removeCommand: string;
++}
++
++const PROVIDER_COMMAND_SPECS: readonly ProviderCommandSpec[] = [
++    { provider: 'gemini',     label: 'Gemini',     setCommand: 'commitsage.setApiKey',              removeCommand: 'commitsage.removeApiKey' },
++    { provider: 'openai',     label: 'OpenAI',     setCommand: 'commitsage.setOpenAIApiKey',        removeCommand: 'commitsage.removeOpenAIApiKey' },
++    { provider: 'codestral',  label: 'Codestral',  setCommand: 'commitsage.setCodestralApiKey',     removeCommand: 'commitsage.removeCodestralApiKey' },
++    { provider: 'ollama',     label: 'Ollama auth token', setCommand: 'commitsage.setOllamaAuthToken', removeCommand: 'commitsage.removeOllamaAuthToken' },
++    { provider: 'openrouter', label: 'OpenRouter', setCommand: 'commitsage.setOpenRouterApiKey',    removeCommand: 'commitsage.removeOpenRouterApiKey' },
++    { provider: 'groq',       label: 'Groq',       setCommand: 'commitsage.setGroqApiKey',          removeCommand: 'commitsage.removeGroqApiKey' },
++    { provider: 'anthropic',  label: 'Anthropic',  setCommand: 'commitsage.setAnthropicApiKey',     removeCommand: 'commitsage.removeAnthropicApiKey' },
++    { provider: 'deepseek',   label: 'DeepSeek',   setCommand: 'commitsage.setDeepSeekApiKey',      removeCommand: 'commitsage.removeDeepSeekApiKey' },
++    { provider: 'xai',        label: 'xAI',        setCommand: 'commitsage.setXaiApiKey',           removeCommand: 'commitsage.removeXaiApiKey' },
++    { provider: 'custom',     label: 'Custom',     setCommand: 'commitsage.setCustomApiKey',        removeCommand: 'commitsage.removeCustomApiKey' },
++];
++
+ export function registerSetApiKeyCommands(_context: vscode.ExtensionContext): vscode.Disposable[] {
+-    return [
+-        vscode.commands.registerCommand('commitsage.setApiKey', () =>
+-            ApiKeyManager.promptForKey('gemini')
+-        ),
+-        vscode.commands.registerCommand('commitsage.setOpenAIApiKey', () =>
+-            ApiKeyManager.promptForKey('openai')
+-        ),
+-        vscode.commands.registerCommand('commitsage.setCodestralApiKey', () =>
+-            ApiKeyManager.promptForKey('codestral')
+-        ),
+-        vscode.commands.registerCommand('commitsage.removeApiKey', async () => {
+-            try {
+-                await ApiKeyManager.removeKey('gemini');
+-                await Logger.showInfo(vscode.l10n.t('Gemini API key has been removed'));
+-            } catch (error) {
+-                Logger.error('Error removing Gemini API key:', toError(error));
+-                await Logger.showError(vscode.l10n.t('Failed to remove API key: {0}', toError(error).message));
+-            }
+-        }),
+-        vscode.commands.registerCommand('commitsage.removeOpenAIApiKey', async () => {
+-            try {
+-                await ApiKeyManager.removeKey('openai');
+-                await Logger.showInfo(vscode.l10n.t('OpenAI API key has been removed'));
+-            } catch (error) {
+-                Logger.error('Error removing OpenAI API key:', toError(error));
+-                await Logger.showError(vscode.l10n.t('Failed to remove API key: {0}', toError(error).message));
+-            }
+-        }),
+-        vscode.commands.registerCommand('commitsage.removeCodestralApiKey', async () => {
+-            try {
+-                await ApiKeyManager.removeKey('codestral');
+-                await Logger.showInfo(vscode.l10n.t('Codestral API key has been removed'));
+-            } catch (error) {
+-                Logger.error('Error removing Codestral API key:', toError(error));
+-                await Logger.showError(vscode.l10n.t('Failed to remove API key: {0}', toError(error).message));
+-            }
+-        }),
+-        vscode.commands.registerCommand('commitsage.setOllamaAuthToken', () =>
+-            ApiKeyManager.promptForKey('ollama')
+-        ),
+-        vscode.commands.registerCommand('commitsage.removeOllamaAuthToken', async () => {
+-            try {
+-                await ApiKeyManager.removeKey('ollama');
+-                await Logger.showInfo(vscode.l10n.t('Ollama auth token has been removed'));
+-            } catch (error) {
+-                Logger.error('Error removing Ollama auth token:', toError(error));
+-                await Logger.showError(vscode.l10n.t('Failed to remove auth token: {0}', toError(error).message));
+-            }
+-        })
+-    ];
++    const disposables: vscode.Disposable[] = [];
++
++    for (const spec of PROVIDER_COMMAND_SPECS) {
++        disposables.push(
++            vscode.commands.registerCommand(spec.setCommand, () =>
++                ApiKeyManager.promptForKey(spec.provider),
++            ),
++        );
++
++        disposables.push(
++            vscode.commands.registerCommand(spec.removeCommand, async () => {
++                try {
++                    await ApiKeyManager.removeKey(spec.provider);
++                    await Logger.showInfo(
++                        vscode.l10n.t('{0} API key has been removed', spec.label),
++                    );
++                } catch (error) {
++                    Logger.error(`Error removing ${spec.label} API key:`, toError(error));
++                    await Logger.showError(
++                        vscode.l10n.t('Failed to remove API key: {0}', toError(error).message),
++                    );
++                }
++            }),
++        );
++    }
++
++    return disposables;
+ }
+diff --git a/src/models/types.ts b/src/models/types.ts
+index 66350cf..bd39d9d 100644
+--- a/src/models/types.ts
++++ b/src/models/types.ts
+@@ -54,6 +54,34 @@ export interface ProjectConfig {
+     ollama?: {
+         baseUrl?: string;
+         model?: string;
++        useAuthToken?: boolean;
++        numCtx?: number;
++    };
++    openrouter?: {
++        model?: string;
++        preferFreeModels?: boolean;
++    };
++    groq?: {
++        model?: string;
++    };
++    anthropic?: {
++        model?: string;
++    };
++    deepseek?: {
++        model?: string;
++    };
++    xai?: {
++        model?: string;
++    };
++    custom?: {
++        baseUrl?: string;
++        model?: string;
++        useApiKey?: boolean;
++        chatCompletionsPath?: string;
++    };
++    general?: {
++        maxDiffSize?: number;
++        temperature?: number;
+     };
+     telemetry?: {
+         enabled?: boolean;
+diff --git a/src/services/aiService.ts b/src/services/aiService.ts
+index f8a1ddc..edc33a9 100644
+--- a/src/services/aiService.ts
++++ b/src/services/aiService.ts
+@@ -6,8 +6,11 @@ import { errorMessages } from '../utils/constants';
+ import { removeThinkTags } from '../utils/textProcessing';
+ import { AIServiceFactory, AIServiceType } from './aiServiceFactory';
+ 
+-// ~100k chars covers most diffs while staying within safe LLM API context window limits
+-const MAX_DIFF_LENGTH = 100000;
++// Fallback if `general.maxDiffSize` is unreadable. ~100k chars covers most
++// diffs while staying within safe LLM API context window limits for major
++// providers. Tighter caps (e.g. ~20k chars) are needed for low-TPM free
++// tiers like Groq free — see the setting's description for guidance.
++const DEFAULT_MAX_DIFF_LENGTH = 100000;
+ 
+ interface GenerateContext {
+     fileCount?: number;
+@@ -29,8 +32,9 @@ export class AIService {
+         const provider = ConfigService.getProvider();
+         const model = ConfigService.getModel();
+         const language = ConfigService.get('commit.commitLanguage');
++        const maxDiffLength = this.resolveMaxDiffLength();
+         const diffSize = diff.length;
+-        const truncated = diffSize > MAX_DIFF_LENGTH;
++        const truncated = diffSize > maxDiffLength;
+ 
+         TelemetryService.sendEvent({
+             name: 'message_generation_started',
+@@ -42,7 +46,7 @@ export class AIService {
+         });
+ 
+         const startTime = Date.now();
+-        const truncatedDiff = this.truncateDiff(diff);
++        const truncatedDiff = this.truncateDiff(diff, maxDiffLength);
+         const prompt = await PromptService.generatePrompt(truncatedDiff, blameAnalysis, progress);
+ 
+         progress.report({ message: 'Generating commit message...', increment: 50 });
+@@ -69,9 +73,27 @@ export class AIService {
+         return result;
+     }
+ 
+-    private static truncateDiff(diff: string): string {
+-        return diff.length > MAX_DIFF_LENGTH
+-            ? `${diff.substring(0, MAX_DIFF_LENGTH)}\n...(truncated)`
++    private static truncateDiff(diff: string, maxDiffLength: number): string {
++        return diff.length > maxDiffLength
++            ? `${diff.substring(0, maxDiffLength)}\n...(truncated)`
+             : diff;
+     }
++
++    /**
++     * Read `general.maxDiffSize` and clamp to a sane range. `-1` disables
++     * truncation (sends the whole diff regardless of size — only useful with
++     * very-long-context models). Anything else is clamped to [1000, 1_000_000]
++     * so a hand-edited project config can't either send an empty prompt or
++     * overflow JSON.stringify.
++     */
++    private static resolveMaxDiffLength(): number {
++        const raw = ConfigService.get('general.maxDiffSize');
++        if (raw === -1) {
++            return Number.POSITIVE_INFINITY;
++        }
++        if (typeof raw !== 'number' || !Number.isFinite(raw) || raw <= 0) {
++            return DEFAULT_MAX_DIFF_LENGTH;
++        }
++        return Math.max(1000, Math.min(1_000_000, raw));
++    }
+ }
+diff --git a/src/services/aiServiceFactory.ts b/src/services/aiServiceFactory.ts
+index 10c2a3c..a4a5890 100644
+--- a/src/services/aiServiceFactory.ts
++++ b/src/services/aiServiceFactory.ts
+@@ -3,12 +3,24 @@ import { GeminiService } from './geminiService';
+ import { OpenAIService } from './openaiService';
+ import { CodestralService } from './codestralService';
+ import { OllamaService } from './ollamaService';
++import { GroqService } from './groqService';
++import { OpenRouterService } from './openRouterService';
++import { AnthropicService } from './anthropicService';
++import { DeepSeekService } from './deepSeekService';
++import { XaiService } from './xaiService';
++import { CustomOpenAIService } from './customOpenAIService';
+ 
+ export enum AIServiceType {
+     GEMINI = 'gemini',
+     OPENAI = 'openai',
+     CODESTRAL = 'codestral',
+-    OLLAMA = 'ollama'
++    OLLAMA = 'ollama',
++    OPENROUTER = 'openrouter',
++    GROQ = 'groq',
++    ANTHROPIC = 'anthropic',
++    DEEPSEEK = 'deepseek',
++    XAI = 'xai',
++    CUSTOM = 'custom'
+ }
+ 
+ type AIServiceClass = {
+@@ -25,7 +37,13 @@ export class AIServiceFactory {
+         [AIServiceType.GEMINI]: GeminiService,
+         [AIServiceType.OPENAI]: OpenAIService,
+         [AIServiceType.CODESTRAL]: CodestralService,
+-        [AIServiceType.OLLAMA]: OllamaService
++        [AIServiceType.OLLAMA]: OllamaService,
++        [AIServiceType.OPENROUTER]: OpenRouterService,
++        [AIServiceType.GROQ]: GroqService,
++        [AIServiceType.ANTHROPIC]: AnthropicService,
++        [AIServiceType.DEEPSEEK]: DeepSeekService,
++        [AIServiceType.XAI]: XaiService,
++        [AIServiceType.CUSTOM]: CustomOpenAIService
+     };
+ 
+     private static getService(type: AIServiceType): AIServiceClass {
+diff --git a/src/services/anthropicService.ts b/src/services/anthropicService.ts
+new file mode 100644
+index 0000000..655f3ac
+--- /dev/null
++++ b/src/services/anthropicService.ts
+@@ -0,0 +1,89 @@
++import { Logger } from '../utils/logger';
++import { ConfigService } from '../utils/configService';
++import type { CommitMessage, ProgressReporter, GenerateOptions } from '../models/types';
++import { extractAndValidateMessage, getConfiguredTemperature, withRetryAndApiKeyGuard } from './baseAIService';
++import { HttpUtils } from '../utils/httpUtils';
++import { RetryUtils } from '../utils/retryUtils';
++import { ApiKeyManager } from './apiKeyManager';
++
++/**
++ * Anthropic Messages API. NOT OpenAI-compatible:
++ *  - URL: `POST https://api.anthropic.com/v1/messages`
++ *  - Auth header: `x-api-key: <key>` (not `Authorization: Bearer ...`)
++ *  - Versioning header: `anthropic-version: 2023-06-01` (required)
++ *  - Body: `{model, max_tokens, system?, messages}` — `max_tokens` mandatory,
++ *    `system` is a separate top-level field (not a message role)
++ *  - Response: `{content: [{type: 'text', text: '...'}]}`
++ *
++ * The `anthropic-version` header is pinned to a stable date — bumping it
++ * pulls in newer response shapes (e.g. cache_control fields) that the
++ * extractor would have to handle.
++ */
++interface AnthropicResponse {
++    content?: Array<{
++        type?: string;
++        text?: string;
++    }>;
++}
++
++const ANTHROPIC_API_URL = 'https://api.anthropic.com/v1/messages';
++const ANTHROPIC_VERSION = '2023-06-01';
++
++export class AnthropicService {
++    static async generateCommitMessage(
++        prompt: string,
++        progress: ProgressReporter,
++        attempt: number = 1,
++        options?: GenerateOptions,
++    ): Promise<CommitMessage> {
++        return withRetryAndApiKeyGuard(
++            'Anthropic',
++            prompt,
++            progress,
++            attempt,
++            (p, pr, a) => this.generateCommitMessage(p, pr, a, options),
++            async () => {
++                const apiKey = await ApiKeyManager.getKey('anthropic');
++                const model = ConfigService.get('anthropic.model');
++
++                const payload = {
++                    model,
++                    // eslint-disable-next-line @typescript-eslint/naming-convention
++                    max_tokens: options?.maxTokens ?? 1024,
++                    temperature: getConfiguredTemperature(),
++                    messages: [{ role: 'user', content: prompt }],
++                };
++
++                await RetryUtils.updateProgressForAttempt(progress, attempt);
++
++                const data = await HttpUtils.postJson<AnthropicResponse>(
++                    ANTHROPIC_API_URL,
++                    payload,
++                    {
++                        headers: HttpUtils.createRequestHeaders(
++                            apiKey,
++                            // eslint-disable-next-line @typescript-eslint/naming-convention
++                            { 'anthropic-version': ANTHROPIC_VERSION },
++                            'x-api-key',
++                        ),
++                        signal: options?.signal,
++                    },
++                );
++
++                progress.report({ message: 'Processing generated message...', increment: 90 });
++
++                // First text block — Anthropic can interleave `text` and `tool_use`
++                // blocks in `content[]`; we only ask for plain completion so
++                // a single text block is expected, but find-first defends
++                // against future API drift.
++                const textBlock = data.content?.find(b => b?.type === 'text');
++                const message = extractAndValidateMessage(
++                    textBlock?.text,
++                    'Anthropic',
++                );
++                Logger.log(`Commit message generated using ${model} model`);
++                return { message, model };
++            },
++        );
++    }
++}
+diff --git a/src/services/apiKeyManager.ts b/src/services/apiKeyManager.ts
+index 1f602ff..12585b9 100644
+--- a/src/services/apiKeyManager.ts
++++ b/src/services/apiKeyManager.ts
+@@ -32,6 +32,36 @@ const API_KEY_CONFIGS: Record<string, ApiKeyConfig> = {
+         displayName: 'Ollama',
+         validator: ApiKeyValidator.validateOllamaAuthToken,
+     },
++    openrouter: {
++        secretKey: 'commitsage.openrouterApiKey',
++        displayName: 'OpenRouter',
++        validator: ApiKeyValidator.validateOpenRouterApiKey,
++    },
++    groq: {
++        secretKey: 'commitsage.groqApiKey',
++        displayName: 'Groq',
++        validator: ApiKeyValidator.validateGroqApiKey,
++    },
++    anthropic: {
++        secretKey: 'commitsage.anthropicApiKey',
++        displayName: 'Anthropic',
++        validator: ApiKeyValidator.validateAnthropicApiKey,
++    },
++    deepseek: {
++        secretKey: 'commitsage.deepseekApiKey',
++        displayName: 'DeepSeek',
++        validator: ApiKeyValidator.validateDeepSeekApiKey,
++    },
++    xai: {
++        secretKey: 'commitsage.xaiApiKey',
++        displayName: 'xAI',
++        validator: ApiKeyValidator.validateXaiApiKey,
++    },
++    custom: {
++        secretKey: 'commitsage.customApiKey',
++        displayName: 'Custom',
++        validator: ApiKeyValidator.validateCustomApiKey,
++    },
+ };
+ 
+ export class ApiKeyManager {
+@@ -66,6 +96,9 @@ export class ApiKeyManager {
+         if (provider === 'ollama') {
+             return ConfigService.get('ollama.useAuthToken');
+         }
++        if (provider === 'custom') {
++            return ConfigService.get('custom.useApiKey');
++        }
+         return true;
+     }
+ 
+diff --git a/src/services/baseAIService.ts b/src/services/baseAIService.ts
+index af40b2e..9e7cf9e 100644
+--- a/src/services/baseAIService.ts
++++ b/src/services/baseAIService.ts
+@@ -4,6 +4,21 @@ import { ApiKeyInvalidError } from '../models/errors';
+ import { RetryUtils } from '../utils/retryUtils';
+ import { toError } from '../utils/errorUtils';
+ import { HttpError, NetworkError } from '../utils/httpUtils';
++import { ConfigService } from '../utils/configService';
++
++/**
++ * Shared LLM sampling temperature (`general.temperature`, default 0.7).
++ * Clamped to [0, 2] — most providers reject values outside this range,
++ * and a project config can't legitimately need otherwise. Defaults to
++ * 0.7 if the setting is unreadable or out of type.
++ */
++export function getConfiguredTemperature(): number {
++    const raw = ConfigService.get('general.temperature');
++    if (typeof raw !== 'number' || !Number.isFinite(raw)) {
++        return 0.7;
++    }
++    return Math.max(0, Math.min(2, raw));
++}
+ 
+ /**
+  * Wraps the per-attempt body of an HTTP-LLM provider with the shared
+@@ -28,7 +43,7 @@ export async function withRetryAndApiKeyGuard(
+     try {
+         return await fn();
+     } catch (error) {
+-        if (error instanceof HttpError && error.status === 401) {
++        if (error instanceof HttpError && isInvalidApiKeyError(error)) {
+             throw new ApiKeyInvalidError(name);
+         }
+         return RetryUtils.handleGenerationError(
+@@ -42,6 +57,32 @@ export async function withRetryAndApiKeyGuard(
+     }
+ }
+ 
++/**
++ * Detect "invalid API key" across providers that don't all use HTTP 401.
++ * - OpenAI/Anthropic/Groq/Codestral/OpenRouter/DeepSeek/Ollama → 401
++ * - **xAI** → **400** with body `{"code":"Client specified an invalid argument",
++ *   "error":"Incorrect API key provided: ..."}` — non-standard, but observed in
++ *   production. Match on the message string rather than only the status.
++ */
++export function isInvalidApiKeyError(error: HttpError): boolean {
++    if (error.status === 401) {
++        return true;
++    }
++    if (error.status === 400) {
++        const data = error.data;
++        const message =
++            typeof data === 'string'
++                ? data
++                : (data as { error?: string | { message?: string } } | undefined)?.error;
++        const messageText =
++            typeof message === 'string'
++                ? message
++                : message?.message ?? JSON.stringify(data);
++        return /incorrect api key|invalid api key|api key.*(?:invalid|expired|revoked)/i.test(messageText ?? '');
++    }
++    return false;
++}
++
+ export function validateCommitMessage(message: string): string {
+     const cleanMessage = message.trim();
+     if (!cleanMessage) {
+@@ -63,8 +104,17 @@ export function extractAndValidateMessage(
+ export function handleHttpError(error: Error, serviceName: string): ApiErrorResult {
+     if (error instanceof HttpError) {
+         const status = error.status;
+-        const data = error.data as { error?: { message?: string } } | string | undefined;
+-        const errorMessage = typeof data === 'object' ? data?.error?.message : undefined;
++        // Provider error bodies are inconsistent: some use `{error: {message}}`,
++        // some `{error: "..."}` (a string), some bare strings. Normalize.
++        const data = error.data as
++            | { error?: string | { message?: string }; code?: string }
++            | string
++            | undefined;
++        const rawError = typeof data === 'object' ? data?.error : undefined;
++        const errorMessage =
++            typeof rawError === 'string'
++                ? rawError
++                : rawError?.message;
+ 
+         switch (status) {
+             case 401:
+@@ -79,6 +129,25 @@ export function handleHttpError(error: Error, serviceName: string): ApiErrorResu
+                     shouldRetry: false,
+                     statusCode: status,
+                 };
++            case 403: {
++                // xAI returns 403 when a team has no credits/licenses yet,
++                // with `error: "Your newly created team doesn't have any
++                // credits or licenses yet. ..."`. Surface that text directly
++                // so users see the purchase URL instead of a generic 403.
++                const text = errorMessage ?? (typeof data === 'string' ? data : '');
++                if (/credits or licenses/i.test(text)) {
++                    return {
++                        errorMessage: text,
++                        shouldRetry: false,
++                        statusCode: status,
++                    };
++                }
++                return {
++                    errorMessage: text || errorMessages.authenticationError,
++                    shouldRetry: false,
++                    statusCode: status,
++                };
++            }
+             case 429:
+                 return {
+                     errorMessage: errorMessages.rateLimitExceeded,
+diff --git a/src/services/codestralService.ts b/src/services/codestralService.ts
+index 771979d..9c769db 100644
+--- a/src/services/codestralService.ts
++++ b/src/services/codestralService.ts
+@@ -1,7 +1,7 @@
+ import { Logger } from '../utils/logger';
+ import { CommitMessage, ProgressReporter, GenerateOptions } from '../models/types';
+ import { ConfigService } from '../utils/configService';
+-import { extractAndValidateMessage, withRetryAndApiKeyGuard } from './baseAIService';
++import { extractAndValidateMessage, getConfiguredTemperature, withRetryAndApiKeyGuard } from './baseAIService';
+ import { HttpUtils } from '../utils/httpUtils';
+ import { RetryUtils } from '../utils/retryUtils';
+ import { ApiKeyManager } from './apiKeyManager';
+@@ -35,7 +35,8 @@ export class CodestralService {
+ 
+                 const payload: Record<string, unknown> = {
+                     model: model,
+-                    messages: [{ role: 'user', content: prompt }]
++                    messages: [{ role: 'user', content: prompt }],
++                    temperature: getConfiguredTemperature()
+                 };
+                 if (options?.maxTokens !== undefined) {
+                     payload['max_tokens'] = options.maxTokens;
+diff --git a/src/services/customOpenAIService.ts b/src/services/customOpenAIService.ts
+new file mode 100644
+index 0000000..9131d0a
+--- /dev/null
++++ b/src/services/customOpenAIService.ts
+@@ -0,0 +1,40 @@
++import { ConfigService } from '../utils/configService';
++import type { ProgressReporter, CommitMessage, GenerateOptions } from '../models/types';
++import { ApiKeyManager } from './apiKeyManager';
++import { generateViaOpenAICompatible } from './openAICompatibleService';
++
++/**
++ * User-configured OpenAI-compatible endpoint. Closes LM Studio, vLLM,
++ * llama.cpp server, LocalAI, Together AI, Fireworks, Cerebras, DeepInfra,
++ * any private self-hosted deployment — anything that exposes the OpenAI
++ * `/chat/completions` wire format at a user-supplied URL.
++ *
++ * `apiKey` is optional: self-hosted models often need no auth. When the
++ * `custom.useApiKey` toggle is off, the key is omitted and no
++ * `Authorization` header is sent.
++ */
++export class CustomOpenAIService {
++    static async generateCommitMessage(
++        prompt: string,
++        progress: ProgressReporter,
++        attempt: number = 1,
++        options?: GenerateOptions,
++    ): Promise<CommitMessage> {
++        const useApiKey = ConfigService.get('custom.useApiKey');
++        const apiKey = useApiKey ? await ApiKeyManager.getKey('custom') : undefined;
++        return generateViaOpenAICompatible(
++            {
++                providerLabel: 'Custom',
++                baseUrl: ConfigService.get('custom.baseUrl'),
++                apiKey,
++                model: ConfigService.get('custom.model'),
++                chatCompletionsPath: ConfigService.get('custom.chatCompletionsPath'),
++            },
++            prompt,
++            progress,
++            attempt,
++            (p, pr, a) => this.generateCommitMessage(p, pr, a, options),
++            options,
++        );
++    }
++}
+diff --git a/src/services/deepSeekService.ts b/src/services/deepSeekService.ts
+new file mode 100644
+index 0000000..bb9b57a
+--- /dev/null
++++ b/src/services/deepSeekService.ts
+@@ -0,0 +1,28 @@
++import { ConfigService } from '../utils/configService';
++import type { ProgressReporter, CommitMessage, GenerateOptions } from '../models/types';
++import { ApiKeyManager } from './apiKeyManager';
++import { generateViaOpenAICompatible } from './openAICompatibleService';
++
++export class DeepSeekService {
++    static async generateCommitMessage(
++        prompt: string,
++        progress: ProgressReporter,
++        attempt: number = 1,
++        options?: GenerateOptions,
++    ): Promise<CommitMessage> {
++        const apiKey = await ApiKeyManager.getKey('deepseek');
++        return generateViaOpenAICompatible(
++            {
++                providerLabel: 'DeepSeek',
++                baseUrl: 'https://api.deepseek.com',
++                apiKey,
++                model: ConfigService.get('deepseek.model'),
++            },
++            prompt,
++            progress,
++            attempt,
++            (p, pr, a) => this.generateCommitMessage(p, pr, a, options),
++            options,
++        );
++    }
++}
+diff --git a/src/services/geminiService.ts b/src/services/geminiService.ts
+index 717d624..5563971 100644
+--- a/src/services/geminiService.ts
++++ b/src/services/geminiService.ts
+@@ -2,7 +2,7 @@ import { Logger } from '../utils/logger';
+ import { ConfigService } from '../utils/configService';
+ import { ProgressReporter, CommitMessage, GenerateOptions } from '../models/types';
+ import { ApiKeyInvalidError } from '../models/errors';
+-import { extractAndValidateMessage, withRetryAndApiKeyGuard } from './baseAIService';
++import { extractAndValidateMessage, getConfiguredTemperature, withRetryAndApiKeyGuard } from './baseAIService';
+ import { HttpError, HttpUtils } from '../utils/httpUtils';
+ import { RetryUtils } from '../utils/retryUtils';
+ import { ApiKeyManager } from './apiKeyManager';
+@@ -28,13 +28,23 @@ interface GeminiModelsResponse {
+     models: GeminiModel[];
+ }
+ 
+-const GEMINI_GENERATION_CONFIG = {
+-    temperature: 0.7,
++const GEMINI_GENERATION_CONFIG_BASE = {
+     topK: 40,
+     topP: 0.95,
+     maxOutputTokens: 1024
+ } as const;
+ 
++function buildGeminiGenerationConfig(options?: GenerateOptions): Record<string, unknown> {
++    const cfg: Record<string, unknown> = {
++        ...GEMINI_GENERATION_CONFIG_BASE,
++        temperature: getConfiguredTemperature(),
++    };
++    if (options?.maxTokens) {
++        cfg.maxOutputTokens = options.maxTokens;
++    }
++    return cfg;
++}
++
+ // Quality tiers for Gemini auto-mode fallback. Lower = preferred.
+ // pro > flash > flash-lite. Unknown / non-flash families fall into the flash
+ // tier so newer experimental models still beat flash-lite.
+@@ -120,9 +130,7 @@ export class GeminiService {
+ 
+                 const payload = {
+                     contents: [{ parts: [{ text: prompt }] }],
+-                    generationConfig: options?.maxTokens
+-                        ? { ...GEMINI_GENERATION_CONFIG, maxOutputTokens: options.maxTokens }
+-                        : GEMINI_GENERATION_CONFIG
++                    generationConfig: buildGeminiGenerationConfig(options)
+                 };
+ 
+                 const data = await HttpUtils.postJson<GeminiResponse>(apiUrl, payload, {
+@@ -185,9 +193,7 @@ export class GeminiService {
+ 
+                 const payload = {
+                     contents: [{ parts: [{ text: prompt }] }],
+-                    generationConfig: options?.maxTokens
+-                        ? { ...GEMINI_GENERATION_CONFIG, maxOutputTokens: options.maxTokens }
+-                        : GEMINI_GENERATION_CONFIG
++                    generationConfig: buildGeminiGenerationConfig(options)
+                 };
+ 
+                 await RetryUtils.updateProgressForAttempt(progress, attempt);
+diff --git a/src/services/groqService.ts b/src/services/groqService.ts
+new file mode 100644
+index 0000000..ef99934
+--- /dev/null
++++ b/src/services/groqService.ts
+@@ -0,0 +1,28 @@
++import { ConfigService } from '../utils/configService';
++import type { ProgressReporter, CommitMessage, GenerateOptions } from '../models/types';
++import { ApiKeyManager } from './apiKeyManager';
++import { generateViaOpenAICompatible } from './openAICompatibleService';
++
++export class GroqService {
++    static async generateCommitMessage(
++        prompt: string,
++        progress: ProgressReporter,
++        attempt: number = 1,
++        options?: GenerateOptions,
++    ): Promise<CommitMessage> {
++        const apiKey = await ApiKeyManager.getKey('groq');
++        return generateViaOpenAICompatible(
++            {
++                providerLabel: 'Groq',
++                baseUrl: 'https://api.groq.com/openai/v1',
++                apiKey,
++                model: ConfigService.get('groq.model'),
++            },
++            prompt,
++            progress,
++            attempt,
++            (p, pr, a) => this.generateCommitMessage(p, pr, a, options),
++            options,
++        );
++    }
++}
+diff --git a/src/services/modelLists.ts b/src/services/modelLists.ts
+index a4812e7..60d32be 100644
+--- a/src/services/modelLists.ts
++++ b/src/services/modelLists.ts
+@@ -22,6 +22,29 @@ interface OpenAIModelsResponse {
+     data?: Array<{ id?: string }>;
+ }
+ 
++/**
++ * Shared fetcher for any provider exposing the OpenAI `/models` endpoint
++ * shape (`{data: [{id}, ...]}`). Used by OpenAI, Groq, DeepSeek, xAI.
++ * `filter` is optional — defaults to "include all non-empty ids".
++ */
++async function fetchOpenAICompatModels(
++    url: string,
++    apiKey: string,
++    signal?: AbortSignal,
++    filter?: (id: string) => boolean,
++): Promise<string[]> {
++    const data = await HttpUtils.getJson<OpenAIModelsResponse>(url, {
++        headers: { Authorization: `Bearer ${apiKey}` },
++        signal,
++    });
++
++    const ids = (data.data ?? [])
++        .map(m => m.id ?? '')
++        .filter(id => id && (!filter || filter(id)));
++
++    return [...new Set(ids)].sort();
++}
++
+ const OPENAI_CHAT_PREFIXES = ['gpt-', 'chatgpt-', 'o1', 'o3', 'o4'];
+ 
+ export async function fetchOpenAIModels(
+@@ -94,3 +117,123 @@ export async function fetchOllamaModels(
+ 
+     return [...new Set(names)].sort();
+ }
++
++interface OpenRouterModelsResponse {
++    data?: Array<{
++        id?: string;
++        pricing?: {
++            prompt?: string;
++            completion?: string;
++        };
++    }>;
++}
++
++/**
++ * OpenRouter `/api/v1/models` returns 300+ models. The webview filters to
++ * free models by default (per `commitSage.openrouter.preferFreeModels`) to
++ * keep the dropdown usable. Free = `:free` suffix OR zero prompt+completion
++ * pricing (covers gift-promo models that don't use the suffix convention).
++ */
++export async function fetchOpenRouterModels(
++    apiKey: string,
++    preferFreeModels: boolean,
++    signal?: AbortSignal,
++): Promise<string[]> {
++    const data = await HttpUtils.getJson<OpenRouterModelsResponse>(
++        'https://openrouter.ai/api/v1/models',
++        {
++            headers: { Authorization: `Bearer ${apiKey}` },
++            signal,
++        },
++    );
++
++    const all = (data.data ?? [])
++        .map(m => ({
++            id: m.id ?? '',
++            isFree:
++                (m.id ?? '').endsWith(':free') ||
++                (m.pricing?.prompt === '0' && m.pricing?.completion === '0'),
++        }))
++        .filter(m => m.id);
++
++    const filtered = preferFreeModels ? all.filter(m => m.isFree) : all;
++    return [...new Set(filtered.map(m => m.id))].sort();
++}
++
++export async function fetchGroqModels(
++    apiKey: string,
++    signal?: AbortSignal,
++): Promise<string[]> {
++    return fetchOpenAICompatModels(
++        'https://api.groq.com/openai/v1/models',
++        apiKey,
++        signal,
++    );
++}
++
++export async function fetchDeepSeekModels(
++    apiKey: string,
++    signal?: AbortSignal,
++): Promise<string[]> {
++    return fetchOpenAICompatModels(
++        'https://api.deepseek.com/models',
++        apiKey,
++        signal,
++    );
++}
++
++// xAI hides `/v1/models` behind team-credit gating (403 with "Your newly
++// created team doesn't have any credits or licenses yet" until a credit
++// pack or license is purchased — even though the listing endpoint itself
++// has no per-call cost). Falling back to a curated list keeps the picker
++// usable on fresh accounts; inference still gates on credits separately.
++// Keep this list in sync with https://docs.x.ai/docs/models.
++const XAI_KNOWN_MODELS = [
++    'grok-4-1-fast',
++    'grok-4-fast',
++    'grok-4-fast-non-reasoning',
++    'grok-3',
++    'grok-3-mini',
++    'grok-code-fast-1',
++];
++
++export async function fetchXaiModels(
++    apiKey: string,
++    signal?: AbortSignal,
++): Promise<string[]> {
++    try {
++        const live = await fetchOpenAICompatModels(
++            'https://api.x.ai/v1/models',
++            apiKey,
++            signal,
++        );
++        return live.length > 0 ? live : [...XAI_KNOWN_MODELS];
++    } catch (error) {
++        // Team-blocked / no-credits accounts can't read `/v1/models`. Treat
++        // any non-cancellation failure as "fall back to static list" rather
++        // than leaving the dropdown empty — the user can still hand-pick a
++        // model they have credits for. Cancellation must propagate so the
++        // UI doesn't paint a stale list after a user-initiated abort.
++        if (signal?.aborted) {
++            throw error;
++        }
++        return [...XAI_KNOWN_MODELS];
++    }
++}
++
++// Anthropic does not expose a public /models endpoint that an end-user API key
++// can hit. Keep this list in sync with https://docs.anthropic.com/en/docs/about-claude/models.
++const ANTHROPIC_KNOWN_MODELS = [
++    'claude-opus-4-1-20250805',
++    'claude-sonnet-4-5-20250929',
++    'claude-haiku-4-5-20251001',
++    'claude-3-5-sonnet-20241022',
++    'claude-3-5-haiku-20241022',
++];
++
++export async function fetchAnthropicModels(
++    _apiKey: string,
++    _signal?: AbortSignal,
++): Promise<string[]> {
++    return [...ANTHROPIC_KNOWN_MODELS];
++}
+diff --git a/src/services/ollamaService.ts b/src/services/ollamaService.ts
+index f29f5ff..8b5a685 100644
+--- a/src/services/ollamaService.ts
++++ b/src/services/ollamaService.ts
+@@ -2,7 +2,7 @@ import { Logger } from '../utils/logger';
+ import { CommitMessage, ProgressReporter, GenerateOptions } from '../models/types';
+ import { ConfigService } from '../utils/configService';
+ import { ApiKeyInvalidError } from '../models/errors';
+-import { extractAndValidateMessage, handleHttpError } from './baseAIService';
++import { extractAndValidateMessage, getConfiguredTemperature, handleHttpError } from './baseAIService';
+ import { HttpError, HttpUtils, NetworkError } from '../utils/httpUtils';
+ import { RetryUtils } from '../utils/retryUtils';
+ import { toError } from '../utils/errorUtils';
+@@ -32,10 +32,19 @@ export class OllamaService {
+             ],
+             stream: false
+         };
++        // Ollama nests sampling parameters under `options`. We always send
++        // `temperature`; `num_ctx` and `num_predict` are conditional so
++        // Ollama keeps its own per-model defaults when the user hasn't
++        // overridden them.
++        const ollamaOptions: Record<string, unknown> = { temperature: getConfiguredTemperature() };
++        const numCtx = ConfigService.get('ollama.numCtx');
++        if (typeof numCtx === 'number' && numCtx > 0) {
++            ollamaOptions['num_ctx'] = numCtx;
++        }
+         if (options?.maxTokens !== undefined) {
+-            // eslint-disable-next-line @typescript-eslint/naming-convention
+-            payload['options'] = { num_predict: options.maxTokens };
++            ollamaOptions['num_predict'] = options.maxTokens;
+         }
++        payload['options'] = ollamaOptions;
+ 
+         try {
+             Logger.log(`Attempt ${attempt}: Sending request to Ollama API`);
+diff --git a/src/services/openAICompatibleService.ts b/src/services/openAICompatibleService.ts
+new file mode 100644
+index 0000000..e780c57
+--- /dev/null
++++ b/src/services/openAICompatibleService.ts
+@@ -0,0 +1,86 @@
++import { Logger } from '../utils/logger';
++import type { CommitMessage, ProgressReporter, GenerateOptions } from '../models/types';
++import { extractAndValidateMessage, getConfiguredTemperature, withRetryAndApiKeyGuard } from './baseAIService';
++import { HttpUtils } from '../utils/httpUtils';
++import { RetryUtils } from '../utils/retryUtils';
++
++interface OpenAIResponse {
++    choices: Array<{
++        message: {
++            content: string;
++        };
++    }>;
++}
++
++/**
++ * Single request to an OpenAI-compatible `chat/completions` endpoint.
++ * Used by OpenAI, Groq, OpenRouter, DeepSeek, xAI, and the user-configurable
++ * "Custom" provider — every vendor that mirrors OpenAI's wire format.
++ *
++ * Anthropic is NOT OpenAI-compatible (different request/response shape,
++ * `x-api-key` header style) — see `anthropicService.ts`.
++ */
++export interface OpenAICompatibleRequest {
++    providerLabel: string;
++    baseUrl: string;
++    apiKey?: string;
++    model: string;
++    chatCompletionsPath?: string;
++    extraHeaders?: Record<string, string>;
++}
++
++export async function generateViaOpenAICompatible(
++    request: OpenAICompatibleRequest,
++    prompt: string,
++    progress: ProgressReporter,
++    attempt: number,
++    retryFn: (
++        prompt: string,
++        progress: ProgressReporter,
++        attempt: number,
++    ) => Promise<CommitMessage>,
++    options?: GenerateOptions,
++): Promise<CommitMessage> {
++    return withRetryAndApiKeyGuard(
++        request.providerLabel,
++        prompt,
++        progress,
++        attempt,
++        retryFn,
++        async () => {
++            const path = request.chatCompletionsPath ?? '/chat/completions';
++            const baseUrl = request.baseUrl.replace(/\/+$/, '');
++
++            const payload = {
++                model: request.model,
++                messages: [{ role: 'user', content: prompt }],
++                temperature: getConfiguredTemperature(),
++                // eslint-disable-next-line @typescript-eslint/naming-convention
++                max_tokens: options?.maxTokens ?? 1024,
++            };
++
++            await RetryUtils.updateProgressForAttempt(progress, attempt);
++
++            const data = await HttpUtils.postJson<OpenAIResponse>(
++                `${baseUrl}${path}`,
++                payload,
++                {
++                    headers: HttpUtils.createRequestHeaders(
++                        request.apiKey,
++                        request.extraHeaders,
++                    ),
++                    signal: options?.signal,
++                },
++            );
++
++            progress.report({ message: 'Processing generated message...', increment: 90 });
++
++            const message = extractAndValidateMessage(
++                data.choices?.[0]?.message?.content,
++                request.providerLabel,
++            );
++            Logger.log(`Commit message generated using ${request.model} model`);
++            return { message, model: request.model };
++        },
++    );
++}
+diff --git a/src/services/openRouterService.ts b/src/services/openRouterService.ts
+new file mode 100644
+index 0000000..4d6f751
+--- /dev/null
++++ b/src/services/openRouterService.ts
+@@ -0,0 +1,36 @@
++import { ConfigService } from '../utils/configService';
++import type { ProgressReporter, CommitMessage, GenerateOptions } from '../models/types';
++import { ApiKeyManager } from './apiKeyManager';
++import { generateViaOpenAICompatible } from './openAICompatibleService';
++
++export class OpenRouterService {
++    static async generateCommitMessage(
++        prompt: string,
++        progress: ProgressReporter,
++        attempt: number = 1,
++        options?: GenerateOptions,
++    ): Promise<CommitMessage> {
++        const apiKey = await ApiKeyManager.getKey('openrouter');
++        return generateViaOpenAICompatible(
++            {
++                providerLabel: 'OpenRouter',
++                baseUrl: 'https://openrouter.ai/api/v1',
++                apiKey,
++                model: ConfigService.get('openrouter.model'),
++                extraHeaders: {
++                    // OpenRouter recommends these headers so usage shows up
++                    // attributed to the calling app on their dashboard.
++                    // eslint-disable-next-line @typescript-eslint/naming-convention
++                    'HTTP-Referer': 'https://github.com/VizzleTF/CommitSage',
++                    // eslint-disable-next-line @typescript-eslint/naming-convention
++                    'X-Title': 'Commit Sage',
++                },
++            },
++            prompt,
++            progress,
++            attempt,
++            (p, pr, a) => this.generateCommitMessage(p, pr, a, options),
++            options,
++        );
++    }
++}
+diff --git a/src/services/openaiService.ts b/src/services/openaiService.ts
+index 3097a2b..36a1e99 100644
+--- a/src/services/openaiService.ts
++++ b/src/services/openaiService.ts
+@@ -1,67 +1,28 @@
+-import { Logger } from '../utils/logger';
+ import { ConfigService } from '../utils/configService';
+ import type { ProgressReporter, CommitMessage, GenerateOptions } from '../models/types';
+-import { extractAndValidateMessage, withRetryAndApiKeyGuard } from './baseAIService';
+-import { HttpUtils } from '../utils/httpUtils';
+-import { RetryUtils } from '../utils/retryUtils';
+ import { ApiKeyManager } from './apiKeyManager';
+-
+-interface OpenAIResponse {
+-    choices: Array<{
+-        message: {
+-            content: string;
+-        };
+-    }>;
+-}
++import { generateViaOpenAICompatible } from './openAICompatibleService';
+ 
+ export class OpenAIService {
+-    private static readonly chatCompletionsPath = '/chat/completions';
+-
+     static async generateCommitMessage(
+         prompt: string,
+         progress: ProgressReporter,
+         attempt: number = 1,
+-        options?: GenerateOptions
++        options?: GenerateOptions,
+     ): Promise<CommitMessage> {
+-        return withRetryAndApiKeyGuard(
+-            'OpenAI',
++        const apiKey = await ApiKeyManager.getKey('openai');
++        return generateViaOpenAICompatible(
++            {
++                providerLabel: 'OpenAI',
++                baseUrl: ConfigService.get('openai.baseUrl'),
++                apiKey,
++                model: ConfigService.get('openai.model'),
++            },
+             prompt,
+             progress,
+             attempt,
+             (p, pr, a) => this.generateCommitMessage(p, pr, a, options),
+-            async () => {
+-                const apiKey = await ApiKeyManager.getKey('openai');
+-                const model = ConfigService.get('openai.model');
+-                const baseUrl = ConfigService.get('openai.baseUrl');
+-
+-                const payload = {
+-                    model,
+-                    messages: [{ role: 'user', content: prompt }],
+-                    temperature: 0.7,
+-                    // eslint-disable-next-line @typescript-eslint/naming-convention
+-                    max_tokens: options?.maxTokens ?? 1024
+-                };
+-
+-                await RetryUtils.updateProgressForAttempt(progress, attempt);
+-
+-                const data = await HttpUtils.postJson<OpenAIResponse>(
+-                    `${baseUrl}${this.chatCompletionsPath}`,
+-                    payload,
+-                    {
+-                        headers: HttpUtils.createRequestHeaders(apiKey),
+-                        signal: options?.signal,
+-                    }
+-                );
+-
+-                progress.report({ message: 'Processing generated message...', increment: 90 });
+-
+-                const message = extractAndValidateMessage(
+-                    data.choices?.[0]?.message?.content,
+-                    'OpenAI'
+-                );
+-                Logger.log(`Commit message generated using ${model} model`);
+-                return { message, model };
+-            }
++            options,
+         );
+     }
+ }
+diff --git a/src/services/promptService.ts b/src/services/promptService.ts
+index a843a16..ac8a43d 100644
+--- a/src/services/promptService.ts
++++ b/src/services/promptService.ts
+@@ -11,6 +11,14 @@ const STRICT_FORMAT_REMINDER = `STRICT OUTPUT RULES — these override any tende
+ - Body bullets MUST start with "- ", each ≤ 50 chars, max 5 bullets total.
+ - Do not list every changed file; summarise.`;
+ 
++// The `detailed` format intentionally violates several of the strict rules
++// (multi-line subject, longer bullets, listing changed files). Use a softer
++// reminder that still suppresses preamble/explanation.
++const DETAILED_FORMAT_REMINDER = `STRICT OUTPUT RULES:
++- Output ONLY the commit message. No preamble, no explanation, no closing remark.
++- No markdown bold (**text**), no headings, no code fences.
++- Follow the Summary/Details/Effects template exactly.`;
++
+ const LANGUAGE_PROMPTS: Record<Exclude<CommitLanguage, 'custom'>, string> = {
+     english: 'Please write the commit message in English.',
+     russian: 'Пожалуйста, напиши сообщение коммита на русском языке.',
+@@ -60,6 +68,8 @@ Please provide ONLY the commit message, without any additional text or explanati
+             languagePrompt = LANGUAGE_PROMPTS[lang] ?? LANGUAGE_PROMPTS.english;
+         }
+ 
++        const reminder = format === 'detailed' ? DETAILED_FORMAT_REMINDER : STRICT_FORMAT_REMINDER;
++
+         return `${template}
+ 
+ ${languagePrompt}
+@@ -70,7 +80,7 @@ ${diff}
+ Git blame analysis:
+ ${blameAnalysis}
+ 
+-${STRICT_FORMAT_REMINDER}
++${reminder}
+ 
+ Please provide ONLY the commit message, without any additional text or explanations.`;
+     }
+diff --git a/src/services/xaiService.ts b/src/services/xaiService.ts
+new file mode 100644
+index 0000000..c2f24ec
+--- /dev/null
++++ b/src/services/xaiService.ts
+@@ -0,0 +1,28 @@
++import { ConfigService } from '../utils/configService';
++import type { ProgressReporter, CommitMessage, GenerateOptions } from '../models/types';
++import { ApiKeyManager } from './apiKeyManager';
++import { generateViaOpenAICompatible } from './openAICompatibleService';
++
++export class XaiService {
++    static async generateCommitMessage(
++        prompt: string,
++        progress: ProgressReporter,
++        attempt: number = 1,
++        options?: GenerateOptions,
++    ): Promise<CommitMessage> {
++        const apiKey = await ApiKeyManager.getKey('xai');
++        return generateViaOpenAICompatible(
++            {
++                providerLabel: 'xAI',
++                baseUrl: 'https://api.x.ai/v1',
++                apiKey,
++                model: ConfigService.get('xai.model'),
++            },
++            prompt,
++            progress,
++            attempt,
++            (p, pr, a) => this.generateCommitMessage(p, pr, a, options),
++            options,
++        );
++    }
++}
+diff --git a/src/templates/formats/detailed.ts b/src/templates/formats/detailed.ts
+new file mode 100644
+index 0000000..ca675b5
+--- /dev/null
++++ b/src/templates/formats/detailed.ts
+@@ -0,0 +1,207 @@
++export const detailedTemplate = {
++    english: `Generate a detailed commit message with three sections — Summary, Details, Effects:
++
++Summary: <one-line imperative summary, ≤ 72 chars>
++
++Details:
++- <changed file/module 1>: <what changed>
++- <changed file/module 2>: <what changed>
++- (max 6 bullets, ≤ 80 chars each)
++
++Effects:
++- <impact on behaviour, performance, or compatibility>
++- <impact 2>
++- (max 4 bullets, ≤ 80 chars each)
++
++Rules:
++- Use the section labels "Summary:", "Details:", "Effects:" verbatim.
++- Skip the Details section entirely if there is only one trivial change.
++- Skip the Effects section if the change has no observable runtime impact (e.g. comment-only edits).
++- No closing remarks, no "Hope this helps", no explanation outside the three sections.
++
++Example:
++Summary: Refactor user authentication to token-based flow
++
++Details:
++- src/auth.js: replace session storage with JWT issuance and verification
++- src/userModel.js: remove deprecated password-hash helpers
++- tests/auth.test.js: cover token expiry + invalid-signature paths
++
++Effects:
++- Tokens expire after 1h, reducing replay-attack window
++- Session storage no longer required server-side
++- All existing sessions invalidated on deploy — users re-login`,
++
++    russian: `Сгенерируй подробное сообщение коммита из трёх секций — Summary, Details, Effects:
++
++Summary: <одна строка в повелительном наклонении, ≤ 72 символов>
++
++Details:
++- <файл/модуль 1>: <что изменилось>
++- <файл/модуль 2>: <что изменилось>
++- (макс 6 пунктов, ≤ 80 символов)
++
++Effects:
++- <влияние на поведение, производительность, совместимость>
++- <влияние 2>
++- (макс 4 пункта, ≤ 80 символов)
++
++Правила:
++- Используй заголовки "Summary:", "Details:", "Effects:" дословно (на английском).
++- Пропусти секцию Details, если изменение тривиальное и затрагивает один файл.
++- Пропусти секцию Effects, если изменение не влияет на runtime (правки комментариев и т.п.).
++- Никаких финальных фраз, объяснений вне трёх секций.
++
++Пример:
++Summary: Переход auth на токенный flow вместо сессий
++
++Details:
++- src/auth.js: замена session storage на JWT issuance/verification
++- src/userModel.js: удалены устаревшие password-hash хелперы
++- tests/auth.test.js: покрытие истёкших токенов и невалидных подписей
++
++Effects:
++- Токены истекают через 1ч — уменьшено окно replay-атак
++- Серверное хранилище сессий больше не требуется
++- Все текущие сессии инвалидируются при деплое — нужен re-login`,
++
++    chinese: `生成包含三个部分的详细提交信息 — Summary、Details、Effects：
++
++Summary: <祈使语单行摘要，≤ 72 字符>
++
++Details:
++- <文件/模块 1>: <更改内容>
++- <文件/模块 2>: <更改内容>
++- (最多 6 项，每项 ≤ 80 字符)
++
++Effects:
++- <对行为、性能或兼容性的影响>
++- <影响 2>
++- (最多 4 项，每项 ≤ 80 字符)
++
++规则：
++- 章节标题 "Summary:"、"Details:"、"Effects:" 必须保留为英文。
++- 如果只有一个简单更改，省略 Details 部分。
++- 如果更改没有可观察的运行时影响，省略 Effects 部分。
++- 不要写结束语或在三个部分之外的解释。`,
++
++    japanese: `Summary・Details・Effects の3セクション構成で詳細なコミットメッセージを生成してください：
++
++Summary: <命令形での1行要約、72文字以内>
++
++Details:
++- <変更ファイル/モジュール 1>: <変更内容>
++- <変更ファイル/モジュール 2>: <変更内容>
++- (最大6項目、各80文字以内)
++
++Effects:
++- <動作・パフォーマンス・互換性への影響>
++- <影響 2>
++- (最大4項目、各80文字以内)
++
++ルール：
++- セクションラベル "Summary:"、"Details:"、"Effects:" は英語のまま使用。
++- 単純な単一変更の場合は Details セクションを省略。
++- 実行時に影響がない場合は Effects セクションを省略。
++- 締めの言葉や3セクション外の説明は不要。`,
++
++    korean: `Summary, Details, Effects 세 섹션으로 구성된 상세 커밋 메시지를 생성하세요:
++
++Summary: <명령형 한 줄 요약, ≤ 72자>
++
++Details:
++- <변경된 파일/모듈 1>: <변경 내용>
++- <변경된 파일/모듈 2>: <변경 내용>
++- (최대 6개, 각 ≤ 80자)
++
++Effects:
++- <동작/성능/호환성에 미치는 영향>
++- <영향 2>
++- (최대 4개, 각 ≤ 80자)
++
++규칙:
++- 섹션 레이블 "Summary:", "Details:", "Effects:"는 영어 그대로 사용.
++- 변경이 단순한 단일 항목이면 Details 섹션 생략.
++- 런타임에 영향이 없으면 Effects 섹션 생략.
++- 마무리 멘트나 세 섹션 외 설명 금지.`,
++
++    german: `Erstelle eine ausführliche Commit-Nachricht mit drei Abschnitten — Summary, Details, Effects:
++
++Summary: <einzeilige Imperativ-Zusammenfassung, ≤ 72 Zeichen>
++
++Details:
++- <geänderte Datei/Modul 1>: <was wurde geändert>
++- <geänderte Datei/Modul 2>: <was wurde geändert>
++- (max. 6 Punkte, je ≤ 80 Zeichen)
++
++Effects:
++- <Auswirkung auf Verhalten/Performance/Kompatibilität>
++- <Auswirkung 2>
++- (max. 4 Punkte, je ≤ 80 Zeichen)
++
++Regeln:
++- Abschnittsbezeichnungen "Summary:", "Details:", "Effects:" wörtlich auf Englisch.
++- Bei einer einzigen trivialen Änderung den Details-Abschnitt weglassen.
++- Bei Änderungen ohne Laufzeitwirkung den Effects-Abschnitt weglassen.
++- Keine Schlussbemerkungen, keine Erklärung außerhalb der drei Abschnitte.`,
++
++    french: `Génère un message de commit détaillé en trois sections — Summary, Details, Effects :
++
++Summary: <résumé impératif d'une ligne, ≤ 72 caractères>
++
++Details:
++- <fichier/module modifié 1> : <ce qui a changé>
++- <fichier/module modifié 2> : <ce qui a changé>
++- (max 6 puces, chacune ≤ 80 caractères)
++
++Effects:
++- <impact sur le comportement/la performance/la compatibilité>
++- <impact 2>
++- (max 4 puces, chacune ≤ 80 caractères)
++
++Règles :
++- Les libellés "Summary:", "Details:", "Effects:" doivent rester en anglais.
++- Omettre la section Details si la modification est triviale et touche un seul fichier.
++- Omettre la section Effects si la modification n'a pas d'impact runtime.
++- Pas de phrase de conclusion ni d'explication hors des trois sections.`,
++
++    spanish: `Genera un mensaje de commit detallado en tres secciones — Summary, Details, Effects:
++
++Summary: <resumen imperativo de una línea, ≤ 72 caracteres>
++
++Details:
++- <archivo/módulo modificado 1>: <qué cambió>
++- <archivo/módulo modificado 2>: <qué cambió>
++- (máx 6 viñetas, cada una ≤ 80 caracteres)
++
++Effects:
++- <impacto en comportamiento/rendimiento/compatibilidad>
++- <impacto 2>
++- (máx 4 viñetas, cada una ≤ 80 caracteres)
++
++Reglas:
++- Las etiquetas "Summary:", "Details:", "Effects:" se mantienen en inglés.
++- Omite la sección Details si el cambio es trivial y afecta un solo archivo.
++- Omite la sección Effects si el cambio no tiene impacto en runtime.
++- Sin frases finales ni explicaciones fuera de las tres secciones.`,
++
++    portuguese: `Gere uma mensagem de commit detalhada em três seções — Summary, Details, Effects:
++
++Summary: <resumo imperativo em uma linha, ≤ 72 caracteres>
++
++Details:
++- <arquivo/módulo alterado 1>: <o que mudou>
++- <arquivo/módulo alterado 2>: <o que mudou>
++- (máx 6 itens, cada um ≤ 80 caracteres)
++
++Effects:
++- <impacto em comportamento/performance/compatibilidade>
++- <impacto 2>
++- (máx 4 itens, cada um ≤ 80 caracteres)
++
++Regras:
++- Mantenha "Summary:", "Details:", "Effects:" em inglês.
++- Omita a seção Details se a mudança for trivial e atingir um único arquivo.
++- Omita a seção Effects se a mudança não tiver impacto em runtime.
++- Sem frases de encerramento nem explicações fora das três seções.`,
++};
+diff --git a/src/templates/index.ts b/src/templates/index.ts
+index 7075d44..fa0fe2b 100644
+--- a/src/templates/index.ts
++++ b/src/templates/index.ts
+@@ -6,13 +6,14 @@ import { emojiTemplate } from './formats/emoji';
+ import { emojiKarmaTemplate } from './formats/emojiKarma';
+ import { googleTemplate } from './formats/google';
+ import { atomTemplate } from './formats/atom';
++import { detailedTemplate } from './formats/detailed';
+ import { SUPPORTED_LANGUAGES } from '../utils/constants';
+ import type { CommitLanguage } from '../utils/constants';
+ import { Logger } from '../utils/logger';
+ 
+ type CommitTemplate = Record<Exclude<CommitLanguage, 'custom'>, string>;
+ 
+-export type CommitFormat = 'conventional' | 'angular' | 'karma' | 'semantic' | 'emoji' | 'emojiKarma' | 'google' | 'atom';
++export type CommitFormat = 'conventional' | 'angular' | 'karma' | 'semantic' | 'emoji' | 'emojiKarma' | 'google' | 'atom' | 'detailed';
+ 
+ const templates: Record<CommitFormat, CommitTemplate> = {
+     conventional: conventionalTemplate,
+@@ -22,7 +23,8 @@ const templates: Record<CommitFormat, CommitTemplate> = {
+     emoji: emojiTemplate,
+     emojiKarma: emojiKarmaTemplate,
+     google: googleTemplate,
+-    atom: atomTemplate
++    atom: atomTemplate,
++    detailed: detailedTemplate
+ } as const;
+ 
+ const isValidFormat = (format: string): format is CommitFormat =>
+diff --git a/src/utils/apiKeyValidator.ts b/src/utils/apiKeyValidator.ts
+index e51af8d..1dff88d 100644
+--- a/src/utils/apiKeyValidator.ts
++++ b/src/utils/apiKeyValidator.ts
+@@ -15,15 +15,24 @@ const apiValidation = {
+ } as const;
+ 
+ export class ApiKeyValidator {
+-    static validateOpenAIApiKey(key: string): string | null {
++    /**
++     * Lax non-empty check used for all OpenAI-compatible providers
++     * (OpenAI, Groq, OpenRouter, DeepSeek, xAI, Anthropic, Codestral).
++     * No prefix/charset check: providers update key shapes (e.g. `sk-or-v1-`,
++     * `gsk_`, `xai-`, `sk-ant-`) and Azure/OpenRouter/LocalAI use yet other
++     * formats. Trust the server to reject bad keys.
++     */
++    private static validateNonEmpty(key: string): string | null {
+         if (!key) {
+             return apiValidation.errorMessages.emptyKey;
+         }
+-        // Note: no `sk-` prefix check — OpenAI-compatible providers (Azure,
+-        // OpenRouter, LocalAI, etc.) use different key formats.
+         return null;
+     }
+ 
++    static validateOpenAIApiKey(key: string): string | null {
++        return ApiKeyValidator.validateNonEmpty(key);
++    }
++
+     static validateGeminiApiKey(key: string): string | null {
+         if (!key) {
+             return apiValidation.errorMessages.emptyKey;
+@@ -45,9 +54,30 @@ export class ApiKeyValidator {
+     }
+ 
+     static validateOllamaAuthToken(key: string): string | null {
+-        if (!key) {
+-            return apiValidation.errorMessages.emptyKey;
+-        }
+-        return null;
++        return ApiKeyValidator.validateNonEmpty(key);
++    }
++
++    static validateOpenRouterApiKey(key: string): string | null {
++        return ApiKeyValidator.validateNonEmpty(key);
++    }
++
++    static validateGroqApiKey(key: string): string | null {
++        return ApiKeyValidator.validateNonEmpty(key);
++    }
++
++    static validateAnthropicApiKey(key: string): string | null {
++        return ApiKeyValidator.validateNonEmpty(key);
++    }
++
++    static validateDeepSeekApiKey(key: string): string | null {
++        return ApiKeyValidator.validateNonEmpty(key);
++    }
++
++    static validateXaiApiKey(key: string): string | null {
++        return ApiKeyValidator.validateNonEmpty(key);
++    }
++
++    static validateCustomApiKey(key: string): string | null {
++        return ApiKeyValidator.validateNonEmpty(key);
+     }
+ }
+diff --git a/src/utils/configService.ts b/src/utils/configService.ts
+index 03a0ef1..c2fbf67 100644
+--- a/src/utils/configService.ts
++++ b/src/utils/configService.ts
+@@ -41,6 +41,19 @@ export const SETTING_DEFAULTS = {
+     'ollama.useAuthToken': false,
+     'openai.model': 'gpt-3.5-turbo',
+     'openai.baseUrl': 'https://api.openai.com/v1',
++    'openrouter.model': 'meta-llama/llama-3.3-70b-instruct:free',
++    'openrouter.preferFreeModels': false,
++    'groq.model': 'llama-3.3-70b-versatile',
++    'anthropic.model': 'claude-sonnet-4-5-20250929',
++    'deepseek.model': 'deepseek-chat',
++    'xai.model': 'grok-3-mini',
++    'custom.baseUrl': 'http://localhost:1234/v1',
++    'custom.model': '',
++    'custom.useApiKey': false,
++    'custom.chatCompletionsPath': '/chat/completions',
++    'general.maxDiffSize': 100000,
++    'general.temperature': 0.7,
++    'ollama.numCtx': 0,
+     'apiRequestTimeout': 30,
+     'gitTimeout': 120,
+     'telemetry.enabled': true,
+@@ -431,7 +444,11 @@ export class ConfigService {
+ 
+   static getProvider(): string {
+     const provider = this.get('provider.type');
+-    if (!['gemini', 'openai', 'codestral', 'ollama'].includes(provider)) {
++    if (
++      !['gemini', 'openai', 'codestral', 'ollama', 'openrouter', 'groq', 'anthropic', 'deepseek', 'xai', 'custom'].includes(
++        provider,
++      )
++    ) {
+       Logger.warn(
+         `Invalid provider type: ${provider}, falling back to gemini`,
+       );
+@@ -458,6 +475,18 @@ export class ConfigService {
+         return this.get('codestral.model');
+       case 'ollama':
+         return this.get('ollama.model');
++      case 'openrouter':
++        return this.get('openrouter.model');
++      case 'groq':
++        return this.get('groq.model');
++      case 'anthropic':
++        return this.get('anthropic.model');
++      case 'deepseek':
++        return this.get('deepseek.model');
++      case 'xai':
++        return this.get('xai.model');
++      case 'custom':
++        return this.get('custom.model');
+     }
+     return 'unknown';
+   }
+diff --git a/src/utils/httpUtils.ts b/src/utils/httpUtils.ts
+index 70e8930..714db20 100644
+--- a/src/utils/httpUtils.ts
++++ b/src/utils/httpUtils.ts
+@@ -40,18 +40,31 @@ interface RequestOptions {
+   timeoutMs?: number;
+ }
+ 
++/**
++ * How a provider expects its API key to be transmitted.
++ * - `bearer` — `Authorization: Bearer <key>` (OpenAI, Groq, OpenRouter, DeepSeek, xAI, Codestral, Ollama auth)
++ * - `x-api-key` — `x-api-key: <key>` (Anthropic)
++ * - `none` — no auth header, even if `apiKey` is provided (custom self-hosted)
++ */
++export type AuthStyle = 'bearer' | 'x-api-key' | 'none';
++
+ export class HttpUtils {
+   static createRequestHeaders(
+     apiKey?: string,
+     additionalHeaders?: Record<string, string>,
++    authStyle: AuthStyle = 'bearer',
+   ): Record<string, string> {
+     const headers: Record<string, string> = {
+       'content-type': 'application/json',
+       ...additionalHeaders,
+     };
+ 
+-    if (apiKey) {
+-      headers['Authorization'] = `Bearer ${apiKey}`;
++    if (apiKey && authStyle !== 'none') {
++      if (authStyle === 'x-api-key') {
++        headers['x-api-key'] = apiKey;
++      } else {
++        headers['Authorization'] = `Bearer ${apiKey}`;
++      }
+     }
+ 
+     return headers;
+diff --git a/src/views/settingsWebviewProvider.ts b/src/views/settingsWebviewProvider.ts
+index f2ebf41..48fed7c 100644
+--- a/src/views/settingsWebviewProvider.ts
++++ b/src/views/settingsWebviewProvider.ts
+@@ -6,14 +6,41 @@ import {
+     fetchOpenAIModels,
+     fetchCodestralModels,
+     fetchOllamaModels,
++    fetchOpenRouterModels,
++    fetchGroqModels,
++    fetchAnthropicModels,
++    fetchDeepSeekModels,
++    fetchXaiModels,
+ } from '../services/modelLists';
+ import { Logger } from '../utils/logger';
+ import { toError } from '../utils/errorUtils';
+ 
+ const VIEW_ID = 'commitsage.settings';
+ 
+-type Provider = 'gemini' | 'codestral' | 'openai' | 'ollama';
+-const PROVIDERS: readonly Provider[] = ['gemini', 'codestral', 'openai', 'ollama'] as const;
++type Provider =
++    | 'gemini'
++    | 'codestral'
++    | 'openai'
++    | 'ollama'
++    | 'openrouter'
++    | 'groq'
++    | 'anthropic'
++    | 'deepseek'
++    | 'xai'
++    | 'custom';
++
++const PROVIDERS: readonly Provider[] = [
++    'gemini',
++    'openrouter',
++    'groq',
++    'anthropic',
++    'openai',
++    'deepseek',
++    'xai',
++    'codestral',
++    'ollama',
++    'custom',
++] as const;
+ 
+ const LANGUAGES = [
+     'english', 'russian', 'chinese', 'japanese', 'korean',
+@@ -21,7 +48,7 @@ const LANGUAGES = [
+ ] as const;
+ const FORMATS = [
+     'conventional', 'angular', 'karma', 'semantic',
+-    'emoji', 'emojiKarma', 'google', 'atom', 'custom',
++    'emoji', 'emojiKarma', 'google', 'atom', 'detailed', 'custom',
+ ] as const;
+ 
+ const SECRET_KEYS: Record<Provider, string> = {
+@@ -29,6 +56,12 @@ const SECRET_KEYS: Record<Provider, string> = {
+     openai: 'commitsage.openaiApiKey',
+     codestral: 'commitsage.codestralApiKey',
+     ollama: 'commitsage.ollamaAuthToken',
++    openrouter: 'commitsage.openrouterApiKey',
++    groq: 'commitsage.groqApiKey',
++    anthropic: 'commitsage.anthropicApiKey',
++    deepseek: 'commitsage.deepseekApiKey',
++    xai: 'commitsage.xaiApiKey',
++    custom: 'commitsage.customApiKey',
+ };
+ 
+ const SETTING_KEYS = {
+@@ -40,6 +73,19 @@ const SETTING_KEYS = {
+     ollamaModel: 'commitSage.ollama.model',
+     ollamaBaseUrl: 'commitSage.ollama.baseUrl',
+     ollamaUseAuthToken: 'commitSage.ollama.useAuthToken',
++    openrouterModel: 'commitSage.openrouter.model',
++    openrouterPreferFreeModels: 'commitSage.openrouter.preferFreeModels',
++    groqModel: 'commitSage.groq.model',
++    anthropicModel: 'commitSage.anthropic.model',
++    deepseekModel: 'commitSage.deepseek.model',
++    xaiModel: 'commitSage.xai.model',
++    customBaseUrl: 'commitSage.custom.baseUrl',
++    customModel: 'commitSage.custom.model',
++    customUseApiKey: 'commitSage.custom.useApiKey',
++    customChatCompletionsPath: 'commitSage.custom.chatCompletionsPath',
++    maxDiffSize: 'commitSage.general.maxDiffSize',
++    temperature: 'commitSage.general.temperature',
++    ollamaNumCtx: 'commitSage.ollama.numCtx',
+     commitLanguage: 'commitSage.commit.commitLanguage',
+     customLanguageName: 'commitSage.commit.customLanguageName',
+     commitFormat: 'commitSage.commit.commitFormat',
+@@ -67,7 +113,9 @@ interface ViewState {
+     selected: Record<Provider, string>;
+     hasApiKey: Record<Provider, boolean>;
+     openai: { baseUrl: string };
+-    ollama: { baseUrl: string; useAuthToken: boolean };
++    ollama: { baseUrl: string; useAuthToken: boolean; numCtx: number };
++    openrouter: { preferFreeModels: boolean };
++    custom: { baseUrl: string; useApiKey: boolean; chatCompletionsPath: string };
+     commit: {
+         format: string;
+         language: string;
+@@ -82,6 +130,8 @@ interface ViewState {
+     advanced: {
+         apiRequestTimeout: number;
+         gitTimeout: number;
++        maxDiffSize: number;
++        temperature: number;
+         telemetryEnabled: boolean;
+     };
+ }
+@@ -91,19 +141,43 @@ type IncomingMessage =
+     | { type: 'setSetting'; key: string; value: string | boolean | number }
+     | { type: 'refreshModels'; provider: Provider }
+     | { type: 'setApiKey'; provider: Provider }
+-    | { type: 'removeApiKey'; provider: Provider };
++    | { type: 'removeApiKey'; provider: Provider }
++    | { type: 'openExternal'; url: string };
++
++const API_KEY_URLS: Partial<Record<Provider, string>> = {
++    gemini: 'https://aistudio.google.com/app/apikey',
++    codestral: 'https://console.mistral.ai/codestral',
++    openai: 'https://platform.openai.com/api-keys',
++    openrouter: 'https://openrouter.ai/keys',
++    groq: 'https://console.groq.com/keys',
++    anthropic: 'https://console.anthropic.com/settings/keys',
++    deepseek: 'https://platform.deepseek.com/api_keys',
++    xai: 'https://console.x.ai/',
++};
+ 
+ const SET_KEY_COMMAND: Record<Provider, string> = {
+     gemini: 'commitsage.setApiKey',
+     openai: 'commitsage.setOpenAIApiKey',
+     codestral: 'commitsage.setCodestralApiKey',
+     ollama: 'commitsage.setOllamaAuthToken',
++    openrouter: 'commitsage.setOpenRouterApiKey',
++    groq: 'commitsage.setGroqApiKey',
++    anthropic: 'commitsage.setAnthropicApiKey',
++    deepseek: 'commitsage.setDeepSeekApiKey',
++    xai: 'commitsage.setXaiApiKey',
++    custom: 'commitsage.setCustomApiKey',
+ };
+ const REMOVE_KEY_COMMAND: Record<Provider, string> = {
+     gemini: 'commitsage.removeApiKey',
+     openai: 'commitsage.removeOpenAIApiKey',
+     codestral: 'commitsage.removeCodestralApiKey',
+     ollama: 'commitsage.removeOllamaAuthToken',
++    openrouter: 'commitsage.removeOpenRouterApiKey',
++    groq: 'commitsage.removeGroqApiKey',
++    anthropic: 'commitsage.removeAnthropicApiKey',
++    deepseek: 'commitsage.removeDeepSeekApiKey',
++    xai: 'commitsage.removeXaiApiKey',
++    custom: 'commitsage.removeCustomApiKey',
+ };
+ 
+ export class SettingsWebviewProvider implements vscode.WebviewViewProvider {
+@@ -115,6 +189,12 @@ export class SettingsWebviewProvider implements vscode.WebviewViewProvider {
+         openai: { list: [], loading: false, error: null },
+         codestral: { list: [], loading: false, error: null },
+         ollama: { list: [], loading: false, error: null },
++        openrouter: { list: [], loading: false, error: null },
++        groq: { list: [], loading: false, error: null },
++        anthropic: { list: [], loading: false, error: null },
++        deepseek: { list: [], loading: false, error: null },
++        xai: { list: [], loading: false, error: null },
++        custom: { list: [], loading: false, error: null },
+     };
+ 
+     constructor(private readonly context: vscode.ExtensionContext) {}
+@@ -191,6 +271,15 @@ export class SettingsWebviewProvider implements vscode.WebviewViewProvider {
+                 case 'removeApiKey':
+                     await vscode.commands.executeCommand(REMOVE_KEY_COMMAND[msg.provider]);
+                     return;
++
++                case 'openExternal':
++                    // Whitelist against the static map — never trust a URL the
++                    // webview hands us back. Prevents the webview from being
++                    // coerced into opening arbitrary protocols.
++                    if (Object.values(API_KEY_URLS).includes(msg.url)) {
++                        await vscode.env.openExternal(vscode.Uri.parse(msg.url));
++                    }
++                    return;
+             }
+         } catch (error) {
+             Logger.error('Webview message handler failed:', toError(error));
+@@ -212,7 +301,10 @@ export class SettingsWebviewProvider implements vscode.WebviewViewProvider {
+             slot.error = null;
+         } catch (error) {
+             const err = toError(error);
+-            slot.error = err.message;
++            // Translate the bare `HTTP 400/401` text from HttpUtils into a
++            // user-actionable string. xAI in particular returns 400 with a
++            // message like "Incorrect API key provided: ..." in the body.
++            slot.error = this.describeRefreshError(err);
+             Logger.error(`Model refresh failed for ${provider}:`, err);
+         } finally {
+             slot.loading = false;
+@@ -220,6 +312,37 @@ export class SettingsWebviewProvider implements vscode.WebviewViewProvider {
+         }
+     }
+ 
++    private describeRefreshError(err: Error): string {
++        const httpMatch = err.message.match(/^HTTP (\d{3})$/);
++        if (!httpMatch) {
++            return err.message;
++        }
++        const status = httpMatch[1];
++        if (status === '401') {
++            return 'Authentication failed — check the API key.';
++        }
++        if (status === '403') {
++            // xAI gates /v1/models behind team credits — common on fresh
++            // accounts. fetchXaiModels already swallows this and falls back
++            // to a static list, so reaching here means a different provider
++            // returned 403 (rare).
++            return 'Forbidden (403). The account may lack permission or credits — check the provider console.';
++        }
++        if (status === '400') {
++            // xAI uses 400 for invalid key; most other providers use 400 for
++            // malformed requests. Either way the user can't fix it without
++            // checking the key first.
++            return 'Bad request (400). The API key may be invalid — check it in the provider console.';
++        }
++        if (status === '429') {
++            return 'Rate limit hit. Try again in a minute.';
++        }
++        if (status === '404') {
++            return 'Endpoint not found (404). Check the base URL setting.';
++        }
++        return err.message;
++    }
++
+     private async fetchByProvider(provider: Provider): Promise<string[]> {
+         switch (provider) {
+             case 'gemini': {
+@@ -248,15 +371,69 @@ export class SettingsWebviewProvider implements vscode.WebviewViewProvider {
+                 const token = useAuth ? await ApiKeyManager.getOptionalKey('ollama') : undefined;
+                 return fetchOllamaModels(ConfigService.get('ollama.baseUrl'), token);
+             }
++            case 'openrouter': {
++                const key = await ApiKeyManager.getOptionalKey('openrouter');
++                if (!key) {
++                    throw new Error('OpenRouter API key is not set');
++                }
++                return fetchOpenRouterModels(key, ConfigService.get('openrouter.preferFreeModels'));
++            }
++            case 'groq': {
++                const key = await ApiKeyManager.getOptionalKey('groq');
++                if (!key) {
++                    throw new Error('Groq API key is not set');
++                }
++                return fetchGroqModels(key);
++            }
++            case 'anthropic': {
++                // Anthropic has no public /models endpoint; the list is a
++                // static fallback baked into modelLists.ts. We still gate on
++                // the key being set so the UI surfaces the same "set a key"
++                // hint as the other providers.
++                const key = await ApiKeyManager.getOptionalKey('anthropic');
++                if (!key) {
++                    throw new Error('Anthropic API key is not set');
++                }
++                return fetchAnthropicModels(key);
++            }
++            case 'deepseek': {
++                const key = await ApiKeyManager.getOptionalKey('deepseek');
++                if (!key) {
++                    throw new Error('DeepSeek API key is not set');
++                }
++                return fetchDeepSeekModels(key);
++            }
++            case 'xai': {
++                const key = await ApiKeyManager.getOptionalKey('xai');
++                if (!key) {
++                    throw new Error('xAI API key is not set');
++                }
++                return fetchXaiModels(key);
++            }
++            case 'custom': {
++                // Custom has no listing endpoint — user types the model
++                // manually. Returning an empty list lets the dropdown render
++                // just the currently configured model.
++                return [];
++            }
+         }
+     }
+ 
+     private async buildState(): Promise<ViewState> {
+-        const [geminiKey, openaiKey, codestralKey, ollamaToken] = await Promise.all([
++        const [
++            geminiKey, openaiKey, codestralKey, ollamaToken,
++            openrouterKey, groqKey, anthropicKey, deepseekKey, xaiKey, customKey,
++        ] = await Promise.all([
+             ApiKeyManager.getOptionalKey('gemini'),
+             ApiKeyManager.getOptionalKey('openai'),
+             ApiKeyManager.getOptionalKey('codestral'),
+             ApiKeyManager.getOptionalKey('ollama'),
++            ApiKeyManager.getOptionalKey('openrouter'),
++            ApiKeyManager.getOptionalKey('groq'),
++            ApiKeyManager.getOptionalKey('anthropic'),
++            ApiKeyManager.getOptionalKey('deepseek'),
++            ApiKeyManager.getOptionalKey('xai'),
++            ApiKeyManager.getOptionalKey('custom'),
+         ]);
+ 
+         return {
+@@ -268,17 +445,38 @@ export class SettingsWebviewProvider implements vscode.WebviewViewProvider {
+                 openai: ConfigService.get('openai.model'),
+                 codestral: ConfigService.get('codestral.model'),
+                 ollama: ConfigService.get('ollama.model'),
++                openrouter: ConfigService.get('openrouter.model'),
++                groq: ConfigService.get('groq.model'),
++                anthropic: ConfigService.get('anthropic.model'),
++                deepseek: ConfigService.get('deepseek.model'),
++                xai: ConfigService.get('xai.model'),
++                custom: ConfigService.get('custom.model'),
+             },
+             hasApiKey: {
+                 gemini: !!geminiKey,
+                 openai: !!openaiKey,
+                 codestral: !!codestralKey,
+                 ollama: !!ollamaToken,
++                openrouter: !!openrouterKey,
++                groq: !!groqKey,
++                anthropic: !!anthropicKey,
++                deepseek: !!deepseekKey,
++                xai: !!xaiKey,
++                custom: !!customKey,
+             },
+             openai: { baseUrl: ConfigService.get('openai.baseUrl') },
+             ollama: {
+                 baseUrl: ConfigService.get('ollama.baseUrl'),
+                 useAuthToken: ConfigService.get('ollama.useAuthToken'),
++                numCtx: ConfigService.get('ollama.numCtx'),
++            },
++            openrouter: {
++                preferFreeModels: ConfigService.get('openrouter.preferFreeModels'),
++            },
++            custom: {
++                baseUrl: ConfigService.get('custom.baseUrl'),
++                useApiKey: ConfigService.get('custom.useApiKey'),
++                chatCompletionsPath: ConfigService.get('custom.chatCompletionsPath'),
+             },
+             commit: {
+                 format: ConfigService.get('commit.commitFormat'),
+@@ -294,6 +492,8 @@ export class SettingsWebviewProvider implements vscode.WebviewViewProvider {
+             advanced: {
+                 apiRequestTimeout: ConfigService.get('apiRequestTimeout'),
+                 gitTimeout: ConfigService.get('gitTimeout'),
++                maxDiffSize: ConfigService.get('general.maxDiffSize'),
++                temperature: ConfigService.get('general.temperature'),
+                 telemetryEnabled: ConfigService.get('telemetry.enabled'),
+             },
+         };
+@@ -416,6 +616,46 @@ export class SettingsWebviewProvider implements vscode.WebviewViewProvider {
+                 color: var(--vscode-descriptionForeground);
+             }
+             .badge.on { color: var(--vscode-testing-iconPassed, var(--vscode-charts-green, currentColor)); }
++            .combo {
++                position: relative;
++                flex: 1;
++            }
++            .combo > input {
++                width: 100%;
++                box-sizing: border-box;
++            }
++            .combo-list {
++                position: absolute;
++                top: 100%;
++                left: 0;
++                right: 0;
++                max-height: 280px;
++                overflow-y: auto;
++                margin: 2px 0 0;
++                padding: 0;
++                list-style: none;
++                background: var(--vscode-dropdown-background, var(--vscode-input-background));
++                color: var(--vscode-dropdown-foreground, var(--vscode-foreground));
++                border: 1px solid var(--vscode-dropdown-border, var(--vscode-input-border, transparent));
++                border-radius: 2px;
++                z-index: 10;
++                box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
++            }
++            .combo-list[hidden] { display: none; }
++            .combo-list-item {
++                padding: 4px 8px;
++                cursor: pointer;
++                white-space: nowrap;
++                overflow: hidden;
++                text-overflow: ellipsis;
++                font-family: inherit;
++                font-size: inherit;
++            }
++            .combo-list-item.active,
++            .combo-list-item:hover {
++                background: var(--vscode-list-activeSelectionBackground, var(--vscode-list-hoverBackground));
++                color: var(--vscode-list-activeSelectionForeground, var(--vscode-foreground));
++            }
+         `;
+ 
+         const data = {
+@@ -423,21 +663,27 @@ export class SettingsWebviewProvider implements vscode.WebviewViewProvider {
+             languages: LANGUAGES,
+             formats: FORMATS,
+             settingKeys: SETTING_KEYS,
++            apiKeyUrls: API_KEY_URLS,
+             l10n: {
+                 provider: vscode.l10n.t('Provider'),
+                 modelAuth: vscode.l10n.t('Model & authentication'),
+                 model: vscode.l10n.t('Model'),
++                modelPlaceholder: vscode.l10n.t('Type a model ID'),
+                 refresh: vscode.l10n.t('Refresh'),
+                 refreshing: vscode.l10n.t('Refreshing…'),
+                 baseUrl: vscode.l10n.t('Base URL'),
++                path: vscode.l10n.t('Path'),
+                 apiKey: vscode.l10n.t('API key'),
+                 authToken: vscode.l10n.t('Auth token'),
+                 setKey: vscode.l10n.t('Set'),
+                 removeKey: vscode.l10n.t('Remove'),
++                getKey: vscode.l10n.t('Get key ↗'),
+                 keySet: vscode.l10n.t('● set'),
+                 keyMissing: vscode.l10n.t('○ not set'),
+                 noKey: vscode.l10n.t('Set an API key to load the live model list.'),
+                 useAuthToken: vscode.l10n.t('Use auth token'),
++                useApiKey: vscode.l10n.t('Send API key'),
++                preferFreeModels: vscode.l10n.t('Show free models only'),
+                 liveFrom: vscode.l10n.t('Live list from'),
+                 notInList: vscode.l10n.t('(not in live list)'),
+                 commit: vscode.l10n.t('Commit message'),
+@@ -458,6 +704,12 @@ export class SettingsWebviewProvider implements vscode.WebviewViewProvider {
+                 apiTimeout: vscode.l10n.t('API request timeout (seconds)'),
+                 gitTimeout: vscode.l10n.t('Git timeout (seconds)'),
+                 timeoutHint: vscode.l10n.t('-1 disables the timeout'),
++                maxDiffSize: vscode.l10n.t('Max diff size (characters)'),
++                maxDiffSizeHint: vscode.l10n.t('-1 disables truncation. For Groq free tier set ~20000. Default 100000 ≈ 25000 tokens.'),
++                temperature: vscode.l10n.t('Temperature'),
++                temperatureHint: vscode.l10n.t('LLM sampling temperature. 0 = deterministic, 0.7 = default, 1+ = more varied.'),
++                ollamaNumCtx: vscode.l10n.t('Context window (num_ctx)'),
++                ollamaNumCtxHint: vscode.l10n.t('Ollama context length. 0 = use model default. Larger values use more RAM/VRAM.'),
+                 telemetry: vscode.l10n.t('Telemetry'),
+                 autoOption: vscode.l10n.t('auto — try all available models'),
+                 providerLabels: {
+@@ -465,12 +717,24 @@ export class SettingsWebviewProvider implements vscode.WebviewViewProvider {
+                     openai: 'OpenAI',
+                     codestral: 'Codestral',
+                     ollama: 'Ollama',
++                    openrouter: 'OpenRouter',
++                    groq: 'Groq',
++                    anthropic: 'Anthropic Claude',
++                    deepseek: 'DeepSeek',
++                    xai: 'xAI Grok',
++                    custom: 'Custom (OpenAI-compatible)',
+                 },
+                 liveSource: {
+                     gemini: 'Google Generative Language',
+                     openai: 'OpenAI /v1/models (gpt-* / o-series)',
+                     codestral: 'Mistral published Codestral aliases (static — no list API)',
+                     ollama: '/api/tags (local)',
++                    openrouter: 'OpenRouter /api/v1/models',
++                    groq: 'Groq /openai/v1/models',
++                    anthropic: 'Static list (Anthropic has no public /models endpoint)',
++                    deepseek: 'DeepSeek /models',
++                    xai: 'xAI /v1/models',
++                    custom: 'Free-form — type the model your endpoint exposes',
+                 },
+             },
+         };
+diff --git a/src/views/webview/main.ts b/src/views/webview/main.ts
+index 4bd2138..34dfc87 100644
+--- a/src/views/webview/main.ts
++++ b/src/views/webview/main.ts
+@@ -7,7 +7,17 @@ declare function acquireVsCodeApi(): {
+     setState(state: unknown): void;
+ };
+ 
+-type Provider = 'gemini' | 'codestral' | 'openai' | 'ollama';
++type Provider =
++    | 'gemini'
++    | 'codestral'
++    | 'openai'
++    | 'ollama'
++    | 'openrouter'
++    | 'groq'
++    | 'anthropic'
++    | 'deepseek'
++    | 'xai'
++    | 'custom';
+ 
+ interface ModelSlot {
+     list: string[];
+@@ -20,21 +30,27 @@ interface InitData {
+     languages: readonly string[];
+     formats: readonly string[];
+     settingKeys: Record<string, string>;
++    apiKeyUrls: Partial<Record<Provider, string>>;
+     l10n: {
+         provider: string;
+         modelAuth: string;
+         model: string;
++        modelPlaceholder: string;
+         refresh: string;
+         refreshing: string;
+         baseUrl: string;
++        path: string;
+         apiKey: string;
+         authToken: string;
+         setKey: string;
+         removeKey: string;
++        getKey: string;
+         keySet: string;
+         keyMissing: string;
+         noKey: string;
+         useAuthToken: string;
++        useApiKey: string;
++        preferFreeModels: string;
+         liveFrom: string;
+         notInList: string;
+         commit: string;
+@@ -55,6 +71,12 @@ interface InitData {
+         apiTimeout: string;
+         gitTimeout: string;
+         timeoutHint: string;
++        maxDiffSize: string;
++        maxDiffSizeHint: string;
++        temperature: string;
++        temperatureHint: string;
++        ollamaNumCtx: string;
++        ollamaNumCtxHint: string;
+         telemetry: string;
+         autoOption: string;
+         providerLabels: Record<Provider, string>;
+@@ -69,7 +91,9 @@ interface ViewState {
+     selected: Record<Provider, string>;
+     hasApiKey: Record<Provider, boolean>;
+     openai: { baseUrl: string };
+-    ollama: { baseUrl: string; useAuthToken: boolean };
++    ollama: { baseUrl: string; useAuthToken: boolean; numCtx: number };
++    openrouter: { preferFreeModels: boolean };
++    custom: { baseUrl: string; useApiKey: boolean; chatCompletionsPath: string };
+     commit: {
+         format: string;
+         language: string;
+@@ -84,6 +108,8 @@ interface ViewState {
+     advanced: {
+         apiRequestTimeout: number;
+         gitTimeout: number;
++        maxDiffSize: number;
++        temperature: number;
+         telemetryEnabled: boolean;
+     };
+ }
+@@ -111,7 +137,9 @@ function el<K extends keyof HTMLElementTagNameMap>(
+     const node = document.createElement(tag);
+     if (attrs) {
+         for (const [k, v] of Object.entries(attrs)) {
+-            if (v === null || v === undefined || v === false) continue;
++            if (v === null || v === undefined || v === false) {
++                continue;
++            }
+             if (k === 'class') {
+                 node.className = String(v);
+             } else if (k.startsWith('on')) {
+@@ -122,7 +150,9 @@ function el<K extends keyof HTMLElementTagNameMap>(
+         }
+     }
+     for (const c of children) {
+-        if (c == null) continue;
++        if (c === null || c === undefined) {
++            continue;
++        }
+         node.appendChild(typeof c === 'string' ? document.createTextNode(c) : c);
+     }
+     return node;
+@@ -178,13 +208,267 @@ function makeTextInput(
+     id: string,
+     value: string,
+     onChange: (v: string) => void,
++    placeholder?: string,
+ ): HTMLInputElement {
+-    const input = el('input', { type: 'text', id, value }) as HTMLInputElement;
++    const input = el('input', { type: 'text', id, value, placeholder }) as HTMLInputElement;
+     input.value = value;
+     input.addEventListener('change', () => onChange(input.value));
+     return input;
+ }
+ 
++/**
++ * Three-tier fuzzy match scorer for the combobox.
++ *
++ * Tier 1 — `query` is a contiguous substring of `target` (case-insensitive).
++ *   Best score. Earlier match position wins (`claude-3-5-sonnet` ranks above
++ *   `meta/some-claude-fork` for query `claude`).
++ * Tier 2 — `query` chars appear as a subsequence in `target`, preserving
++ *   order, possibly with gaps. Example: `clu` → `c…l…u` matches `claude`.
++ *   Earlier first-match position wins.
++ * Tier 3 — `target` contains every char of `query` as a multiset, in any
++ *   order. Example: `gml` → `glm` (no order match, but all three chars
++ *   present). Lowest priority.
++ *
++ * Returns `null` when none of the tiers match — the item is filtered out.
++ */
++function fuzzyScore(query: string, target: string): number | null {
++    const q = query.toLowerCase();
++    const t = target.toLowerCase();
++    if (!q) {
++        return 0;
++    }
++
++    // Tier 1: contiguous substring.
++    const sub = t.indexOf(q);
++    if (sub >= 0) {
++        return 1_000_000 - sub;
++    }
++
++    // Tier 2: subsequence preserving order.
++    let qi = 0;
++    let firstMatch = -1;
++    for (let i = 0; i < t.length && qi < q.length; i++) {
++        if (t.charCodeAt(i) === q.charCodeAt(qi)) {
++            if (firstMatch < 0) {
++                firstMatch = i;
++            }
++            qi++;
++        }
++    }
++    if (qi === q.length) {
++        return 100_000 - firstMatch;
++    }
++
++    // Tier 3: target contains every char of query as a multiset (order ignored).
++    // Use a counts map so `gg` doesn't match a target with a single `g`.
++    const tCounts = new Map<string, number>();
++    for (let i = 0; i < t.length; i++) {
++        const ch = t[i];
++        tCounts.set(ch, (tCounts.get(ch) ?? 0) + 1);
++    }
++    for (let i = 0; i < q.length; i++) {
++        const ch = q[i];
++        const c = tCounts.get(ch) ?? 0;
++        if (c === 0) {
++            return null;
++        }
++        tCounts.set(ch, c - 1);
++    }
++    // Shorter targets rank higher within tier 3 — `glm` beats
++    // `something/with/glm-tagged-name-longer` when the query is `gml`.
++    return 10_000 - t.length;
++}
++
++/**
++ * Custom combobox: text input + scrollable popup list with substring
++ * filtering, keyboard navigation, and free-form entry. Replaces the
++ * browser-native `<datalist>` which had two blockers:
++ *  1. Chromium's datalist popup doesn't scroll past ~20 items (OpenRouter
++ *     ships 300+ models).
++ *  2. There's no way to clear the input on focus while preserving the
++ *     committed value — datalist tightly couples display and value.
++ *
++ * Behaviour:
++ *  - Focus clears the input to an empty filter (placeholder shows the
++ *     committed model), so the user immediately sees the full list.
++ *  - The committed value is preserved — closing without selecting (Esc /
++ *     click outside / blur) restores the displayed value.
++ *  - Selection (click / Enter on highlighted item) commits + calls onChange.
++ *  - Pressing Enter on free-form text not in the list also commits it,
++ *     so brand-new model IDs can be typed in.
++ *  - ↑/↓ navigate, Esc closes without commit.
++ */
++function makeCombobox(
++    id: string,
++    options: string[],
++    current: string,
++    onChange: (value: string) => void,
++    placeholder?: string,
++): HTMLDivElement {
++    const wrap = el('div', { class: 'combo' }) as HTMLDivElement;
++    const input = el('input', {
++        type: 'text',
++        id,
++        autocomplete: 'off',
++        spellcheck: 'false',
++        placeholder: current || placeholder || '',
++    }) as HTMLInputElement;
++    input.value = current;
++
++    const list = el('ul', { class: 'combo-list' }) as HTMLUListElement;
++    list.hidden = true;
++
++    let committed = current;
++    let activeIdx = -1;
++
++    function renderList(filter: string): void {
++        const f = filter.trim();
++        let matches: string[];
++        if (!f) {
++            matches = options.slice();
++        } else {
++            const scored: Array<{ value: string; score: number }> = [];
++            for (const o of options) {
++                const s = fuzzyScore(f, o);
++                if (s !== null) {
++                    scored.push({ value: o, score: s });
++                }
++            }
++            // Higher score first; lexicographic as tiebreaker so the order
++            // is stable across renders.
++            scored.sort((a, b) => b.score - a.score || a.value.localeCompare(b.value));
++            matches = scored.map(s => s.value);
++        }
++
++        list.innerHTML = '';
++        if (matches.length === 0) {
++            list.hidden = true;
++            activeIdx = -1;
++            return;
++        }
++        for (let i = 0; i < matches.length; i++) {
++            const value = matches[i];
++            // eslint-disable-next-line @typescript-eslint/naming-convention
++            const li = el('li', { class: 'combo-list-item', 'data-value': value }, [value]);
++            // mousedown (not click) — click fires AFTER input blur, which
++            // would hide the list and cancel the selection. mousedown +
++            // preventDefault keeps focus.
++            li.addEventListener('mousedown', e => {
++                e.preventDefault();
++                commit(value);
++            });
++            list.appendChild(li);
++        }
++        list.hidden = false;
++        // When the user is filtering, always start from the top match. When
++        // the filter is empty (e.g. on focus), pre-highlight the committed
++        // value so the dropdown opens on the user's current selection.
++        if (!f && committed) {
++            activeIdx = Math.max(0, matches.indexOf(committed));
++        } else {
++            activeIdx = 0;
++        }
++        highlight();
++    }
++
++    function highlight(): void {
++        const items = list.querySelectorAll('.combo-list-item');
++        items.forEach((it, i) => {
++            it.classList.toggle('active', i === activeIdx);
++            if (i === activeIdx) {
++                (it as HTMLElement).scrollIntoView({ block: 'nearest' });
++            }
++        });
++    }
++
++    function commit(value: string): void {
++        committed = value;
++        input.value = value;
++        input.placeholder = value || (placeholder ?? '');
++        list.hidden = true;
++        activeIdx = -1;
++        onChange(value);
++    }
++
++    function restore(): void {
++        input.value = committed;
++        list.hidden = true;
++        activeIdx = -1;
++    }
++
++    function openList(): void {
++        // Clear the typed display so the filter starts empty and the user
++        // sees the full list. `committed` is unchanged — restore() puts it
++        // back if the user closes without picking.
++        input.value = '';
++        input.placeholder = committed || (placeholder ?? '');
++        renderList('');
++    }
++
++    input.addEventListener('focus', openList);
++    // Re-opening on click handles the case where the input already has focus
++    // but the list was closed (e.g. Esc was pressed).
++    input.addEventListener('click', () => {
++        if (list.hidden) {
++            openList();
++        }
++    });
++
++    input.addEventListener('blur', () => {
++        // Defer so a mousedown on a list item can commit first.
++        setTimeout(() => {
++            if (!list.hidden) {
++                restore();
++            } else if (input.value !== committed) {
++                // List already closed (e.g. via commit) but if input still
++                // shows a stale typed value, sync to committed.
++                input.value = committed;
++            }
++        }, 0);
++    });
++
++    input.addEventListener('input', () => renderList(input.value));
++
++    input.addEventListener('keydown', (e: KeyboardEvent) => {
++        if (e.key === 'ArrowDown') {
++            if (list.hidden) {
++                openList();
++            } else {
++                const items = list.querySelectorAll('.combo-list-item');
++                activeIdx = Math.min(activeIdx + 1, items.length - 1);
++                highlight();
++            }
++            e.preventDefault();
++        } else if (e.key === 'ArrowUp') {
++            if (!list.hidden) {
++                activeIdx = Math.max(activeIdx - 1, 0);
++                highlight();
++                e.preventDefault();
++            }
++        } else if (e.key === 'Enter') {
++            e.preventDefault();
++            const items = list.querySelectorAll('.combo-list-item');
++            if (!list.hidden && activeIdx >= 0 && activeIdx < items.length) {
++                commit((items[activeIdx] as HTMLElement).dataset.value ?? '');
++            } else if (input.value.trim()) {
++                // Free-form entry: commit whatever the user typed.
++                commit(input.value.trim());
++            } else {
++                restore();
++            }
++            input.blur();
++        } else if (e.key === 'Escape') {
++            e.preventDefault();
++            restore();
++            input.blur();
++        }
++    });
++
++    wrap.appendChild(input);
++    wrap.appendChild(list);
++    return wrap;
++}
++
+ function makeNumberInput(
+     id: string,
+     value: number,
+@@ -212,11 +496,39 @@ function makeTextarea(
+     return ta;
+ }
+ 
+-function section(title: string, openByDefault: boolean, body: HTMLElement): HTMLDetailsElement {
+-    const details = el('details', { open: openByDefault || undefined }) as HTMLDetailsElement;
++// Per-section open/closed state, persisted via vscode.setState so the
++// webview restores the previous expansion across reloads / window restarts.
++// Keys are stable section IDs ("modelAuth" / "commit" / "automation" /
++// "advanced") — not localized titles, which would change with locale.
++type SectionState = Record<string, boolean>;
++function loadSectionState(): SectionState {
++    const raw = vscode.getState() as { sections?: SectionState } | undefined;
++    return raw?.sections ?? {};
++}
++function saveSectionState(state: SectionState): void {
++    const prev = (vscode.getState() as Record<string, unknown> | undefined) ?? {};
++    vscode.setState({ ...prev, sections: state });
++}
++
++function section(
++    id: string,
++    title: string,
++    openByDefault: boolean,
++    body: HTMLElement,
++): HTMLDetailsElement {
++    const persisted = loadSectionState();
++    const open = id in persisted ? persisted[id] : openByDefault;
++    const details = el('details', { open: open || undefined }) as HTMLDetailsElement;
+     details.appendChild(el('summary', undefined, [title]));
+     const wrap = el('div', { class: 'body' }, [body]);
+     details.appendChild(wrap);
++
++    details.addEventListener('toggle', () => {
++        const next = loadSectionState();
++        next[id] = details.open;
++        saveSectionState(next);
++    });
++
+     return details;
+ }
+ 
+@@ -224,6 +536,29 @@ function setSetting(key: string, value: string | boolean | number): void {
+     send({ type: 'setSetting', key, value });
+ }
+ 
++// Providers that have no live `/models` endpoint and therefore should not
++// show a refresh button (the list is static or user-supplied). Codestral has
++// a static fallback, Anthropic has no public endpoint, Custom has no listing
++// at all.
++const NO_REFRESH_PROVIDERS: ReadonlySet<Provider> = new Set([
++    'codestral',
++    'anthropic',
++    'custom',
++] as const);
++
++const SETTING_KEY_BY_PROVIDER: Record<Provider, string> = {
++    gemini: 'geminiModel',
++    openai: 'openaiModel',
++    codestral: 'codestralModel',
++    ollama: 'ollamaModel',
++    openrouter: 'openrouterModel',
++    groq: 'groqModel',
++    anthropic: 'anthropicModel',
++    deepseek: 'deepseekModel',
++    xai: 'xaiModel',
++    custom: 'customModel',
++};
++
+ function renderProviderPick(state: ViewState): HTMLElement {
+     return el('section', { class: 'provider-pick' }, [
+         fieldLabel(L.provider),
+@@ -241,6 +576,8 @@ function renderModelAuthSection(state: ViewState): HTMLElement {
+     const slot = state.models[p];
+     const body = el('div');
+ 
++    // Provider-specific endpoint config (baseUrl / path) above the model
++    // picker. Only providers whose endpoint is configurable get these.
+     if (p === 'openai') {
+         body.appendChild(fieldLabel(L.baseUrl));
+         body.appendChild(makeTextInput(
+@@ -255,46 +592,66 @@ function renderModelAuthSection(state: ViewState): HTMLElement {
+             state.ollama.baseUrl,
+             v => setSetting(KEYS.ollamaBaseUrl, v),
+         ));
++    } else if (p === 'custom') {
++        body.appendChild(fieldLabel(L.baseUrl));
++        body.appendChild(makeTextInput(
++            'custom-baseurl',
++            state.custom.baseUrl,
++            v => setSetting(KEYS.customBaseUrl, v),
++        ));
++        body.appendChild(fieldLabel(L.path));
++        body.appendChild(makeTextInput(
++            'custom-path',
++            state.custom.chatCompletionsPath,
++            v => setSetting(KEYS.customChatCompletionsPath, v),
++        ));
++    }
++
++    if (p === 'openrouter') {
++        body.appendChild(makeCheckbox(
++            'openrouter-prefer-free',
++            L.preferFreeModels,
++            state.openrouter.preferFreeModels,
++            v => setSetting(KEYS.openrouterPreferFreeModels, v),
++        ));
+     }
+ 
+     body.appendChild(fieldLabel(L.model));
+ 
+-    const modelOptions: Array<{ value: string; label: string }> = [];
++    const settingKeyName = SETTING_KEY_BY_PROVIDER[p];
++    const currentKey = KEYS[settingKeyName];
++    const currentValue = state.selected[p];
++
++    // Combobox (text input + datalist) instead of a plain <select>: lets the
++    // user type to filter the model list (essential for OpenRouter's 300+
++    // models) and lets them enter a brand-new model ID that isn't in the
++    // fetched list yet.
++    const modelOptions: string[] = [];
+     if (p === 'gemini') {
+-        modelOptions.push({ value: 'auto', label: L.autoOption });
+-    }
+-    for (const m of slot.list) {
+-        modelOptions.push({ value: m, label: m });
++        modelOptions.push('auto');
+     }
++    modelOptions.push(...slot.list);
+ 
+-    const currentKey =
+-        p === 'gemini' ? KEYS.geminiModel :
+-        p === 'openai' ? KEYS.openaiModel :
+-        p === 'codestral' ? KEYS.codestralModel :
+-        KEYS.ollamaModel;
+-    const currentValue = state.selected[p];
+-
+-    const modelSelect = makeSelect(
++    const modelCombobox = makeCombobox(
+         'model',
+         modelOptions,
+         currentValue,
+         v => setSetting(currentKey, v),
++        L.modelPlaceholder,
+     );
+ 
+-    // Codestral's dedicated subdomain has no /v1/models endpoint, so the list
+-    // is a static fallback baked into modelLists.ts. Hide refresh — the action
+-    // would be a no-op and the misleading "Refreshing…" state would confuse.
+-    if (p !== 'codestral') {
++    if (!NO_REFRESH_PROVIDERS.has(p)) {
+         const refreshBtn = el('button', {
+             id: 'refresh-models',
+             title: slot.loading ? L.refreshing : L.refresh,
+             disabled: slot.loading,
+         }, ['⟳']) as HTMLButtonElement;
+         refreshBtn.addEventListener('click', () => send({ type: 'refreshModels', provider: p }));
+-        body.appendChild(el('div', { class: 'row' }, [modelSelect, refreshBtn]));
++        body.appendChild(el('div', { class: 'row' }, [modelCombobox, refreshBtn]));
+     } else {
+-        body.appendChild(modelSelect);
++        body.appendChild(modelCombobox);
+     }
++
+     body.appendChild(el('div', { class: 'hint' }, [`${L.liveFrom} ${L.liveSource[p]}`]));
+ 
+     if (slot.error) {
+@@ -311,32 +668,49 @@ function renderModelAuthSection(state: ViewState): HTMLElement {
+         ));
+         if (state.ollama.useAuthToken) {
+             body.appendChild(fieldLabel(L.authToken));
+-            const setBtn = el('button', { class: 'primary' }, [L.setKey]) as HTMLButtonElement;
+-            setBtn.addEventListener('click', () => send({ type: 'setApiKey', provider: 'ollama' }));
+-            const removeBtn = el('button', { disabled: !state.hasApiKey.ollama }, [L.removeKey]) as HTMLButtonElement;
+-            removeBtn.addEventListener('click', () => send({ type: 'removeApiKey', provider: 'ollama' }));
+-            const badge = el('span', { class: 'badge' + (state.hasApiKey.ollama ? ' on' : '') }, [
+-                state.hasApiKey.ollama ? L.keySet : L.keyMissing,
+-            ]);
+-            body.appendChild(el('div', { class: 'actions' }, [setBtn, removeBtn, badge]));
++            body.appendChild(renderApiKeyButtons(state, 'ollama'));
++        }
++    } else if (p === 'custom') {
++        body.appendChild(makeCheckbox(
++            'custom-useapikey',
++            L.useApiKey,
++            state.custom.useApiKey,
++            v => setSetting(KEYS.customUseApiKey, v),
++        ));
++        if (state.custom.useApiKey) {
++            body.appendChild(fieldLabel(L.apiKey));
++            body.appendChild(renderApiKeyButtons(state, 'custom'));
+         }
+     } else {
+         body.appendChild(fieldLabel(L.apiKey));
+-        const setBtn = el('button', { class: 'primary' }, [L.setKey]) as HTMLButtonElement;
+-        setBtn.addEventListener('click', () => send({ type: 'setApiKey', provider: p }));
+-        const removeBtn = el('button', { disabled: !state.hasApiKey[p] }, [L.removeKey]) as HTMLButtonElement;
+-        removeBtn.addEventListener('click', () => send({ type: 'removeApiKey', provider: p }));
+-        const badge = el('span', { class: 'badge' + (state.hasApiKey[p] ? ' on' : '') }, [
+-            state.hasApiKey[p] ? L.keySet : L.keyMissing,
+-        ]);
+-        body.appendChild(el('div', { class: 'actions' }, [setBtn, removeBtn, badge]));
++        body.appendChild(renderApiKeyButtons(state, p));
+ 
+         if (!state.hasApiKey[p]) {
+             body.appendChild(el('div', { class: 'hint' }, [L.noKey]));
+         }
+     }
+ 
+-    return section(L.modelAuth, true, body);
++    return section('modelAuth', L.modelAuth, true, body);
++}
++
++function renderApiKeyButtons(state: ViewState, p: Provider): HTMLDivElement {
++    const setBtn = el('button', { class: 'primary' }, [L.setKey]) as HTMLButtonElement;
++    setBtn.addEventListener('click', () => send({ type: 'setApiKey', provider: p }));
++    const removeBtn = el('button', { disabled: !state.hasApiKey[p] }, [L.removeKey]) as HTMLButtonElement;
++    removeBtn.addEventListener('click', () => send({ type: 'removeApiKey', provider: p }));
++    const badge = el('span', { class: 'badge' + (state.hasApiKey[p] ? ' on' : '') }, [
++        state.hasApiKey[p] ? L.keySet : L.keyMissing,
++    ]);
++    const actions = el('div', { class: 'actions' }, [setBtn, removeBtn, badge]);
++
++    const keyUrl = init.apiKeyUrls[p];
++    if (keyUrl) {
++        const getBtn = el('button', { title: keyUrl }, [L.getKey]) as HTMLButtonElement;
++        getBtn.addEventListener('click', () => send({ type: 'openExternal', url: keyUrl }));
++        actions.appendChild(getBtn);
++    }
++
++    return actions;
+ }
+ 
+ function renderCommitSection(state: ViewState): HTMLElement {
+@@ -396,7 +770,7 @@ function renderCommitSection(state: ViewState): HTMLElement {
+         v => setSetting(KEYS.onlyStagedChanges, v),
+     ));
+ 
+-    return section(L.commit, true, body);
++    return section('commit', L.commit, true, body);
+ }
+ 
+ function renderAutomationSection(state: ViewState): HTMLElement {
+@@ -422,7 +796,7 @@ function renderAutomationSection(state: ViewState): HTMLElement {
+         },
+     ));
+ 
+-    return section(L.automation, true, body);
++    return section('automation', L.automation, true, body);
+ }
+ 
+ function renderAdvancedSection(state: ViewState): HTMLElement {
+@@ -442,7 +816,36 @@ function renderAdvancedSection(state: ViewState): HTMLElement {
+     ));
+     body.appendChild(el('div', { class: 'hint' }, [L.timeoutHint]));
+ 
+-    return section(L.advanced, false, body);
++    body.appendChild(fieldLabel(L.maxDiffSize));
++    body.appendChild(makeNumberInput(
++        'max-diff-size',
++        state.advanced.maxDiffSize,
++        v => setSetting(KEYS.maxDiffSize, v),
++    ));
++    body.appendChild(el('div', { class: 'hint' }, [L.maxDiffSizeHint]));
++
++    body.appendChild(fieldLabel(L.temperature));
++    body.appendChild(makeNumberInput(
++        'temperature',
++        state.advanced.temperature,
++        v => setSetting(KEYS.temperature, v),
++    ));
++    body.appendChild(el('div', { class: 'hint' }, [L.temperatureHint]));
++
++    // Ollama-only: context window override. Surfaced regardless of selected
++    // provider since the Advanced section already collects cross-cutting
++    // settings — keeps related Ollama settings discoverable.
++    if (state.provider === 'ollama') {
++        body.appendChild(fieldLabel(L.ollamaNumCtx));
++        body.appendChild(makeNumberInput(
++            'ollama-num-ctx',
++            state.ollama.numCtx,
++            v => setSetting(KEYS.ollamaNumCtx, v),
++        ));
++        body.appendChild(el('div', { class: 'hint' }, [L.ollamaNumCtxHint]));
++    }
++
++    return section('advanced', L.advanced, true, body);
+ }
+ 
+ function render(state: ViewState): void {
+diff --git a/tests/apiKeyManager.test.ts b/tests/apiKeyManager.test.ts
+index dc8fc55..80c14eb 100644
+--- a/tests/apiKeyManager.test.ts
++++ b/tests/apiKeyManager.test.ts
+@@ -1,6 +1,7 @@
+ import { describe, it, expect, vi, beforeEach } from 'vitest';
+ 
+ const ollamaUseAuthToken = vi.fn(() => false);
++const customUseApiKey = vi.fn(() => false);
+ 
+ vi.mock('../src/utils/configService', () => ({
+     ConfigService: {
+@@ -8,6 +9,9 @@ vi.mock('../src/utils/configService', () => ({
+             if (key === 'ollama.useAuthToken') {
+                 return ollamaUseAuthToken();
+             }
++            if (key === 'custom.useApiKey') {
++                return customUseApiKey();
++            }
+             return undefined;
+         },
+     },
+@@ -16,6 +20,8 @@ vi.mock('../src/utils/configService', () => ({
+ beforeEach(() => {
+     ollamaUseAuthToken.mockReset();
+     ollamaUseAuthToken.mockReturnValue(false);
++    customUseApiKey.mockReset();
++    customUseApiKey.mockReturnValue(false);
+ });
+ 
+ describe('ApiKeyManager.requiresKeyForCurrentConfig (F038)', () => {
+@@ -26,6 +32,15 @@ describe('ApiKeyManager.requiresKeyForCurrentConfig (F038)', () => {
+         expect(ApiKeyManager.requiresKeyForCurrentConfig('gemini')).toBe(true);
+     });
+ 
++    it('returns true for openrouter/groq/anthropic/deepseek/xai', async () => {
++        const { ApiKeyManager } = await import('../src/services/apiKeyManager');
++        expect(ApiKeyManager.requiresKeyForCurrentConfig('openrouter')).toBe(true);
++        expect(ApiKeyManager.requiresKeyForCurrentConfig('groq')).toBe(true);
++        expect(ApiKeyManager.requiresKeyForCurrentConfig('anthropic')).toBe(true);
++        expect(ApiKeyManager.requiresKeyForCurrentConfig('deepseek')).toBe(true);
++        expect(ApiKeyManager.requiresKeyForCurrentConfig('xai')).toBe(true);
++    });
++
+     it('returns false for ollama when useAuthToken is disabled', async () => {
+         ollamaUseAuthToken.mockReturnValue(false);
+         const { ApiKeyManager } = await import('../src/services/apiKeyManager');
+@@ -38,6 +53,18 @@ describe('ApiKeyManager.requiresKeyForCurrentConfig (F038)', () => {
+         expect(ApiKeyManager.requiresKeyForCurrentConfig('ollama')).toBe(true);
+     });
+ 
++    it('returns false for custom when useApiKey is disabled', async () => {
++        customUseApiKey.mockReturnValue(false);
++        const { ApiKeyManager } = await import('../src/services/apiKeyManager');
++        expect(ApiKeyManager.requiresKeyForCurrentConfig('custom')).toBe(false);
++    });
++
++    it('returns true for custom when useApiKey is enabled', async () => {
++        customUseApiKey.mockReturnValue(true);
++        const { ApiKeyManager } = await import('../src/services/apiKeyManager');
++        expect(ApiKeyManager.requiresKeyForCurrentConfig('custom')).toBe(true);
++    });
++
+     it('returns false for unknown providers', async () => {
+         const { ApiKeyManager } = await import('../src/services/apiKeyManager');
+         expect(ApiKeyManager.requiresKeyForCurrentConfig('claude')).toBe(false);
+diff --git a/tests/e2e/sample.code-workspace b/tests/e2e/sample.code-workspace
+index 64980be..0dfb654 100644
+--- a/tests/e2e/sample.code-workspace
++++ b/tests/e2e/sample.code-workspace
+@@ -9,7 +9,7 @@
+         "git.autoRepositoryDetection": false,
+         "git.openRepositoryInParentFolders": "never",
+         "commitSage.provider.type": "openai",
+-        "commitSage.openai.baseUrl": "http://127.0.0.1:62402/v1",
++        "commitSage.openai.baseUrl": "http://127.0.0.1:59139/v1",
+         "commitSage.telemetry.enabled": false,
+         "commitSage.commit.autoCommit": true,
+         "commitSage.commit.autoPush": true,
+diff --git a/tests/providerPayloads.test.ts b/tests/providerPayloads.test.ts
+index 50f0402..a4d19d9 100644
+--- a/tests/providerPayloads.test.ts
++++ b/tests/providerPayloads.test.ts
+@@ -32,6 +32,18 @@ const SETTINGS: Record<string, string | number | boolean> = {
+     'ollama.model': 'llama3.2',
+     'ollama.baseUrl': 'http://localhost:11434',
+     'gemini.model': 'gemini-2.5-flash',
++    'openrouter.model': 'meta-llama/llama-3.3-70b-instruct:free',
++    'openrouter.preferFreeModels': false,
++    'groq.model': 'llama-3.3-70b-versatile',
++    'anthropic.model': 'claude-sonnet-4-5-20250929',
++    'deepseek.model': 'deepseek-chat',
++    'xai.model': 'grok-3-mini',
++    'custom.baseUrl': 'http://localhost:1234/v1',
++    'custom.model': 'qwen2.5-coder',
++    'custom.useApiKey': false,
++    'custom.chatCompletionsPath': '/chat/completions',
++    'general.temperature': 0.7,
++    'ollama.numCtx': 0,
+     'apiRequestTimeout': 30,
+     'general.maxRetries': 3,
+ };
+@@ -131,7 +143,7 @@ describe('CodestralService payload', () => {
+ });
+ 
+ describe('OllamaService payload', () => {
+-    it('targets /api/chat with stream=false', async () => {
++    it('targets /api/chat with stream=false and default temperature in options', async () => {
+         const { OllamaService } = await import('../src/services/ollamaService');
+ 
+         mockedPostJson.mockResolvedValueOnce({
+@@ -144,8 +156,12 @@ describe('OllamaService payload', () => {
+         expect(payload).toMatchObject({
+             model: 'llama3.2',
+             stream: false,
++            options: { temperature: 0.7 },
+         });
+-        expect(payload).not.toHaveProperty('options');
++        // num_ctx omitted when general default (0)
++        expect((payload as { options: Record<string, unknown> }).options).not.toHaveProperty('num_ctx');
++        // num_predict omitted when no maxTokens passed
++        expect((payload as { options: Record<string, unknown> }).options).not.toHaveProperty('num_predict');
+     });
+ 
+     it('forwards maxTokens as options.num_predict when provided (F009)', async () => {
+@@ -160,10 +176,27 @@ describe('OllamaService payload', () => {
+         });
+         const [, payload] = mockedPostJson.mock.calls[0];
+         expect(payload).toMatchObject({
+-            options: { num_predict: 4096 },
++            options: { num_predict: 4096, temperature: 0.7 },
+         });
+     });
+ 
++    it('forwards ollama.numCtx as options.num_ctx when > 0', async () => {
++        SETTINGS['ollama.numCtx'] = 16384;
++        const { OllamaService } = await import('../src/services/ollamaService');
++
++        mockedPostJson.mockResolvedValueOnce({
++            message: { content: 'ok' },
++        });
++
++        await OllamaService.generateCommitMessage('hi', progress, 1);
++        const [, payload] = mockedPostJson.mock.calls[0];
++        expect(payload).toMatchObject({
++            options: { num_ctx: 16384, temperature: 0.7 },
++        });
++
++        SETTINGS['ollama.numCtx'] = 0;
++    });
++
+     it('throws ApiKeyInvalidError on HTTP 401 (F037)', async () => {
+         const { OllamaService } = await import('../src/services/ollamaService');
+         const { ApiKeyInvalidError } = await import('../src/models/errors');
+@@ -258,3 +291,206 @@ describe('AbortSignal propagation (F004)', () => {
+         expect((opts as { signal?: AbortSignal }).signal).toBe(ctrl.signal);
+     });
+ });
++
++describe('GroqService payload', () => {
++    it('targets Groq chat completions URL with Bearer auth', async () => {
++        const { GroqService } = await import('../src/services/groqService');
++
++        mockedPostJson.mockResolvedValueOnce({
++            choices: [{ message: { content: 'feat: ok' } }],
++        });
++
++        await GroqService.generateCommitMessage('hello', progress, 1);
++
++        const [url, payload, opts] = mockedPostJson.mock.calls[0];
++        expect(url).toBe('https://api.groq.com/openai/v1/chat/completions');
++        expect(payload).toMatchObject({
++            model: 'llama-3.3-70b-versatile',
++            messages: [{ role: 'user', content: 'hello' }],
++            max_tokens: 1024,
++        });
++        const headers = (opts as { headers: Record<string, string> }).headers;
++        expect(headers['Authorization']).toBe('Bearer test-key');
++    });
++});
++
++describe('OpenRouterService payload', () => {
++    it('targets OpenRouter URL with attribution headers and Bearer auth', async () => {
++        const { OpenRouterService } = await import('../src/services/openRouterService');
++
++        mockedPostJson.mockResolvedValueOnce({
++            choices: [{ message: { content: 'feat: ok' } }],
++        });
++
++        await OpenRouterService.generateCommitMessage('hello', progress, 1);
++
++        const [url, payload, opts] = mockedPostJson.mock.calls[0];
++        expect(url).toBe('https://openrouter.ai/api/v1/chat/completions');
++        expect(payload).toMatchObject({
++            model: 'meta-llama/llama-3.3-70b-instruct:free',
++        });
++        const headers = (opts as { headers: Record<string, string> }).headers;
++        expect(headers['Authorization']).toBe('Bearer test-key');
++        expect(headers['HTTP-Referer']).toBe('https://github.com/VizzleTF/CommitSage');
++        expect(headers['X-Title']).toBe('Commit Sage');
++    });
++});
++
++describe('DeepSeekService payload', () => {
++    it('targets DeepSeek chat completions URL', async () => {
++        const { DeepSeekService } = await import('../src/services/deepSeekService');
++
++        mockedPostJson.mockResolvedValueOnce({
++            choices: [{ message: { content: 'feat: ok' } }],
++        });
++
++        await DeepSeekService.generateCommitMessage('hello', progress, 1);
++
++        const [url, payload] = mockedPostJson.mock.calls[0];
++        expect(url).toBe('https://api.deepseek.com/chat/completions');
++        expect(payload).toMatchObject({ model: 'deepseek-chat' });
++    });
++});
++
++describe('XaiService payload', () => {
++    it('targets xAI chat completions URL', async () => {
++        const { XaiService } = await import('../src/services/xaiService');
++
++        mockedPostJson.mockResolvedValueOnce({
++            choices: [{ message: { content: 'feat: ok' } }],
++        });
++
++        await XaiService.generateCommitMessage('hello', progress, 1);
++
++        const [url, payload] = mockedPostJson.mock.calls[0];
++        expect(url).toBe('https://api.x.ai/v1/chat/completions');
++        expect(payload).toMatchObject({ model: 'grok-3-mini' });
++    });
++});
++
++describe('fetchXaiModels fallback', () => {
++    it('falls back to static list on HTTP 403 (team without credits)', async () => {
++        const { fetchXaiModels } = await import('../src/services/modelLists');
++        const { HttpError } = await import('../src/utils/httpUtils');
++
++        mockedGetJson.mockRejectedValueOnce(
++            new HttpError(403, { error: "Your newly created team doesn't have any credits or licenses yet." }),
++        );
++
++        const models = await fetchXaiModels('test-key');
++        expect(models.length).toBeGreaterThan(0);
++        expect(models).toContain('grok-3-mini');
++    });
++
++    it('returns live list when /v1/models succeeds', async () => {
++        const { fetchXaiModels } = await import('../src/services/modelLists');
++
++        mockedGetJson.mockResolvedValueOnce({
++            data: [{ id: 'grok-future-1' }, { id: 'grok-future-2' }],
++        });
++
++        const models = await fetchXaiModels('test-key');
++        expect(models).toEqual(['grok-future-1', 'grok-future-2']);
++    });
++});
++
++describe('AnthropicService payload', () => {
++    it('targets /v1/messages with x-api-key, anthropic-version, no Authorization', async () => {
++        const { AnthropicService } = await import('../src/services/anthropicService');
++
++        mockedPostJson.mockResolvedValueOnce({
++            content: [{ type: 'text', text: 'feat: ok' }],
++        });
++
++        await AnthropicService.generateCommitMessage('hello', progress, 1);
++
++        const [url, payload, opts] = mockedPostJson.mock.calls[0];
++        expect(url).toBe('https://api.anthropic.com/v1/messages');
++        expect(payload).toMatchObject({
++            model: 'claude-sonnet-4-5-20250929',
++            max_tokens: 1024,
++            messages: [{ role: 'user', content: 'hello' }],
++        });
++        const headers = (opts as { headers: Record<string, string> }).headers;
++        expect(headers['x-api-key']).toBe('test-key');
++        expect(headers['anthropic-version']).toBe('2023-06-01');
++        expect(headers['Authorization']).toBeUndefined();
++    });
++
++    it('extracts text from content[0].text', async () => {
++        const { AnthropicService } = await import('../src/services/anthropicService');
++
++        mockedPostJson.mockResolvedValueOnce({
++            content: [{ type: 'text', text: 'fix: bug squashed' }],
++        });
++
++        const result = await AnthropicService.generateCommitMessage('hi', progress, 1);
++        expect(result.message).toBe('fix: bug squashed');
++        expect(result.model).toBe('claude-sonnet-4-5-20250929');
++    });
++
++    it('throws ApiKeyInvalidError on HTTP 401', async () => {
++        const { AnthropicService } = await import('../src/services/anthropicService');
++        const { ApiKeyInvalidError } = await import('../src/models/errors');
++        const { HttpError } = await import('../src/utils/httpUtils');
++
++        mockedPostJson.mockRejectedValueOnce(new HttpError(401, {}));
++
++        await expect(
++            AnthropicService.generateCommitMessage('hi', progress, 1)
++        ).rejects.toBeInstanceOf(ApiKeyInvalidError);
++    });
++});
++
++describe('CustomOpenAIService payload', () => {
++    it('omits Authorization header when custom.useApiKey is false', async () => {
++        SETTINGS['custom.useApiKey'] = false;
++        const { CustomOpenAIService } = await import('../src/services/customOpenAIService');
++
++        mockedPostJson.mockResolvedValueOnce({
++            choices: [{ message: { content: 'feat: ok' } }],
++        });
++
++        await CustomOpenAIService.generateCommitMessage('hello', progress, 1);
++
++        const [url, payload, opts] = mockedPostJson.mock.calls[0];
++        expect(url).toBe('http://localhost:1234/v1/chat/completions');
++        expect(payload).toMatchObject({ model: 'qwen2.5-coder' });
++        const headers = (opts as { headers: Record<string, string> }).headers;
++        expect(headers['Authorization']).toBeUndefined();
++    });
++
++    it('sends Bearer auth when custom.useApiKey is true', async () => {
++        SETTINGS['custom.useApiKey'] = true;
++        const { CustomOpenAIService } = await import('../src/services/customOpenAIService');
++
++        mockedPostJson.mockResolvedValueOnce({
++            choices: [{ message: { content: 'feat: ok' } }],
++        });
++
++        await CustomOpenAIService.generateCommitMessage('hello', progress, 1);
++
++        const [, , opts] = mockedPostJson.mock.calls[0];
++        const headers = (opts as { headers: Record<string, string> }).headers;
++        expect(headers['Authorization']).toBe('Bearer test-key');
++
++        // restore for subsequent tests
++        SETTINGS['custom.useApiKey'] = false;
++    });
++
++    it('honors custom.chatCompletionsPath override', async () => {
++        SETTINGS['custom.chatCompletionsPath'] = '/v1/completions';
++        const { CustomOpenAIService } = await import('../src/services/customOpenAIService');
++
++        mockedPostJson.mockResolvedValueOnce({
++            choices: [{ message: { content: 'ok' } }],
++        });
++
++        await CustomOpenAIService.generateCommitMessage('hi', progress, 1);
++
++        const [url] = mockedPostJson.mock.calls[0];
++        expect(url).toBe('http://localhost:1234/v1/v1/completions');
++
++        SETTINGS['custom.chatCompletionsPath'] = '/chat/completions';
++    });
++});

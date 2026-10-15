@@ -1,0 +1,106 @@
+diff --git a/package.json b/package.json
+index ef322e8..b8350a0 100644
+--- a/package.json
++++ b/package.json
+@@ -88,6 +88,12 @@
+           "dark": "./icons/button-dark.svg"
+         }
+       },
++      {
++        "command": "commitsage.generatingCommitMessage",
++        "title": "%command.generatingCommitMessage.title%",
++        "category": "%command.category%",
++        "icon": "$(loading~spin)"
++      },
+       {
+         "command": "commitsage.setApiKey",
+         "title": "%command.setApiKey.title%",
+@@ -235,13 +241,21 @@
+     "menus": {
+       "scm/title": [
+         {
+-          "when": "scmProvider == git",
++          "when": "scmProvider == git && scmProviderRootUri not in commitsage.generatingRepos",
+           "command": "commitsage.generateCommitMessage",
+           "group": "navigation",
+           "arguments": [
+             "$scmProvider"
+           ]
+         },
++        {
++          "when": "scmProvider == git && scmProviderRootUri in commitsage.generatingRepos",
++          "command": "commitsage.generatingCommitMessage",
++          "group": "navigation",
++          "arguments": [
++            "$scmProvider"
++          ]
++        },
+         {
+           "when": "scmProvider == git",
+           "command": "commitsage.createProjectConfig",
+@@ -252,6 +266,10 @@
+         {
+           "command": "commitsage.generateCommitMessage",
+           "when": "workspaceFolderCount != 0"
++        },
++        {
++          "command": "commitsage.generatingCommitMessage",
++          "when": "false"
+         }
+       ]
+     },
+diff --git a/package.nls.json b/package.nls.json
+index 89ca0c4..7bf0afa 100644
+--- a/package.nls.json
++++ b/package.nls.json
+@@ -1,6 +1,7 @@
+ {
+   "command.category": "Commit Sage",
+   "command.generateCommitMessage.title": "Generate Commit Message",
++  "command.generatingCommitMessage.title": "Generating Commit Message…",
+   "command.setApiKey.title": "Set Gemini API Key",
+   "command.setOpenAIApiKey.title": "Set OpenAI API Key",
+   "command.setCodestralApiKey.title": "Set Codestral API Key",
+diff --git a/src/commands/index.ts b/src/commands/index.ts
+index 4863431..b7f04b6 100644
+--- a/src/commands/index.ts
++++ b/src/commands/index.ts
+@@ -14,16 +14,18 @@ import { toError } from '../utils/errorUtils';
+ export function registerCommands(context: vscode.ExtensionContext, ready: Promise<unknown>): void {
+     Logger.log('Registering commands and views');
+ 
++    // generateAndSetCommitMessage handles and reports its own errors.
++    const generate = async (repository?: vscode.SourceControl): Promise<void> => {
++        await ready;
++        return CommitWorkflow.generateAndSetCommitMessage(repository);
++    };
++
+     try {
+         const disposables = [
+-            // generateAndSetCommitMessage handles and reports its own errors.
+-            vscode.commands.registerCommand(
+-                'commitsage.generateCommitMessage',
+-                async (repository?: vscode.SourceControl) => {
+-                    await ready;
+-                    return CommitWorkflow.generateAndSetCommitMessage(repository);
+-                },
+-            ),
++            vscode.commands.registerCommand('commitsage.generateCommitMessage', generate),
++            // The spinner that replaces the SCM button during a run; a click
++            // lands in the per-repository guard, which says a run is active.
++            vscode.commands.registerCommand('commitsage.generatingCommitMessage', generate),
+             ...registerSetApiKeyCommands(),
+             registerSelectGeminiModelCommand(),
+             ...registerOpenRouterAuthCommands(context),
+diff --git a/tests/e2e/suite/activation.e2e.ts b/tests/e2e/suite/activation.e2e.ts
+index 0ebf97f..8435b9d 100644
+--- a/tests/e2e/suite/activation.e2e.ts
++++ b/tests/e2e/suite/activation.e2e.ts
+@@ -4,6 +4,7 @@ import { activateExtension } from '../helpers/settings';
+ 
+ const EXPECTED_COMMANDS = [
+     'commitsage.generateCommitMessage',
++    'commitsage.generatingCommitMessage',
+     'commitsage.setApiKey',
+     'commitsage.setOpenAIApiKey',
+     'commitsage.setCodestralApiKey',

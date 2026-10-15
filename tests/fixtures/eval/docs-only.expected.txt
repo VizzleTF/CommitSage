@@ -1,0 +1,10 @@
+docs: describe provider data-use terms
+
+The default provider is the free Gemini tier, where Google may train on
+prompts and human reviewers may read them, yet the docs only said that
+the diff leaves the machine. Users had no way to compare providers on
+training, retention and review without reading every terms page.
+
+Add a data-use table to docs/providers.md with links to each provider's
+terms, and a README privacy note that points to it and to the existing
+file exclusions. Provider requests are unchanged.
