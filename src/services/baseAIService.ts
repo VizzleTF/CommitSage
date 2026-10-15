@@ -109,6 +109,46 @@ export function isInvalidApiKeyError(error: HttpError): boolean {
     return /incorrect api key|invalid api key|api key not valid|api key.*(?:invalid|expired|revoked)/i.test(text ?? '');
 }
 
+// C0/C1 controls except \t and \n, bidi overrides and isolates, zero-width
+// characters: invisible in the commit box, they can hide or reorder text.
+// A ZWJ before a pictograph is kept: it joins emoji such as U+1F9D1 U+200D U+1F4BB.
+// eslint-disable-next-line no-control-regex
+const INVISIBLE_CHARS = /[\u0000-\u0008\u000B-\u001F\u007F-\u009F\u200B\u200C\u2060\uFEFF\u202A-\u202E\u2066-\u2069]|\u200D(?!\p{Extended_Pictographic})/gu;
+// Conservative, English only: "Here is the commit message:", "Commit message:".
+const PREAMBLE = /^(?:here(?:'s| is)\b[^\n]*\bcommit message\b[^\n]*|(?:suggested |generated |proposed )?commit message)[ \t]*:[ \t]*\n+(?=\S)/i;
+// One outer fence, optional language tag: ```text\n…\n``` or ```…```.
+const OUTER_FENCE = /^```(?:[\w.+-]*\n)?([\s\S]*?)\n?```$/;
+// A wrapping quote pair: the opening and closing characters share an index.
+const OPEN_QUOTES = '"\'`\u201C';
+const CLOSE_QUOTES = '"\'`\u201D';
+
+/** `"feat: x"` → `feat: x`; kept when the quote is also inside: `a` and `b`. */
+function stripWrappingQuotes(text: string): string {
+    const close = CLOSE_QUOTES[OPEN_QUOTES.indexOf(text[0])];
+    if (!close || text.length < 2 || !text.endsWith(close)) {
+        return text;
+    }
+    const inner = text.slice(1, -1);
+    return inner.includes(text[0]) || inner.includes(close) ? text : inner.trim();
+}
+
+/** Deterministic cleanup of the wrapping models put around a commit message. */
+function cleanReply(content: string): string {
+    const unwrapped = content
+        // Reasoning models (Ollama deepseek-r1/qwen3, OpenAI-compatible endpoints)
+        // may inline their <think> blocks; a reply that is only thinking is empty.
+        .replace(/<think>[\s\S]*?<\/think>/g, '')
+        .replace(INVISIBLE_CHARS, '')
+        .trim()
+        .replace(PREAMBLE, '')
+        .replace(OUTER_FENCE, '$1')
+        .trim();
+    return stripWrappingQuotes(unwrapped)
+        // A sign-off certifies the human author; git adds it (--signoff), the model never does.
+        .replace(/^[ \t]*signed-off-by:.*(?:\n|$)/gim, '')
+        .trim();
+}
+
 export function extractAndValidateMessage(
     content: string | undefined | null,
     serviceName: string,
@@ -116,13 +156,7 @@ export function extractAndValidateMessage(
     if (!content) {
         throw new Error(`Invalid response format from ${serviceName} API`);
     }
-    // Reasoning models (Ollama deepseek-r1/qwen3, OpenAI-compatible endpoints)
-    // may inline their <think> blocks; a reply that is only thinking is empty.
-    const cleanMessage = content
-        .replace(/<think>[\s\S]*?<\/think>/g, '')
-        // A sign-off certifies the human author; git adds it (--signoff), the model never does.
-        .replace(/^[ \t]*signed-off-by:.*(?:\r?\n|$)/gim, '')
-        .trim();
+    const cleanMessage = cleanReply(content);
     if (!cleanMessage) {
         throw new Error('Generated commit message is empty.');
     }

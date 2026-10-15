@@ -42,7 +42,7 @@ describe('extractAndValidateMessage: cleanup', () => {
 describe('extractAndValidateMessage: Signed-off-by', () => {
     it('removes sign-off lines the model wrote', () => {
         expect(extractAndValidateMessage('feat: x\n\nbody\n\nSigned-off-by: Bot <b@x.io>', 'Foo')).toBe('feat: x\n\nbody');
-        expect(extractAndValidateMessage('feat: x\r\n\r\n  signed-off-by: a\r\nRefs: #1', 'Foo')).toBe('feat: x\r\n\r\nRefs: #1');
+        expect(extractAndValidateMessage('feat: x\r\n\r\n  signed-off-by: a\r\nRefs: #1', 'Foo')).toBe('feat: x\n\nRefs: #1');
     });
 
     it('keeps a mention that is not a trailer line', () => {
@@ -51,6 +51,77 @@ describe('extractAndValidateMessage: Signed-off-by', () => {
 
     it('throws when only a sign-off is left', () => {
         expect(() => extractAndValidateMessage('Signed-off-by: Bot <b@x.io>', 'Foo')).toThrow('Generated commit message is empty.');
+    });
+});
+
+describe('extractAndValidateMessage: wrapping', () => {
+    const clean = (s: string) => extractAndValidateMessage(s, 'Foo');
+
+    it.each([
+        ['a fence with a language tag', '```text\nfeat: x\n\nbody\n```'],
+        ['a bare fence', '```\nfeat: x\n\nbody\n```'],
+        ['a fence around the sign-off', '```git\nfeat: x\n\nbody\n\nSigned-off-by: Bot <b@x.io>\n```'],
+        ['double quotes', '"feat: x\n\nbody"'],
+        ['backticks', '`feat: x\n\nbody`'],
+        ['curly quotes', '“feat: x\n\nbody”'],
+        ['a preamble line', 'Here is the commit message:\n\nfeat: x\n\nbody'],
+        ['a "Commit message:" line', 'Commit message:\nfeat: x\n\nbody'],
+        ['a preamble, a fence and quotes', "Here's a concise commit message for these changes:\n```\n'feat: x\n\nbody'\n```"],
+    ])('strips %s', (_name, reply) => {
+        expect(clean(reply)).toBe('feat: x\n\nbody');
+    });
+
+    it('unwraps a single-line triple-backtick reply', () => {
+        expect(clean('```fix: typo```')).toBe('fix: typo');
+    });
+
+    it('keeps backticks that belong to the message', () => {
+        expect(clean('fix: handle `null` in `parse`')).toBe('fix: handle `null` in `parse`');
+        expect(clean('`npm test` now runs `lint`')).toBe('`npm test` now runs `lint`');
+        expect(clean('```\ndocs: show usage\n\n```sh\nnpm i\n```\n```')).toBe('docs: show usage\n\n```sh\nnpm i\n```');
+    });
+
+    it('keeps quotes that belong to the message', () => {
+        expect(clean('Revert "feat: x"')).toBe('Revert "feat: x"');
+        expect(clean('"feat: add "dry-run" flag"')).toBe('"feat: add "dry-run" flag"');
+    });
+
+    it('keeps a preamble-like line that is not followed by a message', () => {
+        expect(clean('Here is the commit message:')).toBe('Here is the commit message:');
+        expect(clean('Here is why:\nfeat: x')).toBe('Here is why:\nfeat: x');
+    });
+
+    it('throws when nothing is left after unwrapping', () => {
+        expect(() => clean('```\n```')).toThrow('Generated commit message is empty.');
+        expect(() => clean('""')).toThrow('Generated commit message is empty.');
+    });
+});
+
+describe('extractAndValidateMessage: invisible characters', () => {
+    const clean = (s: string) => extractAndValidateMessage(s, 'Foo');
+
+    it('removes C0 and C1 controls but keeps newlines and tabs', () => {
+        expect(clean('feat: x\u0007\u001b\u0000\r\n\n\tbody\u0085\u009b')).toBe('feat: x\n\n\tbody');
+    });
+
+    it('removes bidi controls', () => {
+        expect(clean('\u202Efeat: x\u202C \u2066y\u2069 \u202A\u202B\u202D\u2067\u2068z')).toBe('feat: x y z');
+    });
+
+    it('removes zero-width characters', () => {
+        expect(clean('\uFEFF\u200Bfeat:\u200C x\u2060\u200D')).toBe('feat: x');
+    });
+
+    it('keeps the joiner inside an emoji sequence', () => {
+        expect(clean('\u{1F9D1}\u200D\u{1F4BB} improve dev experience')).toBe('\u{1F9D1}\u200D\u{1F4BB} improve dev experience');
+    });
+
+    it('unwraps a fence hidden behind a zero-width character', () => {
+        expect(clean('\u200B```\nfeat: x\n```')).toBe('feat: x');
+    });
+
+    it('throws when only invisible characters are left', () => {
+        expect(() => clean('\u200B\u202E\u0007')).toThrow('Generated commit message is empty.');
     });
 });
 

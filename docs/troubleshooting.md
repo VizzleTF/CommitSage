@@ -48,7 +48,7 @@ A failed request is tried up to three times (two retries, after 1 s and 2 s). Af
 | `Invalid Request: The request was malformed or the input was invalid. This may happen if the content is too long or contains unsupported characters.` | The provider returned HTTP 422 without an error text. | Lower `commitSage.general.maxDiffSize` or stage fewer files. |
 | `Server Error: The service is temporarily unavailable. Please try again later.` | The provider returned HTTP 500. | Run the command again later. |
 | `Invalid response format from <PROVIDER> API` | The response held no message text. | Run the command again, or pick another model. |
-| `Generated commit message is empty.` | The model returned only whitespace or only a `<think>` block. | Run the command again, or pick another model. |
+| `Generated commit message is empty.` | Nothing was left of the reply after cleanup: Commit Sage removes `<think>` blocks, an outer code fence, wrapping quotes, a leading "Here is the commit message:" line, `Signed-off-by` lines and invisible control characters. | Run the command again, or pick another model. |
 | `API Error: <STATUS>: <DETAIL>` | The provider returned another HTTP status. | Read `<DETAIL>`: it is the provider's own error text. |
 | ``<PROVIDER> stopped generating before the message was complete (<DETAIL>). Raise `commitSage.general.maxOutputTokens` if this keeps happening.`` | The model used up its output token budget, often on reasoning. | Raise `commitSage.general.maxOutputTokens` or pick a model without reasoning. |
 
