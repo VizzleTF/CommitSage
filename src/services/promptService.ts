@@ -93,21 +93,22 @@ export class PromptService {
     }
 
     /**
-     * Joins the prompt sections; empty ones are left out. Rules first, the
-     * diff next, and the output rules and language last: small models follow
-     * best what they read last, and the localized language line doubles as
-     * the closing restatement of the task.
+     * Joins the prompt sections; empty ones are left out. Moving the output
+     * rules and language line after the diff made 1.5B–3B models copy the
+     * template's examples, so check any reorder with the prompt quality eval
+     * (docs/testing.md).
      */
     private static buildPrompt(mainInstructions: string, languagePrompt: string, changes: string, blameAnalysis: string, reminder: string, examplesBlock = '', draftBlock = '', branch = ''): string {
         return [
             mainInstructions,
             examplesBlock,
+            languagePrompt,
             branch && `Current branch (a hint about intent): ${branch}`,
-            blameAnalysis && `Git blame analysis:\n${blameAnalysis}`,
             changes,
+            blameAnalysis && `Git blame analysis:\n${blameAnalysis}`,
             draftBlock,
             reminder,
-            languagePrompt,
+            'Please provide ONLY the commit message, without any additional text or explanations.',
         ].filter(Boolean).join('\n\n');
     }
 
@@ -232,10 +233,11 @@ ${errors.map(e => `- ${e}`).join('\n')}
 ${rules}
 
 Rewrite the commit message fixing all the errors above while keeping every rule satisfied.
+${this.languagePrompt()}
 
 ${STRICT_FORMAT_REMINDER}
 
-${this.languagePrompt()}
+Please provide ONLY the corrected commit message, without any additional text or explanations.
 `;
     }
 }
