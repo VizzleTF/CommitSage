@@ -115,7 +115,7 @@ describe('AIService large diff summaries', () => {
     it('summarizes an over-budget diff in parts and prompts with the summaries', async () => {
         settings['general.summarizeLargeDiffs'] = true;
         generate.mockImplementation(async (_p: string, prompt: string) => ({
-            message: prompt.startsWith('SUMMARIZE') ? '- part' : 'feat: x', model: 'gpt-test',
+            message: prompt.startsWith('SUMMARIZE') ? 'Here are the bullets:\n\n- part' : 'feat: x', model: 'gpt-test',
         }));
 
         await AIService.generateCommitMessage('/repo', diff, '', progress);
@@ -126,6 +126,7 @@ describe('AIService large diff summaries', () => {
         expect(options.summaries.text).toBe('- part\n- part');
         expect(options.summaries.files).toContain('package-lock.json (+150 -0) generated');
         expect(generatePrompt.mock.calls[0][1]).toBe('');
+        expect(generate.mock.calls[0][3]).toMatchObject({ maxTokens: 512 });
     });
 
     it('sends the truncated diff in one call when summaries are off', async () => {

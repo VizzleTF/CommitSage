@@ -14,6 +14,7 @@ import { mapLimit } from '../utils/concurrency';
 // Summary calls per generation for a diff over budget; a larger diff is
 // truncated to this many budgets first.
 const MAX_SUMMARY_CHUNKS = 4;
+const SUMMARY_MAX_TOKENS = 512;
 
 interface GenerateContext {
     fileCount?: number;
@@ -133,10 +134,12 @@ export class AIService {
     ): Promise<{ files: string; text: string } | undefined> {
         const blocks = splitIntoFileBlocks(diff);
         const meaningful = blocks.filter(block => !isNoisyPath(blockPath(block))).join('');
+        // Packing whole files can need one chunk more than the pre-truncation
+        // implies; the file list still names whatever the cap leaves out.
         const chunks = packFileBlocks(
             splitIntoFileBlocks(truncateDiff(meaningful, maxDiffLength * MAX_SUMMARY_CHUNKS)),
             maxDiffLength,
-        );
+        ).slice(0, MAX_SUMMARY_CHUNKS);
         if (chunks.length === 0) {
             // Only generated files: the truncated diff already shows them all.
             return undefined;
@@ -145,9 +148,12 @@ export class AIService {
         for (const [i, chunk] of chunks.entries()) {
             progress.report({ message: `Summarizing changes (${i + 1}/${chunks.length})...` });
             const reply = await AIServiceFactory.generateCommitMessage(
-                provider, PromptService.generateChunkSummaryPrompt(chunk), progress, { signal },
+                // Three bullets need little room; a small model that loops stops
+                // early, and a cut-off reply is retried with a doubled budget.
+                provider, PromptService.generateChunkSummaryPrompt(chunk), progress, { signal, maxTokens: SUMMARY_MAX_TOKENS },
             );
-            parts.push(reply.message);
+            // Keep the bullets only: a preamble line reads like a message to imitate.
+            parts.push(reply.message.split('\n').filter(line => /^\s*[-*•]/.test(line)).join('\n') || reply.message);
         }
         return { files: fileList(blocks), text: parts.join('\n') };
     }

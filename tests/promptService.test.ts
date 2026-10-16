@@ -154,6 +154,13 @@ describe('generatePrompt — reminder + commitlint', () => {
         expect(onMain).not.toContain('Current branch');
     });
 
+    it('replaces the diff with the summaries and the file list when given', async () => {
+        cfg({ 'commit.commitFormat': 'conventional', 'commit.commitLanguage': 'english' });
+        const out = await PromptService.generatePrompt('/repo', 'DIFF', '', progress as never, { summaries: { files: 'a.ts (+1 -0)', text: '- adds a' } });
+        expect(out).toContain('<changes>\n- adds a\n\nChanged files:\na.ts (+1 -0)\n</changes>');
+        expect(out).not.toContain('<diff>');
+    });
+
     it('leaves the blame header out when there is no blame analysis', async () => {
         cfg({ 'commit.commitFormat': 'conventional', 'commit.commitLanguage': 'english' });
         const out = await PromptService.generatePrompt('/repo', 'DIFF', '', progress as never);
