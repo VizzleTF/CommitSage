@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { truncateDiff, splitIntoFileBlocks, isNoisyPath, blockPath, resolveMaxDiffLength, capBlameAnalysis, packFileBlocks, fileList, collapseBase64, stripHeaderLines, collapseMovedLines, summarizeRemovedLines, collapseFileMoves } from '../src/utils/diffTruncation';
+import { truncateDiff, splitIntoFileBlocks, isNoisyPath, blockPath, resolveMaxDiffLength, capBlameAnalysis, packFileBlocks, fileList, collapseBase64, stripHeaderLines, collapseMovedLines, summarizeRemovedLines, collapseFileMoves, fileRank } from '../src/utils/diffTruncation';
 
 function fileBlock(path: string, bodyLines: number): string {
     const body = Array.from({ length: bodyLines }, (_, i) => `+line ${i} of ${path}`).join('\n');
@@ -269,5 +269,13 @@ describe('collapseFileMoves', () => {
         const diff = 'diff --git a/a.js b/a.js\ndeleted file mode 100644\n@@ -1,9 +0,0 @@\n-[9 lines moved to a.mjs]\n'
             + 'diff --git a/a.mjs b/a.mjs\nnew file mode 100644\n@@ -0,0 +1,10 @@\n+[9 lines moved from a.js]\n+export default config;';
         expect(collapseFileMoves(diff)).toBe(diff);
+    });
+});
+
+describe('fileRank', () => {
+    it('orders source, tests, docs, config, then generated files', () => {
+        const paths = ['package-lock.json', 'package.json', 'README.md', 'tests/a.test.ts', 'src/a.ts'];
+        expect([...paths].sort((a, b) => fileRank(a) - fileRank(b)))
+            .toEqual(['src/a.ts', 'tests/a.test.ts', 'README.md', 'package.json', 'package-lock.json']);
     });
 });

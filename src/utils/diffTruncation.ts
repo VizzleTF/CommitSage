@@ -406,3 +406,16 @@ export function collapseFileMoves(diff: string): string {
         return to === undefined ? [block] : [`diff --git a/${path} b/${to}\nrename from ${path}\nrename to ${to}\n`];
     }).join('');
 }
+
+// Source first: small models weigh the start of the prompt most, and a cut
+// diff loses its end. Then tests, docs, config, and generated files last.
+const FILE_RANK: [RegExp, number][] = [
+    [/(?:^|\/)(?:tests?|__tests__)\/|\.(?:test|spec)\.[^/]+$/, 1],
+    [/\.(?:md|mdx|rst|adoc|txt)$|^docs\//i, 2],
+    [/\.(?:json|ya?ml|toml|ini|cfg|lock)$|(?:^|\/)\.[^/]+$|^\.github\//, 3],
+];
+
+/** Rank for sorting changed paths: source, tests, docs, config, generated. */
+export function fileRank(path: string): number {
+    return isNoisyPath(path) ? 4 : FILE_RANK.find(([pattern]) => pattern.test(path))?.[1] ?? 0;
+}

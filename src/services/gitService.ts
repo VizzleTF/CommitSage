@@ -6,7 +6,7 @@ import { TelemetryService } from './telemetryService';
 import { toError, sanitizeErrorForTelemetry } from '../utils/errorUtils';
 import { GIT_FANOUT_CONCURRENCY, mapLimit } from '../utils/concurrency';
 import { ConfigService, SETTING_DEFAULTS } from '../utils/configService';
-import { resolveMaxDiffLength, collapseBase64, collapseMovedLines, stripHeaderLines, summarizeRemovedLines, collapseFileMoves } from '../utils/diffTruncation';
+import { fileRank, resolveMaxDiffLength, collapseBase64, collapseMovedLines, stripHeaderLines, summarizeRemovedLines, collapseFileMoves } from '../utils/diffTruncation';
 import { GIT_OUTPUT_BUFFER_CAP, GitProcessRunner } from './gitProcessRunner';
 
 // Minimum length for a commit message to be useful as a style example; shorter
@@ -247,7 +247,8 @@ export class GitService {
     signal?: AbortSignal,
     renames?: Map<string, string>,
   ): Promise<string[]> {
-    const diffs = await mapLimit(files, GIT_FANOUT_CONCURRENCY, async (file) => {
+    const ordered = [...files].sort((a, b) => fileRank(a) - fileRank(b));
+    const diffs = await mapLimit(ordered, GIT_FANOUT_CONCURRENCY, async (file) => {
       const renamedFrom = renames?.get(file);
       // A rename diff would show the old file's content too.
       if (excluded.has(file) || (renamedFrom !== undefined && excluded.has(renamedFrom))) {
@@ -281,7 +282,8 @@ export class GitService {
     excluded: ReadonlySet<string>,
     signal?: AbortSignal,
   ): Promise<string[]> {
-    const diffs = await mapLimit(files, GIT_FANOUT_CONCURRENCY, async (file) => {
+    const ordered = [...files].sort((a, b) => fileRank(a) - fileRank(b));
+    const diffs = await mapLimit(ordered, GIT_FANOUT_CONCURRENCY, async (file) => {
       if (excluded.has(file)) {
         return excludedFileBlock(file);
       }
