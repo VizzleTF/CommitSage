@@ -174,6 +174,7 @@ Models run by an Ollama server, on your machine or on another host.
   - `ollama.model`: default `llama3.2`.
   - `ollama.numCtx`: default `0`. Context window sent to Ollama as `options.num_ctx`; `0` sends nothing while the prompt fits Ollama's default 4096-token window and otherwise sizes it to the prompt, so a long diff does not push the instructions out of the window.
   - `ollama.useAuthToken`: default `false`. When `true`, the extension sends the stored token as a Bearer token.
+- On a CPU, a 1.5B–3B model needs several minutes to read the default 100,000-character diff budget, which is longer than the 30-second `apiRequestTimeout`. Set `general.maxDiffSize` to about `20000`; with `general.summarizeLargeDiffs` on, a larger diff is then summarized in parts of that size.
 
 ## Custom (OpenAI-compatible)
 
