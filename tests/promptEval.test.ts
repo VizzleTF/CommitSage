@@ -10,6 +10,7 @@ import { join, resolve } from 'path';
 import { ConfigService, SETTING_DEFAULTS, type SettingKey } from '../src/utils/configService';
 import { ApiKeyManager } from '../src/services/apiKeyManager';
 import { AIService } from '../src/services/aiService';
+import { GitService } from '../src/services/gitService';
 
 const env = process.env;
 const FIXTURES = resolve(env.EVAL_FIXTURES ?? resolve(__dirname, 'fixtures/eval'));
@@ -28,6 +29,8 @@ describe.runIf(env.COMMITSAGE_EVAL)('prompt quality eval', () => {
         );
         vi.spyOn(ApiKeyManager, 'getKey').mockResolvedValue(env.EVAL_API_KEY ?? '');
         vi.spyOn(ApiKeyManager, 'getOptionalKey').mockResolvedValue(env.EVAL_API_KEY);
+        // The fixtures' branch, not whatever the eval checkout is on.
+        vi.spyOn(GitService, 'getBranchName').mockResolvedValue(env.EVAL_BRANCH ?? '');
     });
 
     it('writes model replies for every fixture', async () => {
