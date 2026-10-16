@@ -43,9 +43,30 @@ export interface PromptOptions {
     rejected?: string;
     /** Stand-in for a diff too large to send: the file list and per-part summaries. */
     summaries?: { files: string; text: string };
+    /** Paths of every changed file, for the type hint. */
+    paths?: string[];
     /** Cancels the git reads and a custom-language translation. */
     signal?: AbortSignal;
 }
+
+// When every changed file is of one kind, its type is near certain; small
+// models still pick `feat` or `perf` for a docs-only change without the hint.
+const TYPE_HINTS: { type: string; what: string; test: (path: string) => boolean }[] = [
+    { type: 'docs', what: 'documentation', test: p => /\.(?:md|mdx|rst|adoc)$/i.test(p) || /^docs\//.test(p) },
+    { type: 'test', what: 'tests', test: p => /(?:^|\/)(?:tests?|__tests__)\//.test(p) || /\.(?:test|spec)\.[^/]+$/.test(p) },
+    { type: 'ci', what: 'CI configuration', test: p => /^\.github\/(?:workflows|actions|scripts)\/|^\.gitlab-ci\.yml$|^\.circleci\//.test(p) },
+];
+const LOCKFILE = /(?:^|\/)(?:package-lock\.json|yarn\.lock|pnpm-lock\.yaml|bun\.lockb?|Cargo\.lock|go\.sum|poetry\.lock|uv\.lock|Gemfile\.lock|composer\.lock|gradle\.lockfile)$/;
+const MANIFEST = /(?:^|\/)(?:package\.json|Cargo\.toml|go\.mod|pyproject\.toml|requirements[^/]*\.txt|Gemfile|composer\.json|pom\.xml|build\.gradle(?:\.kts)?)$/;
+// Formats whose type list has each hinted type.
+const FORMAT_TYPES: Partial<Record<CommitFormat, string[]>> = {
+    conventional: ['docs', 'test', 'ci', 'build'],
+    angular: ['docs', 'test', 'ci', 'build'],
+    atom: ['docs', 'test', 'ci', 'build'],
+    google: ['docs', 'test', 'ci', 'build'],
+    karma: ['docs', 'test'],
+    semantic: ['docs', 'test'],
+};
 
 const TRUNK_BRANCHES = new Set(['', 'HEAD', 'main', 'master', 'develop', 'dev', 'trunk']);
 
@@ -98,18 +119,35 @@ export class PromptService {
      * template's examples, so check any reorder with the prompt quality eval
      * (docs/testing.md).
      */
-    private static buildPrompt(mainInstructions: string, languagePrompt: string, changes: string, blameAnalysis: string, reminder: string, examplesBlock = '', draftBlock = '', branch = ''): string {
+    private static buildPrompt(mainInstructions: string, languagePrompt: string, changes: string, blameAnalysis: string, reminder: string, examplesBlock = '', draftBlock = '', branch = '', typeHint = ''): string {
         return [
             mainInstructions,
             examplesBlock,
             languagePrompt,
             branch && `Current branch (a hint about intent): ${branch}`,
+            typeHint,
             changes,
             blameAnalysis && `Git blame analysis:\n${blameAnalysis}`,
             draftBlock,
             reminder,
             'Please provide ONLY the commit message, without any additional text or explanations.',
         ].filter(Boolean).join('\n\n');
+    }
+
+    /** A one-line type hint when every changed file is of one kind, else ''. */
+    private static typeHint(format: CommitFormat, paths: string[]): string {
+        const types = FORMAT_TYPES[format] ?? [];
+        if (paths.length === 0) {
+            return '';
+        }
+        const kind = TYPE_HINTS.find(h => types.includes(h.type) && paths.every(h.test));
+        if (kind) {
+            return `All changed files are ${kind.what}, so the type is most likely ${kind.type}.`;
+        }
+        if (types.includes('build') && paths.some(p => LOCKFILE.test(p)) && paths.every(p => LOCKFILE.test(p) || MANIFEST.test(p))) {
+            return 'All changed files are dependency manifests or lockfiles, so the type is most likely build.';
+        }
+        return '';
     }
 
     /** The branch name, unless it is a trunk or detached HEAD and says nothing about the change. */
@@ -210,7 +248,8 @@ export class PromptService {
         const mainInstructions = rules ? `${template}\n\n${rules}` : template;
 
         const examplesBlock = this.buildExamplesBlock(examples, formatSetting !== 'previous');
-        return this.buildPrompt(mainInstructions, this.languagePrompt(), changes, blameAnalysis, reminder, examplesBlock, draftBlock, branch);
+        const typeHint = this.typeHint(format, options.paths ?? []);
+        return this.buildPrompt(mainInstructions, this.languagePrompt(), changes, blameAnalysis, reminder, examplesBlock, draftBlock, branch, typeHint);
     }
 
     /** Asks for a short per-file summary of one part of a diff too large to send whole. */

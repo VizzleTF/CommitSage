@@ -154,6 +154,20 @@ describe('generatePrompt — reminder + commitlint', () => {
         expect(onMain).not.toContain('Current branch');
     });
 
+    it('hints the type only when every changed file is of one kind the format knows', async () => {
+        cfg({ 'commit.commitFormat': 'conventional', 'commit.commitLanguage': 'english' });
+        const hint = (paths: string[]) => PromptService.generatePrompt('/repo', 'DIFF', '', progress as never, { paths });
+
+        expect(await hint(['README.md', 'docs/providers.md'])).toContain('All changed files are documentation, so the type is most likely docs.');
+        expect(await hint(['.github/workflows/ci.yml'])).toContain('most likely ci.');
+        expect(await hint(['package.json', 'package-lock.json'])).toContain('most likely build.');
+        expect(await hint(['package.json'])).not.toContain('most likely');
+        expect(await hint(['README.md', 'src/a.ts'])).not.toContain('most likely');
+
+        cfg({ 'commit.commitFormat': 'emoji', 'commit.commitLanguage': 'english' });
+        expect(await hint(['README.md'])).not.toContain('most likely');
+    });
+
     it('replaces the diff with the summaries and the file list when given', async () => {
         cfg({ 'commit.commitFormat': 'conventional', 'commit.commitLanguage': 'english' });
         const out = await PromptService.generatePrompt('/repo', 'DIFF', '', progress as never, { summaries: { files: 'a.ts (+1 -0)', text: '- adds a' } });

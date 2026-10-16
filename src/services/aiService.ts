@@ -28,6 +28,32 @@ interface GenerateContext {
     count?: number;
 }
 
+const normalizeLine = (line: string): string => line.trim().toLowerCase();
+
+/** The prompt's instruction lines (everything before the changes) long enough to be worth matching. */
+function instructionLines(prompt: string): Set<string> {
+    const starts = ['\n<diff>', '\n<changes>'].map(tag => prompt.indexOf(tag)).filter(i => i >= 0);
+    const head = prompt.slice(0, starts.length ? Math.min(...starts) : prompt.length);
+    return new Set(head.split('\n').map(normalizeLine).filter(line => line.length >= 12));
+}
+
+/**
+ * Small models put a file path in the scope, `feat(src/services/fooService.ts):`;
+ * keep the file name without its extension, `feat(fooService):`.
+ */
+function tidyScope(message: string): string {
+    return message.replace(/^(\W*\w+\()([^)\n]*[/.][^)\n]*)(\))/, (whole, open: string, scope: string, close: string) => {
+        const name = scope.split('/').filter(Boolean).pop()?.replace(/\.[^.]*$/, '');
+        return name ? `${open}${name}${close}` : whole;
+    });
+}
+
+/** Removes body lines copied from the instructions; the subject is kept. */
+function dropCopiedLines(message: string, copied: Set<string>): string {
+    const [subject, ...body] = message.split('\n');
+    return [subject, ...body.filter(line => !copied.has(normalizeLine(line)))].join('\n').trim();
+}
+
 export class AIService {
     static async generateCommitMessage(
         repoPath: string,
@@ -83,13 +109,21 @@ export class AIService {
             : undefined;
         const prompt = await PromptService.generatePrompt(
             repoPath, summaries ? '' : truncateDiff(maskedDiff, maxDiffLength), capBlameAnalysis(blameAnalysis, maxDiffLength), progress,
-            { rules, draft: context.draft, rejected: context.rejected, summaries, signal: context.signal },
+            { rules, draft: context.draft, rejected: context.rejected, summaries, paths: splitIntoFileBlocks(maskedDiff).map(blockPath).filter(Boolean), signal: context.signal },
         );
 
         progress.report({ message: 'Generating commit message...', increment: 50 });
 
+        const copied = instructionLines(prompt);
         const generateOne = async (): Promise<CommitMessage> => {
-            const result = await AIServiceFactory.generateCommitMessage(provider, prompt, progress, { signal: context.signal });
+            let result = await AIServiceFactory.generateCommitMessage(provider, prompt, progress, { signal: context.signal });
+            // Small models echo the template's example message: ask once more,
+            // then drop whatever lines are still copied.
+            if (copied.has(normalizeLine(result.message.split('\n')[0]))) {
+                Logger.warn('The model copied an example subject from the prompt; regenerating');
+                result = await AIServiceFactory.generateCommitMessage(provider, prompt, progress, { signal: context.signal });
+            }
+            result = { ...result, message: tidyScope(dropCopiedLines(result.message, copied)) };
             return commitlintEnabled
                 ? this.applyCommitLint(result, repoPath, commitFormat, rules, provider, progress, context)
                 : result;
