@@ -189,7 +189,7 @@ export class CommitWorkflow {
         let plan = parseSplitPlan((await AIServiceFactory.generateCommitMessage(provider, prompt, progress, { signal })).message, paths);
         if (!('groups' in plan)) {
             const correction = `\n\nYour previous reply was invalid. Missing files: ${plan.missing.join(', ') || 'none'}. `
-                + `Unknown or repeated files: ${plan.unknown.join(', ') || 'none'}. Reply again with every file exactly once.`;
+                + `Repeated files: ${plan.repeated.join(', ') || 'none'}. Reply again with every file exactly once.`;
             plan = parseSplitPlan((await AIServiceFactory.generateCommitMessage(provider, prompt + correction, progress, { signal })).message, paths);
         }
         if (!('groups' in plan)) {

@@ -17,31 +17,32 @@ export function generateSplitPrompt(paths: string[], diff: string): string {
 
 export type SplitPlan =
     | { groups: string[][] }
-    | { missing: string[]; unknown: string[] };
+    | { missing: string[]; repeated: string[] };
 
 /**
  * Reads `<number> <path>` lines into groups ordered by number. Fails unless
- * every path appears exactly once and no unknown path is named.
+ * every path appears exactly once. Unknown paths are ignored: small models
+ * echo the example lines, and only known paths are ever committed.
  */
 export function parseSplitPlan(reply: string, paths: string[]): SplitPlan {
     const known = new Set(paths);
     const groupOf = new Map<string, number>();
-    const unknown: string[] = [];
+    const repeated: string[] = [];
     for (const line of reply.split('\n')) {
         const match = /^\s*(?:commit\s*)?(\d+)[.:)]?\s+[`"']?(.+?)[`"']?\s*$/i.exec(line);
         if (!match) {
             continue;
         }
         const [, group, path] = match;
-        if (!known.has(path) || groupOf.has(path)) {
-            unknown.push(path);
-        } else {
+        if (groupOf.has(path)) {
+            repeated.push(path);
+        } else if (known.has(path)) {
             groupOf.set(path, Number(group));
         }
     }
     const missing = paths.filter(path => !groupOf.has(path));
-    if (missing.length > 0 || unknown.length > 0) {
-        return { missing, unknown };
+    if (missing.length > 0 || repeated.length > 0) {
+        return { missing, repeated };
     }
     const numbers = [...new Set(groupOf.values())].sort((a, b) => a - b);
     return { groups: numbers.map(n => paths.filter(path => groupOf.get(path) === n)) };

@@ -14,12 +14,17 @@ describe('parseSplitPlan', () => {
         expect(parseSplitPlan(reply, paths)).toEqual({ groups: [['src/a.ts', 'tests/a.test.ts'], ['README.md']] });
     });
 
-    it('reports missing, unknown and repeated paths', () => {
-        const reply = '1 src/a.ts\n2 src/a.ts\n1 src/other.ts';
+    it('reports missing and repeated paths', () => {
+        const reply = '1 src/a.ts\n2 src/a.ts';
         expect(parseSplitPlan(reply, paths)).toEqual({
             missing: ['tests/a.test.ts', 'README.md'],
-            unknown: ['src/a.ts', 'src/other.ts'],
+            repeated: ['src/a.ts'],
         });
+    });
+
+    it('ignores paths that did not change, such as echoed example lines', () => {
+        const reply = '1 src/a.ts\n1 tests/a.test.ts\n2 README.md\n3 src/auth.ts';
+        expect(parseSplitPlan(reply, paths)).toEqual({ groups: [['src/a.ts', 'tests/a.test.ts'], ['README.md']] });
     });
 });
 
