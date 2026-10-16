@@ -165,6 +165,7 @@ Unit and E2E tests check the prompt's shape, not the quality of the message a mo
 | `EVAL_API_KEY` | API key for a provider that needs one. |
 | `EVAL_RUNS` | Replies per fixture, default `3`. |
 | `EVAL_LABEL`, `EVAL_OUT` | Report name and folder, default `eval` and `eval-out`. |
+| `EVAL_FIXTURES` | Folder of `<name>.diff` + `<name>.expected.txt` pairs, default `tests/fixtures/eval`. |
 
 Check at least one small local model (`qwen2.5-coder:1.5b`, `llama3.2:3b`) and one cheap API model. To check another language, add `"commit.commitLanguage":"russian"` to `EVAL_SETTINGS`. To add a fixture, save a diff as `<name>.diff` and the reference message as `<name>.expected.txt`.
 

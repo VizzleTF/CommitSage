@@ -12,7 +12,7 @@ import { ApiKeyManager } from '../src/services/apiKeyManager';
 import { AIService } from '../src/services/aiService';
 
 const env = process.env;
-const FIXTURES = resolve(__dirname, 'fixtures/eval');
+const FIXTURES = resolve(env.EVAL_FIXTURES ?? resolve(__dirname, 'fixtures/eval'));
 const RUNS = Number(env.EVAL_RUNS ?? 3);
 // Deterministic-ish by default; EVAL_SETTINGS overrides any key.
 const settings: Record<string, unknown> = {
