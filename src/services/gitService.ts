@@ -6,7 +6,7 @@ import { TelemetryService } from './telemetryService';
 import { toError, sanitizeErrorForTelemetry } from '../utils/errorUtils';
 import { GIT_FANOUT_CONCURRENCY, mapLimit } from '../utils/concurrency';
 import { ConfigService, SETTING_DEFAULTS } from '../utils/configService';
-import { resolveMaxDiffLength } from '../utils/diffTruncation';
+import { resolveMaxDiffLength, collapseBase64, collapseMovedLines, stripHeaderLines, summarizeRemovedLines, collapseFileMoves } from '../utils/diffTruncation';
 import { GIT_OUTPUT_BUFFER_CAP, GitProcessRunner } from './gitProcessRunner';
 
 // Minimum length for a commit message to be useful as a style example; shorter
@@ -15,6 +15,9 @@ const MIN_EXAMPLE_COMMIT_LENGTH = 10;
 
 // Mechanical / low-signal commits whose style would mislead the example set.
 const RECENT_COMMIT_NOISE = /^(?:merge\b|bump version|revert\b|wip\b|chore\(release\))/i;
+
+// Files where indentation is syntax: `-w` would hide a real change there.
+const INDENT_SENSITIVE_PATH = /(?:\.(?:py|pyi|ya?ml|pug|jade|haml|slim|sass|coffee|mk)|(?:^|\/)(?:GNU)?[Mm]akefile)$/;
 
 export class GitService {
   /**
@@ -180,7 +183,7 @@ export class GitService {
       if (!diff) {
         throw new NoChangesDetectedError();
       }
-      return diff;
+      return collapseBase64(summarizeRemovedLines(collapseFileMoves(collapseMovedLines(stripHeaderLines(diff)))));
     } catch (error) {
       if (error instanceof NoChangesDetectedError) {
         throw error;
@@ -251,14 +254,22 @@ export class GitService {
         return excludedFileBlock(file);
       }
       // Literal pathspecs: `[id].tsx` must not also match `i.tsx`. No color or
-      // external diff tool, whatever the user's git config says.
-      const args = ['--literal-pathspecs', ...diffArgs, '--no-color', '--no-ext-diff', '--ignore-submodules=dirty'];
-      const { stdout } = await this.execGit(
-        renamedFrom ? [...args, '-M', '--', renamedFrom, file] : [...args, '--', file],
+      // external diff tool, whatever the user's git config says. `-B` shows a
+      // rewritten file as all-old then all-new lines, so code moved out of it
+      // is found and summarized after the diff is joined (see getDiff).
+      const args = ['--literal-pathspecs', ...diffArgs, '--no-color', '--no-ext-diff', '--ignore-submodules=dirty', '-B'];
+      const run = async (extra: string[]): Promise<string> => (await this.execGit(
+        renamedFrom ? [...args, ...extra, '-M', '--', renamedFrom, file] : [...args, ...extra, '--', file],
         repoPath,
         { signal, maxBuffer },
-      );
-      return stdout;
+      )).stdout;
+      // Reindenting and blank lines cost tokens and hide the real change. A
+      // whitespace-only file still gets its plain diff, so it never vanishes.
+      if (INDENT_SENSITIVE_PATH.test(file)) {
+        return run([]);
+      }
+      const compact = await run(['-w', '--ignore-blank-lines']);
+      return compact.trim() ? compact : run([]);
     }, signal);
     return diffs.filter((diff) => diff.trim());
   }

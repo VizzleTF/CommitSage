@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { truncateDiff, splitIntoFileBlocks, isNoisyPath, blockPath, resolveMaxDiffLength, capBlameAnalysis, packFileBlocks, fileList } from '../src/utils/diffTruncation';
+import { truncateDiff, splitIntoFileBlocks, isNoisyPath, blockPath, resolveMaxDiffLength, capBlameAnalysis, packFileBlocks, fileList, collapseBase64, stripHeaderLines, collapseMovedLines, summarizeRemovedLines, collapseFileMoves } from '../src/utils/diffTruncation';
 
 function fileBlock(path: string, bodyLines: number): string {
     const body = Array.from({ length: bodyLines }, (_, i) => `+line ${i} of ${path}`).join('\n');
@@ -206,5 +206,68 @@ describe('fileList', () => {
         const code = 'diff --git a/src/a.ts b/src/a.ts\n--- a/src/a.ts\n+++ b/src/a.ts\n@@ -1,2 +1,2 @@\n-old\n+new\n+more\n';
         const lock = 'diff --git a/package-lock.json b/package-lock.json\n+x\n';
         expect(fileList([code, lock])).toBe('src/a.ts (+2 -1)\npackage-lock.json (+1 -0) generated');
+    });
+});
+
+describe('collapseBase64', () => {
+    it('replaces a long base64 run with its size and keeps short hashes', () => {
+        const blob = 'iVBORw0KGgo' + 'A'.repeat(2037);
+        const integrity = '"integrity": "sha512-' + 'Ab9+/'.repeat(17) + '=="';
+        const diff = `+.logo { background: url(data:image/png;base64,${blob}); }\n+${integrity}\n`;
+
+        expect(collapseBase64(diff)).toBe(`+.logo { background: url(data:image/png;base64,[base64, 2 KB]); }\n+${integrity}\n`);
+    });
+});
+
+describe('stripHeaderLines', () => {
+    it('drops index/---/+++ in file headers only', () => {
+        const diff = 'diff --git a/a.md b/a.md\nindex 1..2 100644\n--- a/a.md\n+++ b/a.md\n@@ -1 +1 @@\n--- a/b\n+++ b/c\n'
+            + 'diff --git a/n.ts b/n.ts\nnew file mode 100644\nindex 0..3\n--- /dev/null\n+++ b/n.ts\n@@ -0,0 +1 @@\n+x';
+        expect(stripHeaderLines(diff)).toBe('diff --git a/a.md b/a.md\n@@ -1 +1 @@\n--- a/b\n+++ b/c\n'
+            + 'diff --git a/n.ts b/n.ts\nnew file mode 100644\n@@ -0,0 +1 @@\n+x');
+    });
+});
+
+describe('collapseMovedLines', () => {
+    // A lone `}` neither counts nor breaks the run.
+    const body = ['const alpha = compute(1);', 'const beta = compute(2);', '}', 'const gamma = compute(3);', 'const delta = compute(4);', 'const omega = compute(5);'];
+
+    it('replaces a moved run on both sides with where it went', () => {
+        const diff = ['diff --git a/old.ts b/old.ts', '@@ -1,7 +1,1 @@', ...body.map(l => '-' + l), ' keep',
+            'diff --git a/new.ts b/new.ts', '@@ -0,0 +1,7 @@', ...body.map(l => '+' + l), '+export const extra = 1;'].join('\n');
+        expect(collapseMovedLines(diff)).toBe(['diff --git a/old.ts b/old.ts', '@@ -1,7 +1,1 @@', '-[5 lines moved to new.ts]', ' keep',
+            'diff --git a/new.ts b/new.ts', '@@ -0,0 +1,7 @@', '+[5 lines moved from old.ts]', '+export const extra = 1;'].join('\n'));
+    });
+
+    it('keeps short runs and changed lines', () => {
+        const diff = 'diff --git a/a.ts b/a.ts\n@@ -1,2 +1,2 @@\n-const value = compute(1);\n+const value = compute(2);';
+        expect(collapseMovedLines(diff)).toBe(diff);
+    });
+});
+
+describe('summarizeRemovedLines', () => {
+    it('turns the unmoved old lines of a deleted or rewritten file into counts', () => {
+        const diff = 'diff --git a/old.ts b/old.ts\ndeleted file mode 100644\n@@ -1,4 +0,0 @@\n-a\n-b\n-[5 lines moved to new.ts]\n-c\n'
+            + 'diff --git a/main.ts b/main.ts\ndissimilarity index 90%\n@@ -1,2 +1,1 @@\n-x\n-y\n+z\n'
+            + 'diff --git a/kept.ts b/kept.ts\n@@ -1 +1 @@\n-old\n+new';
+        expect(summarizeRemovedLines(diff)).toBe('diff --git a/old.ts b/old.ts\ndeleted file mode 100644\n@@ -1,4 +0,0 @@\n-[2 lines removed]\n-[5 lines moved to new.ts]\n-[1 line removed]\n'
+            + 'diff --git a/main.ts b/main.ts\ndissimilarity index 90%\n@@ -1,2 +1,1 @@\n-[2 lines removed]\n+z\n'
+            + 'diff --git a/kept.ts b/kept.ts\n@@ -1 +1 @@\n-old\n+new');
+    });
+});
+
+describe('collapseFileMoves', () => {
+    it('shows a deleted file whose lines all moved into one new file as a rename', () => {
+        const diff = 'diff --git a/a.js b/a.js\ndeleted file mode 100644\n@@ -1,9 +0,0 @@\n-[9 lines moved to a.mjs]\n\\ No newline at end of file\n'
+            + 'diff --git a/a.mjs b/a.mjs\nnew file mode 100644\n@@ -0,0 +1,9 @@\n+[9 lines moved from a.js]\n'
+            + 'diff --git a/b.ts b/b.ts\n@@ -1 +1 @@\n-x\n+y';
+        expect(collapseFileMoves(diff)).toBe('diff --git a/a.js b/a.mjs\nrename from a.js\nrename to a.mjs\n'
+            + 'diff --git a/b.ts b/b.ts\n@@ -1 +1 @@\n-x\n+y');
+    });
+
+    it('keeps both files when the new one has lines of its own', () => {
+        const diff = 'diff --git a/a.js b/a.js\ndeleted file mode 100644\n@@ -1,9 +0,0 @@\n-[9 lines moved to a.mjs]\n'
+            + 'diff --git a/a.mjs b/a.mjs\nnew file mode 100644\n@@ -0,0 +1,10 @@\n+[9 lines moved from a.js]\n+export default config;';
+        expect(collapseFileMoves(diff)).toBe(diff);
     });
 });

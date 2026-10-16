@@ -51,9 +51,9 @@ describe('GitService.getDiff staged mode', () => {
     it('returns the per-file staged diffs without a header and ignores the worktree', async () => {
         installExecGit((key) => ({
             'diff --cached --name-only -z': 'a.txt\0img_160000.png\0',
-            '--literal-pathspecs diff --cached --no-color --no-ext-diff --ignore-submodules=dirty -- a.txt': 'diff --git a/a.txt b/a.txt\n+staged line\n',
+            '--literal-pathspecs diff --cached --no-color --no-ext-diff --ignore-submodules=dirty -B -w --ignore-blank-lines -- a.txt': 'diff --git a/a.txt b/a.txt\n+staged line\n',
             // A real file whose name contains a gitlink mode is not a submodule.
-            '--literal-pathspecs diff --cached --no-color --no-ext-diff --ignore-submodules=dirty -- img_160000.png': 'diff --git a/img_160000.png b/img_160000.png\nBinary\n',
+            '--literal-pathspecs diff --cached --no-color --no-ext-diff --ignore-submodules=dirty -B -w --ignore-blank-lines -- img_160000.png': 'diff --git a/img_160000.png b/img_160000.png\nBinary\n',
         } as Record<string, string>)[key]);
 
         const diff = await GitService.getDiff(REPO, true);
@@ -63,6 +63,24 @@ describe('GitService.getDiff staged mode', () => {
         expect(diff).not.toContain('#');
         expect(calls.some((c) => c.args[0] === 'ls-files')).toBe(false);
         expect(calls.some((c) => c.args.join(' ') === 'diff --name-only -z')).toBe(false);
+    });
+
+    it('ignores whitespace except where indentation is syntax, and keeps a whitespace-only file', async () => {
+        const base = '--literal-pathspecs diff --cached --no-color --no-ext-diff --ignore-submodules=dirty -B';
+        installExecGit((key) => ({
+            'diff --cached --name-only -z': 'fmt.ts\0app.py\0',
+            // fmt.ts changed only in whitespace: empty with -w, plain diff without.
+            [`${base} -- fmt.ts`]: 'diff --git a/fmt.ts b/fmt.ts\n-  x\n+    x\n',
+            [`${base} -- app.py`]: 'diff --git a/app.py b/app.py\n+    return x\n',
+        } as Record<string, string>)[key]);
+
+        const diff = await GitService.getDiff(REPO, true);
+
+        expect(diff).toContain('+    x');
+        expect(diff).toContain('+    return x');
+        const args = calls.map((c) => c.args.join(' '));
+        expect(args).toContain(`${base} -w --ignore-blank-lines -- fmt.ts`);
+        expect(args.some((a) => a.includes('-w') && a.endsWith('app.py'))).toBe(false);
     });
 
     it('throws a staged-specific NoChangesDetectedError when the index is empty', async () => {
@@ -82,7 +100,7 @@ describe('GitService.getDiff staged mode', () => {
         installExecGit((key) => ({
             'diff --cached --name-only -z': 'new.txt\0',
             'diff --cached --name-status -M -z': 'R100\0old.txt\0new.txt\0',
-            '--literal-pathspecs diff --cached --no-color --no-ext-diff --ignore-submodules=dirty -M -- old.txt new.txt':
+            '--literal-pathspecs diff --cached --no-color --no-ext-diff --ignore-submodules=dirty -B -w --ignore-blank-lines -M -- old.txt new.txt':
                 'diff --git a/old.txt b/new.txt\nrename from old.txt\nrename to new.txt',
         } as Record<string, string>)[key]);
 
@@ -100,7 +118,7 @@ describe('GitService.getDiff staged mode', () => {
             }
             return ({
                 'diff --cached --name-only -z': 'a.txt\0',
-                '--literal-pathspecs diff --cached --no-color --no-ext-diff --ignore-submodules=dirty -- a.txt': 'diff --git a/a.txt b/a.txt\n+line',
+                '--literal-pathspecs diff --cached --no-color --no-ext-diff --ignore-submodules=dirty -B -w --ignore-blank-lines -- a.txt': 'diff --git a/a.txt b/a.txt\n+line',
             } as Record<string, string>)[key];
         });
 
@@ -115,8 +133,8 @@ describe('GitService.getDiff worktree mode', () => {
             // deleted-files pass that would diff it a second time.
             'diff --name-only -z': 'b.txt\0gone.txt\0',
             'ls-files --others --exclude-standard -z': 'new file ü.txt\0',
-            '--literal-pathspecs diff --no-color --no-ext-diff --ignore-submodules=dirty -- b.txt': 'diff --git a/b.txt b/b.txt\n+unstaged line\n',
-            '--literal-pathspecs diff --no-color --no-ext-diff --ignore-submodules=dirty -- gone.txt': 'diff --git a/gone.txt b/gone.txt\n-old content\n',
+            '--literal-pathspecs diff --no-color --no-ext-diff --ignore-submodules=dirty -B -w --ignore-blank-lines -- b.txt': 'diff --git a/b.txt b/b.txt\n+unstaged line\n',
+            '--literal-pathspecs diff --no-color --no-ext-diff --ignore-submodules=dirty -B -w --ignore-blank-lines -- gone.txt': 'diff --git a/gone.txt b/gone.txt\n-old content\n',
             // -z listings pass paths with spaces/Unicode through unquoted.
             'diff --no-color --no-ext-diff --no-index -- /dev/null new file ü.txt': { stdout: '+brand new\n', stderr: '', exitCode: 1 },
         } as Record<string, string | ExecResult>)[key]);
@@ -160,7 +178,7 @@ describe('GitService.getDiff output caps', () => {
             key === 'general.maxDiffSize' ? 1_000_000 : undefined) as never);
         installExecGit((key) => ({
             'diff --name-only -z': 'big.txt\0',
-            '--literal-pathspecs diff --no-color --no-ext-diff --ignore-submodules=dirty -- big.txt': 'diff --git a/big.txt b/big.txt\n+x',
+            '--literal-pathspecs diff --no-color --no-ext-diff --ignore-submodules=dirty -B -w --ignore-blank-lines -- big.txt': 'diff --git a/big.txt b/big.txt\n+x',
         } as Record<string, string>)[key]);
 
         await GitService.getDiff(REPO, false);
@@ -192,7 +210,7 @@ describe('GitService.getDiff output caps', () => {
         // The per-file diff is not swallowed, so its error surfaces with the
         // prefix while keeping its name and stack.
         installExecGit((key) => {
-            if (key === '--literal-pathspecs diff --cached --no-color --no-ext-diff --ignore-submodules=dirty -- x.txt') {
+            if (key === '--literal-pathspecs diff --cached --no-color --no-ext-diff --ignore-submodules=dirty -B -w --ignore-blank-lines -- x.txt') {
                 throw new TypeError('boom');
             }
             return key === 'diff --cached --name-only -z' ? 'x.txt\0' : '';
@@ -258,7 +276,7 @@ describe('excluded files', () => {
         installExecGit((key) => ({
             'diff --cached --name-only -z': '.env\0a.txt\0renamed.txt\0',
             'diff --cached --name-status -M -z': 'R100\0old.key\0renamed.txt\0',
-            '--literal-pathspecs diff --cached --no-color --no-ext-diff --ignore-submodules=dirty -- a.txt': 'diff --git a/a.txt b/a.txt\n+line\n',
+            '--literal-pathspecs diff --cached --no-color --no-ext-diff --ignore-submodules=dirty -B -w --ignore-blank-lines -- a.txt': 'diff --git a/a.txt b/a.txt\n+line\n',
         } as Record<string, string>)[key]);
 
         const diff = await GitService.getDiff(REPO, true, undefined, new Set(['.env', 'old.key']));

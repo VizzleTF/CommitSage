@@ -261,3 +261,148 @@ export function fileList(blocks: string[]): string {
         return `${path} (+${added} -${removed})${isNoisyPath(path) ? ' generated' : ''}`;
     }).join('\n');
 }
+
+// Encoded blobs (inline images, fonts, notebook plots) cost tokens and say
+// nothing a commit message needs; small models even describe them as changes.
+const BASE64_RUN = /[A-Za-z0-9+/]{200,}={0,2}/g;
+
+/** Replaces each base64 run with a size note. */
+export function collapseBase64(diff: string): string {
+    return diff.replace(BASE64_RUN, run => `[base64, ${Math.round(run.length * 0.75 / 1024)} KB]`);
+}
+
+/**
+ * Drops the `index`, `---` and `+++` lines of each file header: `diff --git`
+ * already names the file, and `new file` / `deleted file` lines stay.
+ */
+export function stripHeaderLines(diff: string): string {
+    let inHeader = false;
+    return diff.split('\n').filter(line => {
+        if (line.startsWith('diff --git ')) {
+            inHeader = true;
+        } else if (line.startsWith('@@')) {
+            inHeader = false;
+        }
+        return !(inHeader && /^(?:index |--- |\+\+\+ )/.test(line));
+    }).join('\n');
+}
+
+// A run this long of removed lines that reappear as added ones (or the other
+// way round) is moved code: the model needs where it went, not every line.
+// Lines shorter than MIN_MOVED_CHARS (`}`, `return;`) match anywhere, so they
+// neither count nor break a run.
+const MIN_MOVED_LINES = 5;
+const MIN_MOVED_CHARS = 8;
+
+const lineCount = (n: number): string => `${n} ${n === 1 ? 'line' : 'lines'}`;
+
+/** Collapses runs of moved lines into `+[N lines moved from <path>]` / `-[N lines moved to <path>]`. */
+export function collapseMovedLines(diff: string): string {
+    const lines = diff.split('\n');
+    const isChange = (line: string): boolean => line.startsWith('+') || line.startsWith('-');
+    const text = (line: string): string => line.slice(1).trim();
+    // Trimmed line -> the file it first appears in, per side.
+    const added = new Map<string, string>();
+    const removed = new Map<string, string>();
+    const side = (sign: string): Map<string, string> => (sign === '+' ? added : removed);
+    let path = '';
+    for (const line of lines) {
+        if (line.startsWith('diff --git ')) {
+            path = blockPath(line);
+        } else if (isChange(line) && text(line).length >= MIN_MOVED_CHARS && !side(line[0]).has(text(line))) {
+            side(line[0]).set(text(line), path);
+        }
+    }
+    const out: string[] = [];
+    for (let i = 0; i < lines.length;) {
+        const sign = lines[i][0];
+        if (isChange(lines[i])) {
+            const other = side(sign === '+' ? '-' : '+');
+            let end = i;
+            while (end < lines.length && lines[end][0] === sign
+                && (text(lines[end]).length < MIN_MOVED_CHARS || other.has(text(lines[end])))) {
+                end++;
+            }
+            const moved = lines.slice(i, end).map(text).filter(t => t.length >= MIN_MOVED_CHARS);
+            if (moved.length >= MIN_MOVED_LINES) {
+                const paths = [...new Set(moved.map(t => other.get(t)))].join(', ');
+                out.push(`${sign}[${lineCount(moved.length)} moved ${sign === '+' ? 'from' : 'to'} ${paths}]`);
+                i = end;
+                continue;
+            }
+        }
+        out.push(lines[i]);
+        i++;
+    }
+    return out.join('\n');
+}
+
+/**
+ * In a deleted or fully rewritten file (`git diff -B`), the old lines that did
+ * not move elsewhere become one `-[N lines removed]` note per run: the model
+ * needs that they went away, not what they said.
+ */
+export function summarizeRemovedLines(diff: string): string {
+    return splitIntoFileBlocks(diff).map(block => {
+        if (!/\n(?:deleted file mode|dissimilarity index)/.test(block.split('\n@@')[0])) {
+            return block;
+        }
+        const out: string[] = [];
+        let run = 0;
+        for (const line of block.split('\n')) {
+            if (line.startsWith('-') && !/^-\[\d+ lines? moved /.test(line)) {
+                run++;
+                continue;
+            }
+            if (run) {
+                out.push(`-[${lineCount(run)} removed]`);
+                run = 0;
+            }
+            out.push(line);
+        }
+        if (run) {
+            out.push(`-[${lineCount(run)} removed]`);
+        }
+        return out.join('\n');
+    }).join('');
+}
+
+/** A block's lines after its first hunk header, minus `\ No newline` notes. */
+function bodyLines(block: string): string[] {
+    const at = block.indexOf('\n@@');
+    if (at === -1) {
+        return [];
+    }
+    return block.slice(at + 1).split('\n').slice(1).filter(line => line && !line.startsWith('\\'));
+}
+
+/**
+ * A deleted file whose every line moved into one new file, and that new file
+ * holds nothing else, is a rename: show it the way `git diff -M` does.
+ */
+export function collapseFileMoves(diff: string): string {
+    const blocks = splitIntoFileBlocks(diff);
+    const movedOnly = (block: string, marker: RegExp): string | undefined => {
+        const targets = bodyLines(block).map(line => marker.exec(line)?.[1]);
+        return targets.length > 0 && targets.every(t => t !== undefined && t === targets[0]) ? targets[0] : undefined;
+    };
+    const renames = new Map<string, string>();
+    for (const block of blocks) {
+        const from = blockPath(block);
+        const to = /\ndeleted file mode/.test(block) ? movedOnly(block, /^-\[\d+ lines? moved to ([^,\]]+)\]$/) : undefined;
+        const target = to === undefined ? undefined : blocks.find(b => blockPath(b) === to);
+        if (to !== undefined && target && /\nnew file mode/.test(target)
+            && movedOnly(target, /^\+\[\d+ lines? moved from ([^,\]]+)\]$/) === from) {
+            renames.set(from, to);
+        }
+    }
+    const targets = new Set(renames.values());
+    return blocks.flatMap(block => {
+        const path = blockPath(block);
+        if (targets.has(path)) {
+            return [];
+        }
+        const to = renames.get(path);
+        return to === undefined ? [block] : [`diff --git a/${path} b/${to}\nrename from ${path}\nrename to ${to}\n`];
+    }).join('');
+}
