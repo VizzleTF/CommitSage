@@ -874,7 +874,7 @@
     "vitest": "^5.0.5"
   },
   "dependencies": {
-    "@amplitude/analytics-node": "^1.5.80"
+    "@amplitude/analytics-node": "^1.5.81"
   },
   "overrides": {
     "serialize-javascript": "^7.0.5",
